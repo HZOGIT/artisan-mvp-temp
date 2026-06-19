@@ -35,7 +35,8 @@ const updateSchema = z.object({
   description: z.string().max(5000).nullish(),
   notes: z.string().max(5000).nullish(),
   isDefault: z.boolean().optional(),
-  lignes: z.array(ligneSchema).optional(), // si fourni → remplacement complet des lignes
+  /** si fourni → remplacement complet des lignes */
+  lignes: z.array(ligneSchema).optional(),
 });
 
 /*

@@ -1,7 +1,7 @@
 import type { ITechnicienPositionReader } from "./application/position-reader";
 import { createGeolocalisationRouter } from "./interface/trpc/geolocalisation.router";
 
-// Wiring DI du module « geolocalisation » (positions des techniciens, lecture seule).
+/** Wiring DI du module « geolocalisation » (positions des techniciens, lecture seule). */
 export interface GeolocalisationModuleDeps {
   readonly reader: ITechnicienPositionReader;
 }

@@ -4,7 +4,7 @@ import type { IRegleCategorisationRepository } from "../../application/regle-cat
 import { listRegles, getRegle } from "../../application/read-use-cases";
 import { creerRegle, modifierRegle, supprimerRegle } from "../../application/write-use-cases";
 
-// Bornes alignées sur la table `regles_categorisation` (defense-in-depth).
+/** Bornes alignées sur la table `regles_categorisation` (defense-in-depth). */
 const createSchema = z.object({
   motifLibelle: z.string().min(1).max(255),
   categorie: z.string().min(1).max(50),

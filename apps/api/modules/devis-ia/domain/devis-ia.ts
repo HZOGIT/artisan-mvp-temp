@@ -60,7 +60,7 @@ export interface DevisGenere {
   readonly createdAt: Date;
 }
 
-// Détail complet d'une analyse (parité legacy `getById`).
+/** Détail complet d'une analyse (parité legacy `getById`). */
 export interface AnalyseDetail extends Analyse {
   readonly photos: readonly Photo[];
   readonly resultats: readonly ResultatAvecSuggestions[];
@@ -85,7 +85,7 @@ export interface UpdateSuggestionInput {
   readonly prixEstime?: string;
 }
 
-// ── Génération de devis depuis les suggestions sélectionnées (genererDevis) ──
+/** ── Génération de devis depuis les suggestions sélectionnées (genererDevis) ── */
 export interface LigneDevisIA {
   readonly ordre: number;
   readonly designation: string;

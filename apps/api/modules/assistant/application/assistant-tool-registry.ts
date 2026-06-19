@@ -3,9 +3,10 @@ import { ASSISTANT_TOOLS, isWriteTool, type ToolSchema } from "../domain/assista
 import { resolveNavigation } from "../domain/navigation";
 import type { AssistantToolRegistry, ToolResult } from "./agentic-port";
 
-// Handler d'un outil : exécute l'outil sous le tenant → `ToolResult` (lecture ou écriture).
+/** Handler d'un outil : exécute l'outil sous le tenant → `ToolResult` (lecture ou écriture). */
 export type ToolHandler = (args: Record<string, unknown>, ctx: TenantContext) => Promise<ToolResult>;
-export type ReadToolHandler = ToolHandler; // alias historique (lecture)
+/** alias historique (lecture) */
+export type ReadToolHandler = ToolHandler;
 
 /*
  * Registre des outils de l'assistant agentique.
@@ -23,7 +24,7 @@ export class AssistantReadToolRegistry implements AssistantToolRegistry {
 
   constructor(handlers: Record<string, ToolHandler> = {}, writeHandlers: Record<string, ToolHandler> = {}) {
     this.handlers = new Map(Object.entries(handlers));
-    // `naviguer_vers` : pur, toujours disponible (sauf override explicite).
+    /** `naviguer_vers` : pur, toujours disponible (sauf override explicite). */
     if (!this.handlers.has("naviguer_vers")) {
       this.handlers.set("naviguer_vers", async (args) => {
         const r = resolveNavigation(args);
@@ -31,7 +32,7 @@ export class AssistantReadToolRegistry implements AssistantToolRegistry {
       });
     }
     this.writeHandlers = new Map(Object.entries(writeHandlers));
-    // N'expose que des outils réellement câblés : lecture (readers) ou écriture (writeHandlers).
+    /** N'expose que des outils réellement câblés : lecture (readers) ou écriture (writeHandlers). */
     this.tools = ASSISTANT_TOOLS.filter((t) => (isWriteTool(t.name) ? this.writeHandlers.has(t.name) : this.handlers.has(t.name)));
   }
 

@@ -1,10 +1,11 @@
-// Données pour l'export FEC achats (Fichier des Écritures Comptables, format AFNOR). Lecture seule.
+/** Données pour l'export FEC achats (Fichier des Écritures Comptables, format AFNOR). Lecture seule. */
 
-// Dépense déductible incluse dans le FEC (sous-ensemble de champs).
+/** Dépense déductible incluse dans le FEC (sous-ensemble de champs). */
 export interface FecDepense {
   readonly id: number;
   readonly numero: string;
-  readonly dateDepense: string; // YYYY-MM-DD
+  /** YYYY-MM-DD */
+  readonly dateDepense: string;
   readonly fournisseur: string | null;
   readonly montantHt: string;
   readonly montantTva: string;
@@ -12,7 +13,7 @@ export interface FecDepense {
   readonly description: string | null;
 }
 
-// Configuration comptable du tenant (comptes + journal d'achats), avec valeurs par défaut PCG.
+/** Configuration comptable du tenant (comptes + journal d'achats), avec valeurs par défaut PCG. */
 export interface ConfigComptable {
   readonly compteAchats: string;
   readonly compteTVADeductible: string;

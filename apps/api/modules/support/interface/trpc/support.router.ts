@@ -2,7 +2,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import { contacterSupport, type SupportDeps } from "../../application/use-cases";
 
-// Bornes alignées sur le legacy (defense-in-depth). `sujet` = enum fermé.
+/** Bornes alignées sur le legacy (defense-in-depth). `sujet` = enum fermé. */
 const contactSchema = z.object({
   nom: z.string().min(1).max(120),
   email: z.string().email(),

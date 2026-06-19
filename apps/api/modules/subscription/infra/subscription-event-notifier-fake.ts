@@ -1,7 +1,7 @@
 import type { SignatureNotificationType } from "../../signature/application/signature-repository";
 import type { SubscriptionEventNotifier } from "../application/subscription-event-notifier";
 
-// Notifier fake (in-memory) pour les tests des use-cases webhook abonnement.
+/** Notifier fake (in-memory) pour les tests des use-cases webhook abonnement. */
 export class FakeSubscriptionEventNotifier implements SubscriptionEventNotifier {
   public notifs: Array<{ artisanId: number; type: SignatureNotificationType; titre: string }> = [];
   public emails: Array<{ artisanId: number; subject: string }> = [];

@@ -1,7 +1,7 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { IFactureReader, FactureReadModel, FactureLigneReadModel } from "../application/facture-reader";
 
-// Double in-memory du lecteur de factures (pour tester la génération FEC sans DB). Scopé tenant.
+/** Double in-memory du lecteur de factures (pour tester la génération FEC sans DB). Scopé tenant. */
 export class FakeFactureReader implements IFactureReader {
   private store = new Map<number, FactureReadModel>();
   private lignes = new Map<number, FactureLigneReadModel[]>();

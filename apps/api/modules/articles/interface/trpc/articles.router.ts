@@ -19,7 +19,7 @@ const biblioDecimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal in
 
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
 
-// Bornes alignées sur la table `articles_artisan` (defense-in-depth).
+/** Bornes alignées sur la table `articles_artisan` (defense-in-depth). */
 const createSchema = z.object({
   reference: z.string().min(1).max(50),
   designation: z.string().min(1).max(500),
@@ -59,7 +59,7 @@ const biblioCreateSchema = z.object({
 });
 
 type BiblioClientInput = z.infer<typeof biblioCreateSchema>;
-// Mappe les clés client (snake_case) vers l'input domaine (camelCase).
+/** Mappe les clés client (snake_case) vers l'input domaine (camelCase). */
 function toBiblioInput(i: BiblioClientInput) {
   return {
     nom: i.nom,

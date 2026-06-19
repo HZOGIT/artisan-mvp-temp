@@ -27,7 +27,7 @@ export interface UpdateDepartData {
  */
 export interface IInterventionMobileRepository {
   getByIntervention(ctx: TenantContext, interventionId: number): Promise<InterventionMobile | null>;
-  // Lecture en lot (anti N+1 pour l'enrichissement de la liste du jour) : map interventionId → données.
+  /** Lecture en lot (anti N+1 pour l'enrichissement de la liste du jour) : map interventionId → données. */
   getManyByInterventions(ctx: TenantContext, interventionIds: readonly number[]): Promise<Map<number, InterventionMobile>>;
   createArrivee(ctx: TenantContext, data: CreateArriveeData): Promise<InterventionMobile>;
   updateArrivee(ctx: TenantContext, id: number, data: UpdateArriveeData): Promise<InterventionMobile>;

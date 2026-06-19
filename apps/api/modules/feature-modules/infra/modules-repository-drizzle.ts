@@ -47,7 +47,7 @@ export class ModulesRepositoryDrizzle implements IModulesRepository {
         .select({ slug: artisanModules.module_slug, actif: artisanModules.actif })
         .from(artisanModules)
         .where(eq(artisanModules.artisan_id, ctx.artisanId));
-      // Aucune préférence → fallback sur les modules actifs par défaut (parité legacy).
+      /** Aucune préférence → fallback sur les modules actifs par défaut (parité legacy). */
       if (prefs.length === 0) {
         const defaults = await tx.select({ slug: modules.slug }).from(modules).where(eq(modules.actif_par_defaut, true));
         return defaults.map((r) => r.slug);

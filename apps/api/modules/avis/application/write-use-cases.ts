@@ -11,7 +11,7 @@ import type { Avis, StatutAvis } from "../domain/avis";
 
 const STATUTS_VALIDES: readonly StatutAvis[] = ["en_attente", "publie", "masque"];
 
-// Réponse publique de l'artisan à un avis. Réponse vide refusée (ValidationError).
+/** Réponse publique de l'artisan à un avis. Réponse vide refusée (ValidationError). */
 export async function repondreAvis(
   repo: IAvisRepository,
   ctx: TenantContext,
@@ -25,7 +25,7 @@ export async function repondreAvis(
   return updated;
 }
 
-// Modération : changement de statut (en_attente / publie / masque).
+/** Modération : changement de statut (en_attente / publie / masque). */
 export async function changerStatutAvis(
   repo: IAvisRepository,
   ctx: TenantContext,

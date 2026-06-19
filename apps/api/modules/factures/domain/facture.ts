@@ -43,7 +43,8 @@ export interface Facture {
   readonly dateEcheance: Date | null;
   readonly statut: FactureStatut;
   readonly typeDocument: FactureTypeDocument;
-  readonly factureOrigineId: number | null; // facture d'origine d'un avoir
+  /** facture d'origine d'un avoir */
+  readonly factureOrigineId: number | null;
   readonly objet: string | null;
   readonly referenceClient: string | null;
   readonly siretDestinataire: string | null;

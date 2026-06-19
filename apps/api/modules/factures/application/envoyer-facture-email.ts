@@ -24,13 +24,13 @@ export interface EnvoyerFactureEmailInput {
   readonly attachPdf: boolean;
 }
 
-// Résultat aligné sur la surface client (`result.success` / `result.message`).
+/** Résultat aligné sur la surface client (`result.success` / `result.message`). */
 export interface EnvoiResult {
   readonly success: boolean;
   readonly message: string;
 }
 
-// Même limiteur que bon de commande/avis (anti-abus d'envoi), clé dédiée par artisan.
+/** Même limiteur que bon de commande/avis (anti-abus d'envoi), clé dédiée par artisan. */
 function rateLimitKey(artisanId: number): string {
   return `facture:${artisanId}`;
 }
@@ -152,7 +152,7 @@ export async function envoyerFactureParEmail(
 
   await deps.email.send({ to: client.email, subject, body, ...(attachments ? { attachments } : {}) });
 
-  // Envoi réussi (pas d'exception) : passage `envoyee` depuis brouillon/validee uniquement.
+  /** Envoi réussi (pas d'exception) : passage `envoyee` depuis brouillon/validee uniquement. */
   if (facture.statut === "brouillon" || facture.statut === "validee") {
     await repo.setStatut(ctx, facture.id, "envoyee");
   }

@@ -184,7 +184,7 @@ export class TechnicienRepositoryDrizzle implements ITechnicienRepository {
   ): Promise<Disponibilite | null> {
     return withTenant(this.db, ctx, async (tx) => {
       if (!(await this.ownsTechnicien(tx, ctx, technicienId))) return null;
-      // Upsert par (technicienId, jourSemaine) : un seul créneau par jour.
+      /** Upsert par (technicienId, jourSemaine) : un seul créneau par jour. */
       const [existing] = await tx
         .select()
         .from(disponibilitesTechniciens)
@@ -330,7 +330,7 @@ export class TechnicienRepositoryDrizzle implements ITechnicienRepository {
   statsTechnicien(ctx: TenantContext, technicienId: number): Promise<TechnicienStats | null> {
     return withTenant(this.db, ctx, async (tx) => {
       if (!(await this.ownsTechnicien(tx, ctx, technicienId))) return null;
-      // Agrégat en 1 requête (COUNT FILTER par statut), scopé artisanId + technicienId.
+      /** Agrégat en 1 requête (COUNT FILTER par statut), scopé artisanId + technicienId. */
       const [row] = await tx
         .select({
           total: sql<number>`count(*)::int`,
@@ -349,7 +349,7 @@ export class TechnicienRepositoryDrizzle implements ITechnicienRepository {
     });
   }
 
-  // Le technicien appartient-il au tenant ? (techniciens a un artisanId → RLS + filtre)
+  /** Le technicien appartient-il au tenant ? (techniciens a un artisanId → RLS + filtre) */
   private async ownsTechnicien(tx: DbClient, ctx: TenantContext, technicienId: number): Promise<boolean> {
     const [row] = await tx
       .select({ id: techniciens.id })

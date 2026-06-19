@@ -1,22 +1,54 @@
-// Gate ESLint pour le backend new-stack (`apps/api/**`).
-// Exécution : pnpm lint:api
 import tseslint from "typescript-eslint";
+
+/**
+ * Interdit les commentaires // (sauf directives ESLint/@ts-*) et les commentaires
+ * inline non-JSDoc (/* … * /). Seuls /** … * / sont autorisés, inline ou non.
+ */
+const commentsJsdocOnly = {
+  meta: {
+    type: "suggestion",
+    docs: { description: "// interdit partout ; inline = JSDoc (/** */) uniquement." },
+    schema: [],
+  },
+  create(context) {
+    const src = context.sourceCode;
+    return {
+      Program(node) {
+        const allComments = src.ast?.comments ?? src.getCommentsInside?.(node) ?? [];
+        const lines = src.getText().split("\n");
+        for (const comment of allComments) {
+          if (comment.type === "Line") {
+            const v = comment.value.trimStart();
+            if (v.startsWith("eslint-") || v.startsWith("@ts-")) continue;
+            context.report({ loc: comment.loc, message: "// interdit : utiliser /** … */ à la place." });
+          } else if (comment.type === "Block" && !comment.value.startsWith("*")) {
+            const startLine = lines[comment.loc.start.line - 1] ?? "";
+            const before = startLine.substring(0, comment.loc.start.column).trim();
+            const endLine = lines[comment.loc.end.line - 1] ?? "";
+            const after = endLine.substring(comment.loc.end.column).trim();
+            if (before !== "" || after !== "") {
+              context.report({ loc: comment.loc, message: "Commentaire inline non-JSDoc : utiliser /** … */ à la place." });
+            }
+          }
+        }
+      },
+    };
+  },
+};
 
 export default tseslint.config(
   {
-    // Plugin TS-ESLint chargé pour que les eslint-disable @typescript-eslint/* existants soient reconnus.
-    plugins: { "@typescript-eslint": tseslint.plugin },
+    plugins: {
+      "@typescript-eslint": tseslint.plugin,
+      local: { rules: { "comments-jsdoc-only": commentsJsdocOnly } },
+    },
     files: ["apps/api/**/*.ts"],
     ignores: ["apps/api/**/*.test.ts", "apps/api/**/*.spec.ts"],
-    languageOptions: {
-      parser: tseslint.parser,
-    },
+    languageOptions: { parser: tseslint.parser },
     rules: {
-      // Convention commentaires : JSDoc uniquement (pas de //). Tickets OPE-XXX OK dans les JSDoc.
       "no-warning-comments": ["error", { terms: ["TODO", "FIXME", "HACK", "XXX"], location: "anywhere" }],
-      "no-inline-comments": "error",
+      "local/comments-jsdoc-only": "error",
       "multiline-comment-style": ["error", "starred-block"],
-      // Console : interdit sauf désactivation explicite (les no-console intentionnels ont déjà eslint-disable-next-line).
       "no-console": ["warn", { allow: ["warn", "error"] }],
     },
   },

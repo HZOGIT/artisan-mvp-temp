@@ -85,7 +85,7 @@ export class ArticleRepositoryDrizzle implements IArticleRepository {
 
   update(ctx: TenantContext, id: number, input: UpdateArticleInput): Promise<Article | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Construit le set des seuls champs fournis (no-op si vide : renvoie l'état courant scopé).
+      /** Construit le set des seuls champs fournis (no-op si vide : renvoie l'état courant scopé). */
       const set: Partial<typeof articlesArtisan.$inferInsert> = {};
       if (input.reference !== undefined) set.reference = input.reference;
       if (input.designation !== undefined) set.designation = input.designation;

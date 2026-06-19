@@ -7,7 +7,7 @@ import { creerCategorie, modifierCategorie, supprimerCategorie } from "../../app
 const couleur = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur hexadécimale #RRGGBB invalide");
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
 
-// Bornes alignées sur la table `categories_depenses` (defense-in-depth).
+/** Bornes alignées sur la table `categories_depenses` (defense-in-depth). */
 const createSchema = z.object({
   nom: z.string().min(1).max(100),
   couleur: couleur.optional(),

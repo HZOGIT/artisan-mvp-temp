@@ -14,12 +14,12 @@ export interface IBadgeRepository {
   list(ctx: TenantContext): Promise<Badge[]>;
   getById(ctx: TenantContext, id: number): Promise<Badge | null>;
   create(ctx: TenantContext, input: CreateBadgeInput): Promise<Badge>;
-  // null si le badge n'appartient pas au tenant.
+  /** null si le badge n'appartient pas au tenant. */
   update(ctx: TenantContext, id: number, input: UpdateBadgeInput): Promise<Badge | null>;
-  // false si le badge n'appartient pas au tenant.
+  /** false si le badge n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
 
-  // Badges attribués à un technicien — [] si le technicien n'appartient pas au tenant.
+  /** Badges attribués à un technicien — [] si le technicien n'appartient pas au tenant. */
   listBadgesTechnicien(ctx: TenantContext, technicienId: number): Promise<BadgeTechnicien[]>;
   /*
    * Objectifs mensuels d'un technicien pour une année (tri par `mois` ASC) — [] si le technicien

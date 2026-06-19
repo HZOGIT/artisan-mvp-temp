@@ -9,7 +9,7 @@
 export type ImportRow = Record<string, unknown>;
 export type ImportMapping = Record<string, string>;
 
-// Compteurs d'un import (parité legacy).
+/** Compteurs d'un import (parité legacy). */
 export interface ImportResult {
   imported: number;
   errors: number;
@@ -33,7 +33,7 @@ export function pickField(row: ImportRow, mapping: ImportMapping, field: string)
   return String(v).trim();
 }
 
-// Client existant minimal (pour dedup/lookup).
+/** Client existant minimal (pour dedup/lookup). */
 export interface ClientRef {
   readonly id: number;
   readonly nom: string | null;

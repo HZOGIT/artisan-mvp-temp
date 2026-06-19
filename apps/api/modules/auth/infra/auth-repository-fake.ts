@@ -1,14 +1,14 @@
 import type { IAuthRepository } from "../application/auth-repository";
 import type { AuthCredentials, AuthUser } from "../domain/auth";
 
-// Vue mutable interne (AuthUser est readonly côté domaine ; le fake mute email/actif/password…).
+/** Vue mutable interne (AuthUser est readonly côté domaine ; le fake mute email/actif/password…). */
 type FakeAuthUser = { -readonly [K in keyof AuthUser]: AuthUser[K] } & {
   password: string | null;
   resetToken?: string | null;
   resetTokenExpiry?: Date | null;
 };
 
-// Repo auth fake in-memory déterministe. `password` stocké tel quel (les tests utilisent FakePasswordHasher).
+/** Repo auth fake in-memory déterministe. `password` stocké tel quel (les tests utilisent FakePasswordHasher). */
 export class FakeAuthRepository implements IAuthRepository {
   private readonly users: FakeAuthUser[] = [];
   public touched: number[] = [];
@@ -92,7 +92,7 @@ export class FakeAuthRepository implements IAuthRepository {
   }
 
   async bootstrapAccount(userId: number): Promise<void> {
-    // Modèle simplifié : lie un artisan fictif au user (suffisant pour les tests d'orchestration).
+    /** Modèle simplifié : lie un artisan fictif au user (suffisant pour les tests d'orchestration). */
     const u = this.users.find((x) => x.id === userId);
     if (u && u.artisanId == null) u.artisanId = 1000 + userId;
     this.bootstrapped.push(userId);

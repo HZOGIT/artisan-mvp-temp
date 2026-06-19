@@ -14,7 +14,8 @@ export interface Stock {
   readonly articleType: StockArticleType;
   readonly reference: string;
   readonly designation: string;
-  readonly quantiteEnStock: string; // numeric PG en string
+  /** numeric PG en string */
+  readonly quantiteEnStock: string;
   readonly seuilAlerte: string;
   readonly unite: string;
   readonly prixAchat: string | null;
@@ -79,7 +80,8 @@ export interface UpdateStockInput {
  */
 export interface AdjustStockInput {
   readonly type: MouvementType;
-  readonly quantite: string; // montant du mouvement, ≥ 0 (numeric PG en string)
+  /** montant du mouvement, ≥ 0 (numeric PG en string) */
+  readonly quantite: string;
   readonly motif?: string | null;
   readonly reference?: string | null;
 }

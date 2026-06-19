@@ -22,5 +22,5 @@ export class NoopComptaPort implements ComptaPort {
   async genererEcrituresEncaissement(): Promise<void> {}
 }
 
-// Singleton réutilisable (la valeur par défaut des use-cases).
+/** Singleton réutilisable (la valeur par défaut des use-cases). */
 export const NOOP_COMPTA: ComptaPort = new NoopComptaPort();

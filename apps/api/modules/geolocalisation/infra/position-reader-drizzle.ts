@@ -43,7 +43,7 @@ export class TechnicienPositionReaderDrizzle implements ITechnicienPositionReade
         .orderBy(techniciens.id);
       if (techs.length === 0) return [];
 
-      // Toutes les positions des techniciens possédés, plus récentes d'abord → on retient la 1re par tech.
+      /** Toutes les positions des techniciens possédés, plus récentes d'abord → on retient la 1re par tech. */
       const ids = techs.map((t) => t.id);
       const positions = await tx
         .select()

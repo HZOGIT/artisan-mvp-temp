@@ -28,7 +28,7 @@ export interface RelanceResult {
   readonly message: string;
 }
 
-// Même limiteur que l'envoi de facture (anti-abus d'envoi), clé dédiée relance par artisan.
+/** Même limiteur que l'envoi de facture (anti-abus d'envoi), clé dédiée relance par artisan. */
 function rateLimitKey(artisanId: number): string {
   return `relance:${artisanId}`;
 }
@@ -98,7 +98,7 @@ export function buildRelanceEmail(params: {
   return { subject, body };
 }
 
-// Jours de retard depuis l'échéance (0 si pas d'échéance ou non échue).
+/** Jours de retard depuis l'échéance (0 si pas d'échéance ou non échue). */
 export function joursDeRetard(dateEcheance: Date | null | undefined, now: number): number {
   if (!dateEcheance) return 0;
   return Math.max(0, Math.floor((now - new Date(dateEcheance).getTime()) / 86400000));

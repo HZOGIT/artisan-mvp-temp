@@ -7,14 +7,14 @@ import type { Activite, ActiviteEntiteType, CreateActiviteInput } from "../domai
  * rattachement optionnel (l'entité liée doit appartenir au tenant).
  */
 export interface IActiviteRepository {
-  // Activités du tenant, triées « à faire d'abord » puis par échéance croissante (parité legacy).
+  /** Activités du tenant, triées « à faire d'abord » puis par échéance croissante (parité legacy). */
   list(ctx: TenantContext): Promise<Activite[]>;
-  // Crée une activité pour le tenant. `echeance` doit être une date pure normalisée (YYYY-MM-DD).
+  /** Crée une activité pour le tenant. `echeance` doit être une date pure normalisée (YYYY-MM-DD). */
   create(ctx: TenantContext, input: CreateActiviteInput): Promise<Activite>;
-  // L'entité (`client`/`devis`/`facture`/`chantier`) `entiteId` appartient-elle au tenant ? Anti-IDOR FK.
+  /** L'entité (`client`/`devis`/`facture`/`chantier`) `entiteId` appartient-elle au tenant ? Anti-IDOR FK. */
   ownsEntite(ctx: TenantContext, entiteType: ActiviteEntiteType, entiteId: number): Promise<boolean>;
-  // Bascule fait/à-faire (positionne/efface `faitAt`). `false` si l'activité n'appartient pas au tenant.
+  /** Bascule fait/à-faire (positionne/efface `faitAt`). `false` si l'activité n'appartient pas au tenant. */
   setFait(ctx: TenantContext, id: number, fait: boolean): Promise<boolean>;
-  // Supprime une activité. `false` si elle n'appartient pas au tenant.
+  /** Supprime une activité. `false` si elle n'appartient pas au tenant. */
   remove(ctx: TenantContext, id: number): Promise<boolean>;
 }

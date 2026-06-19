@@ -1,6 +1,6 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-// Types d entree structurels (./pdf-input-types) - generateur jsPDF internalise dans le new-stack.
+/** Types d entree structurels (./pdf-input-types) - generateur jsPDF internalise dans le new-stack. */
 import type { Devis, DevisLigne, Facture, FactureLigne, Artisan, Client, ContratMaintenance, CommandeFournisseur, LigneCommandeFournisseur, Fournisseur } from "./pdf-input-types";
 import { ROBOTO_REGULAR, ROBOTO_BOLD } from "./fonts";
 
@@ -12,36 +12,41 @@ import { ROBOTO_REGULAR, ROBOTO_BOLD } from "./fonts";
 
 type RGB = [number, number, number];
 
-// Header band — bleu/marine/vert/violet selon le type de document
-const COLOR_DEVIS: RGB = [30, 64, 175];      // #1e40af
-const COLOR_FACTURE: RGB = [30, 58, 95];     // #1e3a5f
-const COLOR_COMMANDE: RGB = [22, 101, 52];   // #166534
-const COLOR_CONTRAT: RGB = [76, 29, 149];    // #4c1d95
+/** Header band — bleu/marine/vert/violet selon le type de document */
+const COLOR_DEVIS: RGB = [30, 64, 175];
+const COLOR_FACTURE: RGB = [30, 58, 95];
+const COLOR_COMMANDE: RGB = [22, 101, 52];
+const COLOR_CONTRAT: RGB = [76, 29, 149];
 
-// Body palette — neutres slate-* pour un rendu type Stripe / QuickBooks
-const TEXT_DARK: RGB = [31, 41, 55];         // slate-800
-const TEXT_BODY: RGB = [55, 65, 81];         // slate-700
-const TEXT_MUTED: RGB = [107, 114, 128];     // slate-500
-const TABLE_HEAD_BG: RGB = [241, 245, 249];  // slate-100
-const TABLE_ALT_BG: RGB = [249, 250, 251];   // slate-50
-const DIVIDER: RGB = [226, 232, 240];        // slate-200
-const BAND_SUBTEXT: RGB = [219, 224, 235];   // blanc semi-transparent (sur fond coloré)
+/** Body palette — neutres slate-* pour un rendu type Stripe / QuickBooks */
+const TEXT_DARK: RGB = [31, 41, 55];
+const TEXT_BODY: RGB = [55, 65, 81];
+const TEXT_MUTED: RGB = [107, 114, 128];
+const TABLE_HEAD_BG: RGB = [241, 245, 249];
+const TABLE_ALT_BG: RGB = [249, 250, 251];
+const DIVIDER: RGB = [226, 232, 240];
+const BAND_SUBTEXT: RGB = [219, 224, 235];
 
-// A4 portrait
+/** A4 portrait */
 const PAGE_W = 210;
 const PAGE_H = 297;
 const MARGIN = 15;
 
-// Header band
+/** Header band */
 const HEADER_H = 40;
-const LOGO_X = 10;                // marge 10mm à gauche
-const LOGO_MAX_W = 35;            // tient dans une zone 35x28
+/** marge 10mm à gauche */
+const LOGO_X = 10;
+/** tient dans une zone 35x28 */
+const LOGO_MAX_W = 35;
 const LOGO_MAX_H = 28;
-const TITLE_X_WITH_LOGO = 50;     // titre à droite du logo
-const TITLE_X_NO_LOGO = 15;       // titre collé à la marge
-const HEADER_RIGHT_X = 200;       // bord droit pour les dates
+/** titre à droite du logo */
+const TITLE_X_WITH_LOGO = 50;
+/** titre collé à la marge */
+const TITLE_X_NO_LOGO = 15;
+/** bord droit pour les dates */
+const HEADER_RIGHT_X = 200;
 
-// Tint color toward white (factor=0..1, 1=white)
+/** Tint color toward white (factor=0..1, 1=white) */
 function tint(c: RGB, factor: number): RGB {
   return [
     Math.round(c[0] + (255 - c[0]) * factor),
@@ -76,7 +81,7 @@ type ImgFormat = "PNG" | "JPEG" | "WEBP";
 function getImageDimensions(buf: Buffer, format: ImgFormat): { width: number; height: number } | null {
   try {
     if (format === "PNG") {
-      // 8-byte signature, then IHDR chunk: 4 length + 4 type + 4 width + 4 height (BE)
+      /** 8-byte signature, then IHDR chunk: 4 length + 4 type + 4 width + 4 height (BE) */
       if (buf.length < 24) return null;
       if (buf[0] !== 0x89 || buf[1] !== 0x50 || buf[2] !== 0x4e || buf[3] !== 0x47) return null;
       return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
@@ -86,16 +91,16 @@ function getImageDimensions(buf: Buffer, format: ImgFormat): { width: number; he
       let off = 2;
       while (off + 9 < buf.length) {
         if (buf[off] !== 0xff) return null;
-        // Skip 0xFF padding bytes
+        /** Skip 0xFF padding bytes */
         let m = off;
         while (m < buf.length - 1 && buf[m] === 0xff) m++;
         const marker = buf[m];
         off = m + 1;
-        // Standalone markers (no length): SOI, EOI, RST0-7
+        /** Standalone markers (no length): SOI, EOI, RST0-7 */
         if (marker === 0xd8 || marker === 0xd9 || (marker >= 0xd0 && marker <= 0xd7)) continue;
         if (off + 1 >= buf.length) return null;
         const segLen = buf.readUInt16BE(off);
-        // SOF markers (frame headers contain dimensions): C0..CF except C4, C8, CC
+        /** SOF markers (frame headers contain dimensions): C0..CF except C4, C8, CC */
         const isSOF = marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
         if (isSOF) {
           if (off + 7 >= buf.length) return null;
@@ -103,7 +108,8 @@ function getImageDimensions(buf: Buffer, format: ImgFormat): { width: number; he
           const width = buf.readUInt16BE(off + 5);
           return { width, height };
         }
-        off += segLen; // length includes itself, so this lands on next 0xFF
+        /** length includes itself, so this lands on next 0xFF */
+        off += segLen;
       }
       return null;
     }
@@ -113,14 +119,14 @@ function getImageDimensions(buf: Buffer, format: ImgFormat): { width: number; he
       if (buf.toString("ascii", 8, 12) !== "WEBP") return null;
       const chunk = buf.toString("ascii", 12, 16);
       if (chunk === "VP8 ") {
-        // After 4-byte size + 3-byte frame tag + 3-byte start code (9D 01 2A): width/height (LE, 14-bit each)
+        /** After 4-byte size + 3-byte frame tag + 3-byte start code (9D 01 2A): width/height (LE, 14-bit each) */
         return {
           width: buf.readUInt16LE(26) & 0x3fff,
           height: buf.readUInt16LE(28) & 0x3fff,
         };
       }
       if (chunk === "VP8L") {
-        // After 4-byte size + 1-byte signature (0x2F): 4 bytes packing width-1 + height-1 (14-bit each)
+        /** After 4-byte size + 1-byte signature (0x2F): 4 bytes packing width-1 + height-1 (14-bit each) */
         const b0 = buf[21];
         const b1 = buf[22];
         const b2 = buf[23];
@@ -130,7 +136,7 @@ function getImageDimensions(buf: Buffer, format: ImgFormat): { width: number; he
         return { width, height };
       }
       if (chunk === "VP8X") {
-        // After 4-byte size + 1-byte flags + 3-byte reserved: 3-byte width-1 + 3-byte height-1 (LE)
+        /** After 4-byte size + 1-byte flags + 3-byte reserved: 3-byte width-1 + 3-byte height-1 (LE) */
         const width = 1 + (buf[24] | (buf[25] << 8) | (buf[26] << 16));
         const height = 1 + (buf[27] | (buf[28] << 8) | (buf[29] << 16));
         return { width, height };
@@ -154,12 +160,13 @@ function renderLogo(doc: jsPDF, artisan: Artisan): boolean {
   const logo = (artisan as any).logo as string | null | undefined;
   if (!logo || typeof logo !== "string") return false;
   const match = logo.match(/^data:image\/(png|jpe?g|webp);base64,(.+)$/i);
-  if (!match) return false; // unsupported (e.g. SVG — jsPDF cannot rasterize)
+  /** unsupported (e.g. SVG — jsPDF cannot rasterize) */
+  if (!match) return false;
 
   const ext = match[1].toLowerCase();
   const format: ImgFormat = ext === "webp" ? "WEBP" : ext.startsWith("jp") ? "JPEG" : "PNG";
 
-  // Compute scaled dimensions that fit LOGO_MAX_W x LOGO_MAX_H without stretching.
+  /** Compute scaled dimensions that fit LOGO_MAX_W x LOGO_MAX_H without stretching. */
   let drawW = LOGO_MAX_W;
   let drawH = LOGO_MAX_H;
   try {
@@ -175,10 +182,10 @@ function renderLogo(doc: jsPDF, artisan: Artisan): boolean {
       }
     }
   } catch {
-    // Fall back to max box; addImage will still receive valid base64.
+    /** Fall back to max box; addImage will still receive valid base64. */
   }
 
-  // Center vertically in the 40mm band.
+  /** Center vertically in the 40mm band. */
   const drawY = (HEADER_H - drawH) / 2;
 
   try {
@@ -200,33 +207,36 @@ function renderLogo(doc: jsPDF, artisan: Artisan): boolean {
 interface HeaderOpts {
   primaryColor: RGB;
   artisan: Artisan;
-  title: string;            // DEVIS, FACTURE, BON DE COMMANDE, CONTRAT DE MAINTENANCE
-  number?: string;          // e.g. "N° 2025-0042"
-  dateLines?: string[];     // ['Date: 12/05/2025', 'Validité: 11/06/2025']
+  /** DEVIS, FACTURE, BON DE COMMANDE, CONTRAT DE MAINTENANCE */
+  title: string;
+  /** e.g. "N° 2025-0042" */
+  number?: string;
+  /** ['Date: 12/05/2025', 'Validité: 11/06/2025'] */
+  dateLines?: string[];
 }
 
 function renderHeaderBand(doc: jsPDF, opts: HeaderOpts): void {
-  // Filled coloured band
+  /** Filled coloured band */
   doc.setFillColor(...opts.primaryColor);
   doc.rect(0, 0, PAGE_W, HEADER_H, "F");
 
   const hasLogo = renderLogo(doc, opts.artisan);
   const titleX = hasLogo ? TITLE_X_WITH_LOGO : TITLE_X_NO_LOGO;
 
-  // Company name (16pt bold white)
+  /** Company name (16pt bold white) */
   doc.setTextColor(255, 255, 255);
   doc.setFont("Roboto", "bold");
   doc.setFontSize(17);
   doc.text(opts.artisan.nomEntreprise || "Mon entreprise", titleX, 18);
 
-  // Document title + number (11pt, légèrement transparent)
+  /** Document title + number (11pt, légèrement transparent) */
   doc.setFont("Roboto", "normal");
   doc.setFontSize(11);
   doc.setTextColor(...BAND_SUBTEXT);
   const titleLine = opts.number ? `${opts.title}  ·  ${opts.number}` : opts.title;
   doc.text(titleLine, titleX, 27);
 
-  // Right-aligned date lines
+  /** Right-aligned date lines */
   if (opts.dateLines && opts.dateLines.length) {
     doc.setFontSize(9);
     let y = 18;
@@ -236,7 +246,7 @@ function renderHeaderBand(doc: jsPDF, opts: HeaderOpts): void {
     }
   }
 
-  // Reset text colour for body
+  /** Reset text colour for body */
   doc.setTextColor(...TEXT_BODY);
 }
 
@@ -248,9 +258,11 @@ function renderHeaderBand(doc: jsPDF, opts: HeaderOpts): void {
  */
 
 interface InfoBlock {
-  label: string;       // 'ÉMETTEUR' / 'CLIENT' / 'FOURNISSEUR'
+  /** 'ÉMETTEUR' / 'CLIENT' / 'FOURNISSEUR' */
+  label: string;
   name: string;
-  lines: string[];     // body lines (address, phone, email, SIRET, ...)
+  /** body lines (address, phone, email, SIRET, ...) */
+  lines: string[];
 }
 
 /*
@@ -337,20 +349,20 @@ function renderInfoBlocks(doc: jsPDF, primary: RGB, left: InfoBlock, right: Info
   const rightX = 115;
   const dividerX = 105;
 
-  // Section labels (small caps, primary color)
+  /** Section labels (small caps, primary color) */
   doc.setFont("Roboto", "bold");
   doc.setFontSize(8);
   doc.setTextColor(...primary);
   doc.text(left.label, leftX, startY);
   doc.text(right.label, rightX, startY);
 
-  // Names (bold dark)
+  /** Names (bold dark) */
   doc.setFontSize(11);
   doc.setTextColor(...TEXT_DARK);
   doc.text(left.name, leftX, startY + 6);
   doc.text(right.name, rightX, startY + 6);
 
-  // Body
+  /** Body */
   doc.setFont("Roboto", "normal");
   doc.setFontSize(9);
   doc.setTextColor(...TEXT_MUTED);
@@ -366,12 +378,12 @@ function renderInfoBlocks(doc: jsPDF, primary: RGB, left: InfoBlock, right: Info
   }
   const bottomY = Math.max(yLeft, yRight) + 1;
 
-  // Vertical divider between blocks
+  /** Vertical divider between blocks */
   doc.setDrawColor(...DIVIDER);
   doc.setLineWidth(0.2);
   doc.line(dividerX, startY - 3, dividerX, bottomY);
 
-  // Reset
+  /** Reset */
   doc.setTextColor(...TEXT_BODY);
   return bottomY;
 }
@@ -401,11 +413,11 @@ function renderTotalsBox(
   const lineH = 6;
   const boxH = 10 + lines.length * lineH + 12;
 
-  // Light tint background
+  /** Light tint background */
   doc.setFillColor(...tint(primary, 0.92));
   doc.rect(boxX, startY, boxW, boxH, "F");
 
-  // Body lines
+  /** Body lines */
   doc.setFont("Roboto", "normal");
   doc.setFontSize(10);
   doc.setTextColor(...TEXT_BODY);
@@ -416,7 +428,7 @@ function renderTotalsBox(
     y += lineH;
   }
 
-  // Separator + total
+  /** Separator + total */
   doc.setDrawColor(...primary);
   doc.setLineWidth(0.4);
   doc.line(boxX + padX, y - 2, boxX + boxW - padX, y - 2);
@@ -476,10 +488,11 @@ export interface PDFFactureData {
   facture: Facture & { lignes: FactureLigne[] };
   artisan: Artisan;
   client: Client;
-  cgv?: string | null; // CGV (cf. PDFDevisData) ; pas sur un avoir.
+  /** CGV (cf. PDFDevisData) ; pas sur un avoir. */
+  cgv?: string | null;
 }
 
-// Page CGV dédiée, avec saut de page si le texte déborde. Lecture seule, additif.
+/** Page CGV dédiée, avec saut de page si le texte déborde. Lecture seule, additif. */
 function renderCgvPage(doc: jsPDF, cgv: string): void {
   doc.addPage();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -521,14 +534,14 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
     dateLines: [
       `Date : ${new Date(devis.dateDevis).toLocaleDateString("fr-FR")}`,
       `Validité : ${devis.dateValidite ? new Date(devis.dateValidite).toLocaleDateString("fr-FR") : "Non définie"}`,
-      // Référence/N° de commande du client (B2B), rappelée si renseignée.
+      /** Référence/N° de commande du client (B2B), rappelée si renseignée. */
       ...(devis.referenceClient ? [`Votre réf. : ${devis.referenceClient}`] : []),
     ],
   });
 
   const blocksEndY = renderInfoBlocks(doc, primary, buildArtisanBlock(artisan), buildClientBlock(client));
 
-  // Tableau des lignes
+  /** Tableau des lignes */
   const tableData = devis.lignes.map((ligne) => {
     /*
      * Section (en-tête de lot, gras) / note (texte libre, italique) en
@@ -588,14 +601,14 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
     `${totalTTC.toFixed(2)} €`,
   );
 
-  // Pied de page
+  /** Pied de page */
   doc.setFont("Roboto", "normal");
   doc.setFontSize(9);
   doc.setTextColor(...TEXT_MUTED);
   doc.text("Conditions de paiement : à réception de la facture.", MARGIN, Math.max(totalsEndY + 12, 280));
   doc.text("Devis valable 30 jours à compter de la date d'émission.", MARGIN, Math.max(totalsEndY + 17, 285));
 
-  // OPE-151 — mentions légales émetteur (société : forme/capital/RCS ; RM si renseigné).
+  /** OPE-151 — mentions légales émetteur (société : forme/capital/RCS ; RM si renseigné). */
   const mentions = buildMentionsLegalesEmetteur(artisan);
   if (mentions.length > 0) {
     doc.setFontSize(7);
@@ -606,7 +619,7 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
     }
   }
 
-  // OPE-127 — CGV sur page dédiée (parité avec le PDF client). N'apparaît que si renseignées.
+  /** OPE-127 — CGV sur page dédiée (parité avec le PDF client). N'apparaît que si renseignées. */
   if (data.cgv && String(data.cgv).trim()) renderCgvPage(doc, String(data.cgv));
 
   return Buffer.from(doc.output("arraybuffer"));
@@ -651,7 +664,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
       ...(isAvoir
         ? ((facture as any).objet ? [String((facture as any).objet)] : [])
         : [`Échéance : ${facture.dateEcheance ? new Date(facture.dateEcheance).toLocaleDateString("fr-FR") : "Non définie"}`]),
-      // Référence/N° de commande du client (B2B), rappelée si renseignée.
+      /** Référence/N° de commande du client (B2B), rappelée si renseignée. */
       ...(facture.referenceClient ? [`Votre réf. : ${facture.referenceClient}`] : []),
     ],
   });
@@ -672,7 +685,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
 
   const blocksEndY = renderInfoBlocks(doc, primary, buildArtisanBlock(artisan), buildClientBlock(client));
 
-  // Tableau des lignes
+  /** Tableau des lignes */
   const tableData = facture.lignes.map((ligne) => {
     /*
      * OPE-168 (volet 2) — section (en-tête de lot, gras) / note (texte libre, italique)
@@ -729,7 +742,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
     `${totalTTC.toFixed(2)} €`,
   );
 
-  // Statut
+  /** Statut */
   doc.setFont("Roboto", "bold");
   doc.setFontSize(11);
   if (isAvoir) {
@@ -747,7 +760,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
     doc.text("EN ATTENTE DE PAIEMENT", MARGIN, totalsStartY + 6);
   }
 
-  // Pied de page — mentions légales obligatoires
+  /** Pied de page — mentions légales obligatoires */
   const a = artisan as any;
   let footerY = Math.max(totalsEndY + 14, 258);
 
@@ -806,7 +819,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
       MARGIN,
       fyPenalty + 4,
     );
-    // OPE-164 — mention d'escompte obligatoire en B2B (Art. L441-9 II 3° C. com.).
+    /** OPE-164 — mention d'escompte obligatoire en B2B (Art. L441-9 II 3° C. com.). */
     doc.text(
       "Escompte pour paiement anticipé : néant (Art. L441-9 C. com.).",
       MARGIN,
@@ -815,7 +828,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
     fy = fyPenalty + 8;
   }
 
-  // OPE-151 — mentions légales émetteur (forme juridique / capital / RCS / RM).
+  /** OPE-151 — mentions légales émetteur (forme juridique / capital / RCS / RM). */
   const mentions = buildMentionsLegalesEmetteur(artisan);
   let my = fy + 6;
   for (const m of mentions) {
@@ -823,7 +836,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
     my += 4;
   }
 
-  // OPE-127 — CGV sur page dédiée (parité PDF client) ; PAS sur un avoir (document d'annulation).
+  /** OPE-127 — CGV sur page dédiée (parité PDF client) ; PAS sur un avoir (document d'annulation). */
   if (data.cgv && String(data.cgv).trim() && (facture as any).typeDocument !== "avoir") {
     renderCgvPage(doc, String(data.cgv));
   }
@@ -877,7 +890,7 @@ export function generateContratPDF(data: PDFContratData): Buffer {
 
   const blocksEndY = renderInfoBlocks(doc, primary, buildArtisanBlock(artisan), buildClientBlock(client));
 
-  // Titre du contrat
+  /** Titre du contrat */
   let y = blocksEndY + 10;
   doc.setFont("Roboto", "bold");
   doc.setFontSize(14);
@@ -885,7 +898,7 @@ export function generateContratPDF(data: PDFContratData): Buffer {
   doc.text(contrat.titre, MARGIN, y);
   y += 8;
 
-  // Description
+  /** Description */
   if (contrat.description) {
     doc.setFont("Roboto", "normal");
     doc.setFontSize(10);
@@ -895,7 +908,7 @@ export function generateContratPDF(data: PDFContratData): Buffer {
     y += descLines.length * 5 + 4;
   }
 
-  // Détails du contrat
+  /** Détails du contrat */
   const montantHT = parseFloat(contrat.montantHT || "0");
   const tauxTVA = parseFloat(contrat.tauxTVA || "20");
   const montantTVA = montantHT * (tauxTVA / 100);
@@ -926,7 +939,7 @@ export function generateContratPDF(data: PDFContratData): Buffer {
 
   y = (doc as any).lastAutoTable.finalY + 8;
 
-  // Conditions particulières
+  /** Conditions particulières */
   if (contrat.conditionsParticulieres) {
     doc.setFont("Roboto", "bold");
     doc.setFontSize(11);
@@ -941,7 +954,7 @@ export function generateContratPDF(data: PDFContratData): Buffer {
     y += condLines.length * 4 + 5;
   }
 
-  // Signatures
+  /** Signatures */
   if (y < 230) {
     y = Math.max(y + 10, 230);
     doc.setFont("Roboto", "bold");
@@ -961,7 +974,7 @@ export function generateContratPDF(data: PDFContratData): Buffer {
     doc.line(125, y + 25, 190, y + 25);
   }
 
-  // Pied de page
+  /** Pied de page */
   doc.setFont("Roboto", "normal");
   doc.setFontSize(7);
   doc.setTextColor(...TEXT_MUTED);
@@ -984,10 +997,12 @@ export function generateContratPDF(data: PDFContratData): Buffer {
  */
 
 export interface PDFInterventionData {
-  intervention: any; // titre, description, dateDebut, dateFin, adresse, statut, numero?
+  /** titre, description, dateDebut, dateFin, adresse, statut, numero? */
+  intervention: any;
   artisan: Artisan;
   client: Client;
-  mobile?: any | null; // signatureClient (base64), signatureDate, heureArrivee/Depart, notesIntervention
+  /** signatureClient (base64), signatureDate, heureArrivee/Depart, notesIntervention */
+  mobile?: any | null;
   technicienNom?: string | null;
 }
 
@@ -996,7 +1011,7 @@ export function generateInterventionPDF(data: PDFInterventionData): Buffer {
   const doc = new jsPDF();
   registerFonts(doc);
 
-  const primary = COLOR_COMMANDE; // vert — distinct des devis/factures
+  const primary = COLOR_COMMANDE;
 
   const fmtDate = (d: any) => (d ? new Date(d).toLocaleDateString("fr-FR") : "—");
   const fmtHeure = (d: any) =>
@@ -1015,7 +1030,7 @@ export function generateInterventionPDF(data: PDFInterventionData): Buffer {
 
   const blocksEndY = renderInfoBlocks(doc, primary, buildArtisanBlock(artisan), buildClientBlock(client));
 
-  // Titre de l'intervention
+  /** Titre de l'intervention */
   let y = blocksEndY + 10;
   doc.setFont("Roboto", "bold");
   doc.setFontSize(14);
@@ -1023,7 +1038,7 @@ export function generateInterventionPDF(data: PDFInterventionData): Buffer {
   doc.text(intervention.titre || "Intervention", MARGIN, y);
   y += 8;
 
-  // Détails
+  /** Détails */
   const arrivee = fmtHeure(mobile?.heureArrivee);
   const depart = fmtHeure(mobile?.heureDepart);
   let duree = "—";
@@ -1056,7 +1071,7 @@ export function generateInterventionPDF(data: PDFInterventionData): Buffer {
   });
   y = (doc as any).lastAutoTable.finalY + 8;
 
-  // Travaux réalisés (description + notes terrain)
+  /** Travaux réalisés (description + notes terrain) */
   const corps = [intervention.description, mobile?.notesIntervention].filter(Boolean).join("\n\n");
   if (corps) {
     doc.setFont("Roboto", "bold");
@@ -1072,7 +1087,7 @@ export function generateInterventionPDF(data: PDFInterventionData): Buffer {
     y += lines.length * 4 + 6;
   }
 
-  // Signature client (image base64 déjà capturée)
+  /** Signature client (image base64 déjà capturée) */
   const sig: string | undefined = mobile?.signatureClient;
   y = Math.max(y + 6, 225);
   doc.setFont("Roboto", "bold");
@@ -1090,7 +1105,7 @@ export function generateInterventionPDF(data: PDFInterventionData): Buffer {
       const fmt = /jpe?g/i.test(sig) ? "JPEG" : "PNG";
       doc.addImage(sig, fmt, MARGIN, y + 8, 60, 25);
     } catch (e) {
-      // signature illisible → on n'embarque pas l'image, le cadre reste
+      /** signature illisible → on n'embarque pas l'image, le cadre reste */
     }
   }
   doc.setDrawColor(...DIVIDER);
@@ -1101,7 +1116,7 @@ export function generateInterventionPDF(data: PDFInterventionData): Buffer {
   doc.setTextColor(...TEXT_BODY);
   doc.text(`${client.prenom || ""} ${client.nom}`.trim(), MARGIN, y + 41);
 
-  // Pied de page
+  /** Pied de page */
   doc.setFont("Roboto", "normal");
   doc.setFontSize(7);
   doc.setTextColor(...TEXT_MUTED);
@@ -1149,7 +1164,7 @@ export function generateBonCommandePDF(data: PDFBonCommandeData): Buffer {
 
   const blocksEndY = renderInfoBlocks(doc, primary, buildArtisanBlock(artisan), buildFournisseurBlock(fournisseur));
 
-  // Tableau des lignes
+  /** Tableau des lignes */
   const tableData = commande.lignes.map((ligne) => {
     const quantite = Number(ligne.quantite) || 0;
     const prixUnitaire = Number(ligne.prixUnitaire) || 0;
@@ -1181,7 +1196,7 @@ export function generateBonCommandePDF(data: PDFBonCommandeData): Buffer {
     margin: { left: MARGIN, right: MARGIN },
   });
 
-  // Totaux
+  /** Totaux */
   const totalHT =
     Number(commande.totalHT) ||
     commande.lignes.reduce((sum, l) => sum + (Number(l.quantite) || 0) * (Number(l.prixUnitaire) || 0), 0);
@@ -1207,7 +1222,7 @@ export function generateBonCommandePDF(data: PDFBonCommandeData): Buffer {
   );
   yPosition += 6;
 
-  // Délai de livraison
+  /** Délai de livraison */
   if (commande.delaiLivraison) {
     doc.setFont("Roboto", "bold");
     doc.setFontSize(10);
@@ -1219,7 +1234,7 @@ export function generateBonCommandePDF(data: PDFBonCommandeData): Buffer {
     yPosition += 7;
   }
 
-  // Adresse de livraison
+  /** Adresse de livraison */
   if (commande.adresseLivraison) {
     doc.setFont("Roboto", "bold");
     doc.setFontSize(10);
@@ -1233,7 +1248,7 @@ export function generateBonCommandePDF(data: PDFBonCommandeData): Buffer {
     yPosition += addrLines.length * 5 + 4;
   }
 
-  // Notes
+  /** Notes */
   if (commande.notes) {
     doc.setFont("Roboto", "bold");
     doc.setFontSize(10);
@@ -1247,7 +1262,7 @@ export function generateBonCommandePDF(data: PDFBonCommandeData): Buffer {
     doc.text(noteLines, MARGIN, yPosition);
   }
 
-  // Pied de page
+  /** Pied de page */
   doc.setFont("Roboto", "normal");
   doc.setFontSize(7);
   doc.setTextColor(...TEXT_MUTED);

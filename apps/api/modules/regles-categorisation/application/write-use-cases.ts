@@ -15,7 +15,8 @@ export async function creerRegle(
 ): Promise<RegleCategorisation> {
   if (!input.motifLibelle?.trim()) throw new ValidationError("Le libellé du motif est requis");
   if (!input.categorie?.trim()) throw new ValidationError("La catégorie est requise");
-  return repo.create(ctx, input); // actif défaut true par l'infra
+  /** actif défaut true par l'infra */
+  return repo.create(ctx, input);
 }
 
 export async function modifierRegle(

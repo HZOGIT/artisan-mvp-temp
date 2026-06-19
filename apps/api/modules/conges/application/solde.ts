@@ -12,13 +12,14 @@
 
 export type SoldeCongeType = "conge_paye" | "rtt";
 
-// Le type de congé impacte-t-il le solde décompté (`soldes_conges`) ?
+/** Le type de congé impacte-t-il le solde décompté (`soldes_conges`) ? */
 export function typeAffecteSolde(type: string): type is SoldeCongeType {
   return type === "conge_paye" || type === "rtt";
 }
 
 export interface CongeDuree {
-  readonly dateDebut: string; // YYYY-MM-DD
+  /** YYYY-MM-DD */
+  readonly dateDebut: string;
   readonly dateFin: string;
   readonly demiJourneeDebut: boolean;
   readonly demiJourneeFin: boolean;

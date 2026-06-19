@@ -4,7 +4,7 @@ import type { IInterventionRepository } from "./intervention-repository";
 import type { ICongeRepository } from "../../conges/application/conge-repository";
 import type { Intervention } from "../domain/intervention";
 
-// Conflit d'agenda (NON bloquant — le client l'affiche en avertissement, l'affectation est faite).
+/** Conflit d'agenda (NON bloquant — le client l'affiche en avertissement, l'affectation est faite). */
 export interface ConflitsTechnicien {
   readonly interventions: ReadonlyArray<{ id: number; titre: string; dateDebut: Date; dateFin: Date | null }>;
   readonly conges: ReadonlyArray<{ id: number; type: string; dateDebut: string; dateFin: string }>;
@@ -39,7 +39,7 @@ export async function assignerTechnicien(
   try {
     const debut = intervention.dateDebut;
     const fin = intervention.dateFin ?? debut;
-    // Double-booking : interventions planifiée/en cours du technicien chevauchant [debut, fin[, hors celle-ci.
+    /** Double-booking : interventions planifiée/en cours du technicien chevauchant [debut, fin[, hors celle-ci. */
     const autres = await repo.listByTechnicien(ctx, technicienId);
     const interventionsConflits = autres
       .filter(
@@ -50,7 +50,7 @@ export async function assignerTechnicien(
           (i.dateFin ?? i.dateDebut) > debut,
       )
       .map((i) => ({ id: i.id, titre: i.titre, dateDebut: i.dateDebut, dateFin: i.dateFin }));
-    // Congés approuvés du technicien chevauchant la période (dates YMD).
+    /** Congés approuvés du technicien chevauchant la période (dates YMD). */
     const debutYmd = ymd(debut);
     const finYmd = ymd(fin);
     const congesConflits = (await congeRepo.list(ctx))
@@ -58,7 +58,7 @@ export async function assignerTechnicien(
       .map((c) => ({ id: c.id, type: c.type, dateDebut: c.dateDebut, dateFin: c.dateFin }));
     conflits = { interventions: interventionsConflits, conges: congesConflits };
   } catch {
-    // Détection best-effort : ne casse pas l'affectation (parité legacy try/catch).
+    /** Détection best-effort : ne casse pas l'affectation (parité legacy try/catch). */
   }
 
   return { ...updated, conflits };

@@ -8,19 +8,19 @@ export interface ChatDeps {
   readonly notifier: ChatClientNotifier;
 }
 
-// `chat.getConversations` (parité legacy) : conversations du tenant enrichies du client.
+/** `chat.getConversations` (parité legacy) : conversations du tenant enrichies du client. */
 export function getConversations(deps: ChatDeps, ctx: TenantContext): Promise<ConversationWithClient[]> {
   return deps.repo.listConversations(ctx);
 }
 
-// Vérifie l'appartenance d'une conversation au tenant, sinon **FORBIDDEN** (parité legacy).
+/** Vérifie l'appartenance d'une conversation au tenant, sinon **FORBIDDEN** (parité legacy). */
 async function assertConversationOwned(deps: ChatDeps, ctx: TenantContext, conversationId: number): Promise<Conversation> {
   const conv = await deps.repo.getConversationOwned(ctx, conversationId);
   if (!conv) throw new ForbiddenError("Conversation non accessible");
   return conv;
 }
 
-// `chat.getMessages` (parité legacy) : ownership → marque lus (côté artisan) → messages.
+/** `chat.getMessages` (parité legacy) : ownership → marque lus (côté artisan) → messages. */
 export async function getMessages(deps: ChatDeps, ctx: TenantContext, conversationId: number): Promise<Message[]> {
   await assertConversationOwned(deps, ctx, conversationId);
   await deps.repo.markMessagesAsRead(ctx, conversationId, "artisan");
@@ -63,12 +63,12 @@ export async function startConversation(
   return conv;
 }
 
-// `chat.getUnreadCount` (parité legacy) : somme des non-lus artisan (hors archivées).
+/** `chat.getUnreadCount` (parité legacy) : somme des non-lus artisan (hors archivées). */
 export function getUnreadCount(deps: ChatDeps, ctx: TenantContext): Promise<number> {
   return deps.repo.getUnreadCount(ctx);
 }
 
-// `chat.archive/close/reopen` (parité legacy) : ownership → changement de statut.
+/** `chat.archive/close/reopen` (parité legacy) : ownership → changement de statut. */
 export async function archiveConversation(deps: ChatDeps, ctx: TenantContext, conversationId: number): Promise<Conversation> {
   await assertConversationOwned(deps, ctx, conversationId);
   return deps.repo.updateStatut(ctx, conversationId, "archivee");

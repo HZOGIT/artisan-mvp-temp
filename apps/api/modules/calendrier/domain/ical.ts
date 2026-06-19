@@ -6,12 +6,12 @@ export interface IcalFeed {
   readonly path: string;
 }
 
-// Chemin d'abonnement à partir du jeton (le front préfixe l'origine). Fonction PURE.
+/** Chemin d'abonnement à partir du jeton (le front préfixe l'origine). Fonction PURE. */
 export function icalPath(token: string): string {
   return `/api/calendar/${token}.ics`;
 }
 
-// Évènement de calendrier (intervention enrichie du client) à sérialiser en VEVENT. Découplé Drizzle.
+/** Évènement de calendrier (intervention enrichie du client) à sérialiser en VEVENT. Découplé Drizzle. */
 export interface IcalEvent {
   readonly id: number;
   readonly titre: string | null;
@@ -24,7 +24,7 @@ export interface IcalEvent {
   readonly clientTelephone: string | null;
 }
 
-// Échappement de texte iCal (RFC 5545 : backslash, point-virgule, virgule, newline). Fonction PURE.
+/** Échappement de texte iCal (RFC 5545 : backslash, point-virgule, virgule, newline). Fonction PURE. */
 export function icalText(s: string | null | undefined): string {
   return String(s ?? "")
     .replace(/\\/g, "\\\\")
@@ -33,7 +33,7 @@ export function icalText(s: string | null | undefined): string {
     .replace(/\r?\n/g, "\\n");
 }
 
-// Date iCal UTC compacte (`YYYYMMDDTHHMMSSZ`). Fonction PURE.
+/** Date iCal UTC compacte (`YYYYMMDDTHHMMSSZ`). Fonction PURE. */
 export function icalDate(d: Date): string {
   return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
 }

@@ -18,13 +18,16 @@ export interface Chantier {
   readonly adresse: string | null;
   readonly codePostal: string | null;
   readonly ville: string | null;
-  readonly dateDebut: string | null; // date PG (YYYY-MM-DD)
+  /** date PG (YYYY-MM-DD) */
+  readonly dateDebut: string | null;
   readonly dateFinPrevue: string | null;
   readonly dateFinReelle: string | null;
-  readonly budgetPrevisionnel: string | null; // numeric PG en string
+  /** numeric PG en string */
+  readonly budgetPrevisionnel: string | null;
   readonly budgetRealise: string;
   readonly statut: ChantierStatut;
-  readonly avancement: number; // 0..100
+  /** 0..100 */
+  readonly avancement: number;
   readonly priorite: ChantierPriorite;
   readonly notes: string | null;
   readonly createdAt: Date;

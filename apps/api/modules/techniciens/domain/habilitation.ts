@@ -18,7 +18,7 @@ export interface AjouterHabilitationInput {
   readonly type: string;
   readonly numero?: string | null;
   readonly organisme?: string | null;
-  // Dates ISO `YYYY-MM-DD` ; une valeur invalide est ignorée (→ null) côté use-case.
+  /** Dates ISO `YYYY-MM-DD` ; une valeur invalide est ignorée (→ null) côté use-case. */
   readonly dateObtention?: string | null;
   readonly dateExpiration?: string | null;
 }

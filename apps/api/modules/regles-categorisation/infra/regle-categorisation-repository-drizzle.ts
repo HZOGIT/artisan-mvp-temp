@@ -9,7 +9,7 @@ import type { RegleCategorisation, CreateRegleInput, UpdateRegleInput } from "..
 type RegleRow = typeof reglesCategorisation.$inferSelect;
 type RegleInsert = typeof reglesCategorisation.$inferInsert;
 
-// Traduit une ligne PG (colonnes snake_case) → domaine (camelCase). Défaut `actif` true si null.
+/** Traduit une ligne PG (colonnes snake_case) → domaine (camelCase). Défaut `actif` true si null. */
 function toRegle(r: RegleRow): RegleCategorisation {
   return {
     id: r.id,
@@ -21,7 +21,7 @@ function toRegle(r: RegleRow): RegleCategorisation {
   };
 }
 
-// Mappe les champs camelCase de l'input vers les colonnes snake_case (seuls les champs fournis).
+/** Mappe les champs camelCase de l'input vers les colonnes snake_case (seuls les champs fournis). */
 function toSet(input: UpdateRegleInput): Partial<RegleInsert> {
   const set: Partial<RegleInsert> = {};
   if (input.motifLibelle !== undefined) set.motif_libelle = input.motifLibelle;

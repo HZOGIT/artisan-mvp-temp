@@ -12,7 +12,7 @@ export interface ArtisanInfo {
   readonly [key: string]: unknown;
 }
 
-// Émetteur courant (déduit de `ctx.artisanId`). Renvoie null si absent.
+/** Émetteur courant (déduit de `ctx.artisanId`). Renvoie null si absent. */
 export interface ArtisanReader {
   getArtisan(ctx: TenantContext): Promise<ArtisanInfo | null>;
 }

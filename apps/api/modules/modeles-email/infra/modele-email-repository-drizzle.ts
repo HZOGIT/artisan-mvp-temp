@@ -83,7 +83,7 @@ export class ModeleEmailRepositoryDrizzle implements IModeleEmailRepository {
 
   update(ctx: TenantContext, id: number, input: UpdateModeleEmailInput): Promise<ModeleEmail | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Construit le set des seuls champs fournis (no-op si vide : renvoie l'état courant scopé).
+      /** Construit le set des seuls champs fournis (no-op si vide : renvoie l'état courant scopé). */
       const set: Partial<typeof modelesEmail.$inferInsert> = {};
       if (input.nom !== undefined) set.nom = input.nom;
       if (input.type !== undefined) set.type = input.type;

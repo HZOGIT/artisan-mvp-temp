@@ -11,12 +11,12 @@ import { creerDepense, modifierDepense, supprimerDepense, creerIndemniteKm } fro
 import type { ICategorieDepenseRepository } from "../../../categories-depenses/application/categorie-depense-repository";
 import { listCategories } from "../../../categories-depenses/application/read-use-cases";
 import { creerCategorie, modifierCategorie, supprimerCategorie } from "../../../categories-depenses/application/write-use-cases";
-// Composition : le client gère les budgets mensuels par catégorie via `trpc.depenses.setBudget` / etc.
+/** Composition : le client gère les budgets mensuels par catégorie via `trpc.depenses.setBudget` / etc. */
 import type { IBudgetCategorieRepository } from "../../../budgets-categories/application/budget-categorie-repository";
 import { budgetsParMois } from "../../../budgets-categories/application/read-use-cases";
 import { creerBudget, modifierBudget, copierBudgetsMois } from "../../../budgets-categories/application/write-use-cases";
 import { budgetsRealises } from "../../application/budgets-realises-use-case";
-// Composition : règles de catégorisation auto via `trpc.depenses.getRegles/createRegle/deleteRegle`.
+/** Composition : règles de catégorisation auto via `trpc.depenses.getRegles/createRegle/deleteRegle`. */
 import type { IRegleCategorisationRepository } from "../../../regles-categorisation/application/regle-categorisation-repository";
 import { listRegles } from "../../../regles-categorisation/application/read-use-cases";
 import { creerRegle, supprimerRegle } from "../../../regles-categorisation/application/write-use-cases";
@@ -172,12 +172,12 @@ export function createDepensesRouter(
       )
       .query(({ ctx, input }) => checkDoublons(repo, ctx.tenant, input)),
 
-    // Statistiques du mois (défaut = mois courant).
+    /** Statistiques du mois (défaut = mois courant). */
     stats: protectedProcedure
       .input(z.object({ mois: z.string().regex(/^\d{4}-\d{2}$/, "Mois invalide (AAAA-MM)").optional() }).optional())
       .query(({ ctx, input }) => getDepensesStats(repo, ctx.tenant, input?.mois)),
 
-    // ── Catégories de dépense (parité client : trpc.depenses.*Categorie) ──────────────
+    /** ── Catégories de dépense (parité client : trpc.depenses.*Categorie) ────────────── */
     getCategories: protectedProcedure.query(({ ctx }) => listCategories(categorieRepo, ctx.tenant)),
 
     createCategorie: protectedProcedure
@@ -185,7 +185,8 @@ export function createDepensesRouter(
       .mutation(({ ctx, input }) =>
         creerCategorie(categorieRepo, ctx.tenant, {
           nom: input.nom,
-          couleur: input.couleur || undefined, // "" → défaut
+          /** "" → défaut */
+          couleur: input.couleur || undefined,
           icone: input.icone,
           compteComptable: input.compteComptable,
           plafondMensuel: input.plafondMensuel !== undefined ? String(input.plafondMensuel) : undefined,
@@ -239,7 +240,7 @@ export function createDepensesRouter(
         return { success: true };
       }),
 
-    // Copie les budgets d'un mois vers un autre (upsert par catégorie, idempotent).
+    /** Copie les budgets d'un mois vers un autre (upsert par catégorie, idempotent). */
     copierBudgetsMois: protectedProcedure
       .input(
         z.object({
@@ -249,7 +250,7 @@ export function createDepensesRouter(
       )
       .mutation(({ ctx, input }) => copierBudgetsMois(budgetRepo, ctx.tenant, input.moisSource, input.moisCible)),
 
-    // ── Indemnité kilométrique (crée une dépense forfaitaire sans TVA) ────────────────
+    /** ── Indemnité kilométrique (crée une dépense forfaitaire sans TVA) ──────────────── */
     creerIndemniteKm: protectedProcedure
       .input(
         z.object({
@@ -272,7 +273,7 @@ export function createDepensesRouter(
         }),
       ),
 
-    // ── Règles de catégorisation auto (parité client : trpc.depenses.getRegles/...) ────
+    /** ── Règles de catégorisation auto (parité client : trpc.depenses.getRegles/...) ──── */
     getRegles: protectedProcedure.query(({ ctx }) => listRegles(regleRepo, ctx.tenant)),
 
     createRegle: protectedProcedure
@@ -323,7 +324,7 @@ export function createDepensesRouter(
         for (const depenseId of input.depenseIds ?? []) {
           await noteRepo.addDepenseLink(ctx.tenant, note.id, depenseId);
         }
-        // Relit pour renvoyer le `montant_total` à jour (recalculé par addDepenseLink).
+        /** Relit pour renvoyer le `montant_total` à jour (recalculé par addDepenseLink). */
         return (await noteRepo.getById(ctx.tenant, note.id)) ?? note;
       }),
 
@@ -366,7 +367,7 @@ export function createDepensesRouter(
       .input(z.object({ id: z.number() }))
       .query(({ ctx, input }) => getNoteFraisDetail(noteRepo, ctx.tenant, input.id)),
 
-    // ── Liens dépense ↔ note de frais (anti-IDOR via la note+dépense du tenant ; recalcul du total) ─
+    /** ── Liens dépense ↔ note de frais (anti-IDOR via la note+dépense du tenant ; recalcul du total) ─ */
     addDepenseToNoteFrais: protectedProcedure
       .input(z.object({ noteId: z.number().int(), depenseId: z.number().int() }))
       .mutation(({ ctx, input }) => ajouterDepenseANote(noteRepo, ctx.tenant, input.noteId, input.depenseId)),
@@ -375,7 +376,7 @@ export function createDepensesRouter(
       .input(z.object({ noteId: z.number().int(), depenseId: z.number().int() }))
       .mutation(({ ctx, input }) => retirerDepenseDeNote(noteRepo, ctx.tenant, input.noteId, input.depenseId)),
 
-    // ── Transactions bancaires (lecture + ignorer ; import/conversion = slices dédiés) ─────────────
+    /** ── Transactions bancaires (lecture + ignorer ; import/conversion = slices dédiés) ───────────── */
     getTransactionsBancaires: protectedProcedure
       .input(z.object({ releveId: z.number().int() }).optional())
       .query(({ ctx, input }) => getTransactionsBancaires(transactionRepo, ctx.tenant, input?.releveId)),
@@ -388,7 +389,7 @@ export function createDepensesRouter(
       .input(z.object({ nomFichier: z.string().max(255), contenuCsv: z.string().max(5_000_000, "Fichier trop volumineux (max ~5 Mo)") }))
       .mutation(({ ctx, input }) => importReleve({ transactionRepo, regleRepo }, ctx.tenant, input)),
 
-    // ⚠️ Idempotence anti double-dépense (FEC/TVA) : refuse si déjà convertie.
+    /** ⚠️ Idempotence anti double-dépense (FEC/TVA) : refuse si déjà convertie. */
     convertirTransaction: protectedProcedure
       .input(
         z.object({
@@ -400,12 +401,12 @@ export function createDepensesRouter(
       )
       .mutation(({ ctx, input }) => convertirTransaction({ transactionRepo, depenseRepo: repo }, ctx.tenant, input)),
 
-    // ── Export FEC achats (format AFNOR ; débit=crédit par construction) — lecture seule ──────────
+    /** ── Export FEC achats (format AFNOR ; débit=crédit par construction) — lecture seule ────────── */
     exportFecAchats: protectedProcedure
       .input(z.object({ dateDebut: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date AAAA-MM-JJ"), dateFin: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date AAAA-MM-JJ") }))
       .mutation(({ ctx, input }) => exportFecAchats(fecReader, ctx.tenant, input.dateDebut, input.dateFin)),
 
-    // ── OCR justificatif (vision) — anti-IDOR depenseId + rate-limit IA ; sans seam → dégradé ──────
+    /** ── OCR justificatif (vision) — anti-IDOR depenseId + rate-limit IA ; sans seam → dégradé ────── */
     analyserJustificatif: protectedProcedure
       .input(z.object({ imageBase64: z.string().min(1), depenseId: z.number().int().optional() }))
       .mutation(({ ctx, input }) =>

@@ -47,7 +47,7 @@ export async function suggererArticlesIA(
   ctx: TenantContext,
   input: SuggererArticlesInput,
 ): Promise<ArticleSuggere[]> {
-  // Rate-limit IA AVANT tout (anti-coût). Parité legacy : pas de 429, on renvoie [].
+  /** Rate-limit IA AVANT tout (anti-coût). Parité legacy : pas de 429, on renvoie []. */
   if (!(await deps.rateLimiter.check(rateLimitKey(ctx.artisanId)))) return [];
 
   const artisan = await deps.artisanReader.getArtisan(ctx);

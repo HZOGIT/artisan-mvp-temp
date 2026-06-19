@@ -28,7 +28,7 @@ export class BcryptPasswordHasher implements PasswordHasher {
   }
 }
 
-// Fake déterministe (tests) : « hash » réversible, aucune dépendance crypto.
+/** Fake déterministe (tests) : « hash » réversible, aucune dépendance crypto. */
 export class FakePasswordHasher implements PasswordHasher {
   async hash(password: string): Promise<string> {
     return `hashed:${password}`;

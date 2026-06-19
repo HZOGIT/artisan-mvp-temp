@@ -5,12 +5,13 @@
 export interface FactureEnRetard {
   readonly id: number;
   readonly numero: string;
-  readonly totalTTC: string; // numeric PG en string (précision préservée)
+  /** numeric PG en string (précision préservée) */
+  readonly totalTTC: string;
   readonly dateEcheance: Date;
   readonly clientNom: string | null;
 }
 
-// Données d'une notification à créer (rappel généré).
+/** Données d'une notification à créer (rappel généré). */
 export interface CreerNotificationInput {
   readonly type: import("./notification").NotificationType;
   readonly titre: string;

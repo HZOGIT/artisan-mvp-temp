@@ -1,7 +1,7 @@
 import type { SubscriptionUpsertFields } from "../domain/webhook";
 import type { SubscriptionWebhookWriter } from "../application/subscription-webhook-writer";
 
-// Writer webhook fake (in-memory) pour les tests des use-cases.
+/** Writer webhook fake (in-memory) pour les tests des use-cases. */
 export class FakeSubscriptionWebhookWriter implements SubscriptionWebhookWriter {
   private byCustomer = new Map<string, number>();
   public upserts: Array<{ artisanId: number; fields: SubscriptionUpsertFields }> = [];

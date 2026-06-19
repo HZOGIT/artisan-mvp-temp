@@ -3,7 +3,7 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { CreateRapportInput, ExecutionResult, RapportPersonnalise } from "../domain/rapport";
 import type { IRapportRepository } from "./rapport-repository";
 
-// Horloge en millisecondes (injectable pour des tests déterministes de `tempsExecution`).
+/** Horloge en millisecondes (injectable pour des tests déterministes de `tempsExecution`). */
 type ClockMs = () => number;
 
 export function listRapports(repo: IRapportRepository, ctx: TenantContext): Promise<RapportPersonnalise[]> {
@@ -14,7 +14,7 @@ export function creerRapport(repo: IRapportRepository, ctx: TenantContext, input
   return repo.create(ctx, input);
 }
 
-// Suppression : anti-IDOR (parité legacy `assertRapportOwner` → 404 si non possédé).
+/** Suppression : anti-IDOR (parité legacy `assertRapportOwner` → 404 si non possédé). */
 export async function supprimerRapport(repo: IRapportRepository, ctx: TenantContext, id: number): Promise<{ success: true }> {
   if (!(await repo.remove(ctx, id))) throw new NotFoundError("Rapport non trouvé");
   return { success: true };

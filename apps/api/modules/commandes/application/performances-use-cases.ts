@@ -45,10 +45,11 @@ export function calculerPerformancesFournisseurs(
       if (prevu == null) return false;
       if (c.statut === "livree") return c.dateLivraisonReelle ? c.dateLivraisonReelle.getTime() > prevu : false;
       if (c.statut === "annulee") return false;
-      return prevu < now; // en cours, échéance dépassée
+      /** en cours, échéance dépassée */
+      return prevu < now;
     }).length;
 
-    // Délai moyen (jours) sur les livrées datées.
+    /** Délai moyen (jours) sur les livrées datées. */
     const livreesDatees = livrees.filter((c) => c.dateLivraisonReelle && c.createdAt);
     let delaiMoyenLivraison: number | null = null;
     if (livreesDatees.length > 0) {
@@ -59,7 +60,7 @@ export function calculerPerformancesFournisseurs(
       delaiMoyenLivraison = Math.round(somme / livreesDatees.length);
     }
 
-    // Taux de fiabilité : % de commandes livrées « à temps ».
+    /** Taux de fiabilité : % de commandes livrées « à temps ». */
     const livreesAvecPrevu = livrees.filter((c) => c.dateLivraisonPrevue && c.dateLivraisonReelle);
     let tauxFiabilite = 100;
     if (livreesAvecPrevu.length > 0) {
@@ -81,7 +82,7 @@ export function calculerPerformancesFournisseurs(
   });
 }
 
-// Orchestration : charge commandes + fournisseurs du tenant puis agrège (scopé tenant).
+/** Orchestration : charge commandes + fournisseurs du tenant puis agrège (scopé tenant). */
 export async function getPerformancesFournisseurs(
   commandeRepo: ICommandeRepository,
   fournisseurRepo: IFournisseurRepository,

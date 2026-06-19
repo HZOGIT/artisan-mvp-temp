@@ -51,7 +51,7 @@ export class FakeBudgetCategorieRepository implements IBudgetCategorieRepository
       ...current,
       ...(input.budget !== undefined ? { budget: input.budget } : {}),
       ...(input.depenseReelle !== undefined ? { depenseReelle: input.depenseReelle } : {}),
-      // categorie/mois jamais touchés (clé d'unicité immuable)
+      /** categorie/mois jamais touchés (clé d'unicité immuable) */
     };
     this.store[idx] = next;
     return next;

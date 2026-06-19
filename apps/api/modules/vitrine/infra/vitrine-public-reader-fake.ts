@@ -9,7 +9,7 @@ export interface VitrineFakeState {
   categories?: Record<number, string[]>;
 }
 
-// Fake en mémoire du lecteur public de vitrine (indexé par slug / artisanId).
+/** Fake en mémoire du lecteur public de vitrine (indexé par slug / artisanId). */
 export class VitrinePublicReaderFake implements IVitrinePublicReader {
   constructor(private readonly state: VitrineFakeState = {}) {}
 

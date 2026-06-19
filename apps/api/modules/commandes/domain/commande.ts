@@ -21,7 +21,8 @@ export interface LigneCommande {
   readonly stockId: number | null;
   readonly designation: string;
   readonly reference: string | null;
-  readonly quantite: string; // numeric PG en string
+  /** numeric PG en string */
+  readonly quantite: string;
   readonly quantiteRecue: string;
   readonly unite: string;
   readonly prixUnitaire: string | null;

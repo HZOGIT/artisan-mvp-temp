@@ -36,7 +36,7 @@ export async function modifierTechnicien(
   id: number,
   input: UpdateTechnicienInput,
 ): Promise<Technicien> {
-  // Un nom explicitement vidé est refusé (le legacy borne nom.min(1)).
+  /** Un nom explicitement vidé est refusé (le legacy borne nom.min(1)). */
   if (input.nom !== undefined && !input.nom.trim()) throw new ValidationError("Nom du technicien requis");
   const updated = await repo.update(ctx, id, input);
   if (!updated) throw new NotFoundError("Technicien introuvable");

@@ -39,7 +39,7 @@ export async function listContratsAFacturer(
   });
 }
 
-// Interventions d'un contrat (ownership du contrat requis → 404 sinon).
+/** Interventions d'un contrat (ownership du contrat requis → 404 sinon). */
 export async function getInterventionsContrat(
   repo: IContratRepository,
   ctx: TenantContext,
@@ -49,7 +49,7 @@ export async function getInterventionsContrat(
   return repo.listInterventions(ctx, contratId);
 }
 
-// Crée une intervention sous un contrat possédé (404 si le contrat n'est pas du tenant).
+/** Crée une intervention sous un contrat possédé (404 si le contrat n'est pas du tenant). */
 export async function creerInterventionContrat(
   repo: IContratRepository,
   ctx: TenantContext,
@@ -59,7 +59,7 @@ export async function creerInterventionContrat(
   return repo.createIntervention(ctx, input);
 }
 
-// Nombre de mois d'une période de facturation, par périodicité.
+/** Nombre de mois d'une période de facturation, par périodicité. */
 const MOIS_PAR_PERIODICITE: Record<ContratPeriodicite, number> = { mensuel: 1, trimestriel: 3, semestriel: 6, annuel: 12 };
 
 /*

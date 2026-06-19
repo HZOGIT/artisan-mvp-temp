@@ -468,7 +468,7 @@ export class ChantierRepositoryDrizzle implements IChantierRepository {
 
   listAllInterventionsLiens(ctx: TenantContext): Promise<ChantierInterventionLien[]> {
     return withTenant(this.db, ctx, async (tx) => {
-      // chantiers est scopée RLS/tenant → on ne récupère que les chantiers du tenant.
+      /** chantiers est scopée RLS/tenant → on ne récupère que les chantiers du tenant. */
       const ids = await tx.select({ id: chantiers.id }).from(chantiers);
       if (ids.length === 0) return [];
       const rows = await tx
@@ -482,7 +482,7 @@ export class ChantierRepositoryDrizzle implements IChantierRepository {
 
   associerIntervention(ctx: TenantContext, input: AssocierInterventionInput): Promise<ChantierInterventionLien> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Idempotent : si le lien (chantier,intervention) existe déjà, le renvoyer tel quel.
+      /** Idempotent : si le lien (chantier,intervention) existe déjà, le renvoyer tel quel. */
       const [existing] = await tx
         .select()
         .from(interventionsChantier)
@@ -522,7 +522,7 @@ export class ChantierRepositoryDrizzle implements IChantierRepository {
     });
   }
 
-  // ⚠️ `documents_chantier` n'a PAS d'artisanId : scopé via le chantier parent par le use-case.
+  /** ⚠️ `documents_chantier` n'a PAS d'artisanId : scopé via le chantier parent par le use-case. */
   listDocuments(ctx: TenantContext, chantierId: number): Promise<ChantierDocument[]> {
     return withTenant(this.db, ctx, async (tx) => {
       const rows = await tx
@@ -580,7 +580,7 @@ export class ChantierRepositoryDrizzle implements IChantierRepository {
 
   setAvancement(ctx: TenantContext, chantierId: number, avancement: number): Promise<void> {
     return withTenant(this.db, ctx, async (tx) => {
-      // `chantiers` est scopée RLS/tenant → l'UPDATE ne touche que le chantier du tenant.
+      /** `chantiers` est scopée RLS/tenant → l'UPDATE ne touche que le chantier du tenant. */
       await tx.update(chantiers).set({ avancement, updatedAt: new Date() }).where(eq(chantiers.id, chantierId));
     });
   }

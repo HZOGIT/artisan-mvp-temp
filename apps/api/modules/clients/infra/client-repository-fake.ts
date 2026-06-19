@@ -10,17 +10,17 @@ import type { Client, CreateClientInput, UpdateClientInput } from "../domain/cli
 export class FakeClientRepository implements IClientRepository {
   private store: Client[] = [];
   private seq = 0;
-  // Nombre de documents liés par clientId (injectable pour tester la garde de suppression).
+  /** Nombre de documents liés par clientId (injectable pour tester la garde de suppression). */
   private documentsLies = new Map<number, number>();
-  // Lignes de factures injectables (pour tester le wiring de l'encours).
+  /** Lignes de factures injectables (pour tester le wiring de l'encours). */
   private facturesEncours: FactureEncoursLigne[] = [];
 
-  // Aide de test : déclare N documents métier liés à un client (garde d'intégrité).
+  /** Aide de test : déclare N documents métier liés à un client (garde d'intégrité). */
   setDocumentsLies(clientId: number, n: number): void {
     this.documentsLies.set(clientId, n);
   }
 
-  // Aide de test : injecte les lignes de factures servant au calcul de l'encours.
+  /** Aide de test : injecte les lignes de factures servant au calcul de l'encours. */
   setFacturesEncours(rows: FactureEncoursLigne[]): void {
     this.facturesEncours = rows;
   }
@@ -77,7 +77,7 @@ export class FakeClientRepository implements IClientRepository {
   }
 
   async countDocumentsLies(ctx: TenantContext, clientId: number): Promise<number> {
-    // Le client doit appartenir au tenant ; sinon 0 (rien de visible cross-tenant).
+    /** Le client doit appartenir au tenant ; sinon 0 (rien de visible cross-tenant). */
     const c = await this.getById(ctx, clientId);
     if (!c) return 0;
     return this.documentsLies.get(clientId) ?? 0;

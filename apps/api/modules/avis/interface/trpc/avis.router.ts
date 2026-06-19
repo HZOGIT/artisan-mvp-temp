@@ -11,7 +11,7 @@ import {
 import { getInfoDemandeAvis, soumettreAvisPublic, type AvisPublicDeps } from "../../application/avis-public-use-cases";
 
 const idInput = z.object({ id: z.number().int() });
-// Parité legacy avisRouter : input.avisId pour repondre/moderer.
+/** Parité legacy avisRouter : input.avisId pour repondre/moderer. */
 const repondreSchema = z.object({ avisId: z.number().int(), reponse: z.string().min(1).max(5000) });
 const modererSchema = z.object({ avisId: z.number().int(), statut: z.enum(["publie", "masque"]) });
 
@@ -24,7 +24,7 @@ const modererSchema = z.object({ avisId: z.number().int(), statut: z.enum(["publ
  */
 export function createAvisRouter(repo: IAvisRepository, demandeDeps: DemandeAvisDeps, publicDeps: AvisPublicDeps) {
   return router({
-    // Parité legacy : list/getAll renvoient l'avis enrichi (client + intervention).
+    /** Parité legacy : list/getAll renvoient l'avis enrichi (client + intervention). */
     list: protectedProcedure.query(({ ctx }) => listAvisEnrichi(repo, ctx.tenant)),
     getAll: protectedProcedure.query(({ ctx }) => listAvisEnrichi(repo, ctx.tenant)),
 
@@ -42,7 +42,7 @@ export function createAvisRouter(repo: IAvisRepository, demandeDeps: DemandeAvis
       .input(modererSchema)
       .mutation(({ ctx, input }) => changerStatutAvis(repo, ctx.tenant, input.avisId, input.statut)),
 
-    // Workflow demande d'avis (parité legacy) : envoi d'un lien d'avis au client.
+    /** Workflow demande d'avis (parité legacy) : envoi d'un lien d'avis au client. */
     envoyerDemande: protectedProcedure
       .input(z.object({ interventionId: z.number().int() }))
       .mutation(({ ctx, input }) => envoyerDemandeAvis(demandeDeps, ctx.tenant, input.interventionId)),
@@ -59,7 +59,7 @@ export function createAvisRouter(repo: IAvisRepository, demandeDeps: DemandeAvis
       .input(z.object({ token: z.string().min(1).max(64) }))
       .query(({ input }) => getInfoDemandeAvis(publicDeps, input.token)),
 
-    // Soumission d'un avis par le client via son lien token. 400 si déjà complété / expiré.
+    /** Soumission d'un avis par le client via son lien token. 400 si déjà complété / expiré. */
     submitAvis: publicProcedure
       .input(z.object({ token: z.string().min(1).max(64), note: z.number().int().min(1).max(5), commentaire: z.string().max(5000).optional() }))
       .mutation(({ input }) => soumettreAvisPublic(publicDeps, { token: input.token, note: input.note, commentaire: input.commentaire })),

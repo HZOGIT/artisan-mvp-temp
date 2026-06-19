@@ -10,7 +10,7 @@ import {
   dissocierArticleFournisseur,
 } from "../../application/association-use-cases";
 
-// Bornes alignées sur la table `fournisseurs` (defense-in-depth).
+/** Bornes alignées sur la table `fournisseurs` (defense-in-depth). */
 const createSchema = z.object({
   nom: z.string().min(1).max(255),
   contact: z.string().max(255).nullish(),
@@ -64,7 +64,7 @@ export function createFournisseursRouter(repo: IFournisseurRepository) {
         return { success: true };
       }),
 
-    // ── Associations article↔fournisseur (prix d'achat, données tenant-privées) ──
+    /** ── Associations article↔fournisseur (prix d'achat, données tenant-privées) ── */
     getArticleFournisseurs: protectedProcedure
       .input(z.object({ articleId: z.number().int() }))
       .query(({ ctx, input }) => listerFournisseursDeArticle(repo, ctx.tenant, input.articleId)),

@@ -141,7 +141,7 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
 
   update(ctx: TenantContext, id: number, input: UpdateFactureInput): Promise<Facture | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Métadonnées seulement (UpdateFactureInput exclut clientId/devisId/numero/statut/totaux).
+      /** Métadonnées seulement (UpdateFactureInput exclut clientId/devisId/numero/statut/totaux). */
       const set: Partial<typeof factures.$inferInsert> = { updatedAt: new Date() };
       if (input.objet !== undefined) set.objet = input.objet;
       if (input.referenceClient !== undefined) set.referenceClient = input.referenceClient;
@@ -161,7 +161,8 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
   delete(ctx: TenantContext, id: number): Promise<boolean> {
     return withTenant(this.db, ctx, async (tx) => {
       if (!(await this.ownsFacture(tx, ctx, id))) return false;
-      await tx.delete(facturesLignes).where(eq(facturesLignes.factureId, id)); // cascade
+      /** cascade */
+      await tx.delete(facturesLignes).where(eq(facturesLignes.factureId, id));
       const deleted = await tx
         .delete(factures)
         .where(and(eq(factures.id, id), eq(factures.artisanId, ctx.artisanId)))
@@ -232,7 +233,7 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
 
   nextNumeroAvoir(ctx: TenantContext): Promise<string> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Parité legacy `getNextAvoirNumber` : préfixe/compteur dédiés ; MAX scopé typeDocument='avoir'.
+      /** Parité legacy `getNextAvoirNumber` : préfixe/compteur dédiés ; MAX scopé typeDocument='avoir'. */
       const [params] = await tx
         .select({ prefixe: parametresArtisan.prefixeAvoir, compteur: parametresArtisan.compteurAvoir })
         .from(parametresArtisan)
@@ -294,7 +295,7 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
 
   createAvoir(ctx: TenantContext, input: CreateAvoirInput): Promise<Facture | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // La facture d'origine doit appartenir au tenant (anti-IDOR-FK).
+      /** La facture d'origine doit appartenir au tenant (anti-IDOR-FK). */
       if (!(await this.ownsFacture(tx, ctx, input.factureOrigineId))) return null;
       const totaux = calculerTotaux(input.lignes);
       const [avoir] = await tx
@@ -348,7 +349,7 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
 
   createFromDevis(ctx: TenantContext, input: CreateFromDevisInput): Promise<Facture | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Le client référencé (hérité du devis) doit appartenir au tenant (anti-IDOR-FK).
+      /** Le client référencé (hérité du devis) doit appartenir au tenant (anti-IDOR-FK). */
       const [cli] = await tx
         .select({ id: clients.id })
         .from(clients)
@@ -503,7 +504,7 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
     });
   }
 
-  // Recalcule les totaux de la facture à partir de SES lignes (source de vérité). Server-side.
+  /** Recalcule les totaux de la facture à partir de SES lignes (source de vérité). Server-side. */
   private async recalculerTotaux(tx: DbClient, factureId: number): Promise<void> {
     const lignes = await tx
       .select({ montantHT: facturesLignes.montantHT, montantTVA: facturesLignes.montantTVA, montantTTC: facturesLignes.montantTTC })
@@ -520,7 +521,7 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
       .where(eq(factures.id, factureId));
   }
 
-  // La facture appartient-elle au tenant ? (RLS + filtre artisanId)
+  /** La facture appartient-elle au tenant ? (RLS + filtre artisanId) */
   private async ownsFacture(tx: DbClient, ctx: TenantContext, factureId: number): Promise<boolean> {
     const [row] = await tx
       .select({ id: factures.id })

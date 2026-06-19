@@ -9,7 +9,7 @@ const DEFAULT_CONFIG: ConfigComptable = {
   journalAchats: "AC",
 };
 
-// Double in-memory du FecReader (tests sans DB). Filtre déductibles par période + scope tenant.
+/** Double in-memory du FecReader (tests sans DB). Filtre déductibles par période + scope tenant. */
 export class FakeFecReader implements FecReader {
   private depenses: Array<FecDepense & { artisanId: number; deductible: boolean }> = [];
   private configs = new Map<number, ConfigComptable>();

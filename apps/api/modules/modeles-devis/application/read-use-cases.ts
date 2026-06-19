@@ -8,7 +8,7 @@ import type { ModeleDevis, ModeleDevisLigne } from "../domain/modele-devis";
  * `getModeleDevis` sur une ressource d'un autre tenant → repo renvoie null → NotFoundError.
  */
 
-// Liste « légère » (en-têtes sans lignes) ; le détail (lignes) passe par getModeleDevis.
+/** Liste « légère » (en-têtes sans lignes) ; le détail (lignes) passe par getModeleDevis. */
 export function listModelesDevis(repo: IModeleDevisRepository, ctx: TenantContext): Promise<ModeleDevis[]> {
   return repo.list(ctx);
 }

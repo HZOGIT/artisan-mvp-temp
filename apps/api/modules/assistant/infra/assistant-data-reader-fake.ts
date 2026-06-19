@@ -2,11 +2,12 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { DevisAnalyseData, TresorerieData } from "../domain/generators";
 import type { AssistantDataReader, DevisNonSigneAvecClient } from "../application/assistant-data-reader";
 
-// Data reader fake (in-memory, par tenant) pour tester les générateurs IA sans DB.
+/** Data reader fake (in-memory, par tenant) pour tester les générateurs IA sans DB. */
 export class FakeAssistantDataReader implements AssistantDataReader {
   private devisNonSignes = new Map<number, DevisNonSigneAvecClient[]>();
   private catalogues = new Map<number, string>();
-  private analyses = new Map<string, DevisAnalyseData>(); // clé `${artisanId}:${devisId}`
+  /** clé `${artisanId}:${devisId}` */
+  private analyses = new Map<string, DevisAnalyseData>();
   private tresoreries = new Map<number, TresorerieData>();
 
   seedDevisNonSignes(artisanId: number, rows: DevisNonSigneAvecClient[]): void {

@@ -8,7 +8,7 @@ const startSchema = z.object({
   longitude: z.number().optional(),
 });
 
-// Bornes legacy : notes ~5 000 car, signatureClient = image base64 (~500 Ko, même borne que signDevis).
+/** Bornes legacy : notes ~5 000 car, signatureClient = image base64 (~500 Ko, même borne que signDevis). */
 const endSchema = z.object({
   interventionId: z.number().int().positive(),
   notes: z.string().max(5000).optional(),

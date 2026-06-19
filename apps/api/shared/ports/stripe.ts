@@ -61,16 +61,16 @@ export interface StripePort {
    * ⚠️ Ne JAMAIS appeler avec un secret vide (un attaquant forgerait une signature à clé vide).
    */
   constructEvent(rawBody: Buffer, signature: string, secret: string): Promise<StripeWebhookEvent>;
-  // Crée un Customer Stripe (à la 1re souscription). Renvoie son id.
+  /** Crée un Customer Stripe (à la 1re souscription). Renvoie son id. */
   createCustomer(params: CreateCustomerParams): Promise<{ id: string }>;
-  // Crée une session Checkout (mode subscription). Renvoie l'URL de redirection (null possible).
+  /** Crée une session Checkout (mode subscription). Renvoie l'URL de redirection (null possible). */
   createCheckoutSession(params: CreateCheckoutParams): Promise<{ url: string | null }>;
-  // Crée une session Checkout (mode `payment`) pour le paiement d'une facture. Renvoie url + sessionId.
+  /** Crée une session Checkout (mode `payment`) pour le paiement d'une facture. Renvoie url + sessionId. */
   createInvoiceCheckout(params: CreateInvoiceCheckoutParams): Promise<{ url: string | null; sessionId: string }>;
-  // Crée une session du portail de facturation (gérer carte/factures). Renvoie l'URL.
+  /** Crée une session du portail de facturation (gérer carte/factures). Renvoie l'URL. */
   createBillingPortalSession(params: { customerId: string; returnUrl: string }): Promise<{ url: string | null }>;
-  // Bascule `cancel_at_period_end` sur l'abonnement Stripe (annulation/réactivation en fin de période).
+  /** Bascule `cancel_at_period_end` sur l'abonnement Stripe (annulation/réactivation en fin de période). */
   setCancelAtPeriodEnd(subscriptionId: string, cancel: boolean): Promise<void>;
-  // Recharge l'abonnement Stripe (webhook `invoice.payment_succeeded` → `current_period_*` à jour).
+  /** Recharge l'abonnement Stripe (webhook `invoice.payment_succeeded` → `current_period_*` à jour). */
   retrieveSubscription(subscriptionId: string): Promise<{ status: string; currentPeriodStart: Date | null; currentPeriodEnd: Date | null }>;
 }

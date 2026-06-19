@@ -45,7 +45,7 @@ export class UtilisateurRepositoryDrizzle implements IUtilisateurRepository {
     return { id: row.id, email: row.email ?? null, role: row.role };
   }
 
-  // Appartenance STRICTE (collaborateur du tenant) : `users.artisanId === ctx.artisanId` (owner exclu).
+  /** Appartenance STRICTE (collaborateur du tenant) : `users.artisanId === ctx.artisanId` (owner exclu). */
   private async ownsStrict(ctx: TenantContext, userId: number): Promise<boolean> {
     const [u] = await this.db.select({ artisanId: users.artisanId }).from(users).where(eq(users.id, userId)).limit(1);
     return Boolean(u) && u.artisanId === ctx.artisanId;

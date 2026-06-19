@@ -11,7 +11,7 @@ type MutableActivite = { -readonly [K in keyof Activite]: Activite[K] };
 export class FakeActiviteRepository implements IActiviteRepository {
   private seq = 0;
   private activites: MutableActivite[] = [];
-  // clé `${entiteType}:${entiteId}` → artisanId propriétaire (pour ownsEntite).
+  /** clé `${entiteType}:${entiteId}` → artisanId propriétaire (pour ownsEntite). */
   private readonly entiteOwner = new Map<string, number>();
 
   registerEntite(artisanId: number, entiteType: ActiviteEntiteType, entiteId: number): void {

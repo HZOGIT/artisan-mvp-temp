@@ -26,7 +26,7 @@ export interface PublicArticleSearchReader {
   search(q: string, filters: PublicArticleSearchFilters): Promise<PublicArticleRow[]>;
 }
 
-// Requête de recherche exploitable ? (parité legacy : < 2 caractères → pas de requête, renvoie []).
+/** Requête de recherche exploitable ? (parité legacy : < 2 caractères → pas de requête, renvoie []). */
 export function isSearchable(q: string): boolean {
   return q.trim().length >= 2;
 }

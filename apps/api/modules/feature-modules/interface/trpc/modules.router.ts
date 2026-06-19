@@ -31,7 +31,7 @@ export function createModulesRouter(repo: IModulesRepository) {
         z.object({
           metier: z.string().max(100).optional(),
           plan: z.string().max(20).optional(),
-          // Borne defense-in-depth (parcouru via Set.has pour chaque module du catalogue).
+          /** Borne defense-in-depth (parcouru via Set.has pour chaque module du catalogue). */
           moduleSlugs: z.array(z.string().max(100)).max(200).optional(),
         }),
       )

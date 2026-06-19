@@ -55,7 +55,7 @@ export class PortalAccessRepositoryDrizzle implements IPortalAccessRepository {
 
   async createAccess(ctx: TenantContext, data: CreateAccessData): Promise<void> {
     await withTenant(this.db, ctx, async (tx) => {
-      // Parité legacy : un nouveau lien remplace l'ancien → on désactive les accès existants du client.
+      /** Parité legacy : un nouveau lien remplace l'ancien → on désactive les accès existants du client. */
       await tx.update(clientPortalAccess).set({ isActive: false }).where(and(eq(clientPortalAccess.clientId, data.clientId), eq(clientPortalAccess.artisanId, ctx.artisanId)));
       await tx.insert(clientPortalAccess).values({ clientId: data.clientId, artisanId: ctx.artisanId, token: data.token, email: data.email, expiresAt: data.expiresAt, isActive: true });
     });

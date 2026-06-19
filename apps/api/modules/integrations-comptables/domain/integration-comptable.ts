@@ -9,7 +9,7 @@ export type FormatExport = "fec" | "iif" | "qbo" | "csv";
 export type FrequenceSync = "quotidien" | "hebdomadaire" | "mensuel" | "manuel";
 export type ExportStatut = "en_cours" | "termine" | "erreur";
 
-// Configuration comptable d'un artisan (1 par tenant). Tous les champs nullables (config partielle).
+/** Configuration comptable d'un artisan (1 par tenant). Tous les champs nullables (config partielle). */
 export interface ConfigComptable {
   readonly logiciel: string | null;
   readonly formatExport: string | null;
@@ -38,7 +38,7 @@ export interface ConfigComptable {
   readonly prochainSync: Date | null;
 }
 
-// Patch d'upsert de la config (toutes optionnelles ; artisanId jamais fourni par le client).
+/** Patch d'upsert de la config (toutes optionnelles ; artisanId jamais fourni par le client). */
 export interface SaveConfigInput {
   readonly logiciel?: LogicielComptable;
   readonly formatExport?: FormatExport;
@@ -81,7 +81,7 @@ export interface ExportComptableRow {
   readonly createdAt: Date;
 }
 
-// Facture pour l'export IIF (sous-ensemble).
+/** Facture pour l'export IIF (sous-ensemble). */
 export interface FactureIIF {
   readonly id: number;
   readonly numero: string | null;
@@ -117,7 +117,7 @@ export function buildIIF(factures: readonly FactureIIF[]): string {
   return lines.join("\n");
 }
 
-// Statut de synchro dérivé de la config (parité legacy `getSyncStatus`).
+/** Statut de synchro dérivé de la config (parité legacy `getSyncStatus`). */
 export function deriveSyncStatus(config: ConfigComptable | null): { actif: boolean; derniereSync: Date | null; prochainSync: Date | null } {
   return {
     actif: Boolean(config?.syncAutoFactures || config?.syncAutoPaiements),

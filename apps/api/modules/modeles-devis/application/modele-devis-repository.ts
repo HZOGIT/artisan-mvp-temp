@@ -14,14 +14,14 @@ import type {
  * sans vérifier l'ownership du modèle).
  */
 export interface IModeleDevisRepository {
-  // Liste « légère » : en-têtes du tenant (les lignes ne sont pas chargées ici — voir getById).
+  /** Liste « légère » : en-têtes du tenant (les lignes ne sont pas chargées ici — voir getById). */
   list(ctx: TenantContext): Promise<ModeleDevis[]>;
-  // Agrégat complet (en-tête + lignes ordonnées) ; null si le modèle n'appartient pas au tenant.
+  /** Agrégat complet (en-tête + lignes ordonnées) ; null si le modèle n'appartient pas au tenant. */
   getById(ctx: TenantContext, id: number): Promise<ModeleDevis | null>;
   create(ctx: TenantContext, input: CreateModeleDevisInput): Promise<ModeleDevis>;
-  // null si le modèle n'appartient pas au tenant. Si `input.lignes` est fourni → remplacement complet.
+  /** null si le modèle n'appartient pas au tenant. Si `input.lignes` est fourni → remplacement complet. */
   update(ctx: TenantContext, id: number, input: UpdateModeleDevisInput): Promise<ModeleDevis | null>;
-  // false si le modèle n'appartient pas au tenant (supprime aussi ses lignes).
+  /** false si le modèle n'appartient pas au tenant (supprime aussi ses lignes). */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
   /*
    * Ajoute UNE ligne à un modèle possédé (sans toucher aux autres lignes — ≠ `update` qui remplace

@@ -10,10 +10,10 @@ import type { CreateRdvInput, Rdv, RdvStatut, UpdateRdvInput } from "../domain/r
 export class FakeRdvRepository implements IRdvRepository {
   private readonly store: Rdv[] = [];
   private seq = 0;
-  // Clients possédés, par artisanId (seedés par les tests pour simuler l'anti-IDOR).
+  /** Clients possédés, par artisanId (seedés par les tests pour simuler l'anti-IDOR). */
   private readonly clientsByArtisan = new Map<number, Set<number>>();
 
-  // Déclare qu'un client appartient à un artisan (pour les tests d'anti-IDOR-FK).
+  /** Déclare qu'un client appartient à un artisan (pour les tests d'anti-IDOR-FK). */
   seedClient(artisanId: number, clientId: number): void {
     if (!this.clientsByArtisan.has(artisanId)) this.clientsByArtisan.set(artisanId, new Set());
     this.clientsByArtisan.get(artisanId)!.add(clientId);
@@ -41,7 +41,8 @@ export class FakeRdvRepository implements IRdvRepository {
       description: input.description ?? null,
       dateProposee: input.dateProposee,
       dureeEstimee: input.dureeEstimee ?? 60,
-      statut: "en_attente", // forcé
+      /** forcé */
+      statut: "en_attente",
       motifRefus: null,
       urgence: input.urgence ?? "normale",
       interventionId: null,
@@ -63,7 +64,7 @@ export class FakeRdvRepository implements IRdvRepository {
       ...(input.dateProposee !== undefined ? { dateProposee: input.dateProposee } : {}),
       ...(input.dureeEstimee !== undefined ? { dureeEstimee: input.dureeEstimee } : {}),
       ...(input.urgence !== undefined ? { urgence: input.urgence } : {}),
-      // statut/motifRefus jamais touchés par update
+      /** statut/motifRefus jamais touchés par update */
       updatedAt: new Date(),
     };
     this.store[idx] = next;

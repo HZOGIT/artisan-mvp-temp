@@ -12,7 +12,7 @@ import {
 } from "../../application/write-use-cases";
 
 const typeEnum = z.enum(["conge_paye", "rtt", "maladie", "sans_solde", "formation", "autre"]);
-// Date PG `date` au format ISO `YYYY-MM-DD`.
+/** Date PG `date` au format ISO `YYYY-MM-DD`. */
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
 
 /*
@@ -47,7 +47,7 @@ export function createCongesRouter(repo: ICongeRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listConges(repo, ctx.tenant)),
 
-    // Demandes en attente (vue manager/approbateur), scopées tenant (parité client trpc.conges.enAttente).
+    /** Demandes en attente (vue manager/approbateur), scopées tenant (parité client trpc.conges.enAttente). */
     enAttente: protectedProcedure.query(({ ctx }) => listCongesEnAttente(repo, ctx.tenant)),
 
     getById: protectedProcedure
@@ -72,7 +72,7 @@ export function createCongesRouter(repo: ICongeRepository) {
         return { success: true };
       }),
 
-    // Workflow d'approbation. ⚠️ anti self-approbation porté par le use-case (403 si self).
+    /** Workflow d'approbation. ⚠️ anti self-approbation porté par le use-case (403 si self). */
     approuver: protectedProcedure
       .input(z.object({ id: z.number().int(), commentaire: z.string().max(2000).nullish() }))
       .mutation(({ ctx, input }) => approuverConge(repo, ctx.tenant, input.id, input.commentaire)),

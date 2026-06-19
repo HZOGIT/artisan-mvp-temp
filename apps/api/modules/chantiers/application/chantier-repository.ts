@@ -25,19 +25,19 @@ import type {
  */
 export interface IChantierRepository {
   list(ctx: TenantContext): Promise<Chantier[]>;
-  // null si le chantier n'appartient pas au tenant.
+  /** null si le chantier n'appartient pas au tenant. */
   getById(ctx: TenantContext, id: number): Promise<Chantier | null>;
   create(ctx: TenantContext, input: CreateChantierInput): Promise<Chantier>;
-  // null si le chantier n'appartient pas au tenant.
+  /** null si le chantier n'appartient pas au tenant. */
   update(ctx: TenantContext, id: number, input: UpdateChantierInput): Promise<Chantier | null>;
-  // false si le chantier n'appartient pas au tenant.
+  /** false si le chantier n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
   /*
    * true si le client (FK) appartient au tenant. Garde anti-IDOR-FK : interdit de rattacher un
    * chantier à un client d'un autre tenant.
    */
   ownsClient(ctx: TenantContext, clientId: number): Promise<boolean>;
-  // true si le technicien (FK) appartient au tenant (anti-IDOR-FK sur le pointage).
+  /** true si le technicien (FK) appartient au tenant (anti-IDOR-FK sur le pointage). */
   ownsTechnicien(ctx: TenantContext, technicienId: number): Promise<boolean>;
 
   /*
@@ -45,9 +45,9 @@ export interface IChantierRepository {
    * Pointages d'un chantier — [] si le chantier n'appartient pas au tenant.
    */
   listPointages(ctx: TenantContext, chantierId: number): Promise<ChantierPointage[]>;
-  // Ajoute un pointage (artisanId forcé) — null si le chantier n'appartient pas au tenant.
+  /** Ajoute un pointage (artisanId forcé) — null si le chantier n'appartient pas au tenant. */
   addPointage(ctx: TenantContext, input: CreatePointageInput): Promise<ChantierPointage | null>;
-  // Supprime un pointage (scopé chantier+tenant) — false si absent/hors tenant. Idempotent.
+  /** Supprime un pointage (scopé chantier+tenant) — false si absent/hors tenant. Idempotent. */
   deletePointage(ctx: TenantContext, chantierId: number, id: number): Promise<boolean>;
 
   /*
@@ -61,11 +61,11 @@ export interface IChantierRepository {
    * pour récupérer `chantierId` puis vérifier l'ownership du chantier (anti-IDOR). null si absent.
    */
   getSuiviById(ctx: TenantContext, id: number): Promise<ChantierSuivi | null>;
-  // Crée une étape de suivi (ownership du chantier vérifiée par le use-case).
+  /** Crée une étape de suivi (ownership du chantier vérifiée par le use-case). */
   addSuivi(ctx: TenantContext, input: CreateSuiviInput): Promise<ChantierSuivi>;
-  // Met à jour une étape de suivi par id (ownership vérifiée en amont) — null si absente.
+  /** Met à jour une étape de suivi par id (ownership vérifiée en amont) — null si absente. */
   updateSuivi(ctx: TenantContext, id: number, input: UpdateSuiviInput): Promise<ChantierSuivi | null>;
-  // Supprime une étape de suivi par id (ownership vérifiée en amont) — false si absente.
+  /** Supprime une étape de suivi par id (ownership vérifiée en amont) — false si absente. */
   deleteSuivi(ctx: TenantContext, id: number): Promise<boolean>;
 
   /*
@@ -78,11 +78,11 @@ export interface IChantierRepository {
    * puis vérifier l'ownership du chantier (anti-IDOR). null si absente.
    */
   getPhaseById(ctx: TenantContext, id: number): Promise<ChantierPhase | null>;
-  // Crée une phase (ownership du chantier vérifiée par le use-case).
+  /** Crée une phase (ownership du chantier vérifiée par le use-case). */
   addPhase(ctx: TenantContext, input: CreatePhaseInput): Promise<ChantierPhase>;
-  // Met à jour une phase par id (ownership vérifiée en amont) — null si absente.
+  /** Met à jour une phase par id (ownership vérifiée en amont) — null si absente. */
   updatePhase(ctx: TenantContext, id: number, input: UpdatePhaseInput): Promise<ChantierPhase | null>;
-  // Supprime une phase par id (ownership vérifiée en amont) — false si absente.
+  /** Supprime une phase par id (ownership vérifiée en amont) — false si absente. */
   deletePhase(ctx: TenantContext, id: number): Promise<boolean>;
 
   /*
@@ -90,16 +90,16 @@ export interface IChantierRepository {
    * true si l'intervention (FK) appartient au tenant (anti-IDOR-FK sur l'association).
    */
   ownsIntervention(ctx: TenantContext, interventionId: number): Promise<boolean>;
-  // Liens d'un chantier (triés par ordre). Ownership chantier vérifiée en amont par le use-case.
+  /** Liens d'un chantier (triés par ordre). Ownership chantier vérifiée en amont par le use-case. */
   listInterventionsLiens(ctx: TenantContext, chantierId: number): Promise<ChantierInterventionLien[]>;
-  // Tous les liens des chantiers du tenant (scopé tenant via jointure chantiers, anti-N+1).
+  /** Tous les liens des chantiers du tenant (scopé tenant via jointure chantiers, anti-N+1). */
   listAllInterventionsLiens(ctx: TenantContext): Promise<ChantierInterventionLien[]>;
   /*
    * Associe une intervention à un chantier (idempotent sur (chantier,intervention)). Ownership des
    * DEUX ressources (chantier + intervention) vérifiée en amont par le use-case.
    */
   associerIntervention(ctx: TenantContext, input: AssocierInterventionInput): Promise<ChantierInterventionLien>;
-  // Dissocie une intervention d'un chantier — false si le lien n'existait pas. Idempotent.
+  /** Dissocie une intervention d'un chantier — false si le lien n'existait pas. Idempotent. */
   dissocierIntervention(ctx: TenantContext, chantierId: number, interventionId: number): Promise<boolean>;
 
   /*
@@ -112,9 +112,9 @@ export interface IChantierRepository {
    * puis vérifier l'ownership du chantier (anti-IDOR). null si absent.
    */
   getDocumentById(ctx: TenantContext, id: number): Promise<ChantierDocument | null>;
-  // Ajoute un document (ownership du chantier vérifiée par le use-case).
+  /** Ajoute un document (ownership du chantier vérifiée par le use-case). */
   addDocument(ctx: TenantContext, input: AddDocumentInput): Promise<ChantierDocument>;
-  // Supprime un document par id (ownership vérifiée en amont) — false si absent.
+  /** Supprime un document par id (ownership vérifiée en amont) — false si absent. */
   deleteDocument(ctx: TenantContext, id: number): Promise<boolean>;
 
   /*
@@ -124,6 +124,6 @@ export interface IChantierRepository {
    * chantier vérifiée en amont par le use-case.
    */
   sumDepensesChantier(ctx: TenantContext, chantierId: number): Promise<string>;
-  // Met à jour l'avancement (0..100) d'un chantier possédé (scopé tenant). Ownership vérifiée en amont.
+  /** Met à jour l'avancement (0..100) d'un chantier possédé (scopé tenant). Ownership vérifiée en amont. */
   setAvancement(ctx: TenantContext, chantierId: number, avancement: number): Promise<void>;
 }

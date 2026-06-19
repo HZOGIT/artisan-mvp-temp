@@ -26,7 +26,7 @@ function toSubscription(r: Row): SubscriptionRow {
   };
 }
 
-// ⚠️ `subscriptions` est HORS RLS (denylist) → scope EXPLICITE par `artisan_id`.
+/** ⚠️ `subscriptions` est HORS RLS (denylist) → scope EXPLICITE par `artisan_id`. */
 export class SubscriptionReaderDrizzle implements ISubscriptionRepository {
   constructor(private readonly db: DbClient) {}
 
@@ -39,7 +39,7 @@ export class SubscriptionReaderDrizzle implements ISubscriptionRepository {
     await this.db.update(subscriptions).set({ cancel_at_period_end: cancel }).where(eq(subscriptions.artisan_id, ctx.artisanId));
   }
 
-  // Upsert sur la clé unique `artisan_id` (la ligne d'abonnement peut ne pas exister au 1er checkout).
+  /** Upsert sur la clé unique `artisan_id` (la ligne d'abonnement peut ne pas exister au 1er checkout). */
   async setStripeCustomerId(ctx: TenantContext, customerId: string): Promise<void> {
     await this.db
       .insert(subscriptions)

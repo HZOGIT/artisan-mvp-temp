@@ -16,12 +16,14 @@ export interface ConfigRelancesAuto {
   readonly joursApresEnvoi: number;
   readonly joursEntreRelances: number;
   readonly nombreMaxRelances: number;
-  readonly heureEnvoi: string; // "HH:MM"
-  readonly joursEnvoi: string; // ex. "1,2,3,4,5" (jours de la semaine 1..7)
+  /** "HH:MM" */
+  readonly heureEnvoi: string;
+  /** ex. "1,2,3,4,5" (jours de la semaine 1..7) */
+  readonly joursEnvoi: string;
   readonly modeleEmailId: number | null;
 }
 
-// Champs modifiables via la configuration (tous optionnels — upsert partiel).
+/** Champs modifiables via la configuration (tous optionnels — upsert partiel). */
 export interface UpdateConfigRelancesInput {
   readonly actif?: boolean;
   readonly joursApresEnvoi?: number;

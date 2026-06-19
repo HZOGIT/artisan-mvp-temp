@@ -20,7 +20,7 @@ export class PortalDocsReaderDrizzle implements IPortalDocsReader {
         .from(devis)
         .where(and(eq(devis.clientId, clientId), eq(devis.artisanId, ctx.artisanId)))
         .orderBy(desc(devis.createdAt));
-      // `tokenSignature` n'existe pas sur la table devis (parité legacy : toujours null).
+      /** `tokenSignature` n'existe pas sur la table devis (parité legacy : toujours null). */
       return rows.map((d) => ({ id: d.id, numero: d.numero, objet: d.objet ?? null, totalTTC: d.totalTTC ?? null, statut: d.statut ?? null, dateCreation: d.createdAt, tokenSignature: null }));
     });
   }
@@ -33,7 +33,7 @@ export class PortalDocsReaderDrizzle implements IPortalDocsReader {
         .where(and(eq(factures.clientId, clientId), eq(factures.artisanId, ctx.artisanId)))
         .orderBy(desc(factures.createdAt));
       if (rows.length === 0) return [];
-      // Lien de paiement « en attente » par facture (1 requête groupée, anti N+1).
+      /** Lien de paiement « en attente » par facture (1 requête groupée, anti N+1). */
       const pendings = await tx
         .select({ factureId: paiementsStripe.factureId, lienPaiement: paiementsStripe.lienPaiement })
         .from(paiementsStripe)
@@ -59,7 +59,7 @@ export class PortalDocsReaderDrizzle implements IPortalDocsReader {
 
   listContrats(ctx: TenantContext, clientId: number): Promise<PortalContrat[]> {
     return withTenant(this.db, ctx, async (tx) => {
-      // ⚠️ on EXCLUT `notes` (notes internes artisan) et autres champs non client-safe (parité legacy).
+      /** ⚠️ on EXCLUT `notes` (notes internes artisan) et autres champs non client-safe (parité legacy). */
       const rows = await tx
         .select({
           id: contratsMaintenance.id, reference: contratsMaintenance.reference, titre: contratsMaintenance.titre, description: contratsMaintenance.description,

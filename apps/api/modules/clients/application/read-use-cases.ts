@@ -31,7 +31,7 @@ export async function rechercherClients(repo: IClientRepository, ctx: TenantCont
   return repo.search(ctx, query);
 }
 
-// Encours (reste dû) d'un client — lecture seule, scopée tenant. Le calcul est pur (testable).
+/** Encours (reste dû) d'un client — lecture seule, scopée tenant. Le calcul est pur (testable). */
 export async function getEncoursClient(
   repo: IClientRepository,
   ctx: TenantContext,
@@ -42,7 +42,7 @@ export async function getEncoursClient(
   return calculerEncours(rows, now);
 }
 
-// Encours de tous les clients débiteurs du tenant (une requête, agrégat par clientId).
+/** Encours de tous les clients débiteurs du tenant (une requête, agrégat par clientId). */
 export async function getEncoursMap(
   repo: IClientRepository,
   ctx: TenantContext,

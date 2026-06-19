@@ -15,7 +15,8 @@ export interface Article {
   readonly designation: string;
   readonly description: string | null;
   readonly unite: string;
-  readonly prixUnitaireHT: string; // numeric PG en string
+  /** numeric PG en string */
+  readonly prixUnitaireHT: string;
   readonly tauxTVA: string;
   readonly categorie: string | null;
   readonly createdAt: Date;

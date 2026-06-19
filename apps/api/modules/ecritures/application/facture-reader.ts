@@ -12,8 +12,10 @@ export interface FactureReadModel {
   readonly artisanId: number;
   readonly numero: string;
   readonly dateFacture: Date;
-  readonly typeDocument: string; // "facture" | "avoir"
-  readonly statut: string; // brouillon|validee|envoyee|payee|en_retard|annulee
+  /** "facture" | "avoir" */
+  readonly typeDocument: string;
+  /** brouillon|validee|envoyee|payee|en_retard|annulee */
+  readonly statut: string;
   readonly datePaiement: Date | null;
   readonly totalHT: string;
   readonly totalTVA: string;
@@ -26,8 +28,8 @@ export interface FactureLigneReadModel {
 }
 
 export interface IFactureReader {
-  // null si la facture n'appartient pas au tenant.
+  /** null si la facture n'appartient pas au tenant. */
   getFacture(ctx: TenantContext, factureId: number): Promise<FactureReadModel | null>;
-  // [] si la facture n'appartient pas au tenant (scope via la facture parente).
+  /** [] si la facture n'appartient pas au tenant (scope via la facture parente). */
   getLignes(ctx: TenantContext, factureId: number): Promise<FactureLigneReadModel[]>;
 }

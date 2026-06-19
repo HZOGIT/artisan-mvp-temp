@@ -7,8 +7,8 @@ import type { ConfigRelancesAuto, UpdateConfigRelancesInput } from "../domain/co
  * une seule ligne par artisan ; pas d'opération by-id, uniquement get/upsert.
  */
 export interface IConfigRelancesRepository {
-  // Renvoie la config du tenant ; **défauts (jamais null)** si la ligne est absente.
+  /** Renvoie la config du tenant ; **défauts (jamais null)** si la ligne est absente. */
   get(ctx: TenantContext): Promise<ConfigRelancesAuto>;
-  // Crée la ligne si absente, sinon met à jour les champs config fournis. Idempotent.
+  /** Crée la ligne si absente, sinon met à jour les champs config fournis. Idempotent. */
   upsert(ctx: TenantContext, input: UpdateConfigRelancesInput): Promise<ConfigRelancesAuto>;
 }

@@ -2,7 +2,7 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { CreateArriveeData, IInterventionMobileRepository, UpdateArriveeData, UpdateDepartData } from "../application/intervention-mobile-repository";
 import type { InterventionMobile } from "../domain/intervention-mobile";
 
-// Fake en mémoire de `interventions_mobile` (une ligne au plus par interventionId).
+/** Fake en mémoire de `interventions_mobile` (une ligne au plus par interventionId). */
 export class InterventionMobileRepositoryFake implements IInterventionMobileRepository {
   rows: InterventionMobile[];
   private seq: number;

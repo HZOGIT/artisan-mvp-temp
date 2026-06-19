@@ -16,7 +16,7 @@ export class FakeCategorieDepenseRepository implements ICategorieDepenseReposito
     return this.store.filter((c) => c.artisanId === ctx.artisanId);
   }
 
-  // Lève ConflictError si un autre enregistrement du tenant porte déjà `nom`.
+  /** Lève ConflictError si un autre enregistrement du tenant porte déjà `nom`. */
   private assertNomUnique(ctx: TenantContext, nom: string, exclureId?: number): void {
     const doublon = this.scoped(ctx).some((c) => c.nom === nom && c.id !== exclureId);
     if (doublon) throw new ConflictError("Une catégorie portant ce nom existe déjà");

@@ -16,7 +16,7 @@ export async function getIcalFeed(repo: IIcalFeedRepository, genererToken: Token
   return { path: icalPath(token) };
 }
 
-// Régénère le jeton (révoque l'ancien lien d'abonnement) et renvoie le nouveau chemin.
+/** Régénère le jeton (révoque l'ancien lien d'abonnement) et renvoie le nouveau chemin. */
 export async function regenerateIcalFeed(repo: IIcalFeedRepository, genererToken: TokenGenerator, ctx: TenantContext): Promise<IcalFeed> {
   const token = genererToken();
   await repo.setToken(ctx, token);

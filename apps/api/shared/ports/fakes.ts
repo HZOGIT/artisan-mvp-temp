@@ -1,4 +1,4 @@
-// Implémentations en mémoire des ports, pour les tests (use-cases sans infra réelle).
+/** Implémentations en mémoire des ports, pour les tests (use-cases sans infra réelle). */
 import type { EmailPort, EmailMessage } from "./email";
 import type { SmsPort, SmsMessage } from "./sms";
 import type { StoragePort, PutOptions } from "./storage";
@@ -80,7 +80,7 @@ export class FakeLlmPort implements LlmPort {
     this.queue = Array.isArray(responses) ? [...responses] : [responses];
   }
   private next(): string {
-    // File à plusieurs entrées → consomme ; sinon réponse fixe réutilisée.
+    /** File à plusieurs entrées → consomme ; sinon réponse fixe réutilisée. */
     return this.queue.length > 1 ? this.queue.shift()! : this.queue[0] ?? "";
   }
   async complete(prompt: string): Promise<string> {
@@ -90,7 +90,7 @@ export class FakeLlmPort implements LlmPort {
   async *stream(prompt: string): AsyncIterable<string> {
     this.prompts.push(prompt);
     const text = this.next();
-    // Découpe en fragments pour simuler le flux (concaténés = texte complet).
+    /** Découpe en fragments pour simuler le flux (concaténés = texte complet). */
     for (const part of text.match(/[\s\S]{1,8}/g) ?? [text]) yield part;
   }
 }

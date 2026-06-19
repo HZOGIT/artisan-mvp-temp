@@ -8,12 +8,13 @@ import type { ReadToolHandler } from "./assistant-tool-registry";
  * formatage sont PURES (testables sans I/O).
  */
 
-// Sous-ensemble des champs client/facture nécessaires (compatible avec les types migrés Client/Facture).
+/** Sous-ensemble des champs client/facture nécessaires (compatible avec les types migrés Client/Facture). */
 export interface AgentClient {
   readonly id: number;
   readonly nom: string;
   readonly prenom: string | null;
-  readonly raisonSociale: string | null; // ex-`entreprise` legacy
+  /** ex-`entreprise` legacy */
+  readonly raisonSociale: string | null;
   readonly email: string | null;
   readonly telephone: string | null;
   readonly ville: string | null;
@@ -39,8 +40,10 @@ export interface AgentDevis {
 export interface AgentStock {
   readonly id: number;
   readonly designation: string;
-  readonly quantiteEnStock: string; // ex-`quantite` legacy
-  readonly seuilAlerte: string; // ex-`seuil` legacy
+  /** ex-`quantite` legacy */
+  readonly quantiteEnStock: string;
+  /** ex-`seuil` legacy */
+  readonly seuilAlerte: string;
   readonly unite: string;
 }
 export interface AgentFournisseur {
@@ -60,7 +63,7 @@ export interface AgentIntervention {
   readonly statut: string;
   readonly adresse: string | null;
 }
-// Stats dashboard nécessaires à `get_statistiques` (DashboardStats migré est structurellement compatible).
+/** Stats dashboard nécessaires à `get_statistiques` (DashboardStats migré est structurellement compatible). */
 export interface AgentDashboardStats {
   readonly caMonth: number;
   readonly caYear: number;
@@ -106,7 +109,7 @@ export interface AssistantReadDeps {
   readonly stats?: StatsReaderForAgent;
 }
 
-// Normalisation recherche : minuscule, sans accents (NFD + suppression des diacritiques combinants).
+/** Normalisation recherche : minuscule, sans accents (NFD + suppression des diacritiques combinants). */
 export function normalizeForSearch(s: string | null | undefined): string {
   return (s || "")
     .normalize("NFD")
@@ -135,13 +138,13 @@ export function formatChercherClient(clients: readonly AgentClient[], rawNom: st
   const haystackOf = (c: AgentClient) => normalizeForSearch(`${c.prenom || ""} ${c.nom || ""} ${c.raisonSociale || ""} ${c.email || ""}`);
 
   type Candidate = { c: AgentClient; score: number };
-  // Passe 1 — la chaîne complète apparaît telle quelle.
+  /** Passe 1 — la chaîne complète apparaît telle quelle. */
   let candidates: Candidate[] = clients.filter((c) => haystackOf(c).includes(queryNorm)).map((c) => ({ c, score: 1000 }));
-  // Passe 2 — tous les mots présents (ordre/champ libres).
+  /** Passe 2 — tous les mots présents (ordre/champ libres). */
   if (candidates.length === 0) {
     candidates = clients.filter((c) => words.every((w) => haystackOf(c).includes(w))).map((c) => ({ c, score: words.length * 10 }));
   }
-  // Passe 3 — partielle : au moins un mot, tri par nombre de mots matchés décroissant.
+  /** Passe 3 — partielle : au moins un mot, tri par nombre de mots matchés décroissant. */
   if (candidates.length === 0) {
     candidates = clients
       .map((c) => ({ c, score: words.reduce((acc, w) => acc + (haystackOf(c).includes(w) ? 1 : 0), 0) }))
@@ -152,7 +155,7 @@ export function formatChercherClient(clients: readonly AgentClient[], rawNom: st
   return { matches, count: matches.length };
 }
 
-// `lister_clients` : filtre substring sur nom/prénom/entreprise, ≤50 résultats. `{count, total, clients}`.
+/** `lister_clients` : filtre substring sur nom/prénom/entreprise, ≤50 résultats. `{count, total, clients}`. */
 export function formatListerClients(clients: readonly AgentClient[], rawFiltre: string | undefined): { count: number; total: number; clients: ReturnType<typeof clientCard>[] } {
   const filtre = String(rawFiltre || "").toLowerCase().trim();
   const filtered = filtre
@@ -165,7 +168,7 @@ export function formatListerClients(clients: readonly AgentClient[], rawFiltre: 
   return { count: limited.length, total: filtered.length, clients: limited };
 }
 
-// Map clientId → "Prénom Nom" (sinon "#id") pour enrichir les listes de factures.
+/** Map clientId → "Prénom Nom" (sinon "#id") pour enrichir les listes de factures. */
 export function buildClientNameMap(clients: readonly AgentClient[]): Map<number, string> {
   const map = new Map<number, string>();
   for (const c of clients) map.set(c.id, `${c.prenom || ""} ${c.nom || ""}`.trim() || `#${c.id}`);
@@ -192,7 +195,7 @@ export function formatListerFactures(factures: readonly AgentFacture[], names: M
   return { count: list.length, factures: list };
 }
 
-// `lister_factures_impayees` : statut ≠ payee/annulee/brouillon, jours de retard, plus en retard d'abord.
+/** `lister_factures_impayees` : statut ≠ payee/annulee/brouillon, jours de retard, plus en retard d'abord. */
 export function formatListerFacturesImpayees(factures: readonly AgentFacture[], now: number): { count: number; factures: object[] } {
   const impayees = factures
     .filter((f) => f.statut !== "payee" && f.statut !== "annulee" && f.statut !== "brouillon")
@@ -209,7 +212,7 @@ export function formatListerFacturesImpayees(factures: readonly AgentFacture[], 
   return { count: impayees.length, factures: impayees };
 }
 
-// `lister_devis` : tous les devis (filtre statut optionnel), nom client résolu, plus récent d'abord.
+/** `lister_devis` : tous les devis (filtre statut optionnel), nom client résolu, plus récent d'abord. */
 export function formatListerDevis(devis: readonly AgentDevis[], names: Map<number, string>, statut: string | undefined): { count: number; devis: object[] } {
   const wantStatut = statut ? String(statut).trim() : undefined;
   let list = devis.map((d) => ({
@@ -226,7 +229,7 @@ export function formatListerDevis(devis: readonly AgentDevis[], names: Map<numbe
   return { count: list.length, devis: list };
 }
 
-// `lister_devis_en_attente` : devis `envoye`, jours depuis envoi, plus ancien (le plus en attente) d'abord.
+/** `lister_devis_en_attente` : devis `envoye`, jours depuis envoi, plus ancien (le plus en attente) d'abord. */
 export function formatListerDevisEnAttente(devis: readonly AgentDevis[], now: number): { count: number; devis: object[] } {
   const enAttente = devis
     .filter((d) => d.statut === "envoye")
@@ -243,7 +246,7 @@ export function formatListerDevisEnAttente(devis: readonly AgentDevis[], now: nu
   return { count: enAttente.length, devis: enAttente };
 }
 
-// `verifier_stocks` : statut rupture (q≤0) | alerte (q≤seuil) | ok, + récap réappro (parité legacy).
+/** `verifier_stocks` : statut rupture (q≤0) | alerte (q≤seuil) | ok, + récap réappro (parité legacy). */
 export function formatVerifierStocks(stocks: readonly AgentStock[]): {
   total: number;
   nbRuptures: number;
@@ -270,7 +273,7 @@ export function formatVerifierStocks(stocks: readonly AgentStock[]): {
   };
 }
 
-// `lister_fournisseurs` : ≤50, `{count, fournisseurs}` (avec `contact`).
+/** `lister_fournisseurs` : ≤50, `{count, fournisseurs}` (avec `contact`). */
 export function formatListerFournisseurs(fournisseurs: readonly AgentFournisseur[]): { count: number; fournisseurs: object[] } {
   const limited = fournisseurs.slice(0, 50).map((f) => ({
     id: f.id,
@@ -283,7 +286,7 @@ export function formatListerFournisseurs(fournisseurs: readonly AgentFournisseur
   return { count: limited.length, fournisseurs: limited };
 }
 
-// `chercher_fournisseur` : substring nom (insensible casse), ≤5, `{matches, count}` (sans `contact`).
+/** `chercher_fournisseur` : substring nom (insensible casse), ≤5, `{matches, count}` (sans `contact`). */
 export function formatChercherFournisseur(fournisseurs: readonly AgentFournisseur[], rawNom: string): { matches: object[]; count: number } {
   const query = String(rawNom || "").toLowerCase().trim();
   const matches = fournisseurs
@@ -293,7 +296,7 @@ export function formatChercherFournisseur(fournisseurs: readonly AgentFournisseu
   return { matches, count: matches.length };
 }
 
-// `lister_interventions` : filtres statut + dateDebut≥dateMin / dateDebut≤dateMax, ≤50, `{count, interventions}`.
+/** `lister_interventions` : filtres statut + dateDebut≥dateMin / dateDebut≤dateMax, ≤50, `{count, interventions}`. */
 export function formatListerInterventions(
   interventions: readonly AgentIntervention[],
   filtres: { statut?: string; dateDebut?: string; dateFin?: string },
@@ -313,7 +316,7 @@ export function formatListerInterventions(
   return { count: filtered.length, interventions: filtered };
 }
 
-// Nombre d'interventions planifiées dans les 7 prochains jours (pour `get_statistiques`).
+/** Nombre d'interventions planifiées dans les 7 prochains jours (pour `get_statistiques`). */
 export function countInterventionsSemaine(interventions: readonly AgentIntervention[], now: number): number {
   const week = now + 7 * 86400000;
   return interventions.filter((i) => {
@@ -422,7 +425,7 @@ export function buildAssistantReadHandlers(deps: AssistantReadDeps): Record<stri
     };
   }
 
-  // `get_statistiques` compose 3 readers → câblé seulement si les 3 sont fournis.
+  /** `get_statistiques` compose 3 readers → câblé seulement si les 3 sont fournis. */
   const statsReader = deps.stats;
   if (statsReader && interventionsReader && stocksReader) {
     handlers.get_statistiques = async (args, ctx: TenantContext) => {

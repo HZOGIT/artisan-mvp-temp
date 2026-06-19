@@ -25,7 +25,7 @@ export interface EnvoiResult {
   readonly message: string;
 }
 
-// Même limiteur anti-abus que factures/avis, clé dédiée bon de commande par artisan.
+/** Même limiteur anti-abus que factures/avis, clé dédiée bon de commande par artisan. */
 function rateLimitKey(artisanId: number): string {
   return `bc:${artisanId}`;
 }
@@ -39,7 +39,7 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-// Corps HTML du mail de bon de commande (pur, testable) — parité fonctionnelle du template legacy.
+/** Corps HTML du mail de bon de commande (pur, testable) — parité fonctionnelle du template legacy. */
 export function buildCommandeEmail(params: {
   artisanName: string;
   destinataire: string;
@@ -74,7 +74,7 @@ export async function envoyerCommandeParEmail(
 
   const fournisseur = await deps.fournisseurRepo.getById(ctx, commande.fournisseurId);
   if (!fournisseur || !fournisseur.email) throw new ValidationError("Le fournisseur n'a pas d'adresse email");
-  // Capturé ici (narrowing non-null) : TS réinitialise le narrowing de propriété après les `await`.
+  /** Capturé ici (narrowing non-null) : TS réinitialise le narrowing de propriété après les `await`. */
   const destinataireEmail = fournisseur.email;
 
   if (!(await deps.rateLimiter.check(rateLimitKey(ctx.artisanId)))) {

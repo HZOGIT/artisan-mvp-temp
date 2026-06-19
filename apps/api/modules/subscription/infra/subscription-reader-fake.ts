@@ -2,7 +2,7 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { ISubscriptionRepository } from "../application/subscription-reader";
 import type { SubscriptionRow } from "../domain/subscription";
 
-// Repo fake déterministe : abonnement par tenant (null si non semé) + miroir cancel_at_period_end.
+/** Repo fake déterministe : abonnement par tenant (null si non semé) + miroir cancel_at_period_end. */
 export class FakeSubscriptionReader implements ISubscriptionRepository {
   private readonly byTenant = new Map<number, SubscriptionRow>();
 

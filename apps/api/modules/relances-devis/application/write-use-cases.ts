@@ -19,7 +19,7 @@ export async function enregistrerRelance(
   if (input.statut !== undefined && !STATUTS_RELANCE.includes(input.statut)) {
     throw new ValidationError("Statut de relance invalide");
   }
-  // Anti-IDOR-FK : le devis doit appartenir au tenant. NotFound (ne révèle pas l'existence cross-tenant).
+  /** Anti-IDOR-FK : le devis doit appartenir au tenant. NotFound (ne révèle pas l'existence cross-tenant). */
   if (!(await repo.ownsDevis(ctx, input.devisId))) throw new NotFoundError("Devis introuvable");
   return repo.create(ctx, input);
 }

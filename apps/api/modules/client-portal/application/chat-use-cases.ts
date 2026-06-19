@@ -2,7 +2,7 @@ import { ForbiddenError, NotFoundError, TooManyRequestsError, UnauthorizedError 
 import type { TenantContext } from "../../../shared/tenant";
 import type { IPortalAccessRepository } from "./portal-access-repository";
 
-// Sous-ensemble du port chat migré requis (typage structurel → on passe directement IChatRepository).
+/** Sous-ensemble du port chat migré requis (typage structurel → on passe directement IChatRepository). */
 export interface PortalChatConversation {
   readonly id: number;
   readonly clientId: number;
@@ -13,7 +13,7 @@ export interface PortalChatMessage {
   readonly conversationId: number;
   readonly auteur: string;
   readonly contenu: string;
-  // exposé pour l'UI portail (`createdAt` du message ; déjà présent au runtime, type élargi).
+  /** exposé pour l'UI portail (`createdAt` du message ; déjà présent au runtime, type élargi). */
   readonly createdAt: Date;
 }
 /*
@@ -60,14 +60,14 @@ async function conversationDuClient(deps: PortalChatDeps, ctx: TenantContext, cl
   return conv;
 }
 
-// Conversations du client connecté (filtrées sur SON clientId parmi celles du tenant).
+/** Conversations du client connecté (filtrées sur SON clientId parmi celles du tenant). */
 export async function getConversations(deps: Pick<PortalChatDeps, "access" | "chat">, token: string, now: Date = new Date()): Promise<PortalChatConversationSummary[]> {
   const { ctx, clientId } = await resolve(deps, token, now);
   const all = await deps.chat.listConversations(ctx);
   return all.filter((c) => c.clientId === clientId);
 }
 
-// Messages d'une conversation du client (marque comme lus côté client). FORBIDDEN si la conv n'est pas la sienne.
+/** Messages d'une conversation du client (marque comme lus côté client). FORBIDDEN si la conv n'est pas la sienne. */
 export async function getConversationMessages(deps: PortalChatDeps, token: string, conversationId: number, now: Date = new Date()): Promise<PortalChatMessage[]> {
   const { ctx, clientId } = await resolve(deps, token, now);
   await conversationDuClient(deps, ctx, clientId, conversationId);
@@ -75,7 +75,7 @@ export async function getConversationMessages(deps: PortalChatDeps, token: strin
   return deps.chat.listMessages(ctx, conversationId);
 }
 
-// Envoi d'un message client (anti-flood) → notifie l'artisan.
+/** Envoi d'un message client (anti-flood) → notifie l'artisan. */
 export async function sendClientMessage(deps: PortalChatDeps, token: string, conversationId: number, contenu: string, now: Date = new Date()): Promise<PortalChatMessage> {
   const { ctx, clientId, artisanId } = await resolve(deps, token, now);
   if (!(await deps.rateLimiter.check(`portal-chat:${artisanId}:${clientId}`))) {
@@ -93,7 +93,7 @@ export async function sendClientMessage(deps: PortalChatDeps, token: string, con
   return msg;
 }
 
-// Marque les messages d'une conversation du client comme lus (anti-IDOR : appartenance vérifiée).
+/** Marque les messages d'une conversation du client comme lus (anti-IDOR : appartenance vérifiée). */
 export async function markClientMessagesAsRead(deps: PortalChatDeps, token: string, conversationId: number, now: Date = new Date()): Promise<{ success: true }> {
   const { ctx, clientId } = await resolve(deps, token, now);
   await conversationDuClient(deps, ctx, clientId, conversationId);
@@ -101,7 +101,7 @@ export async function markClientMessagesAsRead(deps: PortalChatDeps, token: stri
   return { success: true };
 }
 
-// ── demanderModification (public) ─────────────────────────────────────────────
+/** ── demanderModification (public) ───────────────────────────────────────────── */
 export interface DemanderModificationDeps {
   readonly access: Pick<IPortalAccessRepository, "resolveByToken">;
   readonly artisanReader: { getArtisanPublic(artisanId: number): Promise<{ email: string | null } | null> };

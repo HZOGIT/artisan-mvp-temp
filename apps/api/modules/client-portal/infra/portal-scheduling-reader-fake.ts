@@ -8,7 +8,7 @@ export interface SchedulingFakeState {
   chantiersByClient?: Record<number, PortalChantier[]>;
 }
 
-// Fake en mémoire de la planification portail (occupations, RDV créés/listés, chantiers+suivi).
+/** Fake en mémoire de la planification portail (occupations, RDV créés/listés, chantiers+suivi). */
 export class PortalSchedulingReaderFake implements IPortalSchedulingReader {
   readonly created: PortalRdv[] = [];
   private occupied: CreneauOccupe[];

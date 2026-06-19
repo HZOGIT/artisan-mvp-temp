@@ -132,7 +132,7 @@ export class CommandeRepositoryDrizzle implements ICommandeRepository {
 
   create(ctx: TenantContext, input: CreateCommandeInput): Promise<Commande | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Le fournisseur référencé doit appartenir au tenant (anti-IDOR-FK).
+      /** Le fournisseur référencé doit appartenir au tenant (anti-IDOR-FK). */
       const [fourn] = await tx
         .select({ id: fournisseurs.id })
         .from(fournisseurs)
@@ -159,7 +159,7 @@ export class CommandeRepositoryDrizzle implements ICommandeRepository {
         })
         .returning();
 
-      // Numéro dérivé de l'id (séquence per-tenant à industrialiser ultérieurement).
+      /** Numéro dérivé de l'id (séquence per-tenant à industrialiser ultérieurement). */
       const numero = `CMD-${String(commande.id).padStart(5, "0")}`;
       await tx
         .update(commandesFournisseurs)
@@ -260,7 +260,7 @@ export class CommandeRepositoryDrizzle implements ICommandeRepository {
         .where(eq(lignesCommandesFournisseurs.commandeId, commandeId));
       const ligneById = new Map(lignes.map((l) => [l.id, l]));
 
-      // Dédoublonne par ligneId (dernière valeur) ; ignore les ligneId hors commande.
+      /** Dédoublonne par ligneId (dernière valeur) ; ignore les ligneId hors commande. */
       const recueParLigne = new Map<number, number>();
       for (const r of receptions) {
         if (ligneById.has(r.ligneId)) recueParLigne.set(r.ligneId, r.quantiteRecue);
@@ -268,7 +268,7 @@ export class CommandeRepositoryDrizzle implements ICommandeRepository {
 
       for (const [ligneId, quantiteRecue] of Array.from(recueParLigne.entries())) {
         const ligne = ligneById.get(ligneId)!;
-        // Invariant garanti côté infra : qté reçue ∈ [0, quantité commandée] (clamp défensif).
+        /** Invariant garanti côté infra : qté reçue ∈ [0, quantité commandée] (clamp défensif). */
         const max = Number(ligne.quantite);
         const valeur = Math.max(0, Math.min(quantiteRecue, max));
         const ancienneRecue = Number(ligne.quantiteRecue ?? 0);
@@ -306,7 +306,7 @@ export class CommandeRepositoryDrizzle implements ICommandeRepository {
         }
       }
 
-      // Recalcule le statut depuis les quantités reçues (source de vérité = lignes).
+      /** Recalcule le statut depuis les quantités reçues (source de vérité = lignes). */
       const apres = await tx
         .select()
         .from(lignesCommandesFournisseurs)
@@ -322,7 +322,7 @@ export class CommandeRepositoryDrizzle implements ICommandeRepository {
         if (recu < cmd) toutRecu = false;
       }
       const set: Record<string, unknown> = { updatedAt: new Date() };
-      // On ne sort pas d'un état terminal (annulee) ni du brouillon via la réception.
+      /** On ne sort pas d'un état terminal (annulee) ni du brouillon via la réception. */
       if (commande.statut !== "annulee" && commande.statut !== "brouillon") {
         if (totalCommande > 0 && toutRecu) set.statut = "livree";
         else if (totalRecu > 0) set.statut = "partiellement_livree";
@@ -369,7 +369,7 @@ export class CommandeRepositoryDrizzle implements ICommandeRepository {
     });
   }
 
-  // La commande appartient-elle au tenant ? (RLS + filtre artisanId)
+  /** La commande appartient-elle au tenant ? (RLS + filtre artisanId) */
   private async ownsCommande(tx: DbClient, ctx: TenantContext, commandeId: number): Promise<boolean> {
     const [row] = await tx
       .select({ id: commandesFournisseurs.id })

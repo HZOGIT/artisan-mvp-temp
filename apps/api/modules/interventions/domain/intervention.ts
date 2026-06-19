@@ -63,19 +63,21 @@ export interface UpdateInterventionInput {
  * cloisonnement) ; l'accès est TOUJOURS borné par l'intervention parente du tenant (anti-IDOR).
  */
 export interface EquipeMembre {
-  readonly id: number; // id de la liaison
+  /** id de la liaison */
+  readonly id: number;
   readonly technicienId: number;
   readonly role: string | null;
-  readonly nom: string | null; // dénormalisé (jointure technicien) pour l'affichage
+  /** dénormalisé (jointure technicien) pour l'affichage */
+  readonly nom: string | null;
   readonly prenom: string | null;
 }
 
-// Membre d'équipe enrichi de son intervention (affichage liste/planning, 1 requête, anti-N+1).
+/** Membre d'équipe enrichi de son intervention (affichage liste/planning, 1 requête, anti-N+1). */
 export interface EquipeMembreArtisan extends EquipeMembre {
   readonly interventionId: number;
 }
 
-// Entrée d'ajout d'un membre (artisanId forcé serveur ; idempotent sur intervention+technicien).
+/** Entrée d'ajout d'un membre (artisanId forcé serveur ; idempotent sur intervention+technicien). */
 export interface AjouterMembreEquipeInput {
   readonly interventionId: number;
   readonly technicienId: number;

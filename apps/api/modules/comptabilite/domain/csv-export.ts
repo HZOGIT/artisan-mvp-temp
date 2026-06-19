@@ -3,18 +3,18 @@
  * et de formatage, + assemblage du CSV. Aucun effet de bord.
  */
 
-// Montant FR (virgule décimale, 2 décimales) — parité legacy `fecAmount`.
+/** Montant FR (virgule décimale, 2 décimales) — parité legacy `fecAmount`. */
 export function fecAmount(val: string | number | null | undefined): string {
   const num = typeof val === "string" ? parseFloat(val) : val || 0;
   return (Number.isFinite(num) ? num : 0).toFixed(2).replace(".", ",");
 }
 
-// Date FR déterministe `JJ/MM/AAAA` (≠ toLocaleDateString, indépendant de la locale système).
+/** Date FR déterministe `JJ/MM/AAAA` (≠ toLocaleDateString, indépendant de la locale système). */
 export function formatDateFr(d: Date): string {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 }
 
-// Date `AAAAMMJJ` (nom de fichier) — parité legacy `fecDate`.
+/** Date `AAAAMMJJ` (nom de fichier) — parité legacy `fecDate`. */
 export function ymdCompact(d: Date): string {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
 }
@@ -26,9 +26,12 @@ export function ymdCompact(d: Date): string {
  */
 export function csvCell(val: string | number | null | undefined): string {
   let s = String(val ?? "");
-  if (/^-?\d+(?:[.,]\d+)?$/.test(s)) return s; // nombre pur : inchangé
-  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; // anti injection de formule
-  if (/[;"\n\r]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"'; // anti rupture de structure
+  /** nombre pur : inchangé */
+  if (/^-?\d+(?:[.,]\d+)?$/.test(s)) return s;
+  /** anti injection de formule */
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  /** anti rupture de structure */
+  if (/[;"\n\r]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
   return s;
 }
 
@@ -44,7 +47,7 @@ export interface FactureCsvRow {
 
 const CSV_HEADER = "Date;Numéro;Client;HT;TVA;TTC;Statut";
 
-// Assemble le CSV des factures (entête + lignes neutralisées) avec BOM Excel. PUR.
+/** Assemble le CSV des factures (entête + lignes neutralisées) avec BOM Excel. PUR. */
 export function buildFacturesCsv(rows: readonly FactureCsvRow[]): string {
   const lignes = [CSV_HEADER];
   for (const f of rows) {
@@ -54,10 +57,11 @@ export function buildFacturesCsv(rows: readonly FactureCsvRow[]): string {
         .join(";"),
     );
   }
-  return "﻿" + lignes.join("\n"); // BOM UTF-8 (Excel)
+  /** BOM UTF-8 (Excel) */
+  return "﻿" + lignes.join("\n");
 }
 
-// Nom de fichier de l'export CSV (parité legacy : `factures_<début>_<fin>.csv`). PUR.
+/** Nom de fichier de l'export CSV (parité legacy : `factures_<début>_<fin>.csv`). PUR. */
 export function csvFileName(dateDebut: Date, dateFin: Date): string {
   return `factures_${ymdCompact(dateDebut)}_${ymdCompact(dateFin)}.csv`;
 }

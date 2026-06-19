@@ -26,7 +26,7 @@ export interface AssistantStreamInput {
   readonly threadId?: number;
 }
 
-// Évènement SSE émis vers le client (parité legacy : `{threadId}` au début, puis `{content}` par chunk).
+/** Évènement SSE émis vers le client (parité legacy : `{threadId}` au début, puis `{content}` par chunk). */
 export type AssistantStreamEvent = { readonly threadId: number } | { readonly content: string };
 
 /*
@@ -45,7 +45,7 @@ export async function* streamAssistantReply(
   const artisan = await deps.artisanReader.getArtisan(ctx);
   const metier = (artisan?.metier as string | null | undefined) || (artisan?.specialite as string | null | undefined) || null;
 
-  // Stats best-effort (un échec ne casse pas le chat).
+  /** Stats best-effort (un échec ne casse pas le chat). */
   let stats = { devisEnCours: 0, facturesImpayeesCount: 0, facturesImpayeesTotal: 0 };
   try {
     const s = await deps.statsReader.getStats(ctx);
@@ -57,7 +57,7 @@ export async function* streamAssistantReply(
   const system = buildAssistantSystemPrompt({ artisanName: artisan?.nomEntreprise ?? null, metier, stats, pageContext: input.pageContext });
   const prompt = buildUserPrompt(input.history ?? [], input.message);
 
-  // Thread : réutilise le threadId fourni, sinon en crée un (best-effort).
+  /** Thread : réutilise le threadId fourni, sinon en crée un (best-effort). */
   let threadId = input.threadId ?? 0;
   if (!threadId) {
     try {
@@ -76,7 +76,7 @@ export async function* streamAssistantReply(
     }
   }
 
-  // Persistance best-effort (n'altère pas le stream déjà émis).
+  /** Persistance best-effort (n'altère pas le stream déjà émis). */
   if (threadId) {
     try {
       await deps.threadWriter.addMessage(ctx, threadId, "user", input.message);

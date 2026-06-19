@@ -126,7 +126,7 @@ export async function importFactures(repo: IImportErpRepository, ctx: TenantCont
         res.errorDetails.push(`Ligne ${lineNum} : client "${nomClient}" introuvable`);
         continue;
       }
-      // Numéro LÉGAL d'origine : préservé s'il est mappé ; refusé s'il existe déjà (doublon).
+      /** Numéro LÉGAL d'origine : préservé s'il est mappé ; refusé s'il existe déjà (doublon). */
       const numeroOrigine = pickField(row, input.mapping, "numeroFacture")?.trim() || undefined;
       if (numeroOrigine && numerosVus.has(numeroOrigine)) {
         res.errors++;
@@ -147,7 +147,8 @@ export async function importFactures(repo: IImportErpRepository, ctx: TenantCont
         modePaiement: pickField(row, input.mapping, "modePaiement"),
         totalTTC: pickField(row, input.mapping, "totalTTC") || "0",
       });
-      if (numeroOrigine) numerosVus.add(numeroOrigine); // anti-doublon intra-lot
+      /** anti-doublon intra-lot */
+      if (numeroOrigine) numerosVus.add(numeroOrigine);
       res.imported++;
     } catch (err) {
       res.errors++;

@@ -6,7 +6,7 @@ import type { FecConfig, FecInput } from "../domain/fec";
 
 const EMPTY_FEC: FecInput = { factures: [], depenses: [], encaissements: [] };
 
-// Lecteur fake déterministe : écritures par tenant (filtrées par période) + détail TVA brut injecté.
+/** Lecteur fake déterministe : écritures par tenant (filtrées par période) + détail TVA brut injecté. */
 export class FakeComptabiliteReader implements IComptabiliteReader {
   private readonly ecritures = new Map<number, Ecriture[]>();
   private readonly tvaBrut = new Map<number, DeclarationTVABrut>();

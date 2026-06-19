@@ -10,9 +10,9 @@ type MutableOnboarding = { -readonly [K in keyof OnboardingStatus]: OnboardingSt
  */
 export class FakeModulesRepository implements IModulesRepository {
   private readonly catalogue: ModuleCatalogue[];
-  // artisanId → (slug → actif)
+  /** artisanId → (slug → actif) */
   private readonly prefs = new Map<number, Map<string, boolean>>();
-  // artisanId → onboarding
+  /** artisanId → onboarding */
   private readonly onboarding = new Map<number, MutableOnboarding>();
 
   constructor(catalogue: ModuleCatalogue[] = []) {

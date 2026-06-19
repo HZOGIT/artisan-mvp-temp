@@ -10,7 +10,7 @@ import type { CategorieDepense, CreateCategorieInput, UpdateCategorieInput } fro
 type CategorieRow = typeof categoriesDepenses.$inferSelect;
 type CategorieInsert = typeof categoriesDepenses.$inferInsert;
 
-// Traduit une ligne PG (colonnes snake_case) → domaine (camelCase). Défauts du domaine si null.
+/** Traduit une ligne PG (colonnes snake_case) → domaine (camelCase). Défauts du domaine si null. */
 function toCategorie(r: CategorieRow): CategorieDepense {
   return {
     id: r.id,
@@ -47,7 +47,7 @@ function relancerSiDoublon(err: unknown): never {
   throw err;
 }
 
-// Mappe les champs camelCase de l'input vers les colonnes snake_case (seuls les champs fournis).
+/** Mappe les champs camelCase de l'input vers les colonnes snake_case (seuls les champs fournis). */
 function toSet(input: UpdateCategorieInput): Partial<CategorieInsert> {
   const set: Partial<CategorieInsert> = {};
   if (input.nom !== undefined) set.nom = input.nom;

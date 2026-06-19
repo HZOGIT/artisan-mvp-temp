@@ -14,19 +14,19 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { ToolSchema } from "../domain/assistant-tools-catalog";
 
-// Un appel d'outil émis par le modèle.
+/** Un appel d'outil émis par le modèle. */
 export interface AgenticFunctionCall {
-  // Identifiant éventuel (corrélation appel↔réponse selon le provider ; optionnel).
+  /** Identifiant éventuel (corrélation appel↔réponse selon le provider ; optionnel). */
   readonly id?: string;
   readonly name: string;
   readonly args: Record<string, unknown>;
 }
 
-// Résultat d'un outil renvoyé au modèle au tour suivant.
+/** Résultat d'un outil renvoyé au modèle au tour suivant. */
 export interface AgenticToolResultPart {
   readonly id?: string;
   readonly name: string;
-  // Charge utile sérialisable (la donnée `ToolResult.data` ou un objet d'erreur).
+  /** Charge utile sérialisable (la donnée `ToolResult.data` ou un objet d'erreur). */
   readonly response: unknown;
 }
 
@@ -39,7 +39,7 @@ export interface AgenticMessage {
   readonly content: unknown;
 }
 
-// Entrée d'un tour : instruction système, outils exposés (sous-ensemble activé), historique complet.
+/** Entrée d'un tour : instruction système, outils exposés (sous-ensemble activé), historique complet. */
 export interface AgenticTurnInput {
   readonly system: string;
   readonly tools: readonly ToolSchema[];
@@ -67,7 +67,7 @@ export interface LlmAgenticPort {
   streamTurn(input: AgenticTurnInput): AsyncIterable<AgenticEvent>;
 }
 
-// Résultat d'exécution d'un outil (parité legacy `ToolResult`).
+/** Résultat d'exécution d'un outil (parité legacy `ToolResult`). */
 export type ToolResult =
   | { readonly ok: true; readonly data: unknown }
   | { readonly ok: false; readonly error: string };

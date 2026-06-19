@@ -7,12 +7,12 @@ import type { ClientRef, CreerDemandeInput, DemandeAvis, InterventionRef } from 
  * anti-oracle d'énumération cross-tenant).
  */
 export interface IDemandeAvisRepository {
-  // Intervention possédée par le tenant (null sinon).
+  /** Intervention possédée par le tenant (null sinon). */
   getInterventionOwned(ctx: TenantContext, interventionId: number): Promise<InterventionRef | null>;
-  // Client possédé par le tenant (null sinon).
+  /** Client possédé par le tenant (null sinon). */
   getClientOwned(ctx: TenantContext, clientId: number): Promise<ClientRef | null>;
-  // Dernière intervention du client (la plus récente), scopée tenant (null si aucune).
+  /** Dernière intervention du client (la plus récente), scopée tenant (null si aucune). */
   getDerniereInterventionDuClient(ctx: TenantContext, clientId: number): Promise<InterventionRef | null>;
-  // Persiste une demande d'avis pour le tenant.
+  /** Persiste une demande d'avis pour le tenant. */
   creerDemande(ctx: TenantContext, input: CreerDemandeInput): Promise<DemandeAvis>;
 }

@@ -6,7 +6,7 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { FecReader } from "../application/fec-reader";
 import type { FecDepense, ConfigComptable } from "../domain/fec";
 
-// Défauts PCG (plan comptable général) si aucune config comptable enregistrée — parité legacy.
+/** Défauts PCG (plan comptable général) si aucune config comptable enregistrée — parité legacy. */
 const DEFAULT_CONFIG: ConfigComptable = {
   compteAchats: "607000",
   compteTVADeductible: "445660",

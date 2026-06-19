@@ -46,7 +46,8 @@ export interface TotauxFacture {
  * `createAvoir`). Le `prixUnitaireHT` est stocké négatif (−|pu|), la quantité reste positive.
  */
 export interface MontantsAvoirLigne extends MontantsLigne {
-  readonly prixUnitaireHT: string; // négatif
+  /** négatif */
+  readonly prixUnitaireHT: string;
 }
 
 export function calculerMontantsAvoirLigne(quantite: string, prixUnitaireHT: string, tauxTVA: string): MontantsAvoirLigne {

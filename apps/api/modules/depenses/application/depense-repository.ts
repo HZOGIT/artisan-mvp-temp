@@ -1,7 +1,7 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { Depense, CreateDepenseInput, UpdateDepenseInput, DoublonParams, DepenseDoublon, DepenseStats } from "../domain/depense";
 
-// Nature d'une FK référencée par une dépense (toutes des tables scopées tenant).
+/** Nature d'une FK référencée par une dépense (toutes des tables scopées tenant). */
 export type DepenseRefKind = "chantier" | "intervention" | "client";
 
 /*
@@ -12,12 +12,12 @@ export type DepenseRefKind = "chantier" | "intervention" | "client";
  */
 export interface IDepenseRepository {
   list(ctx: TenantContext): Promise<Depense[]>;
-  // null si la dépense n'appartient pas au tenant.
+  /** null si la dépense n'appartient pas au tenant. */
   getById(ctx: TenantContext, id: number): Promise<Depense | null>;
   create(ctx: TenantContext, input: CreateDepenseInput): Promise<Depense>;
-  // null si la dépense n'appartient pas au tenant.
+  /** null si la dépense n'appartient pas au tenant. */
   update(ctx: TenantContext, id: number, input: UpdateDepenseInput): Promise<Depense | null>;
-  // false si la dépense n'appartient pas au tenant.
+  /** false si la dépense n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
   /*
    * true si la ressource référencée (chantier/intervention/client) appartient au tenant.

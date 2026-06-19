@@ -30,7 +30,7 @@ export async function creerActivite(repo: IActiviteRepository, ctx: TenantContex
       throw new ForbiddenError("Entité rattachée non autorisée");
     }
   } else if (entiteId != null && entiteType === "aucun") {
-    // Rattachement incohérent (id sans type) → on neutralise l'id (cohérence du couple type/id).
+    /** Rattachement incohérent (id sans type) → on neutralise l'id (cohérence du couple type/id). */
     return repo.create(ctx, { ...input, echeance, entiteType: "aucun", entiteId: null });
   }
   return repo.create(ctx, { ...input, echeance, entiteType, entiteId });
@@ -46,7 +46,7 @@ export async function basculerFait(repo: IActiviteRepository, ctx: TenantContext
   return { success: true };
 }
 
-// Suppression scopée tenant, **succès idempotent** (parité legacy : DELETE WHERE id ET artisanId).
+/** Suppression scopée tenant, **succès idempotent** (parité legacy : DELETE WHERE id ET artisanId). */
 export async function supprimerActivite(repo: IActiviteRepository, ctx: TenantContext, id: number): Promise<{ success: true }> {
   await repo.remove(ctx, id);
   return { success: true };

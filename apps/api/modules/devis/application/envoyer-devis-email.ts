@@ -161,7 +161,7 @@ export async function envoyerDevisParEmail(
 
   await deps.email.send({ to: destinataireEmail, subject, body, ...(attachments ? { attachments } : {}) });
 
-  // Envoi réussi : passage `envoye` depuis brouillon uniquement (ne régresse pas un devis émis/signé).
+  /** Envoi réussi : passage `envoye` depuis brouillon uniquement (ne régresse pas un devis émis/signé). */
   if (devis.statut === "brouillon") {
     await repo.setStatut(ctx, devis.id, "envoye");
   }

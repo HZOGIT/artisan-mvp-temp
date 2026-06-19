@@ -5,7 +5,7 @@ import type { IUtilisateurRepository } from "./application/utilisateur-repositor
 import type { UtilisateurDeps } from "./application/use-cases";
 import { createUtilisateursRouter } from "./interface/trpc/utilisateurs.router";
 
-// Générateur de MDP temporaire par défaut : 10 caractères alphanumériques, RNG crypto-sûr (parité legacy).
+/** Générateur de MDP temporaire par défaut : 10 caractères alphanumériques, RNG crypto-sûr (parité legacy). */
 const ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
 export const defaultTempPassword = (): string => Array.from(randomBytes(10), (b) => ALPHABET[b % 36]).join("");
 

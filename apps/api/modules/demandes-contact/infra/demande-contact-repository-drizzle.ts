@@ -76,8 +76,10 @@ export class DemandeContactRepositoryDrizzle implements IDemandeContactRepositor
           email: input.email ?? null,
           telephone: input.telephone ?? null,
           message: input.message ?? null,
-          source: input.source ?? undefined, // défaut PG "vitrine"
-          statut: "nouveau", // forcé
+          /** défaut PG "vitrine" */
+          source: input.source ?? undefined,
+          /** forcé */
+          statut: "nouveau",
           clientId: null,
         })
         .returning();
@@ -87,7 +89,7 @@ export class DemandeContactRepositoryDrizzle implements IDemandeContactRepositor
 
   update(ctx: TenantContext, id: number, input: UpdateDemandeInput): Promise<DemandeContact | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Métadonnées seulement (UpdateDemandeInput exclut statut/clientId → état machine protégée).
+      /** Métadonnées seulement (UpdateDemandeInput exclut statut/clientId → état machine protégée). */
       const set: Partial<typeof demandesContact.$inferInsert> = { updatedAt: new Date() };
       if (input.nom !== undefined) set.nom = input.nom;
       if (input.email !== undefined) set.email = input.email;

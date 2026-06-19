@@ -79,7 +79,7 @@ export class DevisIARepositoryDrizzle implements IDevisIARepository {
 
   addPhoto(ctx: TenantContext, analyseId: number, input: AddPhotoInput): Promise<Photo | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Ownership de l'analyse parente (RLS + filtre) avant l'insertion de la photo.
+      /** Ownership de l'analyse parente (RLS + filtre) avant l'insertion de la photo. */
       const [a] = await tx.select({ id: analysesPhotosChantier.id }).from(analysesPhotosChantier).where(and(eq(analysesPhotosChantier.id, analyseId), eq(analysesPhotosChantier.artisanId, ctx.artisanId))).limit(1);
       if (!a) return null;
       const [r] = await tx.insert(photosAnalyse).values({ analyseId, url: input.url, description: input.description ?? null, ordre: input.ordre ?? null }).returning();
@@ -113,17 +113,17 @@ export class DevisIARepositoryDrizzle implements IDevisIARepository {
 
   createDevisFromAnalyse(ctx: TenantContext, params: { analyseId: number; clientId: number; suggestionIds?: number[] }): Promise<{ devisId: number; montantEstime: number } | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Ownership de l'analyse (RLS + filtre).
+      /** Ownership de l'analyse (RLS + filtre). */
       const [a] = await tx.select().from(analysesPhotosChantier).where(and(eq(analysesPhotosChantier.id, params.analyseId), eq(analysesPhotosChantier.artisanId, ctx.artisanId))).limit(1);
       if (!a) return null;
-      // Suggestions de toutes les analyses → résultats → suggestions de CETTE analyse.
+      /** Suggestions de toutes les analyses → résultats → suggestions de CETTE analyse. */
       const resultats = await tx.select({ id: resultatsAnalyseIA.id }).from(resultatsAnalyseIA).where(eq(resultatsAnalyseIA.analyseId, params.analyseId));
       const resultatIds = resultats.map((r) => r.id);
       const suggestions = resultatIds.length ? await tx.select().from(suggestionsArticlesIA).where(inArray(suggestionsArticlesIA.resultatId, resultatIds)) : [];
       const devisData = genererLignesDevis(suggestions.map(toSuggestion), params.suggestionIds);
       if (!devisData) return null;
 
-      // Numéro spécial (préfixe IA, parité legacy — distinct du compteur devis standard).
+      /** Numéro spécial (préfixe IA, parité legacy — distinct du compteur devis standard). */
       const numero = `IA-${Date.now().toString().slice(-8)}`;
       const [created] = await tx
         .insert(devis)
@@ -132,7 +132,7 @@ export class DevisIARepositoryDrizzle implements IDevisIARepository {
       for (const l of devisData.lignes) {
         await tx.insert(devisLignes).values({ devisId: created.id, ordre: l.ordre, designation: l.designation, quantite: l.quantite.toFixed(2), unite: l.unite, prixUnitaireHT: l.prixUnitaireHT.toFixed(2), tauxTVA: l.tauxTVA.toFixed(2), montantHT: l.montantHT.toFixed(2), montantTVA: l.montantTVA.toFixed(2), montantTTC: l.montantTTC.toFixed(2) });
       }
-      // Lien analyse→devis (remplace l'existant).
+      /** Lien analyse→devis (remplace l'existant). */
       await tx.delete(devisGenereIA).where(eq(devisGenereIA.analyseId, params.analyseId));
       await tx.insert(devisGenereIA).values({ analyseId: params.analyseId, devisId: created.id, montantEstime: devisData.totalTTC.toFixed(2) });
       return { devisId: created.id, montantEstime: devisData.totalTTC };

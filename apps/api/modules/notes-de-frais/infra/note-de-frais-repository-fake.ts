@@ -11,12 +11,12 @@ import { computeNextNoteFraisNumero } from "../application/numero";
 export class FakeNoteDeFraisRepository implements INoteDeFraisRepository {
   private store: NoteDeFrais[] = [];
   private seq = 0;
-  // Dépenses connues (pour les liens) : clé `${artisanId}:${depenseId}` → état minimal.
+  /** Dépenses connues (pour les liens) : clé `${artisanId}:${depenseId}` → état minimal. */
   private depenses = new Map<string, { remboursable: boolean; montantTtc: string; statut: string; rembourse: boolean; dateRemboursement: string | null; numero: string; fournisseur: string | null; dateDepense: string; categorie: string }>();
-  // Liens note↔dépense : ensemble de `${noteId}:${depenseId}`.
+  /** Liens note↔dépense : ensemble de `${noteId}:${depenseId}`. */
   private links = new Set<string>();
 
-  // Aide de test : déclare une dépense du tenant (pour addDepenseLink / cascade workflow / détail).
+  /** Aide de test : déclare une dépense du tenant (pour addDepenseLink / cascade workflow / détail). */
   registerDepense(artisanId: number, depenseId: number, opts: { remboursable: boolean; montantTtc: string; statut?: string; numero?: string; fournisseur?: string | null; dateDepense?: string; categorie?: string }): void {
     this.depenses.set(`${artisanId}:${depenseId}`, {
       remboursable: opts.remboursable, montantTtc: opts.montantTtc, statut: opts.statut ?? "brouillon", rembourse: false, dateRemboursement: null,
@@ -24,13 +24,13 @@ export class FakeNoteDeFraisRepository implements INoteDeFraisRepository {
     });
   }
 
-  // Aide de test : état d'une dépense après cascade (statut/rembourse/dateRemboursement).
+  /** Aide de test : état d'une dépense après cascade (statut/rembourse/dateRemboursement). */
   depenseEtat(artisanId: number, depenseId: number): { statut: string; rembourse: boolean; dateRemboursement: string | null } | undefined {
     const d = this.depenses.get(`${artisanId}:${depenseId}`);
     return d ? { statut: d.statut, rembourse: d.rembourse, dateRemboursement: d.dateRemboursement } : undefined;
   }
 
-  // Ids des dépenses liées à une note (pour les assertions de test).
+  /** Ids des dépenses liées à une note (pour les assertions de test). */
   linkedDepenseIds(noteId: number): number[] {
     return Array.from(this.links)
       .filter((k) => k.startsWith(`${noteId}:`))
@@ -69,10 +69,13 @@ export class FakeNoteDeFraisRepository implements INoteDeFraisRepository {
 
   async addDepenseLink(ctx: TenantContext, noteId: number, depenseId: number): Promise<void> {
     const note = this.store.find((n) => n.id === noteId && n.artisanId === ctx.artisanId);
-    if (!note) return; // note pas au tenant → skip
+    /** note pas au tenant → skip */
+    if (!note) return;
     const dep = this.depenses.get(`${ctx.artisanId}:${depenseId}`);
-    if (!dep || !dep.remboursable) return; // dépense pas au tenant / non remboursable → skip
-    this.links.add(`${noteId}:${depenseId}`); // idempotent (Set)
+    /** dépense pas au tenant / non remboursable → skip */
+    if (!dep || !dep.remboursable) return;
+    /** idempotent (Set) */
+    this.links.add(`${noteId}:${depenseId}`);
     this.recompute(ctx, noteId);
   }
 
@@ -89,10 +92,12 @@ export class FakeNoteDeFraisRepository implements INoteDeFraisRepository {
     patch: { statut: DepenseLieeStatut; rembourse?: boolean; dateRemboursement?: string },
   ): Promise<void> {
     const note = this.store.find((n) => n.id === noteId && n.artisanId === ctx.artisanId);
-    if (!note) return; // note pas au tenant → skip
+    /** note pas au tenant → skip */
+    if (!note) return;
     for (const did of this.linkedDepenseIds(noteId)) {
       const d = this.depenses.get(`${ctx.artisanId}:${did}`);
-      if (!d || !d.remboursable) continue; // dépense pas au tenant / non remboursable → skip
+      /** dépense pas au tenant / non remboursable → skip */
+      if (!d || !d.remboursable) continue;
       d.statut = patch.statut;
       if (patch.rembourse !== undefined) d.rembourse = patch.rembourse;
       if (patch.dateRemboursement !== undefined) d.dateRemboursement = patch.dateRemboursement;
@@ -100,7 +105,7 @@ export class FakeNoteDeFraisRepository implements INoteDeFraisRepository {
   }
 
   async nextNumero(ctx: TenantContext): Promise<string> {
-    // Dernière note du tenant (par id décroissant) → numéro suivant (parité legacy).
+    /** Dernière note du tenant (par id décroissant) → numéro suivant (parité legacy). */
     const last = this.store
       .filter((n) => n.artisanId === ctx.artisanId)
       .reduce<NoteDeFrais | null>((acc, n) => (acc === null || n.id > acc.id ? n : acc), null);
@@ -140,7 +145,7 @@ export class FakeNoteDeFraisRepository implements INoteDeFraisRepository {
   async update(ctx: TenantContext, id: number, input: UpdateNoteDeFraisInput): Promise<NoteDeFrais | null> {
     const n = await this.getById(ctx, id);
     if (!n) return null;
-    // `input` n'a pas statut/dates workflow → ces champs restent intacts.
+    /** `input` n'a pas statut/dates workflow → ces champs restent intacts. */
     const updated: NoteDeFrais = { ...n, ...input };
     this.store = this.store.map((x) => (x.id === id ? updated : x));
     return updated;

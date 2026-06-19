@@ -22,12 +22,12 @@ export function listEcrituresFacture(
   return repo.listByFacture(ctx, factureId);
 }
 
-// Balance générale du tenant (agrégat par compte). Lecture seule scopée tenant.
+/** Balance générale du tenant (agrégat par compte). Lecture seule scopée tenant. */
 export async function balanceComptable(repo: IEcritureRepository, ctx: TenantContext): Promise<LigneBalance[]> {
   return calculerBalance(await repo.list(ctx));
 }
 
-// Grand livre du tenant (optionnellement filtré sur un compte), avec solde progressif.
+/** Grand livre du tenant (optionnellement filtré sur un compte), avec solde progressif. */
 export async function grandLivreComptable(
   repo: IEcritureRepository,
   ctx: TenantContext,

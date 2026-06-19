@@ -1,7 +1,7 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { IIcalFeedRepository } from "../application/ical-feed-repository";
 
-// Fake in-memory déterministe : jeton iCal par tenant.
+/** Fake in-memory déterministe : jeton iCal par tenant. */
 export class FakeIcalFeedRepository implements IIcalFeedRepository {
   private readonly tokens = new Map<number, string>();
 

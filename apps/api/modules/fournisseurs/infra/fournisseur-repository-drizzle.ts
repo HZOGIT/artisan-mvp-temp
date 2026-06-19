@@ -116,7 +116,7 @@ export class FournisseurRepositoryDrizzle implements IFournisseurRepository {
   listAssociationsArticle(ctx: TenantContext, articleId: number): Promise<ArticleFournisseur[]> {
     return withTenant(this.db, ctx, async (tx) => {
       if (!(await this.ownsArticle(tx, ctx, articleId))) return [];
-      // Seules les associations dont le fournisseur appartient au tenant (anti-IDOR prix).
+      /** Seules les associations dont le fournisseur appartient au tenant (anti-IDOR prix). */
       const rows = await tx
         .select({ a: articlesFournisseurs })
         .from(articlesFournisseurs)
@@ -141,7 +141,7 @@ export class FournisseurRepositoryDrizzle implements IFournisseurRepository {
 
   ajouterAssociation(ctx: TenantContext, input: AjouterAssociationInput): Promise<ArticleFournisseur | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // L'article ET le fournisseur doivent appartenir au tenant (anti-IDOR sur les 2 FK).
+      /** L'article ET le fournisseur doivent appartenir au tenant (anti-IDOR sur les 2 FK). */
       if (!(await this.ownsArticle(tx, ctx, input.articleId))) return null;
       if (!(await this.ownsFournisseur(tx, ctx, input.fournisseurId))) return null;
       const [row] = await tx
@@ -160,7 +160,7 @@ export class FournisseurRepositoryDrizzle implements IFournisseurRepository {
 
   supprimerAssociation(ctx: TenantContext, id: number): Promise<boolean> {
     return withTenant(this.db, ctx, async (tx) => {
-      // L'association doit cibler un fournisseur du tenant (jointure scopée) avant suppression.
+      /** L'association doit cibler un fournisseur du tenant (jointure scopée) avant suppression. */
       const [assoc] = await tx
         .select({ id: articlesFournisseurs.id })
         .from(articlesFournisseurs)
@@ -176,7 +176,7 @@ export class FournisseurRepositoryDrizzle implements IFournisseurRepository {
     });
   }
 
-  // L'article appartient-il au tenant ? (articles_artisan a un artisanId → RLS + filtre)
+  /** L'article appartient-il au tenant ? (articles_artisan a un artisanId → RLS + filtre) */
   private async ownsArticle(tx: DbClient, ctx: TenantContext, articleId: number): Promise<boolean> {
     const [row] = await tx
       .select({ id: articlesArtisan.id })
@@ -186,7 +186,7 @@ export class FournisseurRepositoryDrizzle implements IFournisseurRepository {
     return Boolean(row);
   }
 
-  // Le fournisseur appartient-il au tenant ? (RLS + filtre artisanId)
+  /** Le fournisseur appartient-il au tenant ? (RLS + filtre artisanId) */
   private async ownsFournisseur(tx: DbClient, ctx: TenantContext, fournisseurId: number): Promise<boolean> {
     const [row] = await tx
       .select({ id: fournisseurs.id })

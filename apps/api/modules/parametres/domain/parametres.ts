@@ -13,35 +13,36 @@
 
 export interface ParametresArtisan {
   readonly artisanId: number;
-  // — Numérotation (préfixes modifiables) —
+  /** — Numérotation (préfixes modifiables) — */
   readonly prefixeDevis: string;
   readonly prefixeFacture: string;
   readonly prefixeAvoir: string;
-  // — Compteurs (LECTURE SEULE : pilotés par la numérotation des documents) —
+  /** — Compteurs (LECTURE SEULE : pilotés par la numérotation des documents) — */
   readonly compteurDevis: number;
   readonly compteurFacture: number;
   readonly compteurAvoir: number;
-  // — CGV / mentions —
+  /** — CGV / mentions — */
   readonly mentionsLegales: string | null;
   readonly conditionsGenerales: string | null;
-  // — Paiement —
+  /** — Paiement — */
   readonly conditionsPaiementDefaut: string | null;
   readonly delaiPaiementJours: number | null;
   readonly delaiPaiementType: string;
-  // — Notifications / rappels —
+  /** — Notifications / rappels — */
   readonly notificationsEmail: boolean;
   readonly rappelDevisJours: number;
   readonly rappelFactureJours: number;
-  // — Objectifs —
-  readonly objectifCA: string; // numeric PG en string
+  /** — Objectifs — */
+  /** numeric PG en string */
+  readonly objectifCA: string;
   readonly objectifDevis: number;
   readonly objectifClients: number;
-  // — Marque —
+  /** — Marque — */
   readonly couleurPrincipale: string;
   readonly couleurSecondaire: string;
 }
 
-// Champs modifiables via la configuration. ⚠️ AUCUN compteur ici (inviolables via la config).
+/** Champs modifiables via la configuration. ⚠️ AUCUN compteur ici (inviolables via la config). */
 export interface UpdateParametresInput {
   readonly prefixeDevis?: string;
   readonly prefixeFacture?: string;

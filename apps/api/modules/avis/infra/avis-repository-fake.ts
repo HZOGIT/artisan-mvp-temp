@@ -32,7 +32,7 @@ export class FakeAvisRepository implements IAvisRepository {
   private interventionsStore: SeedIntervention[] = [];
   private seq = 0;
 
-  // Utilitaires de test (hors port) pour alimenter les jointures enrichies.
+  /** Utilitaires de test (hors port) pour alimenter les jointures enrichies. */
   seedClient(c: SeedClient): void {
     this.clientsStore.push(c);
   }
@@ -40,7 +40,7 @@ export class FakeAvisRepository implements IAvisRepository {
     this.interventionsStore.push(i);
   }
 
-  // Utilitaire de test (hors port) : insère un avis appartenant à un tenant donné.
+  /** Utilitaire de test (hors port) : insère un avis appartenant à un tenant donné. */
   seed(input: SeedAvisInput): Avis {
     const now = new Date();
     const avis: Avis = {
@@ -70,7 +70,7 @@ export class FakeAvisRepository implements IAvisRepository {
   async listEnrichi(ctx: TenantContext): Promise<AvisEnrichi[]> {
     const liste = await this.list(ctx);
     return liste.map((a) => {
-      // Résumés scopés tenant : un client/intervention d'un autre artisan n'est jamais joint.
+      /** Résumés scopés tenant : un client/intervention d'un autre artisan n'est jamais joint. */
       const c = this.clientsStore.find((x) => x.id === a.clientId && x.artisanId === ctx.artisanId);
       const i =
         a.interventionId != null

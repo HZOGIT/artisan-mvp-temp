@@ -1,4 +1,4 @@
-// Types de domaine du module fournisseurs — découplés du schéma Drizzle.
+/** Types de domaine du module fournisseurs — découplés du schéma Drizzle. */
 
 export interface Fournisseur {
   readonly id: number;

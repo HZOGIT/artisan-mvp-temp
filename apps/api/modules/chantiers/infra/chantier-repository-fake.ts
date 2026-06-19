@@ -26,24 +26,24 @@ import type {
 export class FakeChantierRepository implements IChantierRepository {
   private store: Chantier[] = [];
   private seq = 0;
-  // Clients appartenant à un tenant (injectable) : clé `${artisanId}:${clientId}`.
+  /** Clients appartenant à un tenant (injectable) : clé `${artisanId}:${clientId}`. */
   private ownedClients = new Set<string>();
   private ownedTechniciens = new Set<string>();
   private ownedInterventions = new Set<string>();
   private pointages: ChantierPointage[] = [];
   private pointageSeq = 0;
 
-  // Aide de test : déclare qu'un client appartient au tenant.
+  /** Aide de test : déclare qu'un client appartient au tenant. */
   registerClient(artisanId: number, clientId: number): void {
     this.ownedClients.add(`${artisanId}:${clientId}`);
   }
 
-  // Aide de test : déclare qu'un technicien appartient au tenant.
+  /** Aide de test : déclare qu'un technicien appartient au tenant. */
   registerTechnicien(artisanId: number, technicienId: number): void {
     this.ownedTechniciens.add(`${artisanId}:${technicienId}`);
   }
 
-  // Aide de test : déclare qu'une intervention appartient au tenant.
+  /** Aide de test : déclare qu'une intervention appartient au tenant. */
   registerIntervention(artisanId: number, interventionId: number): void {
     this.ownedInterventions.add(`${artisanId}:${interventionId}`);
   }
@@ -87,7 +87,7 @@ export class FakeChantierRepository implements IChantierRepository {
   async update(ctx: TenantContext, id: number, input: UpdateChantierInput): Promise<Chantier | null> {
     const c = await this.getById(ctx, id);
     if (!c) return null;
-    // `input` (UpdateChantierInput) n'a pas `clientId` → le client reste intact.
+    /** `input` (UpdateChantierInput) n'a pas `clientId` → le client reste intact. */
     const updated: Chantier = { ...c, ...input, updatedAt: new Date() };
     this.store = this.store.map((x) => (x.id === id ? updated : x));
     return updated;
@@ -142,7 +142,7 @@ export class FakeChantierRepository implements IChantierRepository {
     return this.pointages.length < before;
   }
 
-  // ⚠️ suivi_chantier sans artisanId : ces méthodes ne scopent PAS (le use-case garde l'ownership).
+  /** ⚠️ suivi_chantier sans artisanId : ces méthodes ne scopent PAS (le use-case garde l'ownership). */
   private suivis: ChantierSuivi[] = [];
   private suiviSeq = 0;
 
@@ -202,7 +202,7 @@ export class FakeChantierRepository implements IChantierRepository {
     return this.suivis.length < before;
   }
 
-  // ⚠️ phases_chantier sans artisanId : ces méthodes ne scopent PAS (le use-case garde l'ownership).
+  /** ⚠️ phases_chantier sans artisanId : ces méthodes ne scopent PAS (le use-case garde l'ownership). */
   private phases: ChantierPhase[] = [];
   private phaseSeq = 0;
 
@@ -260,7 +260,7 @@ export class FakeChantierRepository implements IChantierRepository {
     return this.phases.length < before;
   }
 
-  // ⚠️ interventions_chantier sans artisanId : scopé via le chantier parent (use-case).
+  /** ⚠️ interventions_chantier sans artisanId : scopé via le chantier parent (use-case). */
   private liens: ChantierInterventionLien[] = [];
   private lienSeq = 0;
 
@@ -298,7 +298,7 @@ export class FakeChantierRepository implements IChantierRepository {
     return this.liens.length < before;
   }
 
-  // ⚠️ documents_chantier sans artisanId : scopé via le chantier parent (use-case).
+  /** ⚠️ documents_chantier sans artisanId : scopé via le chantier parent (use-case). */
   private documents: ChantierDocument[] = [];
   private documentSeq = 0;
 
@@ -338,7 +338,7 @@ export class FakeChantierRepository implements IChantierRepository {
    */
   private depensesTtc = new Map<string, string>();
 
-  // Aide de test : déclare le total TTC des dépenses d'un chantier (pour `sumDepensesChantier`).
+  /** Aide de test : déclare le total TTC des dépenses d'un chantier (pour `sumDepensesChantier`). */
   registerDepensesChantier(artisanId: number, chantierId: number, totalTtc: string): void {
     this.depensesTtc.set(`${artisanId}:${chantierId}`, totalTtc);
   }

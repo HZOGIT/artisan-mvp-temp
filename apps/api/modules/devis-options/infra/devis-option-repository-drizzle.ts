@@ -79,7 +79,7 @@ export class DevisOptionRepositoryDrizzle implements IDevisOptionRepository {
     return withTenant(this.db, ctx, async (tx) => {
       const opt = await ownedOption(tx, ctx, optionId);
       if (!opt) return null;
-      // Une seule option sélectionnée par devis : reset des autres puis set celle-ci.
+      /** Une seule option sélectionnée par devis : reset des autres puis set celle-ci. */
       await tx.update(devisOptions).set({ selectionnee: false }).where(eq(devisOptions.devisId, opt.devisId));
       const [row] = await tx
         .update(devisOptions)
@@ -99,7 +99,7 @@ export class DevisOptionRepositoryDrizzle implements IDevisOptionRepository {
         .from(devisOptionsLignes)
         .where(eq(devisOptionsLignes.optionId, optionId))
         .orderBy(asc(devisOptionsLignes.ordre), asc(devisOptionsLignes.id));
-      // Remplace les lignes officielles du devis parent par celles de l'option.
+      /** Remplace les lignes officielles du devis parent par celles de l'option. */
       await tx.delete(devisLignes).where(eq(devisLignes.devisId, opt.devisId));
       for (const l of lignesOpt) {
         await tx.insert(devisLignes).values({
@@ -116,12 +116,12 @@ export class DevisOptionRepositoryDrizzle implements IDevisOptionRepository {
           montantTTC: l.montantTTC,
         });
       }
-      // Totaux du devis = totaux (stockés) de l'option (parité legacy `convertirOptionEnDevis`).
+      /** Totaux du devis = totaux (stockés) de l'option (parité legacy `convertirOptionEnDevis`). */
       await tx
         .update(devis)
         .set({ totalHT: opt.totalHT, totalTVA: opt.totalTVA, totalTTC: opt.totalTTC })
         .where(and(eq(devis.id, opt.devisId), eq(devis.artisanId, ctx.artisanId)));
-      // Marque l'option sélectionnée (reset des autres du même devis).
+      /** Marque l'option sélectionnée (reset des autres du même devis). */
       await tx.update(devisOptions).set({ selectionnee: false }).where(eq(devisOptions.devisId, opt.devisId));
       await tx
         .update(devisOptions)
@@ -132,7 +132,7 @@ export class DevisOptionRepositoryDrizzle implements IDevisOptionRepository {
   }
 }
 
-// Le devis `devisId` appartient-il au tenant ? (RLS + filtre explicite artisanId — défense en profondeur.)
+/** Le devis `devisId` appartient-il au tenant ? (RLS + filtre explicite artisanId — défense en profondeur.) */
 async function ownsDevis(tx: DbClient, ctx: TenantContext, devisId: number): Promise<boolean> {
   const [row] = await tx
     .select({ id: devis.id })
@@ -142,7 +142,7 @@ async function ownsDevis(tx: DbClient, ctx: TenantContext, devisId: number): Pro
   return Boolean(row);
 }
 
-// Charge l'option `optionId` SI son devis parent appartient au tenant (anti-IDOR via le parent).
+/** Charge l'option `optionId` SI son devis parent appartient au tenant (anti-IDOR via le parent). */
 async function ownedOption(tx: DbClient, ctx: TenantContext, optionId: number): Promise<Row | null> {
   const [opt] = await tx.select().from(devisOptions).where(eq(devisOptions.id, optionId)).limit(1);
   if (!opt) return null;

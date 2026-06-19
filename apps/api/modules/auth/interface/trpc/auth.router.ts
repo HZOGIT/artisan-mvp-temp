@@ -11,10 +11,10 @@ import { deleteAccount, forgotPassword, me, resetPassword, signin, signup, updat
  */
 export function createAuthRouter(deps: AuthDeps) {
   return router({
-    // Utilisateur courant (null si non authentifié / inactif). Public (pas d'exigence de tenant).
+    /** Utilisateur courant (null si non authentifié / inactif). Public (pas d'exigence de tenant). */
     me: publicProcedure.query(({ ctx }) => me(deps.repo, ctx.claims, ctx.permissions)),
 
-    // Login : vérifie le mot de passe (bcrypt), émet le JWT et pose le cookie httpOnly.
+    /** Login : vérifie le mot de passe (bcrypt), émet le JWT et pose le cookie httpOnly. */
     signin: publicProcedure
       .input(z.object({ email: z.string().email(), password: z.string() }))
       .mutation(async ({ ctx, input }) => {
@@ -23,7 +23,7 @@ export function createAuthRouter(deps: AuthDeps) {
         return { success: true as const, user };
       }),
 
-    // Signup : crée le compte + provisionne (bootstrap), émet le JWT et pose le cookie. Email pris → 409.
+    /** Signup : crée le compte + provisionne (bootstrap), émet le JWT et pose le cookie. Email pris → 409. */
     signup: publicProcedure
       .input(z.object({ email: z.string().email(), password: z.string().min(6), name: z.string().optional() }))
       .mutation(async ({ ctx, input }) => {
@@ -32,13 +32,13 @@ export function createAuthRouter(deps: AuthDeps) {
         return { success: true as const, user };
       }),
 
-    // Logout : efface le cookie d'auth.
+    /** Logout : efface le cookie d'auth. */
     logout: publicProcedure.mutation(({ ctx }) => {
       if (ctx.res) clearAuthCookie(ctx.res);
       return { success: true as const };
     }),
 
-    // ── Self-service (utilisateur authentifié) ───────────────────────────────────────────────────
+    /** ── Self-service (utilisateur authentifié) ─────────────────────────────────────────────────── */
     updateEmail: protectedProcedure
       .input(z.object({ newEmail: z.string().email() }))
       .mutation(({ ctx, input }) => updateEmail(deps, ctx.tenant.userId, input.newEmail)),
@@ -51,11 +51,12 @@ export function createAuthRouter(deps: AuthDeps) {
       .input(z.object({ confirmation: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const r = await deleteAccount(deps, ctx.tenant.userId, input.confirmation);
-        if (ctx.res) clearAuthCookie(ctx.res); // déconnecte après suppression
+        /** déconnecte après suppression */
+        if (ctx.res) clearAuthCookie(ctx.res);
         return r;
       }),
 
-    // ── Reset mot de passe (public, anti-énumération) ────────────────────────────────────────────
+    /** ── Reset mot de passe (public, anti-énumération) ──────────────────────────────────────────── */
     forgotPassword: publicProcedure
       .input(z.object({ email: z.string().email() }))
       .mutation(({ input }) => forgotPassword(deps, input.email)),

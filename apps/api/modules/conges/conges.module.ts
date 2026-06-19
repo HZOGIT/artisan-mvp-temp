@@ -1,7 +1,7 @@
 import type { ICongeRepository } from "./application/conge-repository";
 import { createCongesRouter } from "./interface/trpc/conges.router";
 
-// Wiring DI du module conges : assemble le routeur tRPC à partir du repository injecté.
+/** Wiring DI du module conges : assemble le routeur tRPC à partir du repository injecté. */
 export interface CongesModuleDeps {
   readonly repository: ICongeRepository;
 }

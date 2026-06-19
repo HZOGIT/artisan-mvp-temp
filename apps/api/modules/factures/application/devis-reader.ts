@@ -12,7 +12,8 @@ export interface DevisReadModel {
   readonly artisanId: number;
   readonly clientId: number;
   readonly numero: string;
-  readonly statut: string; // "brouillon" | "envoye" | "accepte" | "refuse" | "expire"
+  /** "brouillon" | "envoye" | "accepte" | "refuse" | "expire" */
+  readonly statut: string;
   readonly objet: string | null;
   readonly referenceClient: string | null;
   readonly conditionsPaiement: string | null;
@@ -34,12 +35,13 @@ export interface DevisLigneReadModel {
   readonly montantHT: string;
   readonly montantTVA: string;
   readonly montantTTC: string;
-  readonly type: string; // "produit" | "section" | "note"
+  /** "produit" | "section" | "note" */
+  readonly type: string;
 }
 
 export interface IDevisReader {
-  // null si le devis n'appartient pas au tenant.
+  /** null si le devis n'appartient pas au tenant. */
   getDevis(ctx: TenantContext, devisId: number): Promise<DevisReadModel | null>;
-  // [] si le devis n'appartient pas au tenant (scope via le devis parent).
+  /** [] si le devis n'appartient pas au tenant (scope via le devis parent). */
   getLignes(ctx: TenantContext, devisId: number): Promise<DevisLigneReadModel[]>;
 }

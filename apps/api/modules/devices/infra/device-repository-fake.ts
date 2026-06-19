@@ -5,7 +5,7 @@ interface StoredDevice extends Device {
   readonly userId: number;
 }
 
-// Fake en mémoire du repository `devices` (scope explicite par userId, parité de l'isolation).
+/** Fake en mémoire du repository `devices` (scope explicite par userId, parité de l'isolation). */
 export class DeviceRepositoryFake implements IDeviceRepository {
   private rows: StoredDevice[];
   constructor(seed: StoredDevice[] = []) {

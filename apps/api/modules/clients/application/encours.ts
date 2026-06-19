@@ -21,14 +21,15 @@ export interface FactureEncoursLigne {
 }
 
 export interface EncoursClient {
-  readonly encoursTotal: string; // decimal string à 2 décimales
+  /** decimal string à 2 décimales */
+  readonly encoursTotal: string;
   readonly echu: string;
   readonly nbFacturesImpayees: number;
 }
 
 const num = (v: string | null): number => parseFloat(String(v ?? "0")) || 0;
 
-// Encours d'UN client à partir de ses lignes de factures.
+/** Encours d'UN client à partir de ses lignes de factures. */
 export function calculerEncours(rows: readonly FactureEncoursLigne[], now: number): EncoursClient {
   let encoursTotal = 0;
   let echu = 0;

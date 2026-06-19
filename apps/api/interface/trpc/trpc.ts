@@ -32,7 +32,7 @@ const mapDomainErrors = t.middleware(async ({ next }) => {
   return result;
 });
 
-// Exige un TenantContext résolu (sinon UNAUTHORIZED) + narrowe `tenant` non-null.
+/** Exige un TenantContext résolu (sinon UNAUTHORIZED) + narrowe `tenant` non-null. */
 const requireTenant = t.middleware(({ ctx, next }) => {
   if (!ctx.tenant) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: "Authentification requise" });
@@ -63,10 +63,10 @@ const requireAdmin = t.middleware(({ ctx, next }) => {
  */
 export const publicProcedure = t.procedure.use(mapDomainErrors);
 
-// Procédure protégée : mapping erreurs domaine + exigence de tenant.
+/** Procédure protégée : mapping erreurs domaine + exigence de tenant. */
 export const protectedProcedure = t.procedure.use(mapDomainErrors).use(requireTenant);
 
-// Procédure ADMIN (staff Operioz) : mapping erreurs domaine + exigence du rôle admin (sans tenant).
+/** Procédure ADMIN (staff Operioz) : mapping erreurs domaine + exigence du rôle admin (sans tenant). */
 export const adminProcedure = t.procedure.use(mapDomainErrors).use(requireAdmin);
 
 /*
@@ -80,7 +80,8 @@ function requirePermission(...requiredPerms: string[]) {
     if (!ctx.claims) {
       throw new TRPCError({ code: "UNAUTHORIZED", message: "Authentification requise" });
     }
-    if (ctx.role === "admin") return next(); // admin bypasse toutes les permissions
+    /** admin bypasse toutes les permissions */
+    if (ctx.role === "admin") return next();
     const has = requiredPerms.every((p) => ctx.permissions.includes(p));
     if (!has) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Vous n'avez pas la permission requise" });

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { router, permissionProcedure } from "../../../../interface/trpc/trpc";
-// Lecture = `contrats.voir`, écriture/transitions/facturation = `contrats.gerer` (parité legacy).
+/** Lecture = `contrats.voir`, écriture/transitions/facturation = `contrats.gerer` (parité legacy). */
 const voir = permissionProcedure("contrats.voir");
 const gerer = permissionProcedure("contrats.gerer");
 import type { IContratRepository } from "../../application/contrat-repository";
@@ -20,7 +20,7 @@ const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide
 const typeEnum = z.enum(["maintenance_preventive", "entretien", "depannage", "contrat_service"]);
 const periodiciteEnum = z.enum(["mensuel", "trimestriel", "semestriel", "annuel"]);
 const interventionStatutEnum = z.enum(["planifiee", "en_cours", "effectuee", "annulee"]);
-// `dateDebut`/`dateFin` arrivent en string ISO (transport JSON) ; `z.coerce.date()` → Date.
+/** `dateDebut`/`dateFin` arrivent en string ISO (transport JSON) ; `z.coerce.date()` → Date. */
 
 /*
  * Bornes alignées sur la table `contrats_maintenance` (defense-in-depth). ⚠️ Le client NE fournit
@@ -89,7 +89,7 @@ export function createContratsMaintenanceRouter(repo: IContratRepository, factur
         return { success: true };
       }),
 
-    // Transitions de statut (état machine) — chacune valide la légalité depuis le statut courant.
+    /** Transitions de statut (état machine) — chacune valide la légalité depuis le statut courant. */
     suspendre: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => suspendreContrat(repo, ctx.tenant, input.id)),
@@ -106,15 +106,15 @@ export function createContratsMaintenanceRouter(repo: IContratRepository, factur
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => annulerContrat(repo, ctx.tenant, input.id)),
 
-    // Contrats arrivés à échéance de facturation (enrichis client/TTC/retard) — parité `getAFacturer`.
+    /** Contrats arrivés à échéance de facturation (enrichis client/TTC/retard) — parité `getAFacturer`. */
     getAFacturer: voir.query(({ ctx }) => listContratsAFacturer(repo, ctx.tenant)),
 
-    // Génère une facture émise pour un contrat (récurrente) — parité `generateFacture`. ⚠️ pas d'écriture FEC.
+    /** Génère une facture émise pour un contrat (récurrente) — parité `generateFacture`. ⚠️ pas d'écriture FEC. */
     generateFacture: gerer
       .input(z.object({ contratId: z.number().int() }))
       .mutation(({ ctx, input }) => genererFactureContrat(repo, factureGen, ctx.tenant, input.contratId)),
 
-    // ── Sous-ressource interventions du contrat (ownership via contrat parent ; anti-IDOR id↔contrat) ──
+    /** ── Sous-ressource interventions du contrat (ownership via contrat parent ; anti-IDOR id↔contrat) ── */
     getInterventions: voir
       .input(z.object({ contratId: z.number().int() }))
       .query(({ ctx, input }) => getInterventionsContrat(repo, ctx.tenant, input.contratId)),

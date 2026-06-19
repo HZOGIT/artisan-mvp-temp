@@ -42,7 +42,7 @@ export interface ExecutionResult {
   readonly tempsExecution: number;
 }
 
-// Agrégat du rapport « financier » (parité legacy `executerRapport` case 'financier'). PURE.
+/** Agrégat du rapport « financier » (parité legacy `executerRapport` case 'financier'). PURE. */
 export function computeFinancier(factures: ReadonlyArray<{ statut: string | null; totalTTC: string | null }>): Array<{ totalCA: number; nombreFactures: number; facturesPayees: number }> {
   const payees = factures.filter((f) => f.statut === "payee");
   const totalCA = payees.reduce((sum, f) => sum + (parseFloat(String(f.totalTTC ?? "0")) || 0), 0);

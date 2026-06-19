@@ -7,7 +7,7 @@ import { creerBudget, modifierBudget, supprimerBudget } from "../../application/
 const mois = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Mois au format YYYY-MM invalide");
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
 
-// Bornes alignées sur la table `budgets_categories` (defense-in-depth).
+/** Bornes alignées sur la table `budgets_categories` (defense-in-depth). */
 const createSchema = z.object({
   categorie: z.string().min(1).max(50),
   mois,
@@ -15,7 +15,7 @@ const createSchema = z.object({
   depenseReelle: decimal.optional(),
 });
 
-// ⚠️ Montants seuls — `categorie`/`mois` sont la clé d'unicité immuable (changer = supprimer + recréer).
+/** ⚠️ Montants seuls — `categorie`/`mois` sont la clé d'unicité immuable (changer = supprimer + recréer). */
 const updateSchema = z.object({
   budget: decimal.optional(),
   depenseReelle: decimal.optional(),

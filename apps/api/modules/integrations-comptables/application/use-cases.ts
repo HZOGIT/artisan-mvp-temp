@@ -33,7 +33,7 @@ export interface GenererExportInput {
 
 export interface GenererExportDeps {
   readonly repo: IIntegrationsComptablesRepository;
-  // Contenu FEC opposable (réutilise le générateur du domaine comptabilité — invariant Σdébit=Σcrédit).
+  /** Contenu FEC opposable (réutilise le générateur du domaine comptabilité — invariant Σdébit=Σcrédit). */
   readonly fec: { getFecContent(ctx: TenantContext, period: { dateDebut: Date; dateFin: Date }): Promise<string> };
 }
 
@@ -77,7 +77,7 @@ export async function genererExport(deps: GenererExportDeps, ctx: TenantContext,
   return { id: exportRecord.id, contenu };
 }
 
-// ── Synchronisation ──
+/** ── Synchronisation ── */
 export function getSyncLogs(repo: IIntegrationsComptablesRepository, ctx: TenantContext): Promise<ExportComptableRow[]> {
   return repo.listSyncLogs(ctx);
 }

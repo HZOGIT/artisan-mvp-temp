@@ -1,4 +1,4 @@
-// Types de domaine du classement des techniciens (gamification) — découplés Drizzle.
+/** Types de domaine du classement des techniciens (gamification) — découplés Drizzle. */
 
 export type PeriodeClassement = "semaine" | "mois" | "trimestre" | "annee";
 

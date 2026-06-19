@@ -2,7 +2,7 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { FecReader } from "./fec-reader";
 import type { FecDepense, ConfigComptable } from "../domain/fec";
 
-// En-tête FEC (18 colonnes AFNOR, séparées par tabulation). Parité legacy `exportDepensesFEC`.
+/** En-tête FEC (18 colonnes AFNOR, séparées par tabulation). Parité legacy `exportDepensesFEC`. */
 const FEC_HEADER = [
   "JournalCode",
   "JournalLib",
@@ -24,7 +24,7 @@ const FEC_HEADER = [
   "Idevise",
 ].join("\t");
 
-// Montant FEC : 2 décimales, virgule décimale (format FR).
+/** Montant FEC : 2 décimales, virgule décimale (format FR). */
 const fec = (val: string | number | null | undefined): string => (Number(val ?? 0) || 0).toFixed(2).replace(".", ",");
 
 /*
@@ -36,7 +36,8 @@ export function genererFecAchats(depenses: readonly FecDepense[], config: Config
   const lines = [FEC_HEADER];
   let num = 1;
   for (const d of depenses) {
-    const dateF = String(d.dateDepense).slice(0, 10).replace(/-/g, ""); // YYYYMMDD
+    /** YYYYMMDD */
+    const dateF = String(d.dateDepense).slice(0, 10).replace(/-/g, "");
     const lib = `Achat ${d.numero} ${d.fournisseur ?? ""}`.trim();
     lines.push([config.journalAchats, "Achats", num, dateF, config.compteAchats, "Achats", "", "", d.numero, dateF, lib, fec(d.montantHt), "0,00", "", "", "", "", ""].join("\t"));
     lines.push([config.journalAchats, "Achats", num, dateF, config.compteTVADeductible, "TVA deductible", "", "", d.numero, dateF, lib, fec(d.montantTva), "0,00", "", "", "", "", ""].join("\t"));

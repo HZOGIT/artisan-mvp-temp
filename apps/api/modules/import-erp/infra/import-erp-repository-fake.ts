@@ -27,7 +27,7 @@ export class ImportErpRepositoryFake implements IImportErpRepository {
     if (this.failOn?.("client", this.createdClients.length)) throw new Error("insert client échoué");
     const id = this.seq++;
     this.createdClients.push(data);
-    // Rend le client disponible pour un lookup ultérieur (parité : créé puis trouvable).
+    /** Rend le client disponible pour un lookup ultérieur (parité : créé puis trouvable). */
     this.existing.push({ id, nom: data.nom, prenom: data.prenom ?? null, email: data.email ?? null });
   }
 
@@ -41,7 +41,7 @@ export class ImportErpRepositoryFake implements IImportErpRepository {
     this.createdFactures.push(data);
   }
 
-  // Numéros déjà créés (préservés) + numéros existants seedés via `existingNumeros`.
+  /** Numéros déjà créés (préservés) + numéros existants seedés via `existingNumeros`. */
   existingNumeros: string[] = [];
   async listFactureNumeros(_ctx: TenantContext): Promise<string[]> {
     return [...this.existingNumeros, ...this.createdFactures.map((f) => f.numero).filter((n): n is string => !!n)];

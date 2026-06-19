@@ -4,7 +4,7 @@ import type { DbClient } from "../../../shared/db";
 import type { Signature, NewSignature, SignatureStatut } from "../domain/signature";
 import type { ISignatureRepository } from "../application/signature-repository";
 
-// Mappe une ligne `signatures_devis` vers le type de domaine (statut par défaut `en_attente`).
+/** Mappe une ligne `signatures_devis` vers le type de domaine (statut par défaut `en_attente`). */
 function toDomain(r: typeof signaturesDevis.$inferSelect): Signature {
   return {
     id: r.id,

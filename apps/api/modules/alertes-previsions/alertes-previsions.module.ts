@@ -1,7 +1,7 @@
 import type { IAlertesPrevisionsRepository } from "./application/alertes-previsions-repository";
 import { createAlertesPrevisionsRouter } from "./interface/trpc/alertes-previsions.router";
 
-// Wiring DI du module « alertesPrevisions » (alertes du prévisionnel de trésorerie, tables sous RLS).
+/** Wiring DI du module « alertesPrevisions » (alertes du prévisionnel de trésorerie, tables sous RLS). */
 export interface AlertesPrevisionsModuleDeps {
   readonly repo: IAlertesPrevisionsRepository;
 }

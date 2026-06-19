@@ -18,7 +18,7 @@ export interface ArtisanInfo {
   readonly [key: string]: unknown;
 }
 
-// Émetteur courant (déduit du `TenantContext` — `ctx.artisanId`). Renvoie null si absent.
+/** Émetteur courant (déduit du `TenantContext` — `ctx.artisanId`). Renvoie null si absent. */
 export interface ArtisanReader {
   getArtisan(ctx: TenantContext): Promise<ArtisanInfo | null>;
 }
@@ -31,7 +31,7 @@ export interface ClientInfo {
   readonly [key: string]: unknown;
 }
 
-// Lecture d'un client du tenant (anti-IDOR : null si le client n'appartient pas au tenant).
+/** Lecture d'un client du tenant (anti-IDOR : null si le client n'appartient pas au tenant). */
 export interface ClientReader {
   getClient(ctx: TenantContext, clientId: number): Promise<ClientInfo | null>;
 }

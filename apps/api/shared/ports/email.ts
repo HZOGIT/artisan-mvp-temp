@@ -17,7 +17,7 @@ export interface EmailMessage {
   readonly to: string;
   readonly subject: string;
   readonly body: string;
-  // Optionnel : pièces jointes (rétro-compatible — les appelants existants n'en fournissent pas).
+  /** Optionnel : pièces jointes (rétro-compatible — les appelants existants n'en fournissent pas). */
   readonly attachments?: readonly EmailAttachment[];
 }
 

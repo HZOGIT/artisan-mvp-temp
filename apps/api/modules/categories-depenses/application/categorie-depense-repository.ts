@@ -9,11 +9,11 @@ import type { CategorieDepense, CreateCategorieInput, UpdateCategorieInput } fro
  */
 export interface ICategorieDepenseRepository {
   list(ctx: TenantContext): Promise<CategorieDepense[]>;
-  // null si la catégorie n'appartient pas au tenant.
+  /** null si la catégorie n'appartient pas au tenant. */
   getById(ctx: TenantContext, id: number): Promise<CategorieDepense | null>;
   create(ctx: TenantContext, input: CreateCategorieInput): Promise<CategorieDepense>;
-  // null si la catégorie n'appartient pas au tenant.
+  /** null si la catégorie n'appartient pas au tenant. */
   update(ctx: TenantContext, id: number, input: UpdateCategorieInput): Promise<CategorieDepense | null>;
-  // false si la catégorie n'appartient pas au tenant.
+  /** false si la catégorie n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
 }

@@ -3,7 +3,7 @@ import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { ISearchReader } from "../../application/search-reader";
 import { globalSearch } from "../../application/use-cases";
 
-// Routeur tRPC de la recherche globale. Surface client = `global` (palette de recherche cross-domaine).
+/** Routeur tRPC de la recherche globale. Surface client = `global` (palette de recherche cross-domaine). */
 export function createSearchRouter(reader: ISearchReader) {
   return router({
     global: protectedProcedure

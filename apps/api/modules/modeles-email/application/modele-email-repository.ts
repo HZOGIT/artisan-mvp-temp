@@ -7,13 +7,13 @@ import type { CreateModeleEmailInput, ModeleEmail, TypeModeleEmail, UpdateModele
  */
 export interface IModeleEmailRepository {
   list(ctx: TenantContext): Promise<ModeleEmail[]>;
-  // Modèles du tenant filtrés par type (scopé tenant ; [] si aucun).
+  /** Modèles du tenant filtrés par type (scopé tenant ; [] si aucun). */
   listByType(ctx: TenantContext, type: TypeModeleEmail): Promise<ModeleEmail[]>;
-  // null si le modèle n'appartient pas au tenant.
+  /** null si le modèle n'appartient pas au tenant. */
   getById(ctx: TenantContext, id: number): Promise<ModeleEmail | null>;
   create(ctx: TenantContext, input: CreateModeleEmailInput): Promise<ModeleEmail>;
-  // null si le modèle n'appartient pas au tenant.
+  /** null si le modèle n'appartient pas au tenant. */
   update(ctx: TenantContext, id: number, input: UpdateModeleEmailInput): Promise<ModeleEmail | null>;
-  // false si le modèle n'appartient pas au tenant.
+  /** false si le modèle n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
 }

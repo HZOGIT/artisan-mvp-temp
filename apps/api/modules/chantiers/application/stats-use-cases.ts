@@ -45,7 +45,7 @@ export function computeStatistiques(
   };
 }
 
-// Statistiques d'un chantier possédé (404 sinon). Lecture seule.
+/** Statistiques d'un chantier possédé (404 sinon). Lecture seule. */
 export async function getStatistiquesChantier(
   repo: IChantierRepository,
   ctx: TenantContext,

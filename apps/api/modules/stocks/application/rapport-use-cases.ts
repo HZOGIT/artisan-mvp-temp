@@ -48,7 +48,7 @@ export async function genererRapportCommande(
   const fournisseurs = await fournisseurRepo.list(ctx);
   const fournisseursById = new Map(fournisseurs.map((f) => [f.id, f]));
 
-  // Regroupement par fournisseur (clé 0 = aucun fournisseur lié), ordre de 1ère apparition.
+  /** Regroupement par fournisseur (clé 0 = aucun fournisseur lié), ordre de 1ère apparition. */
   const grouped = new Map<number, { fournisseur: Fournisseur | null; lignes: RapportLigne[] }>();
 
   for (const stock of stocksBas) {

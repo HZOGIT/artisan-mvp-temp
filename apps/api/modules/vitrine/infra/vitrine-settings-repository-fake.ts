@@ -2,7 +2,7 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IVitrineSettingsRepository } from "../application/vitrine-settings-repository";
 import { DEFAULT_VITRINE_SETTINGS, type VitrineSettings, type UpdateVitrineSettingsInput } from "../domain/vitrine-settings";
 
-// Fake en mémoire (tests use-case) : singleton par artisanId, upsert partiel idempotent.
+/** Fake en mémoire (tests use-case) : singleton par artisanId, upsert partiel idempotent. */
 export class VitrineSettingsRepositoryFake implements IVitrineSettingsRepository {
   private readonly byArtisan = new Map<number, VitrineSettings>();
 

@@ -36,7 +36,7 @@ export function generateFacturXML(
     tvaByRate.set(taux, entry);
   }
 
-  // Fallback when lines have no montantHT/TVA (edge case): single block from totals.
+  /** Fallback when lines have no montantHT/TVA (edge case): single block from totals. */
   const taxBlocks: { taux: number; baseHT: number; montantTVA: number }[] =
     tvaByRate.size > 0
       ? Array.from(tvaByRate.entries()).map(([taux, v]) => ({

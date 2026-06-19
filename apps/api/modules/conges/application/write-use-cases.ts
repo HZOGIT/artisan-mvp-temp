@@ -27,7 +27,7 @@ async function ajusterSoldePourConge(
  */
 
 function assertDatesCoherentes(dateDebut?: string, dateFin?: string): void {
-  // Dates au format ISO `YYYY-MM-DD` → comparaison lexicographique = chronologique.
+  /** Dates au format ISO `YYYY-MM-DD` → comparaison lexicographique = chronologique. */
   if (dateDebut && dateFin && dateFin < dateDebut) {
     throw new ValidationError("La date de fin doit être postérieure ou égale à la date de début");
   }
@@ -35,7 +35,7 @@ function assertDatesCoherentes(dateDebut?: string, dateFin?: string): void {
 
 export async function creerConge(repo: ICongeRepository, ctx: TenantContext, input: CreateCongeInput): Promise<Conge> {
   assertDatesCoherentes(input.dateDebut, input.dateFin);
-  // Anti-IDOR-FK : le technicien (demandeur) doit appartenir au tenant.
+  /** Anti-IDOR-FK : le technicien (demandeur) doit appartenir au tenant. */
   if (!(await repo.ownsTechnicien(ctx, input.technicienId))) {
     throw new NotFoundError("Technicien introuvable");
   }
@@ -57,7 +57,7 @@ export async function modifierConge(
 export async function supprimerConge(repo: ICongeRepository, ctx: TenantContext, id: number): Promise<void> {
   const conge = await repo.getById(ctx, id);
   if (!conge) throw new NotFoundError("Demande de congé introuvable");
-  // Recrédit du solde si on supprime un congé approuvé (qui avait décompté) — parité legacy.
+  /** Recrédit du solde si on supprime un congé approuvé (qui avait décompté) — parité legacy. */
   if (conge.statut === "approuve") await ajusterSoldePourConge(repo, ctx, conge, -1);
   const ok = await repo.delete(ctx, id);
   if (!ok) throw new NotFoundError("Demande de congé introuvable");
@@ -94,7 +94,8 @@ export async function approuverConge(
   commentaire?: string | null,
 ): Promise<Conge> {
   const conge = await chargerCongeDuTenant(repo, ctx, id);
-  if (conge.statut === "approuve") return conge; // idempotent (pas de re-décompte de solde)
+  /** idempotent (pas de re-décompte de solde) */
+  if (conge.statut === "approuve") return conge;
   if (conge.statut !== "en_attente") throw new ConflictError("Cette demande a déjà été traitée");
   await assertPasSelfApprobation(repo, ctx, conge);
   /*
@@ -114,7 +115,8 @@ export async function refuserConge(
   commentaire?: string | null,
 ): Promise<Conge> {
   const conge = await chargerCongeDuTenant(repo, ctx, id);
-  if (conge.statut === "refuse") return conge; // idempotent
+  /** idempotent */
+  if (conge.statut === "refuse") return conge;
   if (conge.statut !== "en_attente") throw new ConflictError("Cette demande a déjà été traitée");
   /*
    * Refuser sa propre demande = se la refuser à soi-même : sans risque, mais on garde la
@@ -128,9 +130,10 @@ export async function refuserConge(
 
 export async function annulerConge(repo: ICongeRepository, ctx: TenantContext, id: number): Promise<Conge> {
   const conge = await chargerCongeDuTenant(repo, ctx, id);
-  if (conge.statut === "annule") return conge; // idempotent (pas de double recrédit de solde)
+  /** idempotent (pas de double recrédit de solde) */
+  if (conge.statut === "annule") return conge;
   if (conge.statut === "refuse") throw new ConflictError("Une demande refusée ne peut pas être annulée");
-  // Recrédit du solde UNIQUEMENT si on QUITTE l'état approuve (qui avait décompté).
+  /** Recrédit du solde UNIQUEMENT si on QUITTE l'état approuve (qui avait décompté). */
   if (conge.statut === "approuve") await ajusterSoldePourConge(repo, ctx, conge, -1);
   const updated = await repo.setStatut(ctx, id, "annule", ctx.userId);
   if (!updated) throw new NotFoundError("Demande de congé introuvable");

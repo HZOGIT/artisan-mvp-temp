@@ -8,7 +8,7 @@ export const MIGRATED_DOMAINS = ["vehicules", "avis", "badges", "techniciens", "
 
 export type MigratedDomain = (typeof MIGRATED_DOMAINS)[number];
 
-// Le domaine est-il monté dans le nouveau stack (donc éligible à une bascule de flag) ?
+/** Le domaine est-il monté dans le nouveau stack (donc éligible à une bascule de flag) ? */
 export function isMigratedDomainAvailable(domain: string): domain is MigratedDomain {
   return (MIGRATED_DOMAINS as readonly string[]).includes(domain);
 }

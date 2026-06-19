@@ -9,7 +9,7 @@ import type { SubscriptionWebhookWriter } from "./subscription-webhook-writer";
 import type { WebhookPaymentWriter } from "./webhook-payment-writer";
 import type { SubscriptionEventNotifier } from "./subscription-event-notifier";
 
-// Dépendances du traitement webhook Stripe. `webhookSecret` injecté (jamais lu à vide).
+/** Dépendances du traitement webhook Stripe. `webhookSecret` injecté (jamais lu à vide). */
 export interface StripeWebhookDeps {
   readonly stripe: StripePort;
   readonly writer: SubscriptionWebhookWriter;
@@ -19,7 +19,7 @@ export interface StripeWebhookDeps {
   readonly appUrl: string;
 }
 
-// Résultat HTTP du traitement (le routeur le mappe en réponse Fastify). `body` est sérialisé JSON.
+/** Résultat HTTP du traitement (le routeur le mappe en réponse Fastify). `body` est sérialisé JSON. */
 export interface WebhookResult {
   readonly http: number;
   readonly body: Record<string, unknown>;
@@ -41,7 +41,7 @@ export async function processStripeWebhook(
   input: { rawBody: Buffer; signature: string | undefined },
 ): Promise<WebhookResult> {
   if (!input.signature) return { http: 400, body: { error: "Missing signature" } };
-  // ⚠️ fail-closed : sans secret, ne JAMAIS vérifier à clé vide (signature forgeable).
+  /** ⚠️ fail-closed : sans secret, ne JAMAIS vérifier à clé vide (signature forgeable). */
   if (!deps.webhookSecret) return { http: 500, body: { error: "Webhook not configured" } };
 
   let event;
@@ -69,7 +69,7 @@ export async function processStripeWebhook(
     } else if (event.type === "customer.subscription.trial_will_end") {
       await handleTrialWillEnd(deps, event.data.object);
     }
-    // Tous les events legacy sont désormais gérés (abonnement + paiement/facture + invoice + trial).
+    /** Tous les events legacy sont désormais gérés (abonnement + paiement/facture + invoice + trial). */
     return { http: 200, body: { received: true } };
   } catch {
     return { http: 500, body: { error: "Webhook handler failed" } };
@@ -85,7 +85,8 @@ async function resolveArtisanId(deps: StripeWebhookDeps, sub: Record<string, unk
 
 async function handleUpsert(deps: StripeWebhookDeps, sub: Record<string, unknown>): Promise<void> {
   const artisanId = await resolveArtisanId(deps, sub);
-  if (!artisanId) return; // artisanId introuvable → skip (parité legacy)
+  /** artisanId introuvable → skip (parité legacy) */
+  if (!artisanId) return;
   await deps.writer.applyUpsert(artisanId, mapSubscriptionUpsert(sub));
 }
 
@@ -114,7 +115,7 @@ async function handleCheckoutCompleted(deps: StripeWebhookDeps, session: Record<
   });
 }
 
-// `payment_intent.payment_failed` (parité legacy) : paiement par token → echoue.
+/** `payment_intent.payment_failed` (parité legacy) : paiement par token → echoue. */
 async function handlePaymentFailed(deps: StripeWebhookDeps, pi: Record<string, unknown>): Promise<void> {
   const metadata = (pi.metadata ?? {}) as Record<string, unknown>;
   const token = metadata.token_paiement ? String(metadata.token_paiement) : null;
@@ -124,7 +125,7 @@ async function handlePaymentFailed(deps: StripeWebhookDeps, pi: Record<string, u
   await deps.paymentWriter.failPaiement({ artisanId: resolved.artisanId, paiementId: resolved.paiementId });
 }
 
-// Notifs/emails best-effort : ne JAMAIS faire échouer le webhook (parité legacy).
+/** Notifs/emails best-effort : ne JAMAIS faire échouer le webhook (parité legacy). */
 async function bestEffort(fn: () => Promise<void>): Promise<void> {
   try {
     await fn();
@@ -157,7 +158,7 @@ async function handleInvoicePaid(deps: StripeWebhookDeps, invoice: Record<string
   });
 }
 
-// `invoice.payment_failed` (parité legacy) : facture d'abonnement → past_due + notif erreur + email.
+/** `invoice.payment_failed` (parité legacy) : facture d'abonnement → past_due + notif erreur + email. */
 async function handleInvoiceFailed(deps: StripeWebhookDeps, invoice: Record<string, unknown>): Promise<void> {
   const subscriptionId = invoice.subscription ? String(invoice.subscription) : null;
   const customerId = invoice.customer ? String(invoice.customer) : null;
@@ -176,7 +177,7 @@ async function handleInvoiceFailed(deps: StripeWebhookDeps, invoice: Record<stri
   });
 }
 
-// `customer.subscription.trial_will_end` (parité legacy, J-3) : notif info + email rappel (best-effort).
+/** `customer.subscription.trial_will_end` (parité legacy, J-3) : notif info + email rappel (best-effort). */
 async function handleTrialWillEnd(deps: StripeWebhookDeps, sub: Record<string, unknown>): Promise<void> {
   const artisanId = await resolveArtisanId(deps, sub);
   if (!artisanId) return;

@@ -25,10 +25,10 @@ import type {
  *    (parité legacy « Document fiscal verrouillé — émettez un avoir pour corriger ») → Conflict.
  */
 
-// Entrée de création : pas de numero (généré serveur).
+/** Entrée de création : pas de numero (généré serveur). */
 export type CreerFactureInput = Omit<CreateFactureInput, "numero">;
 
-// Seul le brouillon est modifiable ; tout autre statut = pièce verrouillée.
+/** Seul le brouillon est modifiable ; tout autre statut = pièce verrouillée. */
 function assertModifiable(facture: Facture): void {
   if (facture.statut !== "brouillon") {
     throw new ConflictError("Document fiscal verrouillé — modification interdite (émettez un avoir pour corriger)");
@@ -52,7 +52,7 @@ function assertLigneValide(designation: string | undefined, prixUnitaireHT?: str
 }
 
 export async function creerFacture(repo: IFactureRepository, ctx: TenantContext, input: CreerFactureInput): Promise<Facture> {
-  // Anti-IDOR-FK : client (et devis lié) du tenant uniquement (ne révèle pas l'existence).
+  /** Anti-IDOR-FK : client (et devis lié) du tenant uniquement (ne révèle pas l'existence). */
   if (!(await repo.ownsClient(ctx, input.clientId))) throw new NotFoundError("Client introuvable");
   if (input.devisId != null && !(await repo.ownsDevis(ctx, input.devisId))) throw new NotFoundError("Devis introuvable");
   const numero = await repo.nextNumero(ctx);
@@ -74,7 +74,7 @@ export async function modifierFacture(
 
 export async function supprimerFacture(repo: IFactureRepository, ctx: TenantContext, id: number): Promise<void> {
   const facture = await getFactureOwned(repo, ctx, id);
-  // Une facture émise ne se supprime pas (pièce légale) — on émet un avoir.
+  /** Une facture émise ne se supprime pas (pièce légale) — on émet un avoir. */
   assertModifiable(facture);
   const ok = await repo.delete(ctx, id);
   if (!ok) throw new NotFoundError("Facture introuvable");
@@ -133,7 +133,8 @@ const TRANSITIONS: Record<FactureStatut, readonly FactureStatut[]> = {
  */
 export type EnregistrerPaiementInput = { readonly montant: string; readonly date?: Date | null; readonly mode?: string | null };
 
-const EPS = 0.005; // tolérance de comparaison au centime
+/** tolérance de comparaison au centime */
+const EPS = 0.005;
 
 /*
  * Enregistre un paiement (partiel ou soldant). ⚠️ Invariants financiers :
@@ -205,9 +206,11 @@ export async function marquerFacturePayee(
   const datePaiement = new Date(input.datePaiement);
   if (Number.isNaN(datePaiement.getTime())) throw new ValidationError("Date de paiement invalide");
   const updated = await repo.enregistrerPaiement(ctx, id, {
-    montantPaye: input.montantPaye, // écrasé (sémantique legacy, non cumulatif)
+    /** écrasé (sémantique legacy, non cumulatif) */
+    montantPaye: input.montantPaye,
     datePaiement,
-    modePaiement: facture.modePaiement, // préservé
+    /** préservé */
+    modePaiement: facture.modePaiement,
     statut: "payee",
   });
   if (!updated) throw new NotFoundError("Facture introuvable");
@@ -215,12 +218,12 @@ export async function marquerFacturePayee(
     await compta.genererEcrituresVente(ctx, id);
     await compta.genererEcrituresEncaissement(ctx, id);
   } catch {
-    // Échec de génération des écritures : ne casse pas le paiement (parité legacy try/catch).
+    /** Échec de génération des écritures : ne casse pas le paiement (parité legacy try/catch). */
   }
   return updated;
 }
 
-// Entrée de création d'un avoir (note de crédit) sur une facture d'origine.
+/** Entrée de création d'un avoir (note de crédit) sur une facture d'origine. */
 export type CreerAvoirInput = {
   readonly lignes: readonly {
     readonly designation: string;
@@ -255,7 +258,7 @@ export async function creerAvoir(
   }
   if (!input.lignes.length) throw new ValidationError("Un avoir doit comporter au moins une ligne");
 
-  // Lignes d'avoir à montants négatifs.
+  /** Lignes d'avoir à montants négatifs. */
   const lignes: AvoirLigneData[] = input.lignes.map((l) => {
     assertLigneValide(l.designation, l.prixUnitaireHT, l.quantite);
     const m = calculerMontantsAvoirLigne(l.quantite, l.prixUnitaireHT, l.tauxTVA ?? "20.00");
@@ -272,7 +275,7 @@ export async function creerAvoir(
     };
   });
 
-  // Anti-sur-avoir : cumul des avoirs ≤ total TTC de la facture d'origine.
+  /** Anti-sur-avoir : cumul des avoirs ≤ total TTC de la facture d'origine. */
   const factureTotal = Math.abs(Number(origine.totalTTC) || 0);
   const dejaCouvert = (await repo.listAvoirs(ctx, factureOrigineId)).reduce(
     (sum, a) => sum + Math.abs(Number(a.totalTTC) || 0),
@@ -307,7 +310,7 @@ export async function creerAvoir(
   try {
     await compta.genererEcrituresVente(ctx, avoir.id);
   } catch {
-    // écritures non bloquantes pour le document (cohérent avec les autres flux compta best-effort)
+    /** écritures non bloquantes pour le document (cohérent avec les autres flux compta best-effort) */
   }
   return avoir;
 }
@@ -371,13 +374,14 @@ export async function changerStatutFacture(
   compta: ComptaPort = NOOP_COMPTA,
 ): Promise<Facture> {
   const facture = await getFactureOwned(repo, ctx, id);
-  if (facture.statut === cible) return facture; // idempotent
+  /** idempotent */
+  if (facture.statut === cible) return facture;
   if (!TRANSITIONS[facture.statut].includes(cible)) {
     throw new ConflictError(`Transition de statut invalide : ${facture.statut} → ${cible}`);
   }
   const updated = await repo.setStatut(ctx, id, cible);
   if (!updated) throw new NotFoundError("Facture introuvable");
-  // À l'émission (passage `envoyee`) : génère la pièce de vente FEC (411/706/445). Idempotent.
+  /** À l'émission (passage `envoyee`) : génère la pièce de vente FEC (411/706/445). Idempotent. */
   if (cible === "envoyee") await compta.genererEcrituresVente(ctx, id);
   return updated;
 }

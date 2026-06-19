@@ -21,7 +21,8 @@ export interface AnalyserJustificatifDeps {
 }
 
 export interface AnalyserJustificatifInput {
-  readonly imageBase64: string; // data URL (`data:image/...;base64,…`) ou base64 brut
+  /** data URL (`data:image/...;base64,…`) ou base64 brut */
+  readonly imageBase64: string;
   readonly depenseId?: number;
 }
 
@@ -55,7 +56,7 @@ export async function analyserJustificatif(
     if (!(await deps.depenseRepo.getById(ctx, input.depenseId))) throw new NotFoundError("Dépense introuvable");
   }
 
-  // Détecte le data URL et extrait le base64 brut + le mimeType.
+  /** Détecte le data URL et extrait le base64 brut + le mimeType. */
   const m = input.imageBase64.match(/^data:(image\/[a-z0-9+.-]+);base64,(.+)$/i);
   const mimeType = m?.[1] ?? "image/jpeg";
   const base64 = m ? m[2] : input.imageBase64;

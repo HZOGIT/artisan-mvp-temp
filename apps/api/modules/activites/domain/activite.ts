@@ -21,7 +21,7 @@ export interface Activite {
   readonly createdAt: Date;
 }
 
-// Champs de création d'une activité (le rattachement entité est vérifié possédé avant insert).
+/** Champs de création d'une activité (le rattachement entité est vérifié possédé avant insert). */
 export interface CreateActiviteInput {
   readonly type: ActiviteType;
   readonly titre: string;

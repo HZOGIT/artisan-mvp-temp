@@ -42,11 +42,12 @@ export async function creerContrat(repo: IContratRepository, ctx: TenantContext,
   if (input.preavisResiliation !== undefined && (!Number.isInteger(input.preavisResiliation) || input.preavisResiliation < 0)) {
     throw new ValidationError("Le préavis de résiliation doit être un entier positif ou nul");
   }
-  // Anti-IDOR-FK : le client doit appartenir au tenant. NotFound (ne révèle pas l'existence cross-tenant).
+  /** Anti-IDOR-FK : le client doit appartenir au tenant. NotFound (ne révèle pas l'existence cross-tenant). */
   if (!(await repo.ownsClient(ctx, input.clientId))) throw new NotFoundError("Client introuvable");
-  // Référence générée serveur (jamais fournie par le client).
+  /** Référence générée serveur (jamais fournie par le client). */
   const reference = await repo.nextReference(ctx);
-  return repo.create(ctx, input, reference); // statut="actif" forcé par l'infra
+  /** statut="actif" forcé par l'infra */
+  return repo.create(ctx, input, reference);
 }
 
 export async function modifierContrat(repo: IContratRepository, ctx: TenantContext, id: number, input: UpdateContratInput): Promise<Contrat> {

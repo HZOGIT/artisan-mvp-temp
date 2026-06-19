@@ -1,7 +1,7 @@
 import type { IDashboardReader } from "./application/dashboard-reader";
 import { createDashboardRouter } from "./interface/trpc/dashboard.router";
 
-// Wiring DI du module « dashboard » (agrégats de lecture).
+/** Wiring DI du module « dashboard » (agrégats de lecture). */
 export interface DashboardModuleDeps {
   readonly reader: IDashboardReader;
 }

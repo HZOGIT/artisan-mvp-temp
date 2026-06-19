@@ -28,7 +28,7 @@ export interface Signature {
   readonly createdAt: Date;
 }
 
-// Entrée de création d'une demande de signature (token + échéance générés serveur).
+/** Entrée de création d'une demande de signature (token + échéance générés serveur). */
 export interface NewSignature {
   readonly devisId: number;
   readonly token: string;
@@ -43,14 +43,14 @@ export function generateSignatureToken(): string {
   return (randomUUID().replace(/-/g, "") + randomUUID().replace(/-/g, "")).slice(0, 64);
 }
 
-// Échéance du lien de signature : `now` + `days` (30 j par défaut, parité legacy).
+/** Échéance du lien de signature : `now` + `days` (30 j par défaut, parité legacy). */
 export function computeSignatureExpiry(now: Date, days = 30): Date {
   const d = new Date(now);
   d.setDate(d.getDate() + days);
   return d;
 }
 
-// Échappement HTML minimal (parité legacy `safeHtml`) avant injection dans le gabarit d'email.
+/** Échappement HTML minimal (parité legacy `safeHtml`) avant injection dans le gabarit d'email. */
 export function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -60,14 +60,14 @@ export function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-// Montant en euros formaté FR (parité legacy `Intl.NumberFormat('fr-FR', currency EUR)`).
+/** Montant en euros formaté FR (parité legacy `Intl.NumberFormat('fr-FR', currency EUR)`). */
 export function formatEuro(montant: number): string {
   return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(
     Number.isFinite(montant) ? montant : 0,
   );
 }
 
-// Données nécessaires à la composition de l'email « devis à signer » (portées au use-case).
+/** Données nécessaires à la composition de l'email « devis à signer » (portées au use-case). */
 export interface SignatureLinkEmailInput {
   readonly artisanName: string;
   readonly clientName: string;
@@ -77,7 +77,7 @@ export interface SignatureLinkEmailInput {
   readonly signatureUrl: string;
 }
 
-// Email HTML envoyé au client avec le lien de signature (gabarit fidèle au legacy). Sujet + corps.
+/** Email HTML envoyé au client avec le lien de signature (gabarit fidèle au legacy). Sujet + corps. */
 export function buildSignatureLinkEmail(input: SignatureLinkEmailInput): { subject: string; body: string } {
   const artisanName = input.artisanName || "Votre artisan";
   const clientName = input.clientName || "Client";
@@ -112,7 +112,7 @@ export function buildSignatureLinkEmail(input: SignatureLinkEmailInput): { subje
   return { subject, body };
 }
 
-// Email artisan « devis accepté et signé » (parité legacy `signDevis`). Notifie l'artisan du succès.
+/** Email artisan « devis accepté et signé » (parité legacy `signDevis`). Notifie l'artisan du succès. */
 export function buildSignedDevisArtisanEmail(input: {
   devisNumero: string;
   signataireName: string;
@@ -124,7 +124,7 @@ export function buildSignedDevisArtisanEmail(input: {
   };
 }
 
-// Email artisan « devis refusé » (parité legacy `refuseDevis`).
+/** Email artisan « devis refusé » (parité legacy `refuseDevis`). */
 export function buildRefusedDevisArtisanEmail(input: {
   devisNumero: string;
   clientName: string;

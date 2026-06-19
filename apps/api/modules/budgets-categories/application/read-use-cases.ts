@@ -12,7 +12,7 @@ export function listBudgets(repo: IBudgetCategorieRepository, ctx: TenantContext
   return repo.list(ctx);
 }
 
-// Budgets du tenant pour un mois donné ("YYYY-MM") ; [] si aucun.
+/** Budgets du tenant pour un mois donné ("YYYY-MM") ; [] si aucun. */
 export function budgetsParMois(repo: IBudgetCategorieRepository, ctx: TenantContext, mois: string): Promise<BudgetCategorie[]> {
   return repo.listByMois(ctx, mois);
 }

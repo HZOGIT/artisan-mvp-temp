@@ -6,10 +6,10 @@ import type { IDevisRepository } from "../../devis/application/devis-repository"
 import type { IStockRepository } from "../../stocks/application/stock-repository";
 import type { IArticleRepository } from "../../articles/application/article-repository";
 import { sanitizeIaError } from "../../../shared/ia/sanitize-ia-error";
-// Réexport (compat appelants/test existants) — l'implémentation vit désormais dans shared/ia.
+/** Réexport (compat appelants/test existants) — l'implémentation vit désormais dans shared/ia. */
 export { sanitizeIaError };
 
-// Dépendances de la génération IA d'une commande à partir d'un devis (lecture seule, non persistée).
+/** Dépendances de la génération IA d'une commande à partir d'un devis (lecture seule, non persistée). */
 export interface CommandeIaDeps {
   readonly devisRepo: IDevisRepository;
   readonly stockRepo: IStockRepository;
@@ -18,7 +18,7 @@ export interface CommandeIaDeps {
   readonly rateLimiter: RateLimiterPort;
 }
 
-// Ligne de commande PROPOSÉE par l'IA (non persistée — le client l'ajoute au formulaire).
+/** Ligne de commande PROPOSÉE par l'IA (non persistée — le client l'ajoute au formulaire). */
 export interface LigneProposee {
   readonly articleId: number | null;
   readonly designation: string;
@@ -72,7 +72,7 @@ export async function genererCommandeDepuisDevisIA(
   const lignesDevis = await deps.devisRepo.listLignes(ctx, devisId);
   if (lignesDevis.length === 0) return { lignes: [], notes: "Devis sans ligne.", devisNumero: devis.numero };
 
-  // Lectures best-effort (le stock/les articles ne sont qu'une aide à la proposition).
+  /** Lectures best-effort (le stock/les articles ne sont qu'une aide à la proposition). */
   let stocks: Awaited<ReturnType<IStockRepository["list"]>> = [];
   try {
     stocks = await deps.stockRepo.list(ctx);

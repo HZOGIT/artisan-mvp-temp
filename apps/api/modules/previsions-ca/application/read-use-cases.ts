@@ -38,7 +38,7 @@ export function listPrevisions(repo: IPrevisionCARepository, ctx: TenantContext)
   return repo.list(ctx);
 }
 
-// Prévisions du tenant pour une année donnée ; [] si aucune.
+/** Prévisions du tenant pour une année donnée ; [] si aucune. */
 export function previsionsParAnnee(repo: IPrevisionCARepository, ctx: TenantContext, annee: number): Promise<PrevisionCA[]> {
   return repo.listByAnnee(ctx, annee);
 }
@@ -49,17 +49,17 @@ export async function getPrevision(repo: IPrevisionCARepository, ctx: TenantCont
   return prevision;
 }
 
-// Parité client `previsions.getPrevisions {annee?}` — défaut = année courante.
+/** Parité client `previsions.getPrevisions {annee?}` — défaut = année courante. */
 export function getPrevisions(repo: IPrevisionCARepository, ctx: TenantContext, annee?: number): Promise<PrevisionCA[]> {
   return repo.listByAnnee(ctx, annee ?? new Date().getFullYear());
 }
 
-// Parité client `previsions.getHistorique {nombreMois=24}` — historique de CA mensuel agrégé.
+/** Parité client `previsions.getHistorique {nombreMois=24}` — historique de CA mensuel agrégé. */
 export function getHistorique(repo: IPrevisionCARepository, ctx: TenantContext, nombreMois: number): Promise<HistoriqueCA[]> {
   return repo.listHistorique(ctx, nombreMois);
 }
 
-// Parité client `previsions.getComparaison {annee}` — prévu vs réalisé, mois par mois (lecture seule).
+/** Parité client `previsions.getComparaison {annee}` — prévu vs réalisé, mois par mois (lecture seule). */
 export async function getComparaison(repo: IPrevisionCARepository, ctx: TenantContext, annee: number): Promise<ComparaisonMois[]> {
   const [previsions, historique] = await Promise.all([repo.listByAnnee(ctx, annee), repo.listHistoriqueAnnee(ctx, annee)]);
   return computeComparaison(previsions, historique);

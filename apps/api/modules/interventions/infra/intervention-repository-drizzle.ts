@@ -100,7 +100,7 @@ export class InterventionRepositoryDrizzle implements IInterventionRepository {
   ownsRef(ctx: TenantContext, kind: InterventionRefKind, id: number): Promise<boolean> {
     return withTenant(this.db, ctx, async (tx) => {
       const n = sql<number>`count(*)::int`;
-      // Chaque table cible porte un `artisanId` (toutes RLS-isolées) → double cloisonnement.
+      /** Chaque table cible porte un `artisanId` (toutes RLS-isolées) → double cloisonnement. */
       let row: { n: number } | undefined;
       switch (kind) {
         case "client":
@@ -205,7 +205,7 @@ export class InterventionRepositoryDrizzle implements IInterventionRepository {
 
   addMembreEquipe(ctx: TenantContext, input: AjouterMembreEquipeInput): Promise<EquipeMembre> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Idempotent : si (intervention, technicien) existe déjà dans le tenant, on le renvoie.
+      /** Idempotent : si (intervention, technicien) existe déjà dans le tenant, on le renvoie. */
       const enrich = async (id: number): Promise<EquipeMembre> => {
         const [m] = await tx
           .select({
@@ -266,7 +266,7 @@ export class InterventionRepositoryDrizzle implements IInterventionRepository {
 
   setCouleur(ctx: TenantContext, interventionId: number, couleur: string): Promise<void> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Upsert sur la PK (artisanId, interventionId) → idempotent, scopé tenant.
+      /** Upsert sur la PK (artisanId, interventionId) → idempotent, scopé tenant. */
       await tx
         .insert(couleursInterventions)
         .values({ artisanId: ctx.artisanId, interventionId, couleur })

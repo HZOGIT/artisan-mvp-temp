@@ -15,10 +15,12 @@ const tokenInput = z.object({ token: z.string().min(1).max(64) });
 const selectOptionInput = z.object({ token: z.string().min(1).max(64), optionId: z.number().int() });
 const signInput = z.object({
   token: z.string().min(1).max(64),
-  signatureData: z.string().max(500000), // image base64 d'une signature manuscrite (~500 Ko)
+  /** image base64 d'une signature manuscrite (~500 Ko) */
+  signatureData: z.string().max(500000),
   signataireName: z.string().max(200),
   signataireEmail: z.string().email().max(320),
-  smsVerified: z.boolean().optional(), // accepté pour compat client, NON vérifié serveur (parité legacy)
+  /** accepté pour compat client, NON vérifié serveur (parité legacy) */
+  smsVerified: z.boolean().optional(),
 });
 const refuseInput = z.object({ token: z.string().min(1).max(64), motifRefus: z.string().max(2000).optional() });
 
@@ -38,7 +40,7 @@ export function createSignatureRouter(deps: SignatureDeps, publicDeps: Signature
       .input(devisIdInput)
       .query(({ ctx, input }) => getSignatureByDevis(deps, ctx.tenant!, input.devisId)),
 
-    // Génère (idempotent) le lien de signature d'un devis du tenant + email client + notification.
+    /** Génère (idempotent) le lien de signature d'un devis du tenant + email client + notification. */
     createSignatureLink: protectedProcedure
       .input(devisIdInput)
       .mutation(({ ctx, input }) => createSignatureLink(deps, ctx.tenant!, input.devisId)),
@@ -52,12 +54,12 @@ export function createSignatureRouter(deps: SignatureDeps, publicDeps: Signature
       .input(tokenInput)
       .query(({ input }) => getDevisForSignature(publicDeps, input.token)),
 
-    // Le client choisit une option/variante AVANT de signer (400 si déjà signé/expiré, rate-limité).
+    /** Le client choisit une option/variante AVANT de signer (400 si déjà signé/expiré, rate-limité). */
     selectDevisOption: publicProcedure
       .input(selectOptionInput)
       .mutation(({ input }) => selectDevisOption(publicDeps, { token: input.token, optionId: input.optionId })),
 
-    // Signature du devis : immutabilité (statut doit être en_attente) + capture IP probante/UA (ctx).
+    /** Signature du devis : immutabilité (statut doit être en_attente) + capture IP probante/UA (ctx). */
     signDevis: publicProcedure
       .input(signInput)
       .mutation(({ ctx, input }) =>
@@ -71,7 +73,7 @@ export function createSignatureRouter(deps: SignatureDeps, publicDeps: Signature
         }),
       ),
 
-    // Refus du devis (+ motif optionnel) : même immutabilité + capture IP/UA.
+    /** Refus du devis (+ motif optionnel) : même immutabilité + capture IP/UA. */
     refuseDevis: publicProcedure
       .input(refuseInput)
       .mutation(({ ctx, input }) =>

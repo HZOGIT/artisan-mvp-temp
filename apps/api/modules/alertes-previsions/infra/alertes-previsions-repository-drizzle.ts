@@ -38,7 +38,7 @@ function toHistorique(r: HistoRow): AlerteHistorique {
   };
 }
 
-// Colonnes autorisées à l'upsert (whitelist, defense-in-depth — parité audit injection SQL legacy).
+/** Colonnes autorisées à l'upsert (whitelist, defense-in-depth — parité audit injection SQL legacy). */
 const CONFIG_COLS = new Set<keyof SaveAlerteConfigInput>([
   "seuilAlertePositif", "seuilAlerteNegatif", "alerteEmail", "alerteSms",
   "emailDestination", "telephoneDestination", "frequenceVerification", "actif",

@@ -21,7 +21,8 @@ export interface VitrineParams {
   readonly vitrineActive: boolean | null;
   readonly vitrineDescription: string | null;
   readonly vitrineZone: string | null;
-  readonly vitrineServices: string | null; // JSON string (legacy) — parsé par la couche domaine
+  /** JSON string (legacy) — parsé par la couche domaine */
+  readonly vitrineServices: string | null;
   readonly vitrineExperience: number | null;
 }
 
@@ -75,7 +76,7 @@ export function resoudreServices(vitrineServices: string | null, categories: rea
   return services.length > 0 ? services : [...categories];
 }
 
-// Échappe le HTML inséré dans le corps de l'email de contact (anti-injection). Parité legacy `safeHtml`.
+/** Échappe le HTML inséré dans le corps de l'email de contact (anti-injection). Parité legacy `safeHtml`. */
 export function safeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }

@@ -25,7 +25,8 @@ export async function creerDemande(repo: IDemandeContactRepository, ctx: TenantC
   if (!input.nom?.trim()) throw new ValidationError("Le nom est requis");
   assertEmail(input.email);
   assertSource(input.source);
-  return repo.create(ctx, input); // statut "nouveau" + clientId null forcés par l'infra
+  /** statut "nouveau" + clientId null forcés par l'infra */
+  return repo.create(ctx, input);
 }
 
 export async function modifierDemande(repo: IDemandeContactRepository, ctx: TenantContext, id: number, input: UpdateDemandeInput): Promise<DemandeContact> {

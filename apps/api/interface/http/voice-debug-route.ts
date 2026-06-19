@@ -3,13 +3,13 @@ import type { RateLimiterPort } from "../../shared/ports/rate-limiter";
 import { extractClientIp } from "./client-ip";
 
 export interface VoiceDebugDeps {
-  // Anti-flood par IP (parité legacy : 30 / min, throttle SILENCIEUX).
+  /** Anti-flood par IP (parité legacy : 30 / min, throttle SILENCIEUX). */
   readonly rateLimiter: RateLimiterPort;
-  // Sink de log (injectable pour les tests). Défaut : console.log.
+  /** Sink de log (injectable pour les tests). Défaut : console.log. */
   readonly log?: (line: string) => void;
 }
 
-// Sanitise une entrée de log (anti log-injection : retire CRLF/contrôle, tronque à 500). PUR.
+/** Sanitise une entrée de log (anti log-injection : retire CRLF/contrôle, tronque à 500). PUR. */
 export function sanitizeLogLine(v: unknown): string {
   return String(typeof v === "string" ? v : JSON.stringify(v))
     .replace(/[\r\n\x00-\x1f]/g, " ")
@@ -26,7 +26,8 @@ export function registerVoiceDebugRoute(app: FastifyInstance, deps: VoiceDebugDe
   app.post("/api/voice/debug", async (req, reply) => {
     try {
       const ip = extractClientIp((req.headers ?? {}) as Record<string, unknown>, req.ip ?? null);
-      if (!(await deps.rateLimiter.check(`voice-debug:${ip}`))) return reply.send({ ok: true }); // throttle silencieux
+      /** throttle silencieux */
+      if (!(await deps.rateLimiter.check(`voice-debug:${ip}`))) return reply.send({ ok: true });
       const body = (req.body ?? {}) as { events?: unknown; msg?: unknown };
       if (Array.isArray(body.events)) {
         for (const e of body.events.slice(0, 20)) log(`[VoiceDebug] ${sanitizeLogLine(e)}`);

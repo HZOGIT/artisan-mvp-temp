@@ -1,9 +1,9 @@
-// Échappement HTML minimal (le `name` est interpolé dans le corps de l'email de bienvenue).
+/** Échappement HTML minimal (le `name` est interpolé dans le corps de l'email de bienvenue). */
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-// Email de bienvenue (signup, best-effort). Lien dashboard depuis APP_URL de confiance.
+/** Email de bienvenue (signup, best-effort). Lien dashboard depuis APP_URL de confiance. */
 export function welcomeEmail(name: string | undefined, appUrl?: string): string {
   const base = appUrl || "https://www.operioz.com";
   return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"></head>

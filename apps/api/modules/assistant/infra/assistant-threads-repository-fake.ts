@@ -2,7 +2,7 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { AiThread, AiMessage } from "../domain/assistant";
 import type { IAssistantThreadsRepository } from "../application/assistant-threads-repository";
 
-// Repo threads/messages assistant in-memory pour les tests (scoping tenant reproduit).
+/** Repo threads/messages assistant in-memory pour les tests (scoping tenant reproduit). */
 export class FakeAssistantThreadsRepository implements IAssistantThreadsRepository {
   private threads: AiThread[] = [];
   private messages: AiMessage[] = [];

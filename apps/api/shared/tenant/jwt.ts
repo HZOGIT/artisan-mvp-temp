@@ -39,7 +39,7 @@ export async function verifyAuthToken(
   }
 }
 
-// Extrait la valeur d'un cookie d'un header `Cookie` brut, sans dépendance Express.
+/** Extrait la valeur d'un cookie d'un header `Cookie` brut, sans dépendance Express. */
 export function extractTokenFromCookieHeader(
   cookieHeader: string | undefined | null,
   cookieName = "token",

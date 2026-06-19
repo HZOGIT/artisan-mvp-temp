@@ -10,7 +10,7 @@ export class FakeTransactionBancaireRepository implements ITransactionBancaireRe
   private store: TransactionBancaire[] = [];
   private seq = 0;
 
-  // Aide de test : insère une transaction (artisanId forcé via l'appelant).
+  /** Aide de test : insère une transaction (artisanId forcé via l'appelant). */
   seed(t: Omit<TransactionBancaire, "id" | "createdAt"> & { id?: number; createdAt?: Date }): TransactionBancaire {
     const created: TransactionBancaire = { ...t, id: t.id ?? ++this.seq, createdAt: t.createdAt ?? new Date() };
     this.store.push(created);

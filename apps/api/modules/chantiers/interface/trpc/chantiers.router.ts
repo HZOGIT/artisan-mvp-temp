@@ -24,7 +24,7 @@ const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide
 const statutEnum = z.enum(["planifie", "en_cours", "en_pause", "termine", "annule"]);
 const prioriteEnum = z.enum(["basse", "normale", "haute", "urgente"]);
 
-// Bornes alignées sur la table `chantiers` (defense-in-depth).
+/** Bornes alignées sur la table `chantiers` (defense-in-depth). */
 const createSchema = z.object({
   clientId: z.number().int(),
   reference: z.string().min(1).max(50),
@@ -44,7 +44,7 @@ const createSchema = z.object({
   notes: z.string().max(5000).nullish(),
 });
 
-// ⚠️ `clientId` ABSENT du schéma d'update : le client d'un chantier est immuable.
+/** ⚠️ `clientId` ABSENT du schéma d'update : le client d'un chantier est immuable. */
 const updateSchema = z.object({
   reference: z.string().min(1).max(50).optional(),
   nom: z.string().min(1).max(255).optional(),
@@ -94,7 +94,7 @@ export function createChantiersRouter(repo: IChantierRepository) {
         return { success: true };
       }),
 
-    // ── Pointages (saisie de temps) — sous-ressource scopée via le chantier parent ────────────────
+    /** ── Pointages (saisie de temps) — sous-ressource scopée via le chantier parent ──────────────── */
     getPointages: protectedProcedure
       .input(z.object({ chantierId: z.number().int() }))
       .query(({ ctx, input }) => getPointagesChantier(repo, ctx.tenant, input.chantierId)),
@@ -128,7 +128,7 @@ export function createChantiersRouter(repo: IChantierRepository) {
         return { success: true };
       }),
 
-    // ── Suivi (avancement/jalons) — sous-ressource scopée via le chantier parent (anti-IDOR) ──────
+    /** ── Suivi (avancement/jalons) — sous-ressource scopée via le chantier parent (anti-IDOR) ────── */
     getSuivi: protectedProcedure
       .input(z.object({ chantierId: z.number().int() }))
       .query(({ ctx, input }) => getSuiviChantier(repo, ctx.tenant, input.chantierId)),
@@ -177,7 +177,7 @@ export function createChantiersRouter(repo: IChantierRepository) {
         return { success: true };
       }),
 
-    // ── Phases (planification/lots) — sous-ressource scopée via le chantier parent (anti-IDOR) ────
+    /** ── Phases (planification/lots) — sous-ressource scopée via le chantier parent (anti-IDOR) ──── */
     getPhases: protectedProcedure
       .input(z.object({ chantierId: z.number().int() }))
       .query(({ ctx, input }) => getPhasesChantier(repo, ctx.tenant, input.chantierId)),
@@ -222,7 +222,7 @@ export function createChantiersRouter(repo: IChantierRepository) {
         return { success: true };
       }),
 
-    // ── Interventions liées — table de liaison (anti-IDOR DOUBLE chantier+intervention) ───────────
+    /** ── Interventions liées — table de liaison (anti-IDOR DOUBLE chantier+intervention) ─────────── */
     getInterventions: protectedProcedure
       .input(z.object({ chantierId: z.number().int() }))
       .query(({ ctx, input }) => getInterventionsLiees(repo, ctx.tenant, input.chantierId)),
@@ -247,7 +247,7 @@ export function createChantiersRouter(repo: IChantierRepository) {
         return { success: true };
       }),
 
-    // ── Documents — sous-ressource scopée via le chantier parent (anti-IDOR) ──────────────────────
+    /** ── Documents — sous-ressource scopée via le chantier parent (anti-IDOR) ────────────────────── */
     getDocuments: protectedProcedure
       .input(z.object({ chantierId: z.number().int() }))
       .query(({ ctx, input }) => getDocumentsChantier(repo, ctx.tenant, input.chantierId)),
@@ -271,7 +271,7 @@ export function createChantiersRouter(repo: IChantierRepository) {
         return { success: true };
       }),
 
-    // ── Statistiques (agrégat lecture seule) + recalcul d'avancement ──────────────────────────────
+    /** ── Statistiques (agrégat lecture seule) + recalcul d'avancement ────────────────────────────── */
     getStatistiques: protectedProcedure
       .input(z.object({ chantierId: z.number().int() }))
       .query(({ ctx, input }) => getStatistiquesChantier(repo, ctx.tenant, input.chantierId)),

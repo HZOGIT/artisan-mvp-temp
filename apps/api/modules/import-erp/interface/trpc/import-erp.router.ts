@@ -3,7 +3,7 @@ import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IImportErpRepository } from "../../application/import-erp-repository";
 import { importClients, importDevis, importFactures } from "../../application/use-cases";
 
-// Bornes alignées sur le legacy : ≤ 5000 lignes/lot, mapping {colonne → champ}.
+/** Bornes alignées sur le legacy : ≤ 5000 lignes/lot, mapping {colonne → champ}. */
 const importSchema = z.object({
   rows: z.array(z.record(z.string(), z.any())).max(5000),
   mapping: z.record(z.string(), z.string()),

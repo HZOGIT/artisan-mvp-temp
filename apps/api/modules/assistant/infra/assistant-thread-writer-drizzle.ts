@@ -5,7 +5,7 @@ import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { AssistantThreadWriter } from "../application/assistant-thread-writer";
 
-// Titre du thread = 80 premiers caractères du 1er message (parité legacy `getOrCreateAiThread`).
+/** Titre du thread = 80 premiers caractères du 1er message (parité legacy `getOrCreateAiThread`). */
 function threadTitle(firstMessage: string): string {
   return firstMessage.slice(0, 80) + (firstMessage.length > 80 ? "…" : "");
 }

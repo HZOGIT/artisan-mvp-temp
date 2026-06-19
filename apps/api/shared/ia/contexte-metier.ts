@@ -91,7 +91,7 @@ Tu connais les prix du marché français 2024 (TVA 10% travaux logement, 5.5% r�
 Tu t'adaptes selon le contexte décrit par l'artisan.`,
 };
 
-// Normalise le métier (accents + casse) → contexte spécialisé, ou 'autre' si non reconnu.
+/** Normalise le métier (accents + casse) → contexte spécialisé, ou 'autre' si non reconnu. */
 export function getContexteMetier(metier: string | null | undefined): string {
   if (!metier) return CONTEXTES_METIER.autre;
   const key = String(metier)
@@ -101,7 +101,7 @@ export function getContexteMetier(metier: string | null | undefined): string {
   return CONTEXTES_METIER[key] || CONTEXTES_METIER.autre;
 }
 
-// Préfixe un prompt utilisateur par le contexte métier approprié (enrichissement expertise).
+/** Préfixe un prompt utilisateur par le contexte métier approprié (enrichissement expertise). */
 export function getSystemPromptMetier(metier: string | null | undefined, basePrompt: string): string {
   return `${getContexteMetier(metier)}\n\n${basePrompt}`;
 }

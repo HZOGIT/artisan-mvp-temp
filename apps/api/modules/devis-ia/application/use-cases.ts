@@ -10,14 +10,14 @@ export function listAnalyses(repo: IDevisIARepository, ctx: TenantContext): Prom
   return repo.listAnalyses(ctx);
 }
 
-// Détail d'une analyse possédée (404 anti-IDOR si hors tenant).
+/** Détail d'une analyse possédée (404 anti-IDOR si hors tenant). */
 export async function getAnalyse(repo: IDevisIARepository, ctx: TenantContext, analyseId: number): Promise<AnalyseDetail> {
   const detail = await repo.getAnalyseDetail(ctx, analyseId);
   if (!detail) throw new NotFoundError("Analyse non trouvée");
   return detail;
 }
 
-// Crée une analyse ; si un client est rattaché, valide son appartenance au tenant (anti-IDOR-FK).
+/** Crée une analyse ; si un client est rattaché, valide son appartenance au tenant (anti-IDOR-FK). */
 export async function createAnalyse(repo: IDevisIARepository, ctx: TenantContext, input: CreateAnalyseInput): Promise<Analyse> {
   if (input.clientId != null && !(await repo.ownsClient(ctx, input.clientId))) {
     throw new NotFoundError("Client introuvable");
@@ -25,7 +25,7 @@ export async function createAnalyse(repo: IDevisIARepository, ctx: TenantContext
   return repo.createAnalyse(ctx, input);
 }
 
-// Ajoute une photo à une analyse possédée (404 anti-IDOR).
+/** Ajoute une photo à une analyse possédée (404 anti-IDOR). */
 export async function addPhoto(repo: IDevisIARepository, ctx: TenantContext, analyseId: number, input: AddPhotoInput): Promise<Photo> {
   const photo = await repo.addPhoto(ctx, analyseId, input);
   if (!photo) throw new NotFoundError("Analyse non trouvée");

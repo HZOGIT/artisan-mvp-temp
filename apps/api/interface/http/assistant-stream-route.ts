@@ -27,7 +27,7 @@ export function registerAssistantStreamRoute(app: FastifyInstance, deps: Assista
 
     const gen = streamAssistantReply(deps, { artisanId: auth.artisanId, userId: auth.userId }, input);
 
-    // 1er tick : les erreurs de validation/rate-limit sont levées AVANT tout stream → mappées en JSON.
+    /** 1er tick : les erreurs de validation/rate-limit sont levées AVANT tout stream → mappées en JSON. */
     let first: IteratorResult<{ threadId: number } | { content: string }>;
     try {
       first = await gen.next();
@@ -37,7 +37,7 @@ export function registerAssistantStreamRoute(app: FastifyInstance, deps: Assista
       return reply.code(500).send({ error: "Erreur serveur" });
     }
 
-    // À partir d'ici : flux SSE. On détache la réponse de Fastify (`hijack`) et on écrit le brut.
+    /** À partir d'ici : flux SSE. On détache la réponse de Fastify (`hijack`) et on écrit le brut. */
     reply.hijack();
     reply.raw.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive", "X-Accel-Buffering": "no" });
     const send = (ev: unknown): void => {

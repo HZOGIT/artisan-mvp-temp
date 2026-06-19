@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { router, permissionProcedure } from "../../../../interface/trpc/trpc";
-// Lecture = `interventions.voir`, écriture/affectation = `interventions.gerer` (parité legacy).
+/** Lecture = `interventions.voir`, écriture/affectation = `interventions.gerer` (parité legacy). */
 const voir = permissionProcedure("interventions.voir");
 const gerer = permissionProcedure("interventions.gerer");
 import { ValidationError } from "../../../../shared/errors";
@@ -36,7 +36,7 @@ function toDate(value: string, champ: string): Date {
 
 const statutEnum = z.enum(["planifiee", "en_cours", "terminee", "annulee"]);
 
-// Bornes alignées sur la table `interventions` (defense-in-depth).
+/** Bornes alignées sur la table `interventions` (defense-in-depth). */
 const createSchema = z.object({
   clientId: z.number().int(),
   titre: z.string().min(1).max(255),
@@ -73,7 +73,7 @@ export function createInterventionsRouter(repo: IInterventionRepository, congeRe
   return router({
     list: voir.query(({ ctx }) => listInterventions(repo, ctx.tenant)),
 
-    // Vue « mes interventions » : minimisation RGPD (un technicien lié ne voit que les siennes).
+    /** Vue « mes interventions » : minimisation RGPD (un technicien lié ne voit que les siennes). */
     getMine: voir.query(({ ctx }) => listMesInterventions(repo, ctx.tenant)),
 
     getById: voir
@@ -109,7 +109,7 @@ export function createInterventionsRouter(repo: IInterventionRepository, congeRe
         return { success: true };
       }),
 
-    // ── Équipe d'intervention (sous-ressource ; anti-IDOR via intervention parente + technicien du tenant) ──
+    /** ── Équipe d'intervention (sous-ressource ; anti-IDOR via intervention parente + technicien du tenant) ── */
     getEquipe: voir
       .input(z.object({ interventionId: z.number().int() }))
       .query(({ ctx, input }) => getEquipeIntervention(repo, ctx.tenant, input.interventionId)),
@@ -127,7 +127,7 @@ export function createInterventionsRouter(repo: IInterventionRepository, congeRe
         return { success: true };
       }),
 
-    // ── Couleurs calendrier (préférence d'affichage par artisan, scopée tenant) ───────────────────
+    /** ── Couleurs calendrier (préférence d'affichage par artisan, scopée tenant) ─────────────────── */
     getCouleursCalendrier: voir.query(({ ctx }) => getCouleursCalendrier(repo, ctx.tenant)),
 
     setCouleurIntervention: gerer

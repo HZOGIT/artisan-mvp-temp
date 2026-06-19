@@ -3,7 +3,7 @@ import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IDashboardReader } from "../../application/dashboard-reader";
 import * as uc from "../../application/use-cases";
 
-// Routeur tRPC du dashboard (10 lectures agrégées du tenant). Surface client complète. Lecture seule.
+/** Routeur tRPC du dashboard (10 lectures agrégées du tenant). Surface client complète. Lecture seule. */
 export function createDashboardRouter(reader: IDashboardReader) {
   return router({
     getStats: protectedProcedure.query(({ ctx }) => uc.getStats(reader, ctx.tenant)),

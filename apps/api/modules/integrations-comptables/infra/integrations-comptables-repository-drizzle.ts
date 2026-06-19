@@ -24,7 +24,7 @@ function toExport(r: ExportRow): ExportComptableRow {
   return { id: r.id, logiciel: r.logiciel ?? null, formatExport: r.formatExport ?? null, periodeDebut: r.periodeDebut ?? null, periodeFin: r.periodeFin ?? null, nombreEcritures: r.nombreEcritures ?? null, montantTotal: r.montantTotal ?? null, statut: r.statut ?? null, erreur: r.erreur ?? null, createdAt: r.createdAt };
 }
 
-// Colonnes whitelistées à l'upsert config (defense-in-depth, parité audit injection SQL legacy).
+/** Colonnes whitelistées à l'upsert config (defense-in-depth, parité audit injection SQL legacy). */
 const CONFIG_COLS = new Set<string>([
   "logiciel", "formatExport", "compteVentes", "compteTVACollectee", "compteClients", "compteAchats", "compteTVADeductible", "compteFournisseurs", "compteBanque", "compteCaisse",
   "journalVentes", "journalAchats", "journalBanque", "prefixeFacture", "prefixeAvoir", "exerciceDebut", "actif", "syncAutoFactures", "syncAutoPaiements", "frequenceSync", "heureSync", "notifierErreurs", "notifierSucces",
@@ -109,7 +109,7 @@ export class IntegrationsComptablesRepositoryDrizzle implements IIntegrationsCom
 
   listPendingItems(ctx: TenantContext): Promise<PendingItem[]> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Factures à statut « émis » NON couvertes par un export `termine` chevauchant leur date.
+      /** Factures à statut « émis » NON couvertes par un export `termine` chevauchant leur date. */
       const rows = await tx
         .select({ id: factures.id, numero: factures.numero, dateFacture: factures.dateFacture, totalTTC: factures.totalTTC, statut: factures.statut })
         .from(factures)

@@ -1,11 +1,11 @@
-// Statistiques agrégées des devis du tenant (parité legacy `statistiques.getDevisStats`).
+/** Statistiques agrégées des devis du tenant (parité legacy `statistiques.getDevisStats`). */
 export interface DevisStats {
   readonly total: number;
   readonly parStatut: Record<string, number>;
   readonly montantTotal: number;
 }
 
-// Ligne minimale nécessaire au calcul (statut + montant TTC). `statut`/`totalTTC` peuvent être nuls.
+/** Ligne minimale nécessaire au calcul (statut + montant TTC). `statut`/`totalTTC` peuvent être nuls. */
 export interface DevisStatRow {
   readonly statut: string | null;
   readonly totalTTC: string | null;

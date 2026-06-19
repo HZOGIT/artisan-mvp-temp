@@ -26,7 +26,7 @@ function assertEntierBorne(valeur: number | undefined, min: number, max: number,
   }
 }
 
-// Valide une liste de jours de la semaine "1,2,3" (entiers 1..7, non vide).
+/** Valide une liste de jours de la semaine "1,2,3" (entiers 1..7, non vide). */
 function assertJoursEnvoi(valeur: string | undefined): void {
   if (valeur === undefined) return;
   const tokens = valeur.split(",").map((t) => t.trim());

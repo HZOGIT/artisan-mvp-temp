@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { router, protectedProcedure, permissionProcedure } from "../../../../interface/trpc/trpc";
-// Permissions (parité legacy) : actions sur lignes/envoi/duplication = `devis.creer` ; conversion en facture = `factures.creer`.
+/** Permissions (parité legacy) : actions sur lignes/envoi/duplication = `devis.creer` ; conversion en facture = `factures.creer`. */
 const devisCreer = permissionProcedure("devis.creer");
 const facturesCreer = permissionProcedure("factures.creer");
 import type { IDevisRepository } from "../../application/devis-repository";
@@ -103,7 +103,7 @@ export function createDevisRouter(
   signatureReader: DevisSignatureReader,
   ia: DevisIaDeps,
 ) {
-  // Dépendances de relance (réutilise les readers/email/rate-limiter du mailing + le repo relances).
+  /** Dépendances de relance (réutilise les readers/email/rate-limiter du mailing + le repo relances). */
   const relanceDeps = {
     devisRepo: repo,
     relanceRepo,
@@ -116,7 +116,7 @@ export function createDevisRouter(
   return router({
     list: protectedProcedure.query(({ ctx }) => listDevis(repo, ctx.tenant)),
 
-    // Détail enrichi (parité legacy : `{ ...devis, lignes, client }`) — consommé par DevisDetail.
+    /** Détail enrichi (parité legacy : `{ ...devis, lignes, client }`) — consommé par DevisDetail. */
     getById: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .query(({ ctx, input }) => getDevisDetail(repo, mailing.clientReader, ctx.tenant, input.id)),
@@ -164,7 +164,7 @@ export function createDevisRouter(
         return { success: true };
       }),
 
-    // Transitions de statut (machine à états dans le use-case : Conflict→409 si invalide).
+    /** Transitions de statut (machine à états dans le use-case : Conflict→409 si invalide). */
     envoyer: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => changerStatutDevis(repo, ctx.tenant, input.id, "envoye")),
@@ -181,7 +181,7 @@ export function createDevisRouter(
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => changerStatutDevis(repo, ctx.tenant, input.id, "expire")),
 
-    // ── Modèles de devis (gabarits réutilisables) exposés sous `devis.*` (parité client) ──────────
+    /** ── Modèles de devis (gabarits réutilisables) exposés sous `devis.*` (parité client) ────────── */
     getModeles: protectedProcedure.query(({ ctx }) => listModelesDevis(modeleRepo, ctx.tenant)),
 
     getModeleWithLignes: protectedProcedure
@@ -192,7 +192,7 @@ export function createDevisRouter(
       .input(z.object({ nom: z.string().min(1).max(255), description: z.string().max(2000).optional(), notes: z.string().max(5000).optional() }))
       .mutation(({ ctx, input }) => creerModeleDevis(modeleRepo, ctx.tenant, input)),
 
-    // Le client envoie des NOMBRES (quantite/prix/TVA/remise) ; le domaine attend des décimaux string.
+    /** Le client envoie des NOMBRES (quantite/prix/TVA/remise) ; le domaine attend des décimaux string. */
     addLigneToModele: protectedProcedure
       .input(
         z.object({
@@ -220,7 +220,7 @@ export function createDevisRouter(
         }),
       ),
 
-    // ── Relances de devis (email + journal append-only) ──────────────────────────────────────────
+    /** ── Relances de devis (email + journal append-only) ────────────────────────────────────────── */
     envoyerRelance: protectedProcedure
       .input(z.object({ devisId: z.number().int(), message: z.string().max(5000).optional() }))
       .mutation(({ ctx, input }) => envoyerRelanceDevis(relanceDeps, ctx.tenant, input)),
@@ -229,12 +229,12 @@ export function createDevisRouter(
       .input(z.object({ joursMinimum: z.number().int().min(0).optional(), joursEntreRelances: z.number().int().min(0).optional() }))
       .mutation(({ ctx, input }) => envoyerRelancesAutomatiques(relanceDeps, ctx.tenant, input)),
 
-    // Devis non signés (≥ N jours) enrichis client + signature — parité `getDevisNonSignes`.
+    /** Devis non signés (≥ N jours) enrichis client + signature — parité `getDevisNonSignes`. */
     getDevisNonSignes: protectedProcedure
       .input(z.object({ joursMinimum: z.number().int().min(0).optional() }).optional())
       .query(({ ctx, input }) => getDevisNonSignes(nonSignesDeps, ctx.tenant, input ?? {})),
 
-    // Génération IA de lignes de devis depuis une description (LECTURE SEULE, non persistée).
+    /** Génération IA de lignes de devis depuis une description (LECTURE SEULE, non persistée). */
     genererLignesIA: protectedProcedure
       .input(z.object({ description: z.string().min(5).max(5000), surface: z.number().optional(), budget: z.number().optional() }))
       .mutation(({ ctx, input }) => genererLignesDevisIA(ia, ctx.tenant, input)),
@@ -247,7 +247,7 @@ export function createDevisRouter(
       .input(z.object({ devisId: z.number().int() }))
       .mutation(({ ctx, input }) => converter.convertir(ctx.tenant, input.devisId)),
 
-    // Duplique un devis (nouveau brouillon, numéro serveur, lignes copiées) — parité `duplicate`.
+    /** Duplique un devis (nouveau brouillon, numéro serveur, lignes copiées) — parité `duplicate`. */
     duplicate: devisCreer
       .input(z.object({ devisId: z.number().int() }))
       .mutation(({ ctx, input }) => dupliquerDevis(repo, ctx.tenant, input.devisId)),

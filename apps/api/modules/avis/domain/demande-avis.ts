@@ -17,7 +17,7 @@ export interface DemandeAvis {
   readonly createdAt: Date;
 }
 
-// Références minimales scopées tenant utilisées par le workflow (ownership).
+/** Références minimales scopées tenant utilisées par le workflow (ownership). */
 export interface InterventionRef {
   readonly id: number;
   readonly clientId: number;

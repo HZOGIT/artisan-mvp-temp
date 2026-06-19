@@ -9,7 +9,7 @@ import { computeNextNumero } from "../application/numero";
 
 type DepenseRow = typeof depenses.$inferSelect;
 
-// ⚠️ Table `depenses` en snake_case → mapping snake↔camel ici (le domaine reste camelCase).
+/** ⚠️ Table `depenses` en snake_case → mapping snake↔camel ici (le domaine reste camelCase). */
 function toDepense(r: DepenseRow): Depense {
   return {
     id: r.id,
@@ -47,7 +47,7 @@ function toDepense(r: DepenseRow): Depense {
   };
 }
 
-// Construit le patch d'insert/update (camel → snake), en ne posant que les clés fournies.
+/** Construit le patch d'insert/update (camel → snake), en ne posant que les clés fournies. */
 function toInsertValues(input: CreateDepenseInput, artisanId: number): typeof depenses.$inferInsert {
   return {
     artisan_id: artisanId,
@@ -127,7 +127,8 @@ export class DepenseRepositoryDrizzle implements IDepenseRepository {
     return withTenant(this.db, ctx, async (tx) => {
       const [y, m] = mois.split("-").map(Number);
       const debut = `${mois}-01`;
-      const fin = new Date(y, m, 0).toISOString().slice(0, 10); // dernier jour du mois
+      /** dernier jour du mois */
+      const fin = new Date(y, m, 0).toISOString().slice(0, 10);
       const rows = await tx
         .select({ categorie: depenses.categorie, reel: sql<string>`COALESCE(SUM(${depenses.montant_ttc}), 0)::text` })
         .from(depenses)
@@ -159,7 +160,7 @@ export class DepenseRepositoryDrizzle implements IDepenseRepository {
     return withTenant(this.db, ctx, async (tx) => {
       const set = toUpdateSet(input);
       if (Object.keys(set).length === 0) {
-        // Aucun champ à modifier : renvoie l'état courant (scopé) sans UPDATE vide.
+        /** Aucun champ à modifier : renvoie l'état courant (scopé) sans UPDATE vide. */
         const [row] = await tx
           .select()
           .from(depenses)
@@ -188,7 +189,7 @@ export class DepenseRepositoryDrizzle implements IDepenseRepository {
 
   nextNumero(ctx: TenantContext): Promise<string> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Dernière dépense de l'artisan (par id desc) → incrément du suffixe numérique.
+      /** Dernière dépense de l'artisan (par id desc) → incrément du suffixe numérique. */
       const [row] = await tx
         .select({ numero: depenses.numero })
         .from(depenses)
@@ -202,7 +203,7 @@ export class DepenseRepositoryDrizzle implements IDepenseRepository {
   ownsRef(ctx: TenantContext, kind: DepenseRefKind, id: number): Promise<boolean> {
     return withTenant(this.db, ctx, async (tx) => {
       const n = sql<number>`count(*)::int`;
-      // Chaque table cible porte un `artisanId` (toutes RLS-isolées) → double cloisonnement.
+      /** Chaque table cible porte un `artisanId` (toutes RLS-isolées) → double cloisonnement. */
       let row: { n: number } | undefined;
       switch (kind) {
         case "chantier":

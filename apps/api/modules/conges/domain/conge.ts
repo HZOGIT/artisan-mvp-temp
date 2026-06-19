@@ -12,9 +12,11 @@ export type CongeType = "conge_paye" | "rtt" | "maladie" | "sans_solde" | "forma
 export interface Conge {
   readonly id: number;
   readonly artisanId: number;
-  readonly technicienId: number; // demandeur
+  /** demandeur */
+  readonly technicienId: number;
   readonly type: CongeType;
-  readonly dateDebut: string; // date PG (YYYY-MM-DD)
+  /** date PG (YYYY-MM-DD) */
+  readonly dateDebut: string;
   readonly dateFin: string;
   readonly demiJourneeDebut: boolean;
   readonly demiJourneeFin: boolean;
@@ -22,7 +24,8 @@ export interface Conge {
   readonly statut: CongeStatut;
   readonly commentaireValidation: string | null;
   readonly dateValidation: Date | null;
-  readonly validePar: number | null; // approbateur (≠ demandeur)
+  /** approbateur (≠ demandeur) */
+  readonly validePar: number | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }

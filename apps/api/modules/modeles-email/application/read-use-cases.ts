@@ -13,7 +13,7 @@ export function listModelesEmail(repo: IModeleEmailRepository, ctx: TenantContex
   return repo.list(ctx);
 }
 
-// Modèles filtrés par type (scopé tenant). Un type sans modèle renvoie [] (pas une erreur métier).
+/** Modèles filtrés par type (scopé tenant). Un type sans modèle renvoie [] (pas une erreur métier). */
 export function modelesParType(repo: IModeleEmailRepository, ctx: TenantContext, type: TypeModeleEmail): Promise<ModeleEmail[]> {
   return repo.listByType(ctx, type);
 }

@@ -4,7 +4,7 @@
  * legacy `conseilsIA` (server/routers.ts). Aucune donnée sensible (montants agrégés du seul tenant).
  */
 
-// Un conseil affiché sur le tableau de bord (carte + bouton d'action vers un lien interne).
+/** Un conseil affiché sur le tableau de bord (carte + bouton d'action vers un lien interne). */
 export interface Conseil {
   readonly icone: string;
   readonly titre: string;
@@ -18,7 +18,7 @@ export interface ConseilsResult {
   readonly genereLe?: string;
 }
 
-// Stats minimales servant à personnaliser le prompt (best-effort : zéros si indisponibles).
+/** Stats minimales servant à personnaliser le prompt (best-effort : zéros si indisponibles). */
 export interface ConseilsStats {
   readonly nbDevisEnAttente: number;
   readonly nbFacturesImpayees: number;
@@ -28,7 +28,7 @@ export interface ConseilsStats {
 
 export const CONSEILS_VIDE: ConseilsResult = { conseils: [] };
 
-// Liens internes autorisés dans les conseils (cohérence avec la navigation de l'app).
+/** Liens internes autorisés dans les conseils (cohérence avec la navigation de l'app). */
 const LIENS_AUTORISES = [
   "/devis",
   "/factures",
@@ -42,7 +42,7 @@ const LIENS_AUTORISES = [
   "/budgets-depenses",
 ];
 
-// Prompt utilisateur (parité legacy) : décrit l'état du tenant et demande 3 conseils en JSON pur.
+/** Prompt utilisateur (parité legacy) : décrit l'état du tenant et demande 3 conseils en JSON pur. */
 export function buildConseilsPrompt(input: {
   nomEntreprise: string | null;
   metier: string | null;

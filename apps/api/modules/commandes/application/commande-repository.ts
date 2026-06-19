@@ -19,16 +19,16 @@ import type {
 export interface ICommandeRepository {
   list(ctx: TenantContext): Promise<Commande[]>;
   getById(ctx: TenantContext, id: number): Promise<Commande | null>;
-  // Lignes d'une commande — [] si la commande n'appartient pas au tenant.
+  /** Lignes d'une commande — [] si la commande n'appartient pas au tenant. */
   listLignes(ctx: TenantContext, commandeId: number): Promise<LigneCommande[]>;
   /*
    * Crée la commande + ses lignes (totaux calculés). Le fournisseur doit appartenir au
    * tenant (null sinon).
    */
   create(ctx: TenantContext, input: CreateCommandeInput): Promise<Commande | null>;
-  // null si la commande n'appartient pas au tenant.
+  /** null si la commande n'appartient pas au tenant. */
   update(ctx: TenantContext, id: number, input: UpdateCommandeInput): Promise<Commande | null>;
-  // false si la commande n'appartient pas au tenant.
+  /** false si la commande n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
 
   /*
@@ -41,7 +41,7 @@ export interface ICommandeRepository {
     statut: CommandeStatut,
     dateLivraisonReelle?: Date | null,
   ): Promise<Commande | null>;
-  // Commandes du tenant en retard de livraison (échéance dépassée, non livrées/annulées).
+  /** Commandes du tenant en retard de livraison (échéance dépassée, non livrées/annulées). */
   listEnRetard(ctx: TenantContext): Promise<Commande[]>;
 
   /*

@@ -11,6 +11,6 @@ export interface IDashboardReader {
   listClients(ctx: TenantContext): Promise<DashClient[]>;
   listInterventions(ctx: TenantContext): Promise<DashIntervention[]>;
   getObjectifs(ctx: TenantContext): Promise<{ objectifCA: string | null; objectifDevis: number | null; objectifClients: number | null }>;
-  // Interventions dont dateDebut ∈ [now, now + days], triées asc, avec le client joint.
+  /** Interventions dont dateDebut ∈ [now, now + days], triées asc, avec le client joint. */
   getUpcomingInterventions(ctx: TenantContext, days: number): Promise<UpcomingInterventionItem[]>;
 }

@@ -94,10 +94,10 @@ export interface SignatureDevisView {
 }
 
 export interface SignaturePublicReader {
-  // Résout le token (sous `withPublicToken`) → signature + devisId + artisanId, ou `null`.
+  /** Résout le token (sous `withPublicToken`) → signature + devisId + artisanId, ou `null`. */
   resolveByToken(token: string): Promise<SignatureTokenResolution | null>;
-  // Lit la vue d'affichage du devis SOUS LE TENANT résolu (client/artisan/lignes/options).
+  /** Lit la vue d'affichage du devis SOUS LE TENANT résolu (client/artisan/lignes/options). */
   getDevisView(ctx: TenantContext, devisId: number): Promise<SignatureDevisView | null>;
-  // Marque le devis comme vu (read-receipt) — best-effort, sous le tenant résolu.
+  /** Marque le devis comme vu (read-receipt) — best-effort, sous le tenant résolu. */
   markDevisVu(ctx: TenantContext, devisId: number): Promise<void>;
 }

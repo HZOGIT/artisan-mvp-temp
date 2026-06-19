@@ -10,7 +10,8 @@ import type { FactureEnRetard, CreerNotificationInput } from "../domain/facture-
 type NotificationRow = typeof notifications.$inferSelect;
 
 const LIMIT_MAX = 100;
-const PAGE_MAX = 100000; // cap anti-DoS sur l'offset (≈ 5M lignes max)
+/** cap anti-DoS sur l'offset (≈ 5M lignes max) */
+const PAGE_MAX = 100000;
 
 function toNotification(r: NotificationRow): Notification {
   return {
@@ -100,7 +101,7 @@ export class NotificationRepositoryDrizzle implements INotificationRepository {
 
   listFacturesEnRetard(ctx: TenantContext): Promise<FactureEnRetard[]> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Lecture seule, scopée tenant : factures non payées/non annulées à échéance dépassée.
+      /** Lecture seule, scopée tenant : factures non payées/non annulées à échéance dépassée. */
       const today = new Date().toISOString().slice(0, 10);
       const rows = await tx
         .select({

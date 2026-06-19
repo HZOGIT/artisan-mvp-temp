@@ -19,7 +19,7 @@ export interface ContactSupportInput {
 export interface SupportDeps {
   readonly email: EmailPort;
   readonly rateLimiter: RateLimiterPort;
-  // Boîte support destinataire (ex. support@operioz.com) — injectée (env au wiring).
+  /** Boîte support destinataire (ex. support@operioz.com) — injectée (env au wiring). */
   readonly destinataire: string;
 }
 
@@ -30,7 +30,7 @@ const SUJET_LABELS: Record<SupportSujet, string> = {
   autre: "Autre",
 };
 
-// Échappe le HTML inséré dans le corps de l'email (anti-injection). Parité legacy `safeHtml`.
+/** Échappe le HTML inséré dans le corps de l'email (anti-injection). Parité legacy `safeHtml`. */
 function safeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }

@@ -13,7 +13,7 @@ export function listAvis(repo: IAvisRepository, ctx: TenantContext): Promise<Avi
   return repo.list(ctx);
 }
 
-// Liste enrichie (client + intervention liés) — parité legacy getAll/list.
+/** Liste enrichie (client + intervention liés) — parité legacy getAll/list. */
 export function listAvisEnrichi(repo: IAvisRepository, ctx: TenantContext): Promise<AvisEnrichi[]> {
   return repo.listEnrichi(ctx);
 }

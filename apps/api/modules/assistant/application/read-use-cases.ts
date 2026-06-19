@@ -3,7 +3,7 @@ import type { AiThread, AiMessage } from "../domain/assistant";
 import { clampThreadsLimit, clampMessagesLimit } from "../domain/assistant";
 import type { IAssistantThreadsRepository } from "./assistant-threads-repository";
 
-// `assistant.getThreads` (parité legacy) : threads de l'assistant du tenant (20 récents).
+/** `assistant.getThreads` (parité legacy) : threads de l'assistant du tenant (20 récents). */
 export function getThreads(repo: IAssistantThreadsRepository, ctx: TenantContext): Promise<AiThread[]> {
   return repo.listThreads(ctx, clampThreadsLimit());
 }

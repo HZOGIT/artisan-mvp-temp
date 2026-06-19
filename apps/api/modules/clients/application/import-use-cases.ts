@@ -26,7 +26,7 @@ export async function importerClients(
       await creerClient(repo, ctx, row);
       imported++;
     } catch {
-      // Ligne rejetée (validation/contrainte) → ignorée, comme le legacy (try/catch par ligne).
+      /** Ligne rejetée (validation/contrainte) → ignorée, comme le legacy (try/catch par ligne). */
       skipped++;
     }
   }

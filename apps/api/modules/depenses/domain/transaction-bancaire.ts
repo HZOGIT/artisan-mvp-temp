@@ -9,7 +9,8 @@ export interface TransactionBancaire {
   readonly id: number;
   readonly artisanId: number;
   readonly releveId: number | null;
-  readonly dateTransaction: string; // YYYY-MM-DD
+  /** YYYY-MM-DD */
+  readonly dateTransaction: string;
   readonly libelle: string;
   readonly montant: string;
   readonly typeTransaction: TransactionType;
@@ -19,7 +20,7 @@ export interface TransactionBancaire {
   readonly createdAt: Date;
 }
 
-// Transaction parsée d'un relevé CSV (avant insertion). `montant` signé (debit < 0, credit > 0).
+/** Transaction parsée d'un relevé CSV (avant insertion). `montant` signé (debit < 0, credit > 0). */
 export interface ImportTransaction {
   readonly dateTransaction: string;
   readonly libelle: string;
@@ -27,7 +28,7 @@ export interface ImportTransaction {
   readonly typeTransaction: TransactionType;
 }
 
-// Item enrichi (catégorie suggérée par les règles) prêt à insérer.
+/** Item enrichi (catégorie suggérée par les règles) prêt à insérer. */
 export interface ReleveItem extends ImportTransaction {
   readonly categorieSuggeree: string | null;
 }

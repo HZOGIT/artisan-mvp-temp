@@ -6,7 +6,7 @@ import { authArtisanFromCookie, type CookieAuthDeps } from "./cookie-auth";
 
 export interface ExportLotRouteDeps extends CookieAuthDeps, ExportLotPdfDeps {}
 
-// Parse une date de query (YYYY-MM-DD ou ISO) ; undefined si absente/invalide.
+/** Parse une date de query (YYYY-MM-DD ou ISO) ; undefined si absente/invalide. */
 function parseDate(v: unknown): Date | undefined {
   if (typeof v !== "string" || !v) return undefined;
   const d = new Date(v);

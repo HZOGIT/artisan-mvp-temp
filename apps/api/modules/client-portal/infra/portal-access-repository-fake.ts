@@ -20,7 +20,7 @@ export interface PortalFakeState {
   artisans?: Record<number, ArtisanPortalInfo>;
 }
 
-// Fake en mémoire de l'accès portail (résolution token actif+non expiré, scope tenant simulé).
+/** Fake en mémoire de l'accès portail (résolution token actif+non expiré, scope tenant simulé). */
 export class PortalAccessRepositoryFake implements IPortalAccessRepository {
   accesses: AccessRow[];
   private clientsById: Record<number, ClientPortalInfo>;

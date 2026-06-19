@@ -14,7 +14,7 @@ export interface IntegrationFakeState {
   pendingItems?: PendingItem[];
 }
 
-// Fake en mémoire des intégrations comptables (config + exports + factures IIF).
+/** Fake en mémoire des intégrations comptables (config + exports + factures IIF). */
 export class IntegrationsComptablesRepositoryFake implements IIntegrationsComptablesRepository {
   config: ConfigComptable | null;
   readonly exports: ExportComptableRow[] = [];

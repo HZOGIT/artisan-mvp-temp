@@ -55,7 +55,7 @@ export class SignatureContextReaderDrizzle implements SignatureDevisContextReade
   }
 }
 
-// Écrit une notification artisan sous le tenant (RLS) — `artisanId` forcé = `ctx.artisanId`.
+/** Écrit une notification artisan sous le tenant (RLS) — `artisanId` forcé = `ctx.artisanId`. */
 export class SignatureNotificationWriterDrizzle implements SignatureNotificationWriter {
   constructor(private readonly db: DbClient) {}
 

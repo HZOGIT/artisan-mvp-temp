@@ -9,8 +9,10 @@ import type { CreatePrevisionInput, PrevisionCA, UpdatePrevisionInput } from "..
  * imposé — le legacy les fournit déjà calculés). Le scoping tenant est porté par le repo.
  */
 
-const DECIMAL_POSITIF = /^\d+(\.\d{1,2})?$/; // montant ≥ 0, 2 décimales max
-const DECIMAL_SIGNE = /^-?\d+(\.\d{1,2})?$/; // écart pouvant être négatif
+/** montant ≥ 0, 2 décimales max */
+const DECIMAL_POSITIF = /^\d+(\.\d{1,2})?$/;
+/** écart pouvant être négatif */
+const DECIMAL_SIGNE = /^-?\d+(\.\d{1,2})?$/;
 
 function assertMontantPositif(valeur: string | undefined, label: string): void {
   if (valeur === undefined) return;
@@ -59,7 +61,8 @@ export async function modifierPrevision(
   input: UpdatePrevisionInput,
 ): Promise<PrevisionCA> {
   assertMontants(input);
-  const updated = await repo.update(ctx, id, input); // montants/méthode/confiance seuls (mois/annee immuables)
+  /** montants/méthode/confiance seuls (mois/annee immuables) */
+  const updated = await repo.update(ctx, id, input);
   if (!updated) throw new NotFoundError("Prévision de CA introuvable");
   return updated;
 }

@@ -58,7 +58,8 @@ export class ImportErpRepositoryDrizzle implements IImportErpRepository {
         clientId: data.clientId,
         numero,
         objet: data.objet,
-        statut: data.statut as never, // valeur libre (parité legacy) ; un enum invalide lève → erreur de ligne
+        /** valeur libre (parité legacy) ; un enum invalide lève → erreur de ligne */
+        statut: data.statut as never,
         dateDevis: data.dateDevis,
         dateValidite: data.dateValidite,
         totalTTC: data.totalTTC,

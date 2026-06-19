@@ -52,7 +52,7 @@ export async function enregistrerKilometrage(
   if (!Number.isInteger(kilometrage) || kilometrage < 0) {
     throw new ValidationError("Kilométrage invalide");
   }
-  // L'invariant « le compteur ne recule pas » est garanti par le repo (GREATEST).
+  /** L'invariant « le compteur ne recule pas » est garanti par le repo (GREATEST). */
   const updated = await repo.updateKilometrage(ctx, id, kilometrage);
   if (!updated) throw new NotFoundError("Véhicule introuvable");
   return updated;

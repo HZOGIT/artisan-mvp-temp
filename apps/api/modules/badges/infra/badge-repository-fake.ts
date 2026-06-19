@@ -14,29 +14,29 @@ export class FakeBadgeRepository implements IBadgeRepository {
   private attributions: BadgeTechnicien[] = [];
   private techniciens: Array<{ id: number; artisanId: number }> = [];
   private classementStore: ClassementEntry[] = [];
-  // Objectifs mensuels (avec leur artisanId pour le scope tenant).
+  /** Objectifs mensuels (avec leur artisanId pour le scope tenant). */
   private objectifsStore: Array<ObjectifTechnicien & { artisanId: number }> = [];
-  // Progrès par technicien (pour verifierEtAttribuerBadges) : { technicienId -> {interventions, avisPositifs} }.
+  /** Progrès par technicien (pour verifierEtAttribuerBadges) : { technicienId -> {interventions, avisPositifs} }. */
   private progress = new Map<number, { interventions: number; avisPositifs: number }>();
   private seq = 0;
   private attrSeq = 0;
 
-  // Utilitaire de test (hors port) : déclare un technicien appartenant à un tenant.
+  /** Utilitaire de test (hors port) : déclare un technicien appartenant à un tenant. */
   seedTechnicien(id: number, artisanId: number): void {
     this.techniciens.push({ id, artisanId });
   }
 
-  // Utilitaire de test (hors port) : ajoute un objectif mensuel (scopé artisanId).
+  /** Utilitaire de test (hors port) : ajoute un objectif mensuel (scopé artisanId). */
   seedObjectif(artisanId: number, objectif: ObjectifTechnicien): void {
     this.objectifsStore.push({ ...objectif, artisanId });
   }
 
-  // Utilitaire de test (hors port) : ajoute une ligne de classement.
+  /** Utilitaire de test (hors port) : ajoute une ligne de classement. */
   seedClassement(entry: ClassementEntry): void {
     this.classementStore.push(entry);
   }
 
-  // Utilitaire de test (hors port) : déclare le progrès d'un technicien.
+  /** Utilitaire de test (hors port) : déclare le progrès d'un technicien. */
   seedProgress(technicienId: number, p: { interventions: number; avisPositifs: number }): void {
     this.progress.set(technicienId, p);
   }
@@ -109,7 +109,8 @@ export class FakeBadgeRepository implements IBadgeRepository {
     valeurAtteinte?: number | null,
   ): Promise<BadgeTechnicien | null> {
     if (!this.ownsTechnicien(ctx, technicienId)) return null;
-    if (!(await this.getById(ctx, badgeId))) return null; // badge hors tenant
+    /** badge hors tenant */
+    if (!(await this.getById(ctx, badgeId))) return null;
     const existing = this.attributions.find((a) => a.technicienId === technicienId && a.badgeId === badgeId);
     if (existing) return existing;
     const at: BadgeTechnicien = {

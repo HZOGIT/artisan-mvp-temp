@@ -22,10 +22,10 @@ export class FakeDevisRepository implements IDevisRepository {
   private seq = 0;
   private ligneSeq = 0;
   private compteur = new Map<number, number>();
-  // Clients appartenant à un tenant (injectable) : clé `${artisanId}:${clientId}`.
+  /** Clients appartenant à un tenant (injectable) : clé `${artisanId}:${clientId}`. */
   private ownedClients = new Set<string>();
 
-  // Aide de test : déclare qu'un client appartient au tenant (pour valider ownsClient/anti-IDOR).
+  /** Aide de test : déclare qu'un client appartient au tenant (pour valider ownsClient/anti-IDOR). */
   registerClient(artisanId: number, clientId: number): void {
     this.ownedClients.add(`${artisanId}:${clientId}`);
   }
@@ -38,7 +38,7 @@ export class FakeDevisRepository implements IDevisRepository {
     this.devisStore = this.devisStore.map((d) => (d.id === id ? { ...d, statut } : d));
   }
 
-  // Aide de test : force la date du devis (ancienneté — relances automatiques).
+  /** Aide de test : force la date du devis (ancienneté — relances automatiques). */
   setDateDevisForTest(id: number, dateDevis: Date): void {
     this.devisStore = this.devisStore.map((d) => (d.id === id ? { ...d, dateDevis } : d));
   }
@@ -85,7 +85,7 @@ export class FakeDevisRepository implements IDevisRepository {
   async update(ctx: TenantContext, id: number, input: UpdateDevisInput): Promise<Devis | null> {
     const d = await this.getById(ctx, id);
     if (!d) return null;
-    // Métadonnées seulement (UpdateDevisInput exclut clientId/numero/statut/totaux).
+    /** Métadonnées seulement (UpdateDevisInput exclut clientId/numero/statut/totaux). */
     const updated: Devis = {
       ...d,
       objet: input.objet !== undefined ? input.objet : d.objet,
@@ -103,7 +103,8 @@ export class FakeDevisRepository implements IDevisRepository {
     const d = await this.getById(ctx, id);
     if (!d) return false;
     this.devisStore = this.devisStore.filter((x) => x.id !== id);
-    this.lignesStore = this.lignesStore.filter((l) => l.devisId !== id); // cascade
+    /** cascade */
+    this.lignesStore = this.lignesStore.filter((l) => l.devisId !== id);
     return true;
   }
 

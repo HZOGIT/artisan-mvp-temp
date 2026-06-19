@@ -15,13 +15,13 @@ export class TresorerieReaderDrizzle implements TresorerieReader {
 
   load(ctx: TenantContext): Promise<TresorerieData> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Créances : factures non soldées (envoyée/en_retard) avec leur reste dû.
+      /** Créances : factures non soldées (envoyée/en_retard) avec leur reste dû. */
       const creancesRows = await tx
         .select({ dateEcheance: factures.dateEcheance, totalTTC: factures.totalTTC, montantPaye: factures.montantPaye })
         .from(factures)
         .where(and(eq(factures.artisanId, ctx.artisanId), inArray(factures.statut, ["envoyee", "en_retard"])));
 
-      // Avoirs (crédits client) : on nette leur totalTTC contre les encaissements attendus.
+      /** Avoirs (crédits client) : on nette leur totalTTC contre les encaissements attendus. */
       const avoirsRows = await tx
         .select({ totalTTC: factures.totalTTC })
         .from(factures)
@@ -33,7 +33,7 @@ export class TresorerieReaderDrizzle implements TresorerieReader {
           ),
         );
 
-      // Dépenses récurrentes avec une prochaine occurrence connue.
+      /** Dépenses récurrentes avec une prochaine occurrence connue. */
       const depRows = await tx
         .select({
           montantTtc: depenses.montant_ttc,

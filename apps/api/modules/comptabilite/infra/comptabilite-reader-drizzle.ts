@@ -60,7 +60,7 @@ export class ComptabiliteReaderDrizzle implements IComptabiliteReader {
     const dStr = p.dateDebut.toISOString().slice(0, 10);
     const fStr = p.dateFin.toISOString().slice(0, 10);
     return withTenant(this.db, ctx, async (tx) => {
-      // Base HT + TVA collectée par taux, depuis les lignes de factures émises (non brouillon/annulées).
+      /** Base HT + TVA collectée par taux, depuis les lignes de factures émises (non brouillon/annulées). */
       const rows = await tx
         .select({ taux: facturesLignes.tauxTVA, baseHT: sql<string>`SUM(${facturesLignes.montantHT})`, tva: sql<string>`SUM(${facturesLignes.montantTVA})` })
         .from(facturesLignes)
@@ -69,7 +69,7 @@ export class ComptabiliteReaderDrizzle implements IComptabiliteReader {
         .groupBy(facturesLignes.tauxTVA)
         .orderBy(desc(facturesLignes.tauxTVA));
       const parTaux = rows.map((r) => ({ taux: Number(r.taux ?? 0), baseHT: Number(r.baseHT ?? 0), tvaCollectee: Number(r.tva ?? 0) }));
-      // TVA déductible depuis les dépenses déductibles de la période.
+      /** TVA déductible depuis les dépenses déductibles de la période. */
       const [ded] = await tx
         .select({ tva: sql<string>`COALESCE(SUM(${depenses.montant_tva}), 0)` })
         .from(depenses)
@@ -82,14 +82,14 @@ export class ComptabiliteReaderDrizzle implements IComptabiliteReader {
     const dStr = p.dateDebut.toISOString().slice(0, 10);
     const fStr = p.dateFin.toISOString().slice(0, 10);
     return withTenant(this.db, ctx, async (tx) => {
-      // 1) Factures de la période (journal VE) + client joint.
+      /** 1) Factures de la période (journal VE) + client joint. */
       const factRows = await tx
         .select({ id: factures.id, numero: factures.numero, dateFacture: factures.dateFacture, totalHT: factures.totalHT, totalTVA: factures.totalTVA, totalTTC: factures.totalTTC, statut: factures.statut, datePaiement: factures.datePaiement, typeDocument: factures.typeDocument, clientId: factures.clientId, clientNom: clients.nom, clientPrenom: clients.prenom })
         .from(factures)
         .leftJoin(clients, eq(clients.id, factures.clientId))
         .where(and(eq(factures.artisanId, ctx.artisanId), sql`DATE(${factures.dateFacture}) BETWEEN ${dStr} AND ${fStr}`, inArray(factures.statut, ["validee", "envoyee", "payee", "en_retard"])))
         .orderBy(asc(factures.dateFacture), asc(factures.id));
-      // Lignes TVA groupées par (facture, taux) — 1 requête, regroupées en mémoire.
+      /** Lignes TVA groupées par (facture, taux) — 1 requête, regroupées en mémoire. */
       const factIds = factRows.map((f) => f.id);
       const lignesByFacture = new Map<number, { tauxTVA: string | null; tva: string }[]>();
       if (factIds.length > 0) {
@@ -106,14 +106,14 @@ export class ComptabiliteReaderDrizzle implements IComptabiliteReader {
       }
       const facturesFec: FecFacture[] = factRows.map((f) => ({ ...f, lignesTVA: lignesByFacture.get(f.id) ?? [] }));
 
-      // 2) Dépenses de la période (journal AC).
+      /** 2) Dépenses de la période (journal AC). */
       const depRows = await tx
         .select({ id: depenses.id, numero: depenses.numero, dateDepense: depenses.date_depense, fournisseur: depenses.fournisseur, categorie: depenses.categorie, montantHT: depenses.montant_ht, montantTVA: depenses.montant_tva, montantTTC: depenses.montant_ttc })
         .from(depenses)
         .where(and(eq(depenses.artisan_id, ctx.artisanId), between(depenses.date_depense, dStr, fStr)))
         .orderBy(asc(depenses.date_depense), asc(depenses.id));
 
-      // 3) Encaissements (factures payées de la période, journal BQ).
+      /** 3) Encaissements (factures payées de la période, journal BQ). */
       const encRows = await tx
         .select({ id: factures.id, numero: factures.numero, datePaiement: factures.datePaiement, totalTTC: factures.totalTTC, typeDocument: factures.typeDocument, clientId: factures.clientId, clientNom: clients.nom, clientPrenom: clients.prenom })
         .from(factures)

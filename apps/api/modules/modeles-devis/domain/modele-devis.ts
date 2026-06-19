@@ -17,7 +17,8 @@ export interface ModeleDevisLigne {
   readonly articleId: number | null;
   readonly designation: string;
   readonly description: string | null;
-  readonly quantite: string; // numeric PG en string
+  /** numeric PG en string */
+  readonly quantite: string;
   readonly unite: string;
   readonly prixUnitaireHT: string;
   readonly tauxTVA: string;

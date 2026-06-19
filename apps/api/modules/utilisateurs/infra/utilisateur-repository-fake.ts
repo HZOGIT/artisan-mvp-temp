@@ -14,12 +14,13 @@ interface FakeUser {
   artisanId: number | null;
 }
 
-// Fake in-memory déterministe reproduisant l'isolation EXPLICITE par artisanId + la notion d'owner.
+/** Fake in-memory déterministe reproduisant l'isolation EXPLICITE par artisanId + la notion d'owner. */
 export class FakeUtilisateurRepository implements IUtilisateurRepository {
   private seq = 0;
   private users: FakeUser[] = [];
   private readonly perms = new Map<number, string[]>();
-  private readonly owners = new Map<number, number>(); // artisanId → ownerUserId
+  /** artisanId → ownerUserId */
+  private readonly owners = new Map<number, number>();
   private readonly noms = new Map<number, string>();
 
   setOwner(artisanId: number, ownerUserId: number): void {

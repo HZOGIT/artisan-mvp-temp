@@ -31,7 +31,7 @@ export class StripeAdapter implements StripePort {
     return this.client;
   }
 
-  // Vérif signature via le SDK (`webhooks.constructEvent`) — LÈVE si invalide (fail-closed).
+  /** Vérif signature via le SDK (`webhooks.constructEvent`) — LÈVE si invalide (fail-closed). */
   async constructEvent(rawBody: Buffer, signature: string, secret: string): Promise<StripeWebhookEvent> {
     const s = await this.sdk();
     const ev = s.webhooks.constructEvent(rawBody, signature, secret);
@@ -62,7 +62,7 @@ export class StripeAdapter implements StripePort {
     return s.billingPortal.sessions.create({ customer: p.customerId, return_url: p.returnUrl });
   }
 
-  // Checkout mode `payment` pour payer une facture (parité legacy `createCheckoutSession`).
+  /** Checkout mode `payment` pour payer une facture (parité legacy `createCheckoutSession`). */
   async createInvoiceCheckout(p: CreateInvoiceCheckoutParams): Promise<{ url: string | null; sessionId: string }> {
     const s = await this.sdk();
     const session = await s.checkout.sessions.create({
@@ -109,14 +109,14 @@ export class StripeAdapter implements StripePort {
   }
 }
 
-// Fake déterministe (tests) : enregistre les appels, renvoie des urls/ids fictifs, aucun réseau.
+/** Fake déterministe (tests) : enregistre les appels, renvoie des urls/ids fictifs, aucun réseau. */
 export class FakeStripePort implements StripePort {
   public customers: CreateCustomerParams[] = [];
   public checkouts: CreateCheckoutParams[] = [];
   public portals: { customerId: string; returnUrl: string }[] = [];
   public cancelToggles: { subscriptionId: string; cancel: boolean }[] = [];
   private seq = 0;
-  // Signature acceptée par le fake `constructEvent` (les autres → throw, comme une signature invalide).
+  /** Signature acceptée par le fake `constructEvent` (les autres → throw, comme une signature invalide). */
   public acceptSignature = "valid-sig";
 
   async constructEvent(rawBody: Buffer, signature: string): Promise<StripeWebhookEvent> {
@@ -145,7 +145,7 @@ export class FakeStripePort implements StripePort {
   async setCancelAtPeriodEnd(subscriptionId: string, cancel: boolean): Promise<void> {
     this.cancelToggles.push({ subscriptionId, cancel });
   }
-  // Abonnement rechargé fictif (override via `retrievedSubscription` dans les tests).
+  /** Abonnement rechargé fictif (override via `retrievedSubscription` dans les tests). */
   public retrievedSubscription = { status: "active", currentPeriodStart: null as Date | null, currentPeriodEnd: null as Date | null };
   async retrieveSubscription(): Promise<{ status: string; currentPeriodStart: Date | null; currentPeriodEnd: Date | null }> {
     return this.retrievedSubscription;

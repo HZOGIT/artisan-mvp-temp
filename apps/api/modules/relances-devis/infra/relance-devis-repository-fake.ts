@@ -12,7 +12,7 @@ export class FakeRelanceDevisRepository implements IRelanceDevisRepository {
   private seq = 0;
   private readonly devisByArtisan = new Map<number, Set<number>>();
 
-  // Déclare qu'un devis appartient à un artisan (pour les tests d'anti-IDOR-FK).
+  /** Déclare qu'un devis appartient à un artisan (pour les tests d'anti-IDOR-FK). */
   seedDevis(artisanId: number, devisId: number): void {
     if (!this.devisByArtisan.has(artisanId)) this.devisByArtisan.set(artisanId, new Set());
     this.devisByArtisan.get(artisanId)!.add(devisId);

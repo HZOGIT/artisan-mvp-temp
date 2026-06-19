@@ -4,7 +4,7 @@
  *   (sous RLS) ; l'onboarding (onboardingCompleted/metier/plan) vit sur la table d'identité `artisans`.
  */
 
-// Une entrée du catalogue global (telle quelle, sans état tenant).
+/** Une entrée du catalogue global (telle quelle, sans état tenant). */
 export interface ModuleCatalogue {
   readonly id: number;
   readonly slug: string;
@@ -17,13 +17,13 @@ export interface ModuleCatalogue {
   readonly ordre: number;
 }
 
-// Module enrichi de l'état du tenant courant (activé ? verrouillé par le plan ?). Forme renvoyée par `list`.
+/** Module enrichi de l'état du tenant courant (activé ? verrouillé par le plan ?). Forme renvoyée par `list`. */
 export interface ModuleAvecEtat extends ModuleCatalogue {
   readonly actif: boolean;
   readonly locked: boolean;
 }
 
-// État d'onboarding du tenant (colonnes de `artisans`).
+/** État d'onboarding du tenant (colonnes de `artisans`). */
 export interface OnboardingStatus {
   readonly onboardingCompleted: boolean;
   readonly metier: string | null;

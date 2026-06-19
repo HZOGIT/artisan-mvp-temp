@@ -9,7 +9,7 @@ import type { BudgetCategorie, CreateBudgetInput, UpdateBudgetInput } from "../d
 
 type BudgetRow = typeof budgetsCategories.$inferSelect;
 
-// Traduit une ligne PG (colonnes snake_case) → domaine (camelCase). Défauts montants "0" si null.
+/** Traduit une ligne PG (colonnes snake_case) → domaine (camelCase). Défauts montants "0" si null. */
 function toBudget(r: BudgetRow): BudgetCategorie {
   return {
     id: r.id,
@@ -99,7 +99,7 @@ export class BudgetCategorieRepositoryDrizzle implements IBudgetCategorieReposit
 
   update(ctx: TenantContext, id: number, input: UpdateBudgetInput): Promise<BudgetCategorie | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Montants seulement (UpdateBudgetInput exclut categorie/mois = clé d'unicité immuable).
+      /** Montants seulement (UpdateBudgetInput exclut categorie/mois = clé d'unicité immuable). */
       const set: Partial<typeof budgetsCategories.$inferInsert> = {};
       if (input.budget !== undefined) set.budget = input.budget;
       if (input.depenseReelle !== undefined) set.depense_reelle = input.depenseReelle;

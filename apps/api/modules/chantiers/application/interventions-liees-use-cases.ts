@@ -10,7 +10,7 @@ import type { ChantierInterventionLien, AssocierInterventionInput } from "../dom
  * l'intervention d'un autre tenant à son propre chantier).
  */
 
-// Liens d'un chantier possédé (404 sinon), triés par ordre.
+/** Liens d'un chantier possédé (404 sinon), triés par ordre. */
 export async function getInterventionsLiees(
   repo: IChantierRepository,
   ctx: TenantContext,
@@ -20,7 +20,7 @@ export async function getInterventionsLiees(
   return repo.listInterventionsLiens(ctx, chantierId);
 }
 
-// Tous les liens des chantiers du tenant (scopé tenant, anti-N+1).
+/** Tous les liens des chantiers du tenant (scopé tenant, anti-N+1). */
 export async function getAllInterventionsLiees(
   repo: IChantierRepository,
   ctx: TenantContext,
@@ -42,7 +42,7 @@ export async function associerInterventionChantier(
   return repo.associerIntervention(ctx, input);
 }
 
-// Dissocie une intervention d'un chantier possédé (404 sinon). Idempotent.
+/** Dissocie une intervention d'un chantier possédé (404 sinon). Idempotent. */
 export async function dissocierInterventionChantier(
   repo: IChantierRepository,
   ctx: TenantContext,

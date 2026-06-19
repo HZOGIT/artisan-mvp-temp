@@ -67,7 +67,7 @@ export function createNotesDeFraisRouter(repo: INoteDeFraisRepository) {
         return { success: true };
       }),
 
-    // Workflow d'approbation. ⚠️ anti self-approbation porté par le use-case (403 si self).
+    /** Workflow d'approbation. ⚠️ anti self-approbation porté par le use-case (403 si self). */
     soumettre: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => soumettreNoteDeFrais(repo, ctx.tenant, input.id)),

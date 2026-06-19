@@ -5,7 +5,7 @@ import { listNotifications, compterNonLues } from "../../application/read-use-ca
 import { marquerLue, marquerToutesLues, archiver } from "../../application/write-use-cases";
 import { genererRappelsFacturesEnRetard } from "../../application/derived-use-cases";
 
-// Bornes alignées sur le legacy : page cap anti-DoS (offset énorme), limit max 100.
+/** Bornes alignées sur le legacy : page cap anti-DoS (offset énorme), limit max 100. */
 const listInput = z
   .object({
     includeArchived: z.boolean().default(false),
@@ -47,7 +47,7 @@ export function createNotificationsRouter(repo: INotificationRepository) {
         return { success: true };
       }),
 
-    // Alias legacy : delete archive la notification (pas de suppression dure).
+    /** Alias legacy : delete archive la notification (pas de suppression dure). */
     delete: protectedProcedure
       .input(idInput)
       .mutation(async ({ ctx, input }) => {
@@ -55,7 +55,7 @@ export function createNotificationsRouter(repo: INotificationRepository) {
         return { success: true };
       }),
 
-    // Logique dérivée : génère les rappels pour les factures impayées en retard (idempotent).
+    /** Logique dérivée : génère les rappels pour les factures impayées en retard (idempotent). */
     generateOverdueReminders: protectedProcedure.mutation(async ({ ctx }) => {
       const { rappelsCreated } = await genererRappelsFacturesEnRetard(repo, ctx.tenant);
       return { success: true, rappelsCreated };

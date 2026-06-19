@@ -24,7 +24,7 @@ export function listerArticlesDeFournisseur(
   return repo.listAssociationsFournisseur(ctx, fournisseurId);
 }
 
-// Associe un article à un fournisseur (→ NotFound si article OU fournisseur hors tenant).
+/** Associe un article à un fournisseur (→ NotFound si article OU fournisseur hors tenant). */
 export async function associerArticleFournisseur(
   repo: IFournisseurRepository,
   ctx: TenantContext,
@@ -35,7 +35,7 @@ export async function associerArticleFournisseur(
   return assoc;
 }
 
-// Dissocie (supprime l'association) — → NotFound si elle ne relève pas du tenant.
+/** Dissocie (supprime l'association) — → NotFound si elle ne relève pas du tenant. */
 export async function dissocierArticleFournisseur(
   repo: IFournisseurRepository,
   ctx: TenantContext,

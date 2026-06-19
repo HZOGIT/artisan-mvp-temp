@@ -10,7 +10,7 @@ import type {
 } from "../application/agentic-port";
 import type { ToolSchema } from "../domain/assistant-tools-catalog";
 
-// Un tour scripté : des fragments de texte streamés, puis (éventuellement) des function-calls.
+/** Un tour scripté : des fragments de texte streamés, puis (éventuellement) des function-calls. */
 export interface ScriptedTurn {
   readonly text?: readonly string[];
   readonly calls?: readonly AgenticFunctionCall[];
@@ -27,20 +27,20 @@ export class FakeLlmAgenticPort implements LlmAgenticPort {
   constructor(private readonly script: readonly ScriptedTurn[]) {}
 
   async *streamTurn(input: AgenticTurnInput): AsyncIterable<AgenticEvent> {
-    // Snapshot des messages (le use-case mute le tableau entre les tours) → observation fidèle du re-feed.
+    /** Snapshot des messages (le use-case mute le tableau entre les tours) → observation fidèle du re-feed. */
     this.turnInputs.push({ ...input, messages: [...input.messages] });
     const turn = this.script[this.callCount] ?? {};
     this.callCount++;
     const fragments = turn.text ?? [];
     for (const t of fragments) yield { kind: "text", text: t };
     const functionCalls = turn.calls ?? [];
-    // Message `model` brut/opaque (round-trip), porte le contenu du tour.
+    /** Message `model` brut/opaque (round-trip), porte le contenu du tour. */
     const modelMessage: AgenticMessage = { role: "model", content: { kind: "raw", text: fragments.join(""), calls: functionCalls } };
     yield { kind: "turn-complete", modelMessage, functionCalls };
   }
 }
 
-// Fake du registre d'outils : capture les appels et délègue à un handler scriptable (succès par défaut).
+/** Fake du registre d'outils : capture les appels et délègue à un handler scriptable (succès par défaut). */
 export class FakeAssistantToolRegistry implements AssistantToolRegistry {
   public readonly calls: { name: string; args: Record<string, unknown>; artisanId: number }[] = [];
   constructor(

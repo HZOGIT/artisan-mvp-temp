@@ -17,7 +17,7 @@ export interface PositionPoint {
   readonly createdAt: Date;
 }
 
-// Technicien du tenant enrichi de sa dernière position (null si aucune). Forme renvoyée par `getPositions`.
+/** Technicien du tenant enrichi de sa dernière position (null si aucune). Forme renvoyée par `getPositions`. */
 export interface TechnicienAvecPosition {
   readonly id: number;
   readonly nom: string;

@@ -10,7 +10,7 @@ const FENETRE_MAX_MS = 14 * 24 * 60 * 60 * 1000;
 export interface PortalSchedulingDeps {
   readonly access: Pick<IPortalAccessRepository, "resolveByToken">;
   readonly scheduling: IPortalSchedulingReader;
-  // Pour la notification artisan lors d'une demande de RDV.
+  /** Pour la notification artisan lors d'une demande de RDV. */
   readonly clients: { getById(ctx: TenantContext, id: number): Promise<{ nom: string; prenom: string | null } | null> };
   readonly notifications: { creer(ctx: TenantContext, input: { type: "info"; titre: string; message: string; lien: string }): Promise<unknown> };
   readonly rateLimiter: { check(key: string): Promise<boolean> };
@@ -22,7 +22,7 @@ async function resolve(deps: { access: Pick<IPortalAccessRepository, "resolveByT
   return { ctx: { artisanId: access.artisanId, userId: 0 }, clientId: access.clientId, artisanId: access.artisanId };
 }
 
-// Créneaux libres proposables au client (fenêtre [+24h, +14j], jours ouvrés 8-17, hors occupations).
+/** Créneaux libres proposables au client (fenêtre [+24h, +14j], jours ouvrés 8-17, hors occupations). */
 export async function getCreneauxDisponibles(deps: PortalSchedulingDeps, token: string, now: Date = new Date()): Promise<string[]> {
   const { ctx } = await resolve(deps, token, now);
   const debut = new Date(now.getTime() + FENETRE_MIN_MS);

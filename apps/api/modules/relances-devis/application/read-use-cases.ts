@@ -12,7 +12,7 @@ export function listRelances(repo: IRelanceDevisRepository, ctx: TenantContext):
   return repo.list(ctx);
 }
 
-// Historique des relances d'un devis (scopé tenant ; [] si aucune — pas une erreur).
+/** Historique des relances d'un devis (scopé tenant ; [] si aucune — pas une erreur). */
 export function relancesParDevis(repo: IRelanceDevisRepository, ctx: TenantContext, devisId: number): Promise<RelanceDevis[]> {
   return repo.listByDevis(ctx, devisId);
 }

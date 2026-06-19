@@ -1,6 +1,6 @@
 import { getContexteMetier } from "../../../shared/ia/contexte-metier";
 
-// Stats minimales injectées dans le prompt système de l'assistant (best-effort).
+/** Stats minimales injectées dans le prompt système de l'assistant (best-effort). */
 export interface AssistantPromptStats {
   readonly devisEnCours: number;
   readonly facturesImpayeesCount: number;

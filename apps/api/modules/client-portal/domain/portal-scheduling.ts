@@ -9,8 +9,10 @@ export interface CreneauOccupe {
 }
 
 const HEURE_DEBUT = 8;
-const HEURE_FIN = 18; // exclusif (derniers créneaux débutent à 17h)
-const FENETRE_MIN_MS = 24 * 60 * 60 * 1000; // un créneau au plus tôt à +24h
+/** exclusif (derniers créneaux débutent à 17h) */
+const HEURE_FIN = 18;
+/** un créneau au plus tôt à +24h */
+const FENETRE_MIN_MS = 24 * 60 * 60 * 1000;
 const FENETRE_MAX_JOURS = 14;
 const SLOT_MS = 60 * 60 * 1000;
 
@@ -47,7 +49,7 @@ export function computeCreneauxLibres(occupied: readonly CreneauOccupe[], now: D
 
 export type RdvDateValidite = "ok" | "invalide" | "trop_tot" | "trop_loin";
 
-// Valide la date proposée d'un RDV (parité legacy : NaN, < +24h, > +2 ans). PUR.
+/** Valide la date proposée d'un RDV (parité legacy : NaN, < +24h, > +2 ans). PUR. */
 export function validerDateRdv(dateProposee: Date, now: Date): RdvDateValidite {
   if (isNaN(dateProposee.getTime())) return "invalide";
   if (dateProposee < new Date(now.getTime() + FENETRE_MIN_MS)) return "trop_tot";

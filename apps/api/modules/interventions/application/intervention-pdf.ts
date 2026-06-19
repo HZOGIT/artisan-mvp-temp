@@ -27,7 +27,7 @@ export async function getInterventionPdf(deps: InterventionPdfDeps, ctx: TenantC
   const artisan = await deps.artisanReader.getProfile(ctx);
   if (!artisan) throw new NotFoundError("Profil artisan introuvable");
 
-  // Nom du technicien assigné (repo scopé tenant → null si cross-tenant, ownership implicite).
+  /** Nom du technicien assigné (repo scopé tenant → null si cross-tenant, ownership implicite). */
   let technicienNom: string | null = null;
   if (intervention.technicienId != null) {
     const tech = await deps.technicienReader.getById(ctx, intervention.technicienId);

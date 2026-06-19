@@ -29,7 +29,8 @@ export function registerUploadLogoRoute(app: FastifyInstance, deps: UploadLogoDe
       }
       let buffer: Buffer;
       try {
-        buffer = await data.toBuffer(); // lève si > MAX_LOGO_BYTES (limite multipart)
+        /** lève si > MAX_LOGO_BYTES (limite multipart) */
+        buffer = await data.toBuffer();
       } catch {
         return reply.code(400).send({ error: "Fichier trop volumineux (max 2MB)" });
       }

@@ -19,7 +19,7 @@ export async function getCommande(repo: ICommandeRepository, ctx: TenantContext,
   return commande;
 }
 
-// Lignes d'une commande — [] si la commande n'appartient pas au tenant (lecture sans oracle).
+/** Lignes d'une commande — [] si la commande n'appartient pas au tenant (lecture sans oracle). */
 export function listLignesCommande(
   repo: ICommandeRepository,
   ctx: TenantContext,

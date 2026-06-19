@@ -9,7 +9,7 @@ import type { FacturesCsvReader } from "./factures-csv-reader";
 
 type Clock = () => Date;
 
-// Bornes par défaut = mois courant (parité legacy : début = 1er du mois, fin = dernier jour 23:59:59).
+/** Bornes par défaut = mois courant (parité legacy : début = 1er du mois, fin = dernier jour 23:59:59). */
 export function resolvePeriode(input: { dateDebut?: Date; dateFin?: Date } | undefined, now: Date): Periode {
   return {
     dateDebut: input?.dateDebut ?? new Date(now.getFullYear(), now.getMonth(), 1),

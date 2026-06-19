@@ -13,15 +13,15 @@ type MutableOption = { -readonly [K in keyof DevisOption]: DevisOption[K] };
 export class FakeDevisOptionRepository implements IDevisOptionRepository {
   private seq = 0;
   private options: MutableOption[] = [];
-  // devisId → artisanId propriétaire.
+  /** devisId → artisanId propriétaire. */
   private readonly devisOwner = new Map<number, number>();
 
-  // Déclare un devis appartenant à un artisan (équiv. d'une ligne `devis` sous RLS).
+  /** Déclare un devis appartenant à un artisan (équiv. d'une ligne `devis` sous RLS). */
   registerDevis(artisanId: number, devisId: number): void {
     this.devisOwner.set(devisId, artisanId);
   }
 
-  // Sème une option existante (utile pour tester remove/select/convertir).
+  /** Sème une option existante (utile pour tester remove/select/convertir). */
   seedOption(opt: Partial<DevisOption> & { devisId: number; nom: string }): DevisOption {
     const full: MutableOption = {
       id: opt.id ?? ++this.seq,

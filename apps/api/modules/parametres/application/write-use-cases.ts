@@ -11,7 +11,8 @@ import type { ParametresArtisan, UpdateParametresInput } from "../domain/paramet
  */
 
 const DELAIS_VALIDES = ["net", "fin_de_mois"] as const;
-const DECIMAL_2 = /^\d+(\.\d{1,2})?$/; // montant ≥ 0 à 2 décimales max
+/** montant ≥ 0 à 2 décimales max */
+const DECIMAL_2 = /^\d+(\.\d{1,2})?$/;
 const HEX_COULEUR = /^#[0-9a-fA-F]{6}$/;
 
 function assertPrefixe(valeur: string | undefined, libelle: string): void {

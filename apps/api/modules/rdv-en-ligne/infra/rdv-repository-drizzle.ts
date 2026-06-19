@@ -69,7 +69,8 @@ export class RdvRepositoryDrizzle implements IRdvRepository {
           dateProposee: input.dateProposee,
           dureeEstimee: input.dureeEstimee ?? undefined,
           urgence: input.urgence ?? undefined,
-          statut: "en_attente", // forcé : jamais fourni par l'appelant
+          /** forcé : jamais fourni par l'appelant */
+          statut: "en_attente",
           motifRefus: null,
         })
         .returning();
@@ -79,7 +80,7 @@ export class RdvRepositoryDrizzle implements IRdvRepository {
 
   update(ctx: TenantContext, id: number, input: UpdateRdvInput): Promise<Rdv | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Métadonnées seulement (UpdateRdvInput exclut statut/motifRefus → état machine protégée).
+      /** Métadonnées seulement (UpdateRdvInput exclut statut/motifRefus → état machine protégée). */
       const set: Partial<typeof rdvEnLigne.$inferInsert> = { updatedAt: new Date() };
       if (input.titre !== undefined) set.titre = input.titre;
       if (input.description !== undefined) set.description = input.description;

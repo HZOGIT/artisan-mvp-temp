@@ -42,7 +42,7 @@ const createSchema = z.object({
   notes: z.string().nullish(),
 });
 
-// Mise à jour partielle : tous les champs optionnels ; `nom` s'il est fourni reste non vide.
+/** Mise à jour partielle : tous les champs optionnels ; `nom` s'il est fourni reste non vide. */
 const updateSchema = z.object({
   nom: z.string().min(1).max(100).optional(),
   prenom: z.string().max(100).nullish(),
@@ -79,7 +79,7 @@ export function createClientsRouter(repo: IClientRepository) {
       .input(z.object({ query: z.string().min(1).max(100) }))
       .query(({ ctx, input }) => rechercherClients(repo, ctx.tenant, input.query)),
 
-    // Encours financier (reste dû des factures impayées). Lecture seule, scopée tenant.
+    /** Encours financier (reste dû des factures impayées). Lecture seule, scopée tenant. */
     getEncours: voir
       .input(z.object({ clientId: z.number().int() }))
       .query(({ ctx, input }) => getEncoursClient(repo, ctx.tenant, input.clientId)),

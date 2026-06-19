@@ -34,17 +34,17 @@ export async function getMouvementsStock(
   return mouvements;
 }
 
-// Stocks sous le seuil d'alerte (inclut les ruptures), scopés tenant.
+/** Stocks sous le seuil d'alerte (inclut les ruptures), scopés tenant. */
 export function listStocksEnAlerte(repo: IStockRepository, ctx: TenantContext): Promise<Stock[]> {
   return repo.listLowStock(ctx);
 }
 
-// Stocks en rupture stricte (épuisés, quantité ≤ 0), scopés tenant.
+/** Stocks en rupture stricte (épuisés, quantité ≤ 0), scopés tenant. */
 export function listStocksEnRupture(repo: IStockRepository, ctx: TenantContext): Promise<Stock[]> {
   return repo.listEnRupture(ctx);
 }
 
-// Quantités en commande (non reçues) par stock, scopées tenant. Parité legacy `getEntrant`.
+/** Quantités en commande (non reçues) par stock, scopées tenant. Parité legacy `getEntrant`. */
 export function listStockEntrant(repo: IStockRepository, ctx: TenantContext): Promise<StockEntrant[]> {
   return repo.listEntrant(ctx);
 }

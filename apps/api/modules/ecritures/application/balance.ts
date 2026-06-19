@@ -1,13 +1,14 @@
 import type { EcritureComptable } from "../domain/ecriture";
 
-// Agrégats comptables de lecture — PURS, testables sans DB sur un `EcritureComptable[]`.
+/** Agrégats comptables de lecture — PURS, testables sans DB sur un `EcritureComptable[]`. */
 
 export interface LigneBalance {
   readonly numeroCompte: string;
   readonly libelleCompte: string | null;
   readonly totalDebit: string;
   readonly totalCredit: string;
-  readonly solde: string; // débit − crédit (signé)
+  /** débit − crédit (signé) */
+  readonly solde: string;
 }
 
 /*
@@ -43,7 +44,8 @@ export interface LigneGrandLivre {
   readonly pieceRef: string | null;
   readonly debit: string;
   readonly credit: string;
-  readonly soldeProgressif: string; // cumul (débit − crédit) jusqu'à cette ligne incluse
+  /** cumul (débit − crédit) jusqu'à cette ligne incluse */
+  readonly soldeProgressif: string;
 }
 
 /*

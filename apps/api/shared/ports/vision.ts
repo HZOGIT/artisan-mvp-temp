@@ -5,9 +5,12 @@
  */
 
 export interface VisionRequest {
-  readonly mimeType: string; // ex. "image/jpeg"
-  readonly base64: string; // données image en base64 (sans préfixe data:)
-  readonly prompt: string; // instruction utilisateur (ex. "extrais le JSON…")
+  /** ex. "image/jpeg" */
+  readonly mimeType: string;
+  /** données image en base64 (sans préfixe data:) */
+  readonly base64: string;
+  /** instruction utilisateur (ex. "extrais le JSON…") */
+  readonly prompt: string;
   readonly system?: string;
   readonly model?: string;
   readonly maxOutputTokens?: number;
@@ -19,8 +22,10 @@ export interface VisionRequest {
  */
 export interface VisionImage {
   readonly mimeType: string;
-  readonly base64?: string; // données inline (base64 sans préfixe data:)
-  readonly fileUri?: string; // URL publique (alternative à base64)
+  /** données inline (base64 sans préfixe data:) */
+  readonly base64?: string;
+  /** URL publique (alternative à base64) */
+  readonly fileUri?: string;
 }
 
 export interface VisionMultiRequest {

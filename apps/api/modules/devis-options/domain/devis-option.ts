@@ -19,7 +19,7 @@ export interface DevisOption {
   readonly updatedAt: Date;
 }
 
-// Champs de création d'une option (le devis parent est désigné par `devisId`, vérifié possédé).
+/** Champs de création d'une option (le devis parent est désigné par `devisId`, vérifié possédé). */
 export interface CreateDevisOptionInput {
   readonly devisId: number;
   readonly nom: string;

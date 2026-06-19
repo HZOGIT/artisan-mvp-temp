@@ -17,7 +17,7 @@ export interface Notification {
   readonly createdAt: Date;
 }
 
-// Options de listing (filtres + pagination poussés en SQL côté repo).
+/** Options de listing (filtres + pagination poussés en SQL côté repo). */
 export interface ListNotificationsOptions {
   readonly includeArchived?: boolean;
   readonly nonLuesUniquement?: boolean;

@@ -4,9 +4,9 @@
  * route SSE consomme `navigate` pour émettre un event au client AVANT de renvoyer le résultat au modèle.
  */
 
-// Pages connues du front (whitelist stricte — le modèle ne doit JAMAIS inventer un chemin).
+/** Pages connues du front (whitelist stricte — le modèle ne doit JAMAIS inventer un chemin). */
 export const VALID_NAV_PAGES: readonly string[] = [
-  // Cœur métier
+  /** Cœur métier */
   "/dashboard",
   "/clients",
   "/devis",
@@ -18,7 +18,7 @@ export const VALID_NAV_PAGES: readonly string[] = [
   "/fournisseurs",
   "/commandes",
   "/contrats",
-  // Compta / dépenses / finances
+  /** Compta / dépenses / finances */
   "/comptabilite",
   "/integrations-comptables",
   "/tableau-bord-sync-comptable",
@@ -28,13 +28,13 @@ export const VALID_NAV_PAGES: readonly string[] = [
   "/import-releve",
   "/budgets-depenses",
   "/regles-depenses",
-  // Chantiers / planification / rentabilité
+  /** Chantiers / planification / rentabilité */
   "/chantiers",
   "/calendrier-chantiers",
   "/planification",
   "/previsions",
   "/alertes-previsions",
-  // Équipe / RH / véhicules
+  /** Équipe / RH / véhicules */
   "/techniciens",
   "/conges",
   "/utilisateurs",
@@ -43,25 +43,25 @@ export const VALID_NAV_PAGES: readonly string[] = [
   "/geolocalisation",
   "/classement",
   "/badges",
-  // Commercial / IA / relances / avis
+  /** Commercial / IA / relances / avis */
   "/devis-ia",
   "/devis-options",
   "/relances",
   "/avis",
   "/analyses-photos",
   "/rdv-en-ligne",
-  // Stats & rapports
+  /** Stats & rapports */
   "/statistiques",
   "/rapports",
   "/rapport-commande",
   "/performances-fournisseurs",
-  // Vitrine / portail / divers
+  /** Vitrine / portail / divers */
   "/ma-vitrine",
   "/portail-gestion",
   "/notifications",
   "/modeles-email",
   "/modeles-email-transactionnels",
-  // Paramétrage / compte
+  /** Paramétrage / compte */
   "/profil",
   "/parametres",
   "/modules",
@@ -76,7 +76,7 @@ export const VALID_NAV_PAGES: readonly string[] = [
  */
 export const NAV_DEEP_LINK_RE = /^\/(devis|factures|clients|contrats|commandes)\/\d+$/;
 
-// La page est-elle une cible de navigation valide (page connue OU deep-link autorisé) ?
+/** La page est-elle une cible de navigation valide (page connue OU deep-link autorisé) ? */
 export function isValidNavPage(page: string): boolean {
   return VALID_NAV_PAGES.includes(page) || NAV_DEEP_LINK_RE.test(page);
 }

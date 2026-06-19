@@ -2,7 +2,7 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { ConseilsStats } from "../domain/conseils";
 import type { ConseilsStatsReader } from "../application/conseils-stats-reader";
 
-// Stats fake (in-memory) par tenant pour les tests des use-cases conseils IA.
+/** Stats fake (in-memory) par tenant pour les tests des use-cases conseils IA. */
 export class FakeConseilsStatsReader implements ConseilsStatsReader {
   private byTenant = new Map<number, ConseilsStats>();
   public throwOnGet = false;

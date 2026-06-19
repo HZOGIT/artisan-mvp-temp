@@ -1,4 +1,4 @@
-// Port d'envoi de SMS.
+/** Port d'envoi de SMS. */
 export interface SmsMessage {
   readonly to: string;
   readonly message: string;

@@ -25,7 +25,7 @@ export class FakeParametresRepository implements IParametresRepository {
 
   async upsert(ctx: TenantContext, input: UpdateParametresInput): Promise<ParametresArtisan> {
     const current = this.store.get(ctx.artisanId) ?? defaultParametres(ctx.artisanId);
-    // Fusionne uniquement les champs config fournis ; compteurs (et artisanId) préservés tels quels.
+    /** Fusionne uniquement les champs config fournis ; compteurs (et artisanId) préservés tels quels. */
     const next: ParametresArtisan = {
       ...current,
       artisanId: ctx.artisanId,

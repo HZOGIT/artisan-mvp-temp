@@ -1,7 +1,7 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { AssistantThreadWriter } from "../application/assistant-thread-writer";
 
-// Writer threads/messages assistant fake (in-memory) pour les tests des use-cases.
+/** Writer threads/messages assistant fake (in-memory) pour les tests des use-cases. */
 export class FakeAssistantThreadWriter implements AssistantThreadWriter {
   public threads: Array<{ artisanId: number; firstMessage: string; id: number }> = [];
   public messages: Array<{ artisanId: number; threadId: number; role: string; transcript: string; metadata?: unknown }> = [];

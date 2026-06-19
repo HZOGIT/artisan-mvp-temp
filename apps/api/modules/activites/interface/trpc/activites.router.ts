@@ -3,11 +3,12 @@ import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IActiviteRepository } from "../../application/activite-repository";
 import { basculerFait, creerActivite, listActivites, supprimerActivite } from "../../application/use-cases";
 
-// Bornes alignées sur le legacy `activitesRouter.create` (defense-in-depth + colonnes `activites`).
+/** Bornes alignées sur le legacy `activitesRouter.create` (defense-in-depth + colonnes `activites`). */
 const createSchema = z.object({
   type: z.enum(["appel", "email", "rdv", "relance", "autre"]).default("autre"),
   titre: z.string().trim().min(1).max(500),
-  echeance: z.string().min(1), // date ISO (YYYY-MM-DD) ; validée/normalisée au use-case
+  /** date ISO (YYYY-MM-DD) ; validée/normalisée au use-case */
+  echeance: z.string().min(1),
   entiteType: z.enum(["client", "devis", "facture", "chantier", "aucun"]).optional(),
   entiteId: z.number().int().positive().optional(),
   note: z.string().max(5000).optional(),

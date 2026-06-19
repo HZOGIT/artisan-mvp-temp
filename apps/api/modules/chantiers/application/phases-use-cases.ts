@@ -10,7 +10,7 @@ import type { ChantierPhase, CreatePhaseInput, UpdatePhaseInput } from "../domai
  * phase (non scopée) pour récupérer son `chantierId`, puis on vérifie que ce chantier est au tenant.
  */
 
-// Normalise/valide une date optionnelle (YYYY-MM-DD). undefined → undefined ; null → null.
+/** Normalise/valide une date optionnelle (YYYY-MM-DD). undefined → undefined ; null → null. */
 function normDate(s: string | null | undefined, champ: string): string | null | undefined {
   if (s === undefined || s === null) return s;
   const d = new Date(s);
@@ -18,7 +18,7 @@ function normDate(s: string | null | undefined, champ: string): string | null | 
   return d.toISOString().slice(0, 10);
 }
 
-// Phases d'un chantier possédé (404 sinon), triées par ordre.
+/** Phases d'un chantier possédé (404 sinon), triées par ordre. */
 export async function getPhasesChantier(repo: IChantierRepository, ctx: TenantContext, chantierId: number): Promise<ChantierPhase[]> {
   if (!(await repo.getById(ctx, chantierId))) throw new NotFoundError("Chantier introuvable");
   return repo.listPhases(ctx, chantierId);
@@ -26,7 +26,7 @@ export async function getPhasesChantier(repo: IChantierRepository, ctx: TenantCo
 
 export type CreerPhaseInput = CreatePhaseInput;
 
-// Crée une phase sous un chantier possédé (404 sinon). Dates prévisionnelles validées/normalisées.
+/** Crée une phase sous un chantier possédé (404 sinon). Dates prévisionnelles validées/normalisées. */
 export async function creerPhase(repo: IChantierRepository, ctx: TenantContext, input: CreerPhaseInput): Promise<ChantierPhase> {
   if (!(await repo.getById(ctx, input.chantierId))) throw new NotFoundError("Chantier introuvable");
   return repo.addPhase(ctx, {
@@ -58,7 +58,7 @@ export async function modifierPhase(
   return updated;
 }
 
-// Supprime une phase (par id). Même garde anti-IDOR via le chantier parent.
+/** Supprime une phase (par id). Même garde anti-IDOR via le chantier parent. */
 export async function supprimerPhase(repo: IChantierRepository, ctx: TenantContext, id: number): Promise<void> {
   const phase = await repo.getPhaseById(ctx, id);
   if (!phase) throw new NotFoundError("Phase introuvable");

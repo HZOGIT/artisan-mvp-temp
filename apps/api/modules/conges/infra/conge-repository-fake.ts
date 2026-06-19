@@ -10,24 +10,24 @@ import type { Conge, CongeStatut, CreateCongeInput, UpdateCongeInput } from "../
 export class FakeCongeRepository implements ICongeRepository {
   private store: Conge[] = [];
   private seq = 0;
-  // Techniciens appartenant à un tenant (injectable) : clé `${artisanId}:${technicienId}`.
+  /** Techniciens appartenant à un tenant (injectable) : clé `${artisanId}:${technicienId}`. */
   private ownedTechniciens = new Set<string>();
-  // Lien utilisateur → fiche technicien (injectable) : clé `${artisanId}:${userId}` → technicienId.
+  /** Lien utilisateur → fiche technicien (injectable) : clé `${artisanId}:${userId}` → technicienId. */
   private userTechnicien = new Map<string, number>();
-  // Solde décompté (joursPris) : clé `${artisanId}:${technicienId}:${type}:${annee}` → jours.
+  /** Solde décompté (joursPris) : clé `${artisanId}:${technicienId}:${type}:${annee}` → jours. */
   private joursPris = new Map<string, number>();
 
-  // Aide de test : lit le total de jours pris (décompté) pour une clé de solde.
+  /** Aide de test : lit le total de jours pris (décompté) pour une clé de solde. */
   getJoursPris(artisanId: number, technicienId: number, type: string, annee: number): number {
     return this.joursPris.get(`${artisanId}:${technicienId}:${type}:${annee}`) ?? 0;
   }
 
-  // Aide de test : déclare qu'un technicien appartient au tenant.
+  /** Aide de test : déclare qu'un technicien appartient au tenant. */
   registerTechnicien(artisanId: number, technicienId: number): void {
     this.ownedTechniciens.add(`${artisanId}:${technicienId}`);
   }
 
-  // Aide de test : lie un utilisateur à une fiche technicien (garde anti self-approbation).
+  /** Aide de test : lie un utilisateur à une fiche technicien (garde anti self-approbation). */
   linkTechnicien(artisanId: number, userId: number, technicienId: number): void {
     this.userTechnicien.set(`${artisanId}:${userId}`, technicienId);
   }
@@ -72,7 +72,7 @@ export class FakeCongeRepository implements ICongeRepository {
   async update(ctx: TenantContext, id: number, input: UpdateCongeInput): Promise<Conge | null> {
     const c = await this.getById(ctx, id);
     if (!c) return null;
-    // `input` n'a pas statut/validePar/dateValidation → workflow intact.
+    /** `input` n'a pas statut/validePar/dateValidation → workflow intact. */
     const updated: Conge = { ...c, ...input, updatedAt: new Date() };
     this.store = this.store.map((x) => (x.id === id ? updated : x));
     return updated;
@@ -122,6 +122,6 @@ export class FakeCongeRepository implements ICongeRepository {
     } else if (deltaJours > 0) {
       this.joursPris.set(key, deltaJours);
     }
-    // absente + recrédit (≤0) → no-op
+    /** absente + recrédit (≤0) → no-op */
   }
 }

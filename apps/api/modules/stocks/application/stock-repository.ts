@@ -28,11 +28,11 @@ export interface IStockRepository {
   list(ctx: TenantContext): Promise<Stock[]>;
   getById(ctx: TenantContext, id: number): Promise<Stock | null>;
   create(ctx: TenantContext, input: CreateStockInput): Promise<Stock>;
-  // null si le stock n'appartient pas au tenant.
+  /** null si le stock n'appartient pas au tenant. */
   update(ctx: TenantContext, id: number, input: UpdateStockInput): Promise<Stock | null>;
-  // false si le stock n'appartient pas au tenant.
+  /** false si le stock n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
-  // Ajuste la quantité via un mouvement tracé (insert mouvement + maj quantité, ATOMIQUE).
+  /** Ajuste la quantité via un mouvement tracé (insert mouvement + maj quantité, ATOMIQUE). */
   adjustQuantity(ctx: TenantContext, stockId: number, input: AdjustStockInput): Promise<AdjustStockResult>;
   /*
    * Historique des mouvements d'un stock (récents d'abord). null si le stock n'appartient

@@ -5,7 +5,7 @@ import { listRelances, relancesParDevis, getRelance } from "../../application/re
 import { enregistrerRelance, supprimerRelance } from "../../application/write-use-cases";
 import { STATUTS_RELANCE, TYPES_RELANCE } from "../../domain/relance-devis";
 
-// Bornes alignées sur la table `relances_devis` (defense-in-depth). Enums réutilisés du domaine.
+/** Bornes alignées sur la table `relances_devis` (defense-in-depth). Enums réutilisés du domaine. */
 const createSchema = z.object({
   devisId: z.number().int(),
   type: z.enum(TYPES_RELANCE),

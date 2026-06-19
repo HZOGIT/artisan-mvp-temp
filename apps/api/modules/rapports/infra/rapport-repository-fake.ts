@@ -12,7 +12,7 @@ type MutableRapport = { -readonly [K in keyof RapportPersonnalise]: RapportPerso
 export class FakeRapportRepository implements IRapportRepository {
   private seq = 0;
   private rapports: MutableRapport[] = [];
-  // type d'entité → lignes par tenant (pour runReport ; financier dérive des factures).
+  /** type d'entité → lignes par tenant (pour runReport ; financier dérive des factures). */
   private readonly entites = new Map<string, unknown[]>();
   public executions: ExecutionLog[] = [];
 

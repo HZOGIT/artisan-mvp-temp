@@ -21,7 +21,7 @@ export class PortalSchedulingReaderDrizzle implements IPortalSchedulingReader {
   constructor(private readonly db: DbClient) {}
 
   getCreneauxOccupes(ctx: TenantContext, debut: Date, fin: Date): Promise<CreneauOccupe[]> {
-    // Sur-ensemble (lookback 48h) : une occupation qui déborde dans la fenêtre doit compter (parité legacy).
+    /** Sur-ensemble (lookback 48h) : une occupation qui déborde dans la fenêtre doit compter (parité legacy). */
     const lookback = new Date(debut.getTime() - 48 * 60 * 60 * 1000);
     return withTenant(this.db, ctx, async (tx) => {
       const ints = await tx
@@ -63,7 +63,7 @@ export class PortalSchedulingReaderDrizzle implements IPortalSchedulingReader {
         .from(chantiers)
         .where(and(eq(chantiers.clientId, clientId), eq(chantiers.artisanId, ctx.artisanId)));
       if (chans.length === 0) return [];
-      // Étapes visibles client, en 1 requête pour tous les chantiers du client (anti N+1).
+      /** Étapes visibles client, en 1 requête pour tous les chantiers du client (anti N+1). */
       const etapesRows = await tx
         .select({ id: suiviChantier.id, chantierId: suiviChantier.chantierId, titre: suiviChantier.titre, description: suiviChantier.description, statut: suiviChantier.statut, pourcentage: suiviChantier.pourcentage, ordre: suiviChantier.ordre, dateDebut: suiviChantier.dateDebut, dateFin: suiviChantier.dateFin, commentaire: suiviChantier.commentaire })
         .from(suiviChantier)

@@ -12,7 +12,7 @@ const methode = z.enum(["moyenne_mobile", "regression_lineaire", "saisonnalite",
 const montantPos = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant positif décimal invalide");
 const montantSigne = z.string().regex(/^-?\d+(\.\d{1,2})?$/, "Montant décimal invalide");
 
-// Bornes alignées sur la table `previsions_ca` (defense-in-depth).
+/** Bornes alignées sur la table `previsions_ca` (defense-in-depth). */
 const createSchema = z.object({
   mois: z.number().int().min(1).max(12),
   annee: z.number().int().min(2000).max(2100),
@@ -24,7 +24,7 @@ const createSchema = z.object({
   confiance: montantPos.nullish(),
 });
 
-// ⚠️ Montants/méthode/confiance seuls — `mois`/`annee` sont la période immuable (changer = supprimer + recréer).
+/** ⚠️ Montants/méthode/confiance seuls — `mois`/`annee` sont la période immuable (changer = supprimer + recréer). */
 const updateSchema = z.object({
   caPrevisionnel: montantPos.optional(),
   caRealise: montantPos.optional(),
@@ -77,12 +77,12 @@ export function createPrevisionsCARouter(repo: IPrevisionCARepository, facturesC
       .input(z.object({ annee: z.number().int().min(2000).max(2100) }).optional())
       .query(({ ctx, input }) => getPrevisions(repo, ctx.tenant, input?.annee)),
 
-    // `getHistorique {nombreMois=24}` : historique de CA mensuel agrégé (récent d'abord).
+    /** `getHistorique {nombreMois=24}` : historique de CA mensuel agrégé (récent d'abord). */
     getHistorique: protectedProcedure
       .input(z.object({ nombreMois: z.number().int().min(1).max(120).default(24) }).optional())
       .query(({ ctx, input }) => getHistorique(repo, ctx.tenant, input?.nombreMois ?? 24)),
 
-    // `getComparaison {annee}` : prévu (previsions_ca) vs réalisé (historique_ca), mois par mois.
+    /** `getComparaison {annee}` : prévu (previsions_ca) vs réalisé (historique_ca), mois par mois. */
     getComparaison: protectedProcedure
       .input(z.object({ annee: z.number().int().min(2000).max(2100) }))
       .query(({ ctx, input }) => getComparaison(repo, ctx.tenant, input.annee)),
@@ -99,7 +99,7 @@ export function createPrevisionsCARouter(repo: IPrevisionCARepository, facturesC
           : Promise.resolve({ message: "Pas assez de données historiques pour calculer les prévisions" }),
       ),
 
-    // `getTresoreriePrevisionnelle {semaines=8}` : flux net hebdo (encaissements − décaissements).
+    /** `getTresoreriePrevisionnelle {semaines=8}` : flux net hebdo (encaissements − décaissements). */
     getTresoreriePrevisionnelle: protectedProcedure
       .input(z.object({ semaines: z.number().int().min(1).max(26).default(8) }).optional())
       .query(({ ctx, input }) => getTresoreriePrevisionnelle(tresorerieReader, ctx.tenant, input?.semaines ?? 8)),

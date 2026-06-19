@@ -74,7 +74,7 @@ export function computeGrandLivre(ecritures: readonly Ecriture[]): CompteGrandLi
   return Array.from(comptes.values());
 }
 
-// Balance : un poste par compte (débit/crédit cumulés + solde débiteur/créditeur), triée par compte.
+/** Balance : un poste par compte (débit/crédit cumulés + solde débiteur/créditeur), triée par compte. */
 export function computeBalance(ecritures: readonly Ecriture[]): LigneBalance[] {
   const comptes = new Map<string, { numeroCompte: string; libelleCompte: string; debit: number; credit: number; soldeDebiteur: number; soldeCrediteur: number }>();
   for (const e of ecritures) {

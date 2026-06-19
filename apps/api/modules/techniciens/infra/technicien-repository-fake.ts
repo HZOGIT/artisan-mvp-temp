@@ -18,7 +18,7 @@ export class FakeTechnicienRepository implements ITechnicienRepository {
   private dispos: Disponibilite[] = [];
   private positions: Position[] = [];
   private habilitations: Array<HabilitationTechnicien & { artisanId: number }> = [];
-  // Interventions simulées pour les stats : {artisanId, technicienId, statut}.
+  /** Interventions simulées pour les stats : {artisanId, technicienId, statut}. */
   private interventions: Array<{ artisanId: number; technicienId: number; statut: InterventionStatut }> = [];
   private usersLiables = new Map<number, UtilisateurLiable[]>();
   private seq = 0;
@@ -26,12 +26,12 @@ export class FakeTechnicienRepository implements ITechnicienRepository {
   private posSeq = 0;
   private habSeq = 0;
 
-  // Utilitaire de test (hors port) : déclare une intervention (pour statsTechnicien).
+  /** Utilitaire de test (hors port) : déclare une intervention (pour statsTechnicien). */
   seedIntervention(artisanId: number, technicienId: number, statut: InterventionStatut): void {
     this.interventions.push({ artisanId, technicienId, statut });
   }
 
-  // Utilitaire de test (hors port) : déclare les users liables d'un tenant.
+  /** Utilitaire de test (hors port) : déclare les users liables d'un tenant. */
   seedUsersLiables(artisanId: number, list: UtilisateurLiable[]): void {
     this.usersLiables.set(artisanId, list);
   }

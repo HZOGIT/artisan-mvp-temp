@@ -39,7 +39,7 @@ export class DevisReaderDrizzle implements IDevisReader {
 
   getLignes(ctx: TenantContext, devisId: number): Promise<DevisLigneReadModel[]> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Scope via le devis parent : si le devis n'est pas du tenant → [].
+      /** Scope via le devis parent : si le devis n'est pas du tenant → []. */
       const [owned] = await tx
         .select({ id: devis.id })
         .from(devis)

@@ -10,7 +10,7 @@ import type { ChantierSuivi, CreateSuiviInput, UpdateSuiviInput } from "../domai
  * pour récupérer son `chantierId`, puis on vérifie que ce chantier appartient au tenant.
  */
 
-// Normalise/valide une date optionnelle (YYYY-MM-DD). undefined → undefined ; null → null.
+/** Normalise/valide une date optionnelle (YYYY-MM-DD). undefined → undefined ; null → null. */
 function normDate(s: string | null | undefined, champ: string): string | null | undefined {
   if (s === undefined || s === null) return s;
   const d = new Date(s);
@@ -18,7 +18,7 @@ function normDate(s: string | null | undefined, champ: string): string | null | 
   return d.toISOString().slice(0, 10);
 }
 
-// Étapes de suivi d'un chantier possédé (404 sinon).
+/** Étapes de suivi d'un chantier possédé (404 sinon). */
 export async function getSuiviChantier(repo: IChantierRepository, ctx: TenantContext, chantierId: number): Promise<ChantierSuivi[]> {
   if (!(await repo.getById(ctx, chantierId))) throw new NotFoundError("Chantier introuvable");
   return repo.listSuivi(ctx, chantierId);
@@ -26,7 +26,7 @@ export async function getSuiviChantier(repo: IChantierRepository, ctx: TenantCon
 
 export type CreerSuiviInput = CreateSuiviInput;
 
-// Crée une étape de suivi sous un chantier possédé (404 sinon). Dates validées/normalisées.
+/** Crée une étape de suivi sous un chantier possédé (404 sinon). Dates validées/normalisées. */
 export async function creerSuivi(repo: IChantierRepository, ctx: TenantContext, input: CreerSuiviInput): Promise<ChantierSuivi> {
   if (!(await repo.getById(ctx, input.chantierId))) throw new NotFoundError("Chantier introuvable");
   return repo.addSuivi(ctx, {
@@ -58,7 +58,7 @@ export async function modifierSuivi(
   return updated;
 }
 
-// Supprime une étape de suivi (par id). Même garde anti-IDOR via le chantier parent.
+/** Supprime une étape de suivi (par id). Même garde anti-IDOR via le chantier parent. */
 export async function supprimerSuivi(repo: IChantierRepository, ctx: TenantContext, id: number): Promise<void> {
   const suivi = await repo.getSuiviById(ctx, id);
   if (!suivi) throw new NotFoundError("Suivi introuvable");

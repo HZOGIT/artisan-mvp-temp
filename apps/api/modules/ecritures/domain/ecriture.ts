@@ -9,7 +9,8 @@
  * `artisanId`.
  */
 
-export type JournalComptable = "VE" | "AC" | "BQ" | "OD"; // Ventes / Achats / Banque / Opérations diverses
+/** Ventes / Achats / Banque / Opérations diverses */
+export type JournalComptable = "VE" | "AC" | "BQ" | "OD";
 
 export interface EcritureComptable {
   readonly id: number;
@@ -20,8 +21,10 @@ export interface EcritureComptable {
   readonly libelleCompte: string | null;
   readonly libelle: string;
   readonly pieceRef: string | null;
-  readonly debit: string; // numeric PG en string (≥ 0)
-  readonly credit: string; // numeric PG en string (≥ 0)
+  /** numeric PG en string (≥ 0) */
+  readonly debit: string;
+  /** numeric PG en string (≥ 0) */
+  readonly credit: string;
   readonly factureId: number | null;
   readonly lettrage: string | null;
   readonly pointage: boolean;

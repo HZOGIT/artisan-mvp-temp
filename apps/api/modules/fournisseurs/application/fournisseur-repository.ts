@@ -13,9 +13,9 @@ export interface IFournisseurRepository {
   list(ctx: TenantContext): Promise<Fournisseur[]>;
   getById(ctx: TenantContext, id: number): Promise<Fournisseur | null>;
   create(ctx: TenantContext, input: CreateFournisseurInput): Promise<Fournisseur>;
-  // null si le fournisseur n'appartient pas au tenant.
+  /** null si le fournisseur n'appartient pas au tenant. */
   update(ctx: TenantContext, id: number, input: UpdateFournisseurInput): Promise<Fournisseur | null>;
-  // false si le fournisseur n'appartient pas au tenant.
+  /** false si le fournisseur n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
 
   /*
@@ -24,8 +24,8 @@ export interface IFournisseurRepository {
    */
   listAssociationsArticle(ctx: TenantContext, articleId: number): Promise<ArticleFournisseur[]>;
   listAssociationsFournisseur(ctx: TenantContext, fournisseurId: number): Promise<ArticleFournisseur[]>;
-  // null si l'article OU le fournisseur n'appartient pas au tenant (anti-IDOR sur les 2 FK).
+  /** null si l'article OU le fournisseur n'appartient pas au tenant (anti-IDOR sur les 2 FK). */
   ajouterAssociation(ctx: TenantContext, input: AjouterAssociationInput): Promise<ArticleFournisseur | null>;
-  // false si l'association ne relève pas d'un fournisseur du tenant.
+  /** false si l'association ne relève pas d'un fournisseur du tenant. */
   supprimerAssociation(ctx: TenantContext, id: number): Promise<boolean>;
 }

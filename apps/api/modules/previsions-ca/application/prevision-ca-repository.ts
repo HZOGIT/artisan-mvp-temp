@@ -16,14 +16,14 @@ import type {
  */
 export interface IPrevisionCARepository {
   list(ctx: TenantContext): Promise<PrevisionCA[]>;
-  // Prévisions du tenant pour une année donnée ; [] si aucune.
+  /** Prévisions du tenant pour une année donnée ; [] si aucune. */
   listByAnnee(ctx: TenantContext, annee: number): Promise<PrevisionCA[]>;
-  // null si la prévision n'appartient pas au tenant.
+  /** null si la prévision n'appartient pas au tenant. */
   getById(ctx: TenantContext, id: number): Promise<PrevisionCA | null>;
   create(ctx: TenantContext, input: CreatePrevisionInput): Promise<PrevisionCA>;
-  // Met à jour les montants/méthode/confiance (jamais mois/annee). null si hors tenant.
+  /** Met à jour les montants/méthode/confiance (jamais mois/annee). null si hors tenant. */
   update(ctx: TenantContext, id: number, input: UpdatePrevisionInput): Promise<PrevisionCA | null>;
-  // false si la prévision n'appartient pas au tenant.
+  /** false si la prévision n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
 
   /*
@@ -31,10 +31,10 @@ export interface IPrevisionCARepository {
    * aux `nombreMois` derniers mois. [] si aucun historique.
    */
   listHistorique(ctx: TenantContext, nombreMois: number): Promise<HistoriqueCA[]>;
-  // Historique de CA d'une année donnée (pour la comparaison prévu vs réalisé). [] si aucun.
+  /** Historique de CA d'une année donnée (pour la comparaison prévu vs réalisé). [] si aucun. */
   listHistoriqueAnnee(ctx: TenantContext, annee: number): Promise<HistoriqueCA[]>;
-  // Upsert d'une ligne d'historique de CA (delete+insert par (artisan,mois,annee) ; artisanId forcé).
+  /** Upsert d'une ligne d'historique de CA (delete+insert par (artisan,mois,annee) ; artisanId forcé). */
   upsertHistorique(ctx: TenantContext, entry: UpsertHistoriqueInput): Promise<void>;
-  // Upsert d'une prévision calculée (delete+insert par (artisan,mois,annee) ; artisanId forcé).
+  /** Upsert d'une prévision calculée (delete+insert par (artisan,mois,annee) ; artisanId forcé). */
   upsertPrevision(ctx: TenantContext, entry: UpsertPrevisionInput): Promise<void>;
 }

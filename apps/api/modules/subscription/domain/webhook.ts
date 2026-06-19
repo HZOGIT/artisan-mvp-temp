@@ -9,7 +9,7 @@ export interface PlanLimits {
   readonly maxSessions: number;
 }
 
-// Limites par plan (parité legacy `PLAN_LIMITS`).
+/** Limites par plan (parité legacy `PLAN_LIMITS`). */
 export const PLAN_LIMITS: Record<string, PlanLimits> = {
   trial: { maxUsers: 1, maxDevices: 3, maxSessions: 2 },
   essentiel: { maxUsers: 1, maxDevices: 3, maxSessions: 2 },
@@ -18,7 +18,7 @@ export const PLAN_LIMITS: Record<string, PlanLimits> = {
   expired: { maxUsers: 0, maxDevices: 0, maxSessions: 0 },
 };
 
-// (plan, extraUsers) depuis le metadata Stripe, ou null si plan inconnu (parité legacy).
+/** (plan, extraUsers) depuis le metadata Stripe, ou null si plan inconnu (parité legacy). */
 export function planFromMetadata(metadata: Record<string, unknown> | undefined): { plan: string; extraUsers: number } | null {
   const raw = metadata?.plan;
   const plan = raw ? String(raw).toLowerCase() : null;
@@ -27,14 +27,14 @@ export function planFromMetadata(metadata: Record<string, unknown> | undefined):
   return { plan, extraUsers: Number.isFinite(extra) ? extra : 0 };
 }
 
-// artisanId depuis le metadata Stripe (>0), sinon null (le fallback customerId est résolu par le repo).
+/** artisanId depuis le metadata Stripe (>0), sinon null (le fallback customerId est résolu par le repo). */
 export function artisanIdFromMetadata(metadata: Record<string, unknown> | undefined): number | null {
   const raw = metadata?.artisanId;
   const n = raw ? parseInt(String(raw), 10) : NaN;
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-// Statut interne depuis le statut Stripe (parité legacy).
+/** Statut interne depuis le statut Stripe (parité legacy). */
 export function computeInternalStatus(stripeStatus: string): string {
   switch (stripeStatus) {
     case "trialing":
@@ -66,7 +66,7 @@ export interface SubscriptionUpsertFields {
 
 const epochToDate = (s: unknown): Date | null => (typeof s === "number" && s > 0 ? new Date(s * 1000) : null);
 
-// Construit les champs d'upsert depuis l'objet `subscription` Stripe (parité legacy `handleSubscriptionUpsert`).
+/** Construit les champs d'upsert depuis l'objet `subscription` Stripe (parité legacy `handleSubscriptionUpsert`). */
 export function mapSubscriptionUpsert(sub: Record<string, unknown>): SubscriptionUpsertFields {
   const planInfo = planFromMetadata(sub.metadata as Record<string, unknown> | undefined) || { plan: "trial", extraUsers: 0 };
   const limits = PLAN_LIMITS[planInfo.plan] || PLAN_LIMITS.trial;
@@ -89,17 +89,17 @@ export function mapSubscriptionUpsert(sub: Record<string, unknown>): Subscriptio
   };
 }
 
-// Champs d'extinction (parité legacy `handleSubscriptionDeleted` : plan expired, canceled).
+/** Champs d'extinction (parité legacy `handleSubscriptionDeleted` : plan expired, canceled). */
 export function deletedUpsertFields(): { plan: string; status: string; cancelAtPeriodEnd: boolean } {
   return { plan: "expired", status: "canceled", cancelAtPeriodEnd: false };
 }
 
-// Échappement HTML minimal (parité legacy `escapeHtml` du webhook).
+/** Échappement HTML minimal (parité legacy `escapeHtml` du webhook). */
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }
 
-// Gabarit HTML uniforme des emails abonnement (parité legacy `subscriptionEmail`). Fonction PURE.
+/** Gabarit HTML uniforme des emails abonnement (parité legacy `subscriptionEmail`). Fonction PURE. */
 export function subscriptionEmail(input: { title: string; body: string; ctaLabel: string; ctaUrl: string }): string {
   return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">

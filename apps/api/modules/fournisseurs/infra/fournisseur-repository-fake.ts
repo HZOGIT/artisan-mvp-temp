@@ -14,7 +14,7 @@ export class FakeFournisseurRepository implements IFournisseurRepository {
   private seq = 0;
   private assocSeq = 0;
 
-  // Utilitaire de test (hors port) : déclare un article appartenant à un tenant.
+  /** Utilitaire de test (hors port) : déclare un article appartenant à un tenant. */
   seedArticle(id: number, artisanId: number): void {
     this.articles.push({ id, artisanId });
   }

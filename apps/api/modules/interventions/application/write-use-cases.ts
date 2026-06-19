@@ -40,7 +40,7 @@ export async function creerIntervention(
 ): Promise<Intervention> {
   if (!input.titre?.trim()) throw new ValidationError("Le titre est requis");
   assertDatesCoherentes(input.dateDebut, input.dateFin ?? undefined);
-  // Ownership des FK (anti-IDOR-FK) AVANT insertion. clientId est requis ; les autres si fournies.
+  /** Ownership des FK (anti-IDOR-FK) AVANT insertion. clientId est requis ; les autres si fournies. */
   await assertRefOwned(repo, ctx, "client", input.clientId);
   if (input.technicienId != null) await assertRefOwned(repo, ctx, "technicien", input.technicienId);
   if (input.devisId != null) await assertRefOwned(repo, ctx, "devis", input.devisId);
@@ -56,7 +56,7 @@ export async function modifierIntervention(
 ): Promise<Intervention> {
   if (input.titre !== undefined && !input.titre.trim()) throw new ValidationError("Le titre est requis");
   assertDatesCoherentes(input.dateDebut, input.dateFin ?? undefined);
-  // Une FK (re)liée doit appartenir au tenant (anti-IDOR-FK). `null` = on détache, pas de vérif.
+  /** Une FK (re)liée doit appartenir au tenant (anti-IDOR-FK). `null` = on détache, pas de vérif. */
   if (input.technicienId != null) await assertRefOwned(repo, ctx, "technicien", input.technicienId);
   if (input.devisId != null) await assertRefOwned(repo, ctx, "devis", input.devisId);
   if (input.factureId != null) await assertRefOwned(repo, ctx, "facture", input.factureId);

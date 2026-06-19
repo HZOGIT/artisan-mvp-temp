@@ -13,7 +13,7 @@ export function listConges(repo: ICongeRepository, ctx: TenantContext): Promise<
   return repo.list(ctx);
 }
 
-// Demandes en attente d'approbation, scopées tenant (vue manager). Parité legacy `enAttente`.
+/** Demandes en attente d'approbation, scopées tenant (vue manager). Parité legacy `enAttente`. */
 export function listCongesEnAttente(repo: ICongeRepository, ctx: TenantContext): Promise<Conge[]> {
   return repo.listEnAttente(ctx);
 }

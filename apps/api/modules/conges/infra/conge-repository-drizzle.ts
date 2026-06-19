@@ -151,7 +151,7 @@ export class CongeRepositoryDrizzle implements ICongeRepository {
 
   ajusterSolde(ctx: TenantContext, { technicienId, type, annee, deltaJours }: AjustementSolde): Promise<void> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Check-then-act scopé tenant (pas de clé unique sur (technicien,type,annee)).
+      /** Check-then-act scopé tenant (pas de clé unique sur (technicien,type,annee)). */
       const [existing] = await tx
         .select({ id: soldesConges.id })
         .from(soldesConges)
@@ -174,7 +174,7 @@ export class CongeRepositoryDrizzle implements ICongeRepository {
           })
           .where(eq(soldesConges.id, existing.id));
       } else if (deltaJours > 0) {
-        // Absente + décompte → insert (trace le décompte ; soldeRestant planché à 0).
+        /** Absente + décompte → insert (trace le décompte ; soldeRestant planché à 0). */
         await tx.insert(soldesConges).values({
           technicienId,
           artisanId: ctx.artisanId,
@@ -186,7 +186,7 @@ export class CongeRepositoryDrizzle implements ICongeRepository {
           joursPris: String(deltaJours),
         });
       }
-      // Absente + recrédit (≤0) → no-op (rien n'avait été décompté).
+      /** Absente + recrédit (≤0) → no-op (rien n'avait été décompté). */
     });
   }
 }

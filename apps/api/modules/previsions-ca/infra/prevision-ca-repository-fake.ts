@@ -67,7 +67,7 @@ export class FakePrevisionCARepository implements IPrevisionCARepository {
       ...(input.methodeCalcul !== undefined ? { methodeCalcul: input.methodeCalcul } : {}),
       ...(input.confiance !== undefined ? { confiance: input.confiance } : {}),
       updatedAt: new Date(),
-      // mois/annee jamais touchés (période immuable)
+      /** mois/annee jamais touchés (période immuable) */
     };
     this.store[idx] = next;
     return next;
@@ -80,11 +80,11 @@ export class FakePrevisionCARepository implements IPrevisionCARepository {
     return true;
   }
 
-  // Historique de CA (table distincte) — injecté en test via `seedHistorique`.
+  /** Historique de CA (table distincte) — injecté en test via `seedHistorique`. */
   private readonly historique: HistoriqueCA[] = [];
   private histSeq = 1000;
 
-  // Aide de test : ajoute une ligne d'historique de CA pour un tenant.
+  /** Aide de test : ajoute une ligne d'historique de CA pour un tenant. */
   seedHistorique(entry: HistoriqueCA): void {
     this.historique.push(entry);
   }

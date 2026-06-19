@@ -3,7 +3,8 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { ICommandeRepository } from "./commande-repository";
 import type { Commande, CreateCommandeInput, UpdateCommandeInput } from "../domain/commande";
 
-const MAX_LIGNES = 500; // anti-DoS (boucle d'INSERT)
+/** anti-DoS (boucle d'INSERT) */
+const MAX_LIGNES = 500;
 
 /*
  * Use-cases d'écriture — purs, repository injecté. ⚠️ Domaine sensible : les totaux sont
@@ -23,7 +24,7 @@ export async function creerCommande(
     if (!(Number(l.quantite) > 0)) throw new ValidationError("Quantité de ligne invalide (> 0 attendu)");
     if (l.prixUnitaire != null && Number(l.prixUnitaire) < 0) throw new ValidationError("Prix unitaire invalide");
   }
-  // Le repo refuse un fournisseur hors tenant (null) → NotFound (anti-IDOR-FK).
+  /** Le repo refuse un fournisseur hors tenant (null) → NotFound (anti-IDOR-FK). */
   const commande = await repo.create(ctx, input);
   if (!commande) throw new NotFoundError("Fournisseur introuvable");
   return commande;

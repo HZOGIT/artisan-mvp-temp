@@ -16,26 +16,26 @@ import type {
 export class FakeInterventionRepository implements IInterventionRepository {
   private store: Intervention[] = [];
   private seq = 0;
-  // FK appartenant à un tenant (injectable) : clé `${artisanId}:${kind}:${id}` → owned.
+  /** FK appartenant à un tenant (injectable) : clé `${artisanId}:${kind}:${id}` → owned. */
   private ownedRefs = new Set<string>();
-  // Lien utilisateur → fiche technicien (injectable) : clé `${artisanId}:${userId}` → technicienId.
+  /** Lien utilisateur → fiche technicien (injectable) : clé `${artisanId}:${userId}` → technicienId. */
   private userTechnicien = new Map<string, number>();
-  // Équipe d'intervention (liaisons) + noms techniciens injectables (pour la jointure simulée).
+  /** Équipe d'intervention (liaisons) + noms techniciens injectables (pour la jointure simulée). */
   private equipe: Array<{ id: number; artisanId: number; interventionId: number; technicienId: number; role: string | null }> = [];
   private equipeSeq = 0;
   private technicienNoms = new Map<string, { nom: string | null; prenom: string | null }>();
 
-  // Aide de test : nom/prénom d'une fiche technicien (jointure simulée de l'équipe).
+  /** Aide de test : nom/prénom d'une fiche technicien (jointure simulée de l'équipe). */
   setTechnicienNom(technicienId: number, nom: string | null, prenom: string | null): void {
     this.technicienNoms.set(String(technicienId), { nom, prenom });
   }
 
-  // Aide de test : déclare qu'une ressource référencée appartient au tenant.
+  /** Aide de test : déclare qu'une ressource référencée appartient au tenant. */
   registerRef(artisanId: number, kind: InterventionRefKind, id: number): void {
     this.ownedRefs.add(`${artisanId}:${kind}:${id}`);
   }
 
-  // Aide de test : lie un utilisateur à une fiche technicien dans un tenant.
+  /** Aide de test : lie un utilisateur à une fiche technicien dans un tenant. */
   linkTechnicien(artisanId: number, userId: number, technicienId: number): void {
     this.userTechnicien.set(`${artisanId}:${userId}`, technicienId);
   }

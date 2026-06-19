@@ -4,7 +4,7 @@ import type { LlmPort } from "../../../shared/ports/llm";
 import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import { sanitizeIaError } from "../../../shared/ia/sanitize-ia-error";
 
-// Dépendances de la génération IA de lignes de devis (lecture seule, non persistée).
+/** Dépendances de la génération IA de lignes de devis (lecture seule, non persistée). */
 export interface DevisIaDeps {
   readonly llm: LlmPort;
   readonly rateLimiter: RateLimiterPort;
@@ -16,7 +16,7 @@ export interface GenererLignesIaInput {
   readonly budget?: number;
 }
 
-// Ligne de devis PROPOSÉE par l'IA (non persistée — le client la met dans le formulaire).
+/** Ligne de devis PROPOSÉE par l'IA (non persistée — le client la met dans le formulaire). */
 export interface LigneDevisIa {
   readonly designation: string;
   readonly quantite: number;

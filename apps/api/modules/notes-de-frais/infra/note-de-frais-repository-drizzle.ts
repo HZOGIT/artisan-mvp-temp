@@ -9,7 +9,7 @@ import { computeNextNoteFraisNumero } from "../application/numero";
 
 type NoteRow = typeof notesDeFrais.$inferSelect;
 
-// ⚠️ Table `notes_de_frais` en snake_case → mapping snake↔camel ici (le domaine reste camelCase).
+/** ⚠️ Table `notes_de_frais` en snake_case → mapping snake↔camel ici (le domaine reste camelCase). */
 function toNoteDeFrais(r: NoteRow): NoteDeFrais {
   return {
     id: r.id,
@@ -98,13 +98,13 @@ export class NoteDeFraisRepositoryDrizzle implements INoteDeFraisRepository {
 
   addDepenseLink(ctx: TenantContext, noteId: number, depenseId: number): Promise<void> {
     return withTenant(this.db, ctx, async (tx) => {
-      // 1) la note doit appartenir au tenant.
+      /** 1) la note doit appartenir au tenant. */
       const [note] = await tx.select({ id: notesDeFrais.id }).from(notesDeFrais).where(and(eq(notesDeFrais.id, noteId), eq(notesDeFrais.artisan_id, ctx.artisanId))).limit(1);
       if (!note) return;
-      // 2) la dépense doit appartenir au tenant ET être remboursable.
+      /** 2) la dépense doit appartenir au tenant ET être remboursable. */
       const [dep] = await tx.select({ remboursable: depenses.remboursable }).from(depenses).where(and(eq(depenses.id, depenseId), eq(depenses.artisan_id, ctx.artisanId))).limit(1);
       if (!dep || !dep.remboursable) return;
-      // 3) lien idempotent (contrainte unique note_id+depense_id), puis recalcul du total.
+      /** 3) lien idempotent (contrainte unique note_id+depense_id), puis recalcul du total. */
       await tx.insert(notesFraisDepenses).values({ note_id: noteId, depense_id: depenseId }).onConflictDoNothing();
       const [agg] = await tx
         .select({ total: sql<string>`COALESCE(SUM(${depenses.montant_ttc}), 0)` })
@@ -121,10 +121,10 @@ export class NoteDeFraisRepositoryDrizzle implements INoteDeFraisRepository {
     patch: { statut: DepenseLieeStatut; rembourse?: boolean; dateRemboursement?: string },
   ): Promise<void> {
     return withTenant(this.db, ctx, async (tx) => {
-      // 1) la note doit appartenir au tenant (anti-IDOR ; skip silencieux sinon).
+      /** 1) la note doit appartenir au tenant (anti-IDOR ; skip silencieux sinon). */
       const [note] = await tx.select({ id: notesDeFrais.id }).from(notesDeFrais).where(and(eq(notesDeFrais.id, noteId), eq(notesDeFrais.artisan_id, ctx.artisanId))).limit(1);
       if (!note) return;
-      // 2) propage aux dépenses REMBOURSABLES du tenant liées à la note (sous-requête sur le lien).
+      /** 2) propage aux dépenses REMBOURSABLES du tenant liées à la note (sous-requête sur le lien). */
       const set: Partial<typeof depenses.$inferInsert> = { statut: patch.statut };
       if (patch.rembourse !== undefined) set.rembourse = patch.rembourse;
       if (patch.dateRemboursement !== undefined) set.date_remboursement = patch.dateRemboursement;
@@ -195,7 +195,7 @@ export class NoteDeFraisRepositoryDrizzle implements INoteDeFraisRepository {
 
   update(ctx: TenantContext, id: number, input: UpdateNoteDeFraisInput): Promise<NoteDeFrais | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Métadonnées seulement (snake mapping). Pas de statut/dates workflow.
+      /** Métadonnées seulement (snake mapping). Pas de statut/dates workflow. */
       const set: Partial<typeof notesDeFrais.$inferInsert> = {};
       if (input.titre !== undefined) set.titre = input.titre;
       if (input.periodeDebut !== undefined) set.periode_debut = input.periodeDebut;
@@ -204,7 +204,7 @@ export class NoteDeFraisRepositoryDrizzle implements INoteDeFraisRepository {
       if (input.montantRembourse !== undefined) set.montant_rembourse = input.montantRembourse;
 
       if (Object.keys(set).length === 0) {
-        // Aucun champ à modifier : renvoie l'état courant (scopé) sans UPDATE vide.
+        /** Aucun champ à modifier : renvoie l'état courant (scopé) sans UPDATE vide. */
         const [row] = await tx
           .select()
           .from(notesDeFrais)

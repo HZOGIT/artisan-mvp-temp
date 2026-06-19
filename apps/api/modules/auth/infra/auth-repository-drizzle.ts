@@ -78,15 +78,15 @@ export class AuthRepositoryDrizzle implements IAuthRepository {
    * sont HORS RLS → accès direct scopé par les ids ; seul l'artisan est requis, le reste est best-effort.
    */
   async bootstrapAccount(userId: number): Promise<void> {
-    // 1. Artisan (idempotent via UNIQUE(userId)).
+    /** 1. Artisan (idempotent via UNIQUE(userId)). */
     let [artisan] = await this.db.select({ id: artisans.id }).from(artisans).where(eq(artisans.userId, userId)).limit(1);
     if (!artisan) {
       [artisan] = await this.db.insert(artisans).values({ userId }).returning({ id: artisans.id });
     }
     const artisanId = artisan.id;
-    // 2. Lier le propriétaire à son entreprise (requis par subscription/permissions ; idempotent).
+    /** 2. Lier le propriétaire à son entreprise (requis par subscription/permissions ; idempotent). */
     await this.db.update(users).set({ artisanId }).where(eq(users.id, userId));
-    // 3. Abonnement d'essai 14 j (si absent) — best-effort.
+    /** 3. Abonnement d'essai 14 j (si absent) — best-effort. */
     try {
       const [sub] = await this.db.select({ id: subscriptions.id }).from(subscriptions).where(eq(subscriptions.artisan_id, artisanId)).limit(1);
       if (!sub) {
@@ -99,7 +99,7 @@ export class AuthRepositoryDrizzle implements IAuthRepository {
     } catch {
       /* best-effort */
     }
-    // 4. Permissions propriétaire = TOUTES (si aucune présente) — best-effort.
+    /** 4. Permissions propriétaire = TOUTES (si aucune présente) — best-effort. */
     try {
       const existing = await this.db.select({ id: permissionsUtilisateur.id }).from(permissionsUtilisateur).where(and(eq(permissionsUtilisateur.userId, userId), eq(permissionsUtilisateur.autorise, true))).limit(1);
       if (existing.length === 0) {

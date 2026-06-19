@@ -32,10 +32,10 @@ export interface UpdateBibliothequeInput {
 
 export interface BibliothequeWriter {
   create(input: CreateBibliothequeInput): Promise<BibliothequeArticle>;
-  // null si l'article n'existe pas.
+  /** null si l'article n'existe pas. */
   update(id: number, input: UpdateBibliothequeInput): Promise<BibliothequeArticle | null>;
-  // false si l'article n'existe pas. Idempotent.
+  /** false si l'article n'existe pas. Idempotent. */
   delete(id: number): Promise<boolean>;
-  // Insertion en masse — renvoie le nombre d'articles importés.
+  /** Insertion en masse — renvoie le nombre d'articles importés. */
   importMany(inputs: CreateBibliothequeInput[]): Promise<number>;
 }

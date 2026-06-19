@@ -32,7 +32,8 @@ export const DEFAULT_FEC_CONFIG: FecConfig = {
 
 export interface FecFactureLigneTVA {
   readonly tauxTVA: string | number | null;
-  readonly tva: string | number | null; // SUM(montantTVA) du taux (peut être négatif pour un avoir)
+  /** SUM(montantTVA) du taux (peut être négatif pour un avoir) */
+  readonly tva: string | number | null;
 }
 export interface FecFacture {
   readonly id: number;
@@ -90,7 +91,7 @@ export interface FecResult {
   readonly conformite: FecConformite;
 }
 
-// Compte de TVA collectée selon le taux (parité legacy `compteTvaCollectee`).
+/** Compte de TVA collectée selon le taux (parité legacy `compteTvaCollectee`). */
 export function compteTvaCollectee(taux: number): { compte: string; lib: string } {
   if (taux >= 19.5) return { compte: "445711", lib: "TVA collectee 20%" };
   if (taux >= 9.5) return { compte: "445712", lib: "TVA collectee 10%" };
@@ -99,7 +100,7 @@ export function compteTvaCollectee(taux: number): { compte: string; lib: string 
   return { compte: "445711", lib: "TVA collectee" };
 }
 
-// Compte de charge (classe 6) selon la catégorie de dépense (parité legacy `compteChargeDepense`).
+/** Compte de charge (classe 6) selon la catégorie de dépense (parité legacy `compteChargeDepense`). */
 export function compteChargeDepense(categorie: string | null | undefined): { compte: string; lib: string } {
   const c = (categorie || "").toLowerCase();
   if (/(materiau|fournitur|consommable)/.test(c)) return { compte: "601000", lib: "Achats de matieres premieres" };
@@ -134,7 +135,7 @@ export function fecFileName(siret: string | null, dateFin: Date): string {
   return `${siren}FEC${ymd(dateFin)}.txt`;
 }
 
-// Construit le FEC complet (3 journaux VE/AC/BQ) + le contrôle de conformité. PUR.
+/** Construit le FEC complet (3 journaux VE/AC/BQ) + le contrôle de conformité. PUR. */
 export function buildFec(input: FecInput, config: FecConfig): FecResult {
   const cVentes = config.compteVentes || "706000";
   const cClients = config.compteClients || "411000";
@@ -174,7 +175,7 @@ export function buildFec(input: FecInput, config: FecConfig): FecResult {
 
   let num = 0;
 
-  // ---- 1) JOURNAL DES VENTES (VE) ----
+  /** ---- 1) JOURNAL DES VENTES (VE) ---- */
   for (const f of input.factures) {
     num++;
     const auxNum = `C${String(f.clientId).padStart(5, "0")}`;
@@ -206,7 +207,7 @@ export function buildFec(input: FecInput, config: FecConfig): FecResult {
     nbEcritures++;
   }
 
-  // ---- 2) JOURNAL DES ACHATS (AC) ----
+  /** ---- 2) JOURNAL DES ACHATS (AC) ---- */
   for (const d of input.depenses) {
     num++;
     const piece = d.numero || `D-${d.id}`;
@@ -221,7 +222,7 @@ export function buildFec(input: FecInput, config: FecConfig): FecResult {
     nbEcritures++;
   }
 
-  // ---- 3) JOURNAL DE BANQUE (BQ) ----
+  /** ---- 3) JOURNAL DE BANQUE (BQ) ---- */
   for (const p of input.encaissements) {
     num++;
     const auxNum = `C${String(p.clientId).padStart(5, "0")}`;
@@ -236,7 +237,7 @@ export function buildFec(input: FecInput, config: FecConfig): FecResult {
     nbEcritures++;
   }
 
-  // ---- Contrôles de conformité ----
+  /** ---- Contrôles de conformité ---- */
   const erreurs: string[] = [];
   totalDebit = Math.round(totalDebit * 100) / 100;
   totalCredit = Math.round(totalCredit * 100) / 100;
@@ -254,7 +255,7 @@ export function buildFec(input: FecInput, config: FecConfig): FecResult {
   };
 }
 
-// Aperçu FEC : 15 premières lignes projetées + conformité + siret (parité legacy `getFecPreview`).
+/** Aperçu FEC : 15 premières lignes projetées + conformité + siret (parité legacy `getFecPreview`). */
 export interface FecPreviewLine {
   readonly ecritureNum: string;
   readonly ecritureDate: string;

@@ -10,7 +10,7 @@ export interface PromptParts {
   readonly maxOutputTokens: number;
 }
 
-// ── suggestRelances ──────────────────────────────────────────────────────────────────────────────
+/** ── suggestRelances ────────────────────────────────────────────────────────────────────────────── */
 export interface RelanceItem {
   readonly numero: string;
   readonly objet: string | null;
@@ -32,7 +32,7 @@ export function buildSuggestRelancesPrompt(items: readonly RelanceItem[]): Promp
   };
 }
 
-// Parité legacy STRICTE : extrait le 1er tableau JSON ; si parse impossible → `[{error: text}]`.
+/** Parité legacy STRICTE : extrait le 1er tableau JSON ; si parse impossible → `[{error: text}]`. */
 export function parseRelances(text: string): unknown[] {
   const match = text.match(/\[[\s\S]*\]/);
   if (!match) return [{ error: text }];
@@ -44,7 +44,7 @@ export function parseRelances(text: string): unknown[] {
   }
 }
 
-// ── generateDevis ────────────────────────────────────────────────────────────────────────────────
+/** ── generateDevis ──────────────────────────────────────────────────────────────────────────────── */
 export function buildGenerateDevisPrompt(description: string, catalogue: string): PromptParts {
   return {
     system: `Tu es un assistant spécialisé dans la génération de devis pour artisans. Tu dois générer des lignes de devis au format JSON.
@@ -56,7 +56,7 @@ Catalogue d'articles disponibles :\n${catalogue}\n\nRéponds UNIQUEMENT avec un 
   };
 }
 
-// Parité legacy : extrait le 1er tableau JSON ; si parse impossible → [].
+/** Parité legacy : extrait le 1er tableau JSON ; si parse impossible → []. */
 export function parseDevisLignes(text: string): unknown[] {
   const match = text.match(/\[[\s\S]*\]/);
   if (!match) return [];
@@ -68,7 +68,7 @@ export function parseDevisLignes(text: string): unknown[] {
   }
 }
 
-// ── analyseRentabilite ───────────────────────────────────────────────────────────────────────────
+/** ── analyseRentabilite ─────────────────────────────────────────────────────────────────────────── */
 export interface DevisAnalyseLigne {
   readonly designation: string;
   readonly quantite: string;
@@ -82,7 +82,8 @@ export interface DevisAnalyseData {
   readonly totalTTC: string;
   readonly clientNom: string;
   readonly lignes: readonly DevisAnalyseLigne[];
-  readonly tarifs: string; // tarifs habituels (catalogue articles artisan), pré-formaté par le reader
+  /** tarifs habituels (catalogue articles artisan), pré-formaté par le reader */
+  readonly tarifs: string;
 }
 
 export function buildAnalyseRentabilitePrompt(data: DevisAnalyseData): PromptParts {
@@ -98,7 +99,7 @@ export function buildAnalyseRentabilitePrompt(data: DevisAnalyseData): PromptPar
   };
 }
 
-// ── predictionTresorerie ─────────────────────────────────────────────────────────────────────────
+/** ── predictionTresorerie ───────────────────────────────────────────────────────────────────────── */
 export interface TresorerieData {
   readonly facturesPayees: string;
   readonly facturesImpayees: string;
@@ -115,7 +116,7 @@ export function buildPredictionTresoreriePrompt(data: TresorerieData): PromptPar
   };
 }
 
-// Nombre de jours écoulés depuis une date (suggestRelances : seuil de relance à 7 j).
+/** Nombre de jours écoulés depuis une date (suggestRelances : seuil de relance à 7 j). */
 export function joursDepuis(date: Date, maintenant: Date): number {
   return Math.floor((maintenant.getTime() - date.getTime()) / 86_400_000);
 }

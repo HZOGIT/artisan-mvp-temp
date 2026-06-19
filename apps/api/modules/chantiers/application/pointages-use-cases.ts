@@ -9,13 +9,13 @@ import type { ChantierPointage } from "../domain/chantier";
  * **validé anti-IDOR-FK** : un technicien hors tenant est **ignoré** (→ null), pas lié (parité legacy).
  */
 
-// Pointages d'un chantier (ownership chantier requis → 404 sinon).
+/** Pointages d'un chantier (ownership chantier requis → 404 sinon). */
 export async function getPointagesChantier(repo: IChantierRepository, ctx: TenantContext, chantierId: number): Promise<ChantierPointage[]> {
   if (!(await repo.getById(ctx, chantierId))) throw new NotFoundError("Chantier introuvable");
   return repo.listPointages(ctx, chantierId);
 }
 
-// Entrée d'ajout (heures déjà borné/format au routeur ; date string validée ici).
+/** Entrée d'ajout (heures déjà borné/format au routeur ; date string validée ici). */
 export interface AjouterPointageInput {
   readonly chantierId: number;
   readonly phaseId?: number | null;
@@ -52,7 +52,7 @@ export async function ajouterPointage(repo: IChantierRepository, ctx: TenantCont
   return pointage;
 }
 
-// Supprime un pointage (scopé chantier+tenant). Ownership chantier requis → 404. Idempotent.
+/** Supprime un pointage (scopé chantier+tenant). Ownership chantier requis → 404. Idempotent. */
 export async function supprimerPointage(repo: IChantierRepository, ctx: TenantContext, chantierId: number, id: number): Promise<void> {
   if (!(await repo.getById(ctx, chantierId))) throw new NotFoundError("Chantier introuvable");
   await repo.deletePointage(ctx, chantierId, id);

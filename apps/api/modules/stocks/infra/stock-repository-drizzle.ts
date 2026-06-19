@@ -50,7 +50,7 @@ function toMouvement(r: MouvementRow): MouvementStock {
   };
 }
 
-// Motif par défaut (parité legacy) quand l'appelant n'en fournit pas.
+/** Motif par défaut (parité legacy) quand l'appelant n'en fournit pas. */
 function defaultMotif(type: MouvementType): string {
   return type === "entree" ? "Ajout manuel" : type === "sortie" ? "Retrait manuel" : "Ajustement";
 }
@@ -149,9 +149,9 @@ export class StockRepositoryDrizzle implements IStockRepository {
 
       const avant = Number(stock.quantiteEnStock ?? "0");
       const delta = Number(input.quantite);
-      // `entree`/`ajustement` ajoutent, `sortie` retranche (parité legacy adjustStock).
+      /** `entree`/`ajustement` ajoutent, `sortie` retranche (parité legacy adjustStock). */
       const apresNum = input.type === "sortie" ? avant - delta : avant + delta;
-      // Invariant : la quantité physique ne peut jamais devenir négative (sortie refusée).
+      /** Invariant : la quantité physique ne peut jamais devenir négative (sortie refusée). */
       if (apresNum < 0) return { status: "insufficient_stock", disponible: avant.toFixed(2) };
       const apres = apresNum.toFixed(2);
 
@@ -181,7 +181,7 @@ export class StockRepositoryDrizzle implements IStockRepository {
 
   listMouvements(ctx: TenantContext, stockId: number): Promise<MouvementStock[] | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Scope via le stock parent (mouvements_stock SANS artisanId) : null si hors tenant.
+      /** Scope via le stock parent (mouvements_stock SANS artisanId) : null si hors tenant. */
       const [owned] = await tx
         .select({ id: stocks.id })
         .from(stocks)
@@ -226,7 +226,7 @@ export class StockRepositoryDrizzle implements IStockRepository {
 
   listEntrant(ctx: TenantContext): Promise<StockEntrant[]> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Reste à recevoir = Σ max(quantite - quantiteRecue, 0) sur les lignes de commandes non soldées.
+      /** Reste à recevoir = Σ max(quantite - quantiteRecue, 0) sur les lignes de commandes non soldées. */
       const entrantExpr = sql<string>`COALESCE(SUM(GREATEST(${lignesCommandesFournisseurs.quantite} - ${lignesCommandesFournisseurs.quantiteRecue}, 0)), 0)`;
       const rows = await tx
         .select({ stockId: lignesCommandesFournisseurs.stockId, entrant: entrantExpr })

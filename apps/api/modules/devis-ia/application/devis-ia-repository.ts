@@ -8,14 +8,14 @@ import type { AddPhotoInput, Analyse, AnalyseDetail, CreateAnalyseInput, Photo, 
  */
 export interface IDevisIARepository {
   listAnalyses(ctx: TenantContext): Promise<Analyse[]>;
-  // Analyse possédée par le tenant (null sinon — anti-IDOR).
+  /** Analyse possédée par le tenant (null sinon — anti-IDOR). */
   getAnalyseOwned(ctx: TenantContext, analyseId: number): Promise<Analyse | null>;
-  // Détail enrichi (photos + résultats[+suggestions] + devis généré) — null si hors tenant.
+  /** Détail enrichi (photos + résultats[+suggestions] + devis généré) — null si hors tenant. */
   getAnalyseDetail(ctx: TenantContext, analyseId: number): Promise<AnalyseDetail | null>;
-  // Le client référencé appartient-il au tenant ? (anti-IDOR-FK à la création).
+  /** Le client référencé appartient-il au tenant ? (anti-IDOR-FK à la création). */
   ownsClient(ctx: TenantContext, clientId: number): Promise<boolean>;
   createAnalyse(ctx: TenantContext, input: CreateAnalyseInput): Promise<Analyse>;
-  // Ajoute une photo à une analyse possédée — null si l'analyse n'est pas au tenant.
+  /** Ajoute une photo à une analyse possédée — null si l'analyse n'est pas au tenant. */
   addPhoto(ctx: TenantContext, analyseId: number, input: AddPhotoInput): Promise<Photo | null>;
   /*
    * Met à jour une suggestion SI son analyse parente appartient au tenant (anti-IDOR via la chaîne
@@ -34,11 +34,11 @@ export interface IDevisIARepository {
    * URLs des photos d'une analyse possédée (pour l'appel Vision). [] si analyse hors tenant.
    */
   listPhotoUrls(ctx: TenantContext, analyseId: number): Promise<string[]>;
-  // Met à jour le statut de l'analyse (possédée).
+  /** Met à jour le statut de l'analyse (possédée). */
   setStatut(ctx: TenantContext, analyseId: number, statut: "en_cours" | "termine" | "erreur"): Promise<void>;
-  // Enregistre un résultat d'analyse → renvoie son id (pour rattacher les suggestions).
+  /** Enregistre un résultat d'analyse → renvoie son id (pour rattacher les suggestions). */
   saveResultat(ctx: TenantContext, data: SaveResultatData): Promise<number>;
-  // Enregistre une suggestion d'article rattachée à un résultat.
+  /** Enregistre une suggestion d'article rattachée à un résultat. */
   saveSuggestion(ctx: TenantContext, data: SaveSuggestionData): Promise<void>;
 }
 

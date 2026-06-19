@@ -14,7 +14,7 @@ export interface PaiementStatutResult {
   readonly dernierPaiement: { statut: string; paidAt: Date | null } | null;
 }
 
-// Issue HTTP discriminée (mappée par le routeur). Parité legacy `/api/paiement/status/:factureId`.
+/** Issue HTTP discriminée (mappée par le routeur). Parité legacy `/api/paiement/status/:factureId`. */
 export type PaiementStatutOutcome =
   | { readonly kind: "bad-request" }
   | { readonly kind: "forbidden" }
@@ -54,7 +54,7 @@ export async function getPaiementStatut(
   };
 }
 
-// ── create-checkout-session ──────────────────────────────────────────────────────────────────────
+/** ── create-checkout-session ────────────────────────────────────────────────────────────────────── */
 export interface CreateCheckoutDeps {
   readonly reader: PortalPaymentReader;
   readonly writer: PortalPaymentWriter;

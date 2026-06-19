@@ -31,16 +31,16 @@ export interface IVehiculeRepository {
    */
   updateKilometrage(ctx: TenantContext, id: number, kilometrage: number): Promise<Vehicule | null>;
 
-  // Entretiens (scopés via le véhicule du tenant).
+  /** Entretiens (scopés via le véhicule du tenant). */
   listEntretiens(ctx: TenantContext, vehiculeId: number): Promise<EntretienVehicule[]>;
   addEntretien(ctx: TenantContext, vehiculeId: number, input: CreateEntretienInput): Promise<EntretienVehicule | null>;
-  // Entretiens à venir sur toute la flotte du tenant (prochaine échéance dans le futur).
+  /** Entretiens à venir sur toute la flotte du tenant (prochaine échéance dans le futur). */
   listEntretiensAVenir(ctx: TenantContext): Promise<EntretienVehicule[]>;
 
-  // Assurances (scopées via le véhicule du tenant).
+  /** Assurances (scopées via le véhicule du tenant). */
   listAssurances(ctx: TenantContext, vehiculeId: number): Promise<AssuranceVehicule[]>;
   addAssurance(ctx: TenantContext, vehiculeId: number, input: CreateAssuranceInput): Promise<AssuranceVehicule | null>;
-  // Assurances expirant sous `joursAvant` jours sur toute la flotte du tenant.
+  /** Assurances expirant sous `joursAvant` jours sur toute la flotte du tenant. */
   listAssurancesExpirant(ctx: TenantContext, joursAvant: number): Promise<AssuranceVehicule[]>;
 
   /*
@@ -50,6 +50,6 @@ export interface IVehiculeRepository {
   addKilometrage(ctx: TenantContext, vehiculeId: number, input: CreateKilometrageInput): Promise<ReleveKilometrage | null>;
   getHistoriqueKilometrage(ctx: TenantContext, vehiculeId: number): Promise<ReleveKilometrage[]>;
 
-  // Statistiques agrégées de la flotte du tenant.
+  /** Statistiques agrégées de la flotte du tenant. */
   getStatistiquesFlotte(ctx: TenantContext): Promise<StatistiquesFlotte>;
 }

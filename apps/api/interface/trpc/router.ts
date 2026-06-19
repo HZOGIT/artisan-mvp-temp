@@ -61,7 +61,7 @@ import type { DevisIAModule } from "../../modules/devis-ia/devis-ia.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
-  // Modules déjà assemblés (router prêt) → découple la composition des détails du domaine.
+  /** Modules déjà assemblés (router prêt) → découple la composition des détails du domaine. */
   readonly avis: AvisModule;
   readonly badges: BadgesModule;
   readonly techniciens: TechniciensModule;
@@ -179,7 +179,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     auth: deps.auth.router,
     subscription: deps.subscription.router,
     signature: deps.signature.router,
-    // `conseilsIA` est une procédure RACINE (appelée `trpc.conseilsIA.useQuery()`), pas un sous-routeur.
+    /** `conseilsIA` est une procédure RACINE (appelée `trpc.conseilsIA.useQuery()`), pas un sous-routeur. */
     conseilsIA: deps.conseilsIa.procedure,
     assistant: deps.assistant.router,
     chat: deps.chat.router,

@@ -45,7 +45,7 @@ export function computePredictions(historique: readonly HistoriqueCA[], methode:
       caPrevisionnel = overallAvg * (1 + 0.02 * (mois / 12));
       confiance = Math.min(75, 40 + historique.length * 2);
     } else {
-      // moyenne_mobile (défaut) ; 'manuel' n'est pas utilisé par `calculer` mais retombe ici par sûreté.
+      /** moyenne_mobile (défaut) ; 'manuel' n'est pas utilisé par `calculer` mais retombe ici par sûreté. */
       caPrevisionnel = overallAvg;
       confiance = Math.min(80, 30 + historique.length * 3);
     }
@@ -59,7 +59,7 @@ export async function calculerPrevisions(
   ctx: TenantContext,
   methode: PrevisionMethode,
 ): Promise<CalculPrevisionsResult> {
-  // 1) Recalcul de l'historique depuis les factures payées (agrégées par mois/année).
+  /** 1) Recalcul de l'historique depuis les factures payées (agrégées par mois/année). */
   const agg = await deps.facturesReader.aggregatePaidByMonth(ctx);
   for (const a of agg) {
     const panierMoyen = a.nombreFactures > 0 ? num(a.caTotal) / a.nombreFactures : 0;
@@ -73,7 +73,7 @@ export async function calculerPrevisions(
     });
   }
 
-  // 2) Projection des prévisions à partir de l'historique recalculé.
+  /** 2) Projection des prévisions à partir de l'historique recalculé. */
   const historique = await deps.repo.listHistorique(ctx, 24);
   if (historique.length === 0) {
     return { message: "Pas assez de données historiques pour calculer les prévisions" };

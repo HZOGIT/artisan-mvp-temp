@@ -84,7 +84,8 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte avant/apres) :
       structured.questions = Array.isArray(data.questions) ? data.questions.slice(0, 5).map((q) => String(q).slice(0, 200)) : [];
     }
   } catch (e) {
-    console.warn("[soumettreDemandeIA]", sanitizeIaError(e)); // dégradation : on garde `structured` par défaut
+    /** dégradation : on garde `structured` par défaut */
+    console.warn("[soumettreDemandeIA]", sanitizeIaError(e));
   }
 
   const fourchette = structured.estimationMin && structured.estimationMax ? `${structured.estimationMin}-${structured.estimationMax} €` : "à chiffrer";

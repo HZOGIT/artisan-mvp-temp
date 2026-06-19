@@ -26,12 +26,12 @@ export interface ICongeRepository {
    * `dateDebut` ASC (parité legacy `getCongesEnAttente`). Vue du manager/approbateur.
    */
   listEnAttente(ctx: TenantContext): Promise<Conge[]>;
-  // null si la demande n'appartient pas au tenant.
+  /** null si la demande n'appartient pas au tenant. */
   getById(ctx: TenantContext, id: number): Promise<Conge | null>;
   create(ctx: TenantContext, input: CreateCongeInput): Promise<Conge>;
-  // null si la demande n'appartient pas au tenant.
+  /** null si la demande n'appartient pas au tenant. */
   update(ctx: TenantContext, id: number, input: UpdateCongeInput): Promise<Conge | null>;
-  // false si la demande n'appartient pas au tenant.
+  /** false si la demande n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
   /*
    * true si le technicien (demandeur) appartient au tenant. Garde anti-IDOR-FK : interdit de

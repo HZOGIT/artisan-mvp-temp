@@ -35,11 +35,11 @@ export class FakeCommandeRepository implements ICommandeRepository {
   private seq = 0;
   private ligneSeq = 0;
 
-  // Utilitaire de test (hors port) : déclare un fournisseur appartenant à un tenant.
+  /** Utilitaire de test (hors port) : déclare un fournisseur appartenant à un tenant. */
   seedFournisseur(id: number, artisanId: number): void {
     this.fournisseurs.push({ id, artisanId });
   }
-  // Utilitaire de test (hors port) : déclare une dépense appartenant à un tenant.
+  /** Utilitaire de test (hors port) : déclare une dépense appartenant à un tenant. */
   seedDepense(id: number, artisanId: number): void {
     this.depenses.push({ id, artisanId });
   }

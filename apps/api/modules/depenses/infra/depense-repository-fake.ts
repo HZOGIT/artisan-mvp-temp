@@ -11,7 +11,7 @@ import { computeNextNumero } from "../application/numero";
 export class FakeDepenseRepository implements IDepenseRepository {
   private store: Depense[] = [];
   private seq = 0;
-  // FK appartenant à un tenant (injectable) : clé `${artisanId}:${kind}:${id}` → owned.
+  /** FK appartenant à un tenant (injectable) : clé `${artisanId}:${kind}:${id}` → owned. */
   private ownedRefs = new Set<string>();
 
   /*
@@ -82,7 +82,7 @@ export class FakeDepenseRepository implements IDepenseRepository {
   async update(ctx: TenantContext, id: number, input: UpdateDepenseInput): Promise<Depense | null> {
     const d = await this.getById(ctx, id);
     if (!d) return null;
-    // `input` n'a pas statut/rembourse/dateRemboursement → ces champs restent intacts.
+    /** `input` n'a pas statut/rembourse/dateRemboursement → ces champs restent intacts. */
     const updated: Depense = { ...d, ...input, updatedAt: new Date() };
     this.store = this.store.map((x) => (x.id === id ? updated : x));
     return updated;
@@ -100,7 +100,7 @@ export class FakeDepenseRepository implements IDepenseRepository {
   }
 
   async nextNumero(ctx: TenantContext): Promise<string> {
-    // Dernière dépense du tenant (plus grand id) → incrément du suffixe.
+    /** Dernière dépense du tenant (plus grand id) → incrément du suffixe. */
     const last = this.store
       .filter((d) => d.artisanId === ctx.artisanId)
       .reduce<Depense | null>((acc, d) => (acc && acc.id > d.id ? acc : d), null);

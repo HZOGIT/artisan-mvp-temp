@@ -16,11 +16,11 @@ export interface DevisModuleDeps {
   readonly repository: IDevisRepository;
   readonly mailing: DevisMailingDeps;
   readonly converter: DevisToFactureConverter;
-  // Modèles de devis (gabarits) exposés sous `devis.*` (parité client) — repo partagé du domaine modelesDevis.
+  /** Modèles de devis (gabarits) exposés sous `devis.*` (parité client) — repo partagé du domaine modelesDevis. */
   readonly modeleRepository: IModeleDevisRepository;
-  // Relances de devis exposées sous `devis.*` — repo partagé du domaine relancesDevis.
+  /** Relances de devis exposées sous `devis.*` — repo partagé du domaine relancesDevis. */
   readonly relanceRepository: IRelanceDevisRepository;
-  // Lecture signature (getDevisNonSignes) + dépendances IA (genererLignesIA).
+  /** Lecture signature (getDevisNonSignes) + dépendances IA (genererLignesIA). */
   readonly signatureReader: DevisSignatureReader;
   readonly ia: DevisIaDeps;
 }

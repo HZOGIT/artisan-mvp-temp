@@ -12,7 +12,7 @@ import { ymdCompact } from "../domain/csv-export";
  * l'assemblage ZIP (archiver, infra) reste à l'interface. 404 si aucune facture sur la période.
  */
 
-// Sous-ensemble du domaine Facture nécessaire à la sélection (le lister renvoie le domaine complet).
+/** Sous-ensemble du domaine Facture nécessaire à la sélection (le lister renvoie le domaine complet). */
 interface FactureLotItem {
   readonly id: number;
   readonly numero: string;
@@ -40,7 +40,7 @@ export interface LotResult {
   readonly filename: string;
 }
 
-// Période demandée (query). Défaut : année courante (1er janvier → aujourd'hui), bornes incluses.
+/** Période demandée (query). Défaut : année courante (1er janvier → aujourd'hui), bornes incluses. */
 export interface PeriodInput {
   readonly dateDebut?: Date;
   readonly dateFin?: Date;
@@ -49,11 +49,12 @@ export interface PeriodInput {
 function resolvePeriod(p: PeriodInput, now: Date): { debut: Date; fin: Date } {
   const debut = p.dateDebut ?? new Date(now.getFullYear(), 0, 1);
   const fin = p.dateFin ? new Date(p.dateFin) : new Date(now);
-  fin.setHours(23, 59, 59, 999); // borne de fin incluse jusqu'à la fin de journée (parité legacy)
+  /** borne de fin incluse jusqu'à la fin de journée (parité legacy) */
+  fin.setHours(23, 59, 59, 999);
   return { debut, fin };
 }
 
-// Nom de fichier sûr depuis le nom client (parité legacy : caractères hors [a-zA-Z0-9À-ÿ_-] → `_`).
+/** Nom de fichier sûr depuis le nom client (parité legacy : caractères hors [a-zA-Z0-9À-ÿ_-] → `_`). */
 function sanitizeName(nom: string | null | undefined): string {
   return (nom || "Client").replace(/[^a-zA-Z0-9À-ÿ_-]/g, "_");
 }
@@ -81,7 +82,8 @@ export async function collectFacturxLot(deps: ExportLotReaderDeps, ctx: TenantCo
   const entries: LotEntry[] = [];
   for (const facture of factures) {
     const [lignes, client] = await Promise.all([deps.factureReader.listLignes(ctx, facture.id), deps.clientReader.getById(ctx, facture.clientId)]);
-    if (!client) continue; // client supprimé : on saute (parité legacy)
+    /** client supprimé : on saute (parité legacy) */
+    if (!client) continue;
     const xml = generateFacturXML({ ...facture, lignes } as never, artisan as never, client as never);
     entries.push({ name: `${facture.numero}_${sanitizeName(client.nom)}.xml`, content: xml });
   }

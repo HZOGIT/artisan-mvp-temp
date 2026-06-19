@@ -15,10 +15,10 @@ export function getHistorique(repo: IAlertesPrevisionsRepository, ctx: TenantCon
   return repo.listHistorique(ctx);
 }
 
-// Vérifie l'écart CA réalisé vs prévisionnel du mois courant et enregistre une alerte si un seuil est
-// franchi (parité legacy `verifierEcartsEtEnvoyerAlertes`). Pas de config / inactif / pas de prévision
-// / prévision ≤ 0 / écart sous les seuils / alerte du même type déjà enregistrée ce mois → []. L'envoi
-// réel (email/sms) est EXTERNE (scheduler) — ici on ne fait qu'enregistrer la ligne d'historique.
+/** Vérifie l'écart CA réalisé vs prévisionnel du mois courant et enregistre une alerte si un seuil est */
+/** franchi (parité legacy `verifierEcartsEtEnvoyerAlertes`). Pas de config / inactif / pas de prévision */
+/** / prévision ≤ 0 / écart sous les seuils / alerte du même type déjà enregistrée ce mois → []. L'envoi */
+/** réel (email/sms) est EXTERNE (scheduler) — ici on ne fait qu'enregistrer la ligne d'historique. */
 export async function verifierEtEnvoyer(repo: IAlertesPrevisionsRepository, ctx: TenantContext, now: Date = new Date()): Promise<AlerteHistorique[]> {
   const config = await repo.getConfig(ctx);
   if (!config || !config.actif) return [];
@@ -34,7 +34,7 @@ export async function verifierEtEnvoyer(repo: IAlertesPrevisionsRepository, ctx:
   const typeAlerte = evaluerTypeAlerte(ecart, seuilOuDefaut(config.seuilAlertePositif), seuilOuDefaut(config.seuilAlerteNegatif));
   if (!typeAlerte) return [];
 
-  // Anti-spam : une seule alerte de chaque type par mois.
+  /** Anti-spam : une seule alerte de chaque type par mois. */
   if (await repo.historiqueExiste(ctx, mois, annee, typeAlerte)) return [];
 
   const ligne = await repo.insertHistorique(ctx, {

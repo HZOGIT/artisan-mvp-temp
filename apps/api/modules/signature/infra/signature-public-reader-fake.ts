@@ -51,7 +51,7 @@ export class FakeSignaturePublicReader implements SignaturePublicReader {
  */
 export class FakeSignaturePublicWriter implements SignaturePublicWriter {
   private signatures = new Map<string, Signature>();
-  // optionId → devisId (ownership) ; sélection courante par devisId.
+  /** optionId → devisId (ownership) ; sélection courante par devisId. */
   private optionOwner = new Map<number, number>();
   public selected: Array<{ devisId: number; optionId: number }> = [];
 
@@ -65,7 +65,8 @@ export class FakeSignaturePublicWriter implements SignaturePublicWriter {
   async signDevis(_ctx: TenantContext, input: SignDevisInput): Promise<Signature> {
     const sig = this.signatures.get(input.token);
     if (!sig) throw new Error("not found");
-    if (sig.statut !== "en_attente") return sig; // garde immutabilité
+    /** garde immutabilité */
+    if (sig.statut !== "en_attente") return sig;
     const updated: Signature = {
       ...sig,
       statut: "accepte",

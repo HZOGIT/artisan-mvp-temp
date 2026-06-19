@@ -7,9 +7,12 @@
 export interface Disponibilite {
   readonly id: number;
   readonly technicienId: number;
-  readonly jourSemaine: number; // 0 (dimanche) .. 6 (samedi)
-  readonly heureDebut: string; // "HH:MM"
-  readonly heureFin: string; // "HH:MM"
+  /** 0 (dimanche) .. 6 (samedi) */
+  readonly jourSemaine: number;
+  /** "HH:MM" */
+  readonly heureDebut: string;
+  /** "HH:MM" */
+  readonly heureFin: string;
   readonly disponible: boolean;
 }
 

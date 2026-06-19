@@ -22,9 +22,9 @@ import type { AssistantThreadWriter } from "./assistant-thread-writer";
  * n'est pas complète (sinon régression). La boucle est PURE/testable via un `FakeLlmAgenticPort`.
  */
 
-// Plafond de tours (parité legacy MAX_TURNS=10) : borne dure anti-boucle infinie.
+/** Plafond de tours (parité legacy MAX_TURNS=10) : borne dure anti-boucle infinie. */
 export const MAX_AGENT_TURNS = 10;
-// Fenêtre d'historique réinjectée (parité legacy : 10 derniers messages).
+/** Fenêtre d'historique réinjectée (parité legacy : 10 derniers messages). */
 const HISTORY_WINDOW = 10;
 
 export interface AssistantAgentDeps {
@@ -43,10 +43,10 @@ export interface AssistantAgentInput {
   readonly threadId?: number;
 }
 
-// Évènements émis vers la couche transport (SSE). **Noms alignés sur le contrat client** (`useAssistantStream`
-// / `Assistant.tsx`) : `{threadId}` au début ; `{content}` par fragment de texte ; **`{toolStart}` AVANT
-// exécution d'un outil + `{toolEnd}` APRÈS** (le client affiche l'état running/done) ; `{navigate}` quand
-// `naviguer_vers` réussit (le client fait `setLocation`) ; `{invalidate}` après une écriture (refresh caches).
+/** Évènements émis vers la couche transport (SSE). **Noms alignés sur le contrat client** (`useAssistantStream` */
+/** / `Assistant.tsx`) : `{threadId}` au début ; `{content}` par fragment de texte ; **`{toolStart}` AVANT */
+/** exécution d'un outil + `{toolEnd}` APRÈS** (le client affiche l'état running/done) ; `{navigate}` quand */
+/** `naviguer_vers` réussit (le client fait `setLocation`) ; `{invalidate}` après une écriture (refresh caches). */
 export type AssistantAgentEvent =
   | { readonly threadId: number }
   | { readonly content: string }
@@ -89,7 +89,7 @@ export async function* runAssistantAgent(
   const artisan = await deps.artisanReader.getArtisan(ctx);
   const metier = (artisan?.metier as string | null | undefined) || (artisan?.specialite as string | null | undefined) || null;
 
-  // Stats best-effort (un échec ne casse pas le chat).
+  /** Stats best-effort (un échec ne casse pas le chat). */
   let stats = { devisEnCours: 0, facturesImpayeesCount: 0, facturesImpayeesTotal: 0 };
   try {
     const s = await deps.statsReader.getStats(ctx);
@@ -100,7 +100,7 @@ export async function* runAssistantAgent(
 
   const system = buildAssistantSystemPrompt({ artisanName: artisan?.nomEntreprise ?? null, metier, stats, pageContext: input.pageContext });
 
-  // Thread : réutilise le threadId fourni, sinon en crée un (best-effort).
+  /** Thread : réutilise le threadId fourni, sinon en crée un (best-effort). */
   let threadId = input.threadId ?? 0;
   if (!threadId) {
     try {
@@ -111,7 +111,7 @@ export async function* runAssistantAgent(
   }
   if (threadId) yield { threadId };
 
-  // Historique (≤ fenêtre) puis le message courant.
+  /** Historique (≤ fenêtre) puis le message courant. */
   const messages: AgenticMessage[] = [];
   for (const h of (input.history ?? []).slice(-HISTORY_WINDOW)) {
     messages.push(h.role === "assistant" || h.role === "model" ? modelTextMessage(h.content) : userMessage(h.content));
@@ -130,16 +130,17 @@ export async function* runAssistantAgent(
           yield { content: ev.text };
         }
       } else {
-        // turn-complete : message `model` BRUT (à réinjecter tel quel) + outils à exécuter.
+        /** turn-complete : message `model` BRUT (à réinjecter tel quel) + outils à exécuter. */
         modelMessage = ev.modelMessage;
         for (const c of ev.functionCalls) calls.push(c);
       }
     }
 
     if (modelMessage) messages.push(modelMessage);
-    if (calls.length === 0) break; // le modèle a répondu sans outil → fin.
+    /** le modèle a répondu sans outil → fin. */
+    if (calls.length === 0) break;
 
-    // Exécution des outils + réinjection des résultats au tour suivant.
+    /** Exécution des outils + réinjection des résultats au tour suivant. */
     const results: AgenticToolResultPart[] = [];
     for (const call of calls) {
       yield { toolStart: { name: call.name, args: call.args } };
@@ -147,7 +148,7 @@ export async function* runAssistantAgent(
       results.push(toResultPart(call, res));
       yield { toolEnd: { name: call.name, ok: res.ok, ...(res.ok ? {} : { error: res.error }) } };
       if (res.ok) {
-        // `naviguer_vers` → event de navigation (le client fait setLocation). Parité legacy.
+        /** `naviguer_vers` → event de navigation (le client fait setLocation). Parité legacy. */
         if (call.name === "naviguer_vers") {
           const nav = (res.data as { navigate?: { page?: string; filtre?: string; message?: string } } | undefined)?.navigate;
           if (nav?.page) yield { navigate: nav.page, ...(nav.filtre ? { filtre: nav.filtre } : {}), ...(nav.message ? { message: nav.message } : {}) };
@@ -161,7 +162,7 @@ export async function* runAssistantAgent(
     messages.push(toolMessage(results));
   }
 
-  // Persistance best-effort (n'altère pas le stream déjà émis).
+  /** Persistance best-effort (n'altère pas le stream déjà émis). */
   if (threadId) {
     try {
       await deps.threadWriter.addMessage(ctx, threadId, "user", input.message);

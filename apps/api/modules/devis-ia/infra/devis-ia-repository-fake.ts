@@ -7,7 +7,8 @@ interface StoredAnalyse extends Analyse {
   readonly artisanId: number;
 }
 interface StoredSuggestion extends Suggestion {
-  readonly artisanId: number; // tenant propriétaire (via l'analyse parente) — pour l'anti-IDOR du fake
+  /** tenant propriétaire (via l'analyse parente) — pour l'anti-IDOR du fake */
+  readonly artisanId: number;
 }
 
 export interface DevisIAFakeState {
@@ -19,7 +20,7 @@ export interface DevisIAFakeState {
   ownedClientIds?: number[];
 }
 
-// Fake en mémoire du repository devis-IA (scope tenant simulé par `artisanId` sur analyses/suggestions).
+/** Fake en mémoire du repository devis-IA (scope tenant simulé par `artisanId` sur analyses/suggestions). */
 export class DevisIARepositoryFake implements IDevisIARepository {
   analyses: StoredAnalyse[];
   photos: Photo[];
@@ -85,7 +86,7 @@ export class DevisIARepositoryFake implements IDevisIARepository {
     return { devisId, montantEstime: data.totalTTC };
   }
 
-  // ── analyserPhotos ──
+  /** ── analyserPhotos ── */
   readonly statutHistory: Array<{ analyseId: number; statut: string }> = [];
   readonly savedResultats: Array<{ id: number; analyseId: number; data: unknown }> = [];
   readonly savedSuggestions: Array<{ resultatId: number; articleId: number | null; nomArticle: string }> = [];

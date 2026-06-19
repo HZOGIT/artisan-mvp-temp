@@ -13,7 +13,7 @@ import type {
   SignatureNotificationWriter,
 } from "./signature-repository";
 
-// Dépendances injectées de la surface ARTISAN (protégée) du domaine signature.
+/** Dépendances injectées de la surface ARTISAN (protégée) du domaine signature. */
 export interface SignatureDeps {
   readonly repo: ISignatureRepository;
   readonly contextReader: SignatureDevisContextReader;
@@ -34,7 +34,8 @@ export async function getSignatureByDevis(
   devisId: number,
 ): Promise<Signature | null> {
   const context = await deps.contextReader.getDevisContext(ctx, devisId);
-  if (!context) return null; // devis inexistant ou hors tenant → pas de fuite
+  /** devis inexistant ou hors tenant → pas de fuite */
+  if (!context) return null;
   return deps.repo.getByDevisId(devisId);
 }
 
@@ -53,7 +54,7 @@ export async function createSignatureLink(
   const context = await deps.contextReader.getDevisContext(ctx, devisId);
   if (!context) throw new NotFoundError("Devis non trouvé");
 
-  // Idempotence : ne pas recréer un lien (ni re-notifier) si la signature existe déjà.
+  /** Idempotence : ne pas recréer un lien (ni re-notifier) si la signature existe déjà. */
   const existing = await deps.repo.getByDevisId(devisId);
   if (existing) return existing;
 
@@ -68,7 +69,7 @@ export async function createSignatureLink(
   const { devis, client, artisan } = context;
   const signatureUrl = `${deps.appUrl}/devis-public/${token}`;
 
-  // Email au client (best-effort : un échec d'envoi ne casse pas la création du lien).
+  /** Email au client (best-effort : un échec d'envoi ne casse pas la création du lien). */
   if (client?.email) {
     const clientName = `${client.prenom ?? ""} ${client.nom ?? ""}`.trim();
     const { subject, body } = buildSignatureLinkEmail({
@@ -86,7 +87,7 @@ export async function createSignatureLink(
     }
   }
 
-  // Notification artisan (best-effort).
+  /** Notification artisan (best-effort). */
   try {
     await deps.notifications.notify(ctx, {
       type: "info",

@@ -3,7 +3,7 @@ import type { ClientReader } from "../../../shared/readers/contact-readers";
 import type { IDevisRepository } from "./devis-repository";
 import type { DevisSignatureReader } from "./devis-signature-reader";
 
-// Dépendances de `getDevisNonSignes` (lecture seule : devis non signés enrichis client + signature).
+/** Dépendances de `getDevisNonSignes` (lecture seule : devis non signés enrichis client + signature). */
 export interface DevisNonSignesDeps {
   readonly devisRepo: IDevisRepository;
   readonly clientReader: ClientReader;

@@ -17,13 +17,13 @@ import {
  */
 export function createAssistantRouter(threadsRepo: IAssistantThreadsRepository, generators: AssistantGeneratorDeps) {
   return router({
-    // ── Lectures (historique conversations) ──────────────────────────────────────────────────────
+    /** ── Lectures (historique conversations) ────────────────────────────────────────────────────── */
     getThreads: protectedProcedure.query(({ ctx }) => getThreads(threadsRepo, ctx.tenant!)),
     getMessages: protectedProcedure
       .input(z.object({ threadId: z.number().int() }))
       .query(({ ctx, input }) => getMessages(threadsRepo, ctx.tenant!, input.threadId)),
 
-    // ── Générateurs IA (request/response) ────────────────────────────────────────────────────────
+    /** ── Générateurs IA (request/response) ──────────────────────────────────────────────────────── */
     suggestRelances: protectedProcedure.query(({ ctx }) => suggestRelances(generators, ctx.tenant!)),
     generateDevis: protectedProcedure
       .input(z.object({ description: z.string().min(1) }))

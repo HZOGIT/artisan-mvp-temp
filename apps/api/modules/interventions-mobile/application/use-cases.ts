@@ -4,7 +4,7 @@ import type { IInterventionMobileRepository } from "./intervention-mobile-reposi
 import type { InterventionMobile } from "../domain/intervention-mobile";
 import { bornesDuJour } from "../domain/intervention-mobile";
 
-// Sous-ensemble des ports migrés requis (typage structurel → on passe directement les repos migrés).
+/** Sous-ensemble des ports migrés requis (typage structurel → on passe directement les repos migrés). */
 export interface InterventionLite {
   readonly id: number;
   readonly clientId: number;

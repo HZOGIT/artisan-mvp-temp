@@ -18,7 +18,8 @@ import { soumettreDemandeIA } from "../../application/ia-use-cases";
  * types larges satisfont structurellement les deps étroites de chaque use-case lors de l'appel).
  */
 export interface ClientPortalRouterDeps {
-  readonly defaultOrigin: string; // origine de base des liens portail (fallback APP_URL au wiring)
+  /** origine de base des liens portail (fallback APP_URL au wiring) */
+  readonly defaultOrigin: string;
   readonly access: IPortalAccessRepository;
   readonly docs: IPortalDocsReader;
   readonly scheduling: IPortalSchedulingReader;
@@ -42,12 +43,12 @@ const tokenInput = z.object({ token: z.string() });
  */
 export function createClientPortalRouter(deps: ClientPortalRouterDeps) {
   return router({
-    // ── ADMIN (protégé) ──
+    /** ── ADMIN (protégé) ── */
     generateAccess: protectedProcedure.input(z.object({ clientId: z.number().int().positive() })).mutation(({ ctx, input }) => generateAccess(deps, ctx.tenant, input.clientId, deps.defaultOrigin)),
     getStatus: protectedProcedure.input(z.object({ clientId: z.number().int().positive() })).query(({ ctx, input }) => getStatus(deps, ctx.tenant, input.clientId)),
     deactivate: protectedProcedure.input(z.object({ clientId: z.number().int().positive() })).mutation(({ ctx, input }) => deactivate(deps, ctx.tenant, input.clientId)),
 
-    // ── PUBLIC (token) — identité + documents ──
+    /** ── PUBLIC (token) — identité + documents ── */
     verifyAccess: publicProcedure.input(tokenInput).query(({ input }) => verifyAccess(deps, input.token)),
     getClientInfo: publicProcedure.input(tokenInput).query(({ input }) => getClientInfo(deps, input.token)),
     getDevis: publicProcedure.input(tokenInput).query(({ input }) => getDevis(deps, input.token)),
@@ -55,7 +56,7 @@ export function createClientPortalRouter(deps: ClientPortalRouterDeps) {
     getInterventions: publicProcedure.input(tokenInput).query(({ input }) => getInterventions(deps, input.token)),
     getContrats: publicProcedure.input(tokenInput).query(({ input }) => getContrats(deps, input.token)),
 
-    // ── PUBLIC (token) — RDV + chantiers ──
+    /** ── PUBLIC (token) — RDV + chantiers ── */
     getCreneauxDisponibles: publicProcedure.input(tokenInput).query(({ input }) => getCreneauxDisponibles(deps, input.token)),
     demanderRdv: publicProcedure
       .input(z.object({ token: z.string(), titre: z.string().min(1).max(200), description: z.string().max(5000).optional(), urgence: z.enum(["normale", "urgente", "tres_urgente"]).default("normale"), dateProposee: z.string().max(40) }))
@@ -63,7 +64,7 @@ export function createClientPortalRouter(deps: ClientPortalRouterDeps) {
     getMesRdv: publicProcedure.input(tokenInput).query(({ input }) => getMesRdv(deps, input.token)),
     getSuiviChantiers: publicProcedure.input(tokenInput).query(({ input }) => getSuiviChantiers(deps, input.token)),
 
-    // ── PUBLIC (token) — chat + demandes ──
+    /** ── PUBLIC (token) — chat + demandes ── */
     getConversations: publicProcedure.input(tokenInput).query(({ input }) => getConversations(deps, input.token)),
     getConversationMessages: publicProcedure.input(z.object({ token: z.string(), conversationId: z.number().int().positive() })).query(({ input }) => getConversationMessages(deps, input.token, input.conversationId)),
     sendClientMessage: publicProcedure.input(z.object({ token: z.string(), conversationId: z.number().int().positive(), contenu: z.string().min(1).max(5000) })).mutation(({ input }) => sendClientMessage(deps, input.token, input.conversationId, input.contenu)),

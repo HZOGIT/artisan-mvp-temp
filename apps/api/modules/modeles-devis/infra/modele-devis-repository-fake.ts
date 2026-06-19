@@ -54,7 +54,7 @@ export class FakeModeleDevisRepository implements IModeleDevisRepository {
     return this.modeles
       .filter((m) => m.artisanId === ctx.artisanId)
       .sort((a, b) => a.nom.localeCompare(b.nom) || a.id - b.id)
-      .map((m) => ({ ...m, lignes: [] })); // léger
+      .map((m) => ({ ...m, lignes: [] }));
   }
 
   async getById(ctx: TenantContext, id: number): Promise<ModeleDevis | null> {

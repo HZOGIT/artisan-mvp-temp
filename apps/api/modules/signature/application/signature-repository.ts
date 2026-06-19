@@ -33,10 +33,10 @@ export interface SignatureDevisContextReader {
   getDevisContext(ctx: TenantContext, devisId: number): Promise<SignatureDevisContext | null>;
 }
 
-// Type de notification (parité enum `notifications.type`).
+/** Type de notification (parité enum `notifications.type`). */
 export type SignatureNotificationType = "erreur" | "info" | "alerte" | "rappel" | "succes";
 
-// Écriture d'une notification artisan (sous le tenant, RLS). Réutilise la table `notifications`.
+/** Écriture d'une notification artisan (sous le tenant, RLS). Réutilise la table `notifications`. */
 export interface SignatureNotificationWriter {
   notify(
     ctx: TenantContext,

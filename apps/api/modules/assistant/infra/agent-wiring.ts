@@ -46,7 +46,7 @@ export interface AssistantAgentReadRepos {
   readonly dashboardReader: IDashboardReader;
 }
 
-// Construit les deps de LECTURE (12 outils) depuis les repos migrés.
+/** Construit les deps de LECTURE (12 outils) depuis les repos migrés. */
 export function buildAssistantReadDeps(repos: AssistantAgentReadRepos): AssistantReadDeps {
   return {
     clients: repos.clients,
@@ -81,7 +81,8 @@ export interface AssistantAgentMailing {
   readonly devis?: DevisMailingDeps;
   readonly facture?: FactureMailingDeps;
   readonly relance?: RelanceMailingDeps;
-  readonly commande?: CommandeMailingDeps; // embarque repo + fournisseurRepo
+  /** embarque repo + fournisseurRepo */
+  readonly commande?: CommandeMailingDeps;
 }
 
 /*
@@ -133,7 +134,7 @@ export function buildAssistantWriteDeps(repos: AssistantAgentWriteRepos, mailing
           },
         }
       : {}),
-    // ── Envois (PDF via PdfPort, email via EmailPort, statut, rate-limit ; portés par les use-cases). ──
+    /** ── Envois (PDF via PdfPort, email via EmailPort, statut, rate-limit ; portés par les use-cases). ── */
     ...(mailing.devis
       ? { devisSender: { envoyer: (ctx, id, m) => envoyerDevisParEmail(devisRepo, mailing.devis!, ctx, { devisId: id, customMessage: m, attachPdf: true }) } }
       : {}),
@@ -143,12 +144,12 @@ export function buildAssistantWriteDeps(repos: AssistantAgentWriteRepos, mailing
     ...(factureRepo && mailing.relance
       ? { relanceSender: { envoyer: (ctx, id, m) => envoyerRelanceFacture(factureRepo, mailing.relance!, ctx, { factureId: id, customMessage: m }) } }
       : {}),
-    // `envoyerCommandeParEmail` n'accepte pas de message personnalisé (le use-case migré l'a dropé) → ignoré.
+    /** `envoyerCommandeParEmail` n'accepte pas de message personnalisé (le use-case migré l'a dropé) → ignoré. */
     ...(mailing.commande ? { commandeSender: { envoyer: (ctx, id) => envoyerCommandeParEmail(mailing.commande!, ctx, id) } } : {}),
   };
 }
 
-// Handlers d'écriture câblés depuis les repos migrés (+ mailing pour les envois).
+/** Handlers d'écriture câblés depuis les repos migrés (+ mailing pour les envois). */
 export function buildAssistantWriteHandlersFromRepos(repos: AssistantAgentWriteRepos, mailing: AssistantAgentMailing = {}): Record<string, ToolHandler> {
   return buildAssistantWriteHandlers(buildAssistantWriteDeps(repos, mailing));
 }

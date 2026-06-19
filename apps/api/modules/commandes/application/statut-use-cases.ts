@@ -20,7 +20,7 @@ export async function changerStatutCommande(
   return updated;
 }
 
-// Indicateur lecture seule : commandes en retard de livraison du tenant.
+/** Indicateur lecture seule : commandes en retard de livraison du tenant. */
 export function listerCommandesEnRetard(repo: ICommandeRepository, ctx: TenantContext): Promise<Commande[]> {
   return repo.listEnRetard(ctx);
 }
@@ -36,7 +36,7 @@ export async function recevoirCommande(
   commandeId: number,
   receptions: ReceptionLigne[],
 ): Promise<Commande> {
-  // La commande (et ses lignes) doit appartenir au tenant.
+  /** La commande (et ses lignes) doit appartenir au tenant. */
   const commande = await repo.getById(ctx, commandeId);
   if (!commande) throw new NotFoundError("Commande introuvable");
 
@@ -45,7 +45,7 @@ export async function recevoirCommande(
   for (const r of receptions) {
     if (r.quantiteRecue < 0) throw new ValidationError("Quantité reçue invalide (≥ 0 attendu)");
     const commandee = quantiteParLigne.get(r.ligneId);
-    // On ne valide que les lignes appartenant à la commande (les autres seront ignorées).
+    /** On ne valide que les lignes appartenant à la commande (les autres seront ignorées). */
     if (commandee !== undefined && r.quantiteRecue > commandee) {
       throw new ValidationError("Quantité reçue supérieure à la quantité commandée");
     }

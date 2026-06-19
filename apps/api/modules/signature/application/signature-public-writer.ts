@@ -31,10 +31,10 @@ export interface SignaturePublicWriter {
    * Renvoie la signature mise à jour (re-lue).
    */
   signDevis(ctx: TenantContext, input: SignDevisInput): Promise<Signature>;
-  // signatures_devis → refuse (+ motif/ip/ua/signedAt) ET devis → refuse, même garde transactionnelle.
+  /** signatures_devis → refuse (+ motif/ip/ua/signedAt) ET devis → refuse, même garde transactionnelle. */
   refuseDevis(ctx: TenantContext, input: RefuseDevisInput): Promise<Signature>;
-  // devisId propriétaire d'une option (sous le tenant), ou `null` si l'option n'existe pas.
+  /** devisId propriétaire d'une option (sous le tenant), ou `null` si l'option n'existe pas. */
   getOptionDevisId(ctx: TenantContext, optionId: number): Promise<number | null>;
-  // Choisit l'option (une seule `selectionnee` par devis : reset les autres puis set celle-ci).
+  /** Choisit l'option (une seule `selectionnee` par devis : reset les autres puis set celle-ci). */
   selectOption(ctx: TenantContext, devisId: number, optionId: number): Promise<void>;
 }

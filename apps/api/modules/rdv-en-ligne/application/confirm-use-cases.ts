@@ -25,7 +25,7 @@ export async function confirmerRdvAvecIntervention(
     throw new ValidationError("Ce RDV ne peut plus être confirmé");
   }
 
-  // Intervention planifiée : début = créneau proposé, fin = début + durée estimée (minutes).
+  /** Intervention planifiée : début = créneau proposé, fin = début + durée estimée (minutes). */
   const dateFin = new Date(rdv.dateProposee.getTime() + (rdv.dureeEstimee || 60) * 60000);
   const intervention = await interventionRepo.create(ctx, {
     clientId: rdv.clientId,

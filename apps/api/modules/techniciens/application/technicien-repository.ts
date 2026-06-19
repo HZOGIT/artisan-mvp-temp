@@ -17,9 +17,9 @@ export interface ITechnicienRepository {
   list(ctx: TenantContext): Promise<Technicien[]>;
   getById(ctx: TenantContext, id: number): Promise<Technicien | null>;
   create(ctx: TenantContext, input: CreateTechnicienInput): Promise<Technicien>;
-  // null si le technicien n'appartient pas au tenant.
+  /** null si le technicien n'appartient pas au tenant. */
   update(ctx: TenantContext, id: number, input: UpdateTechnicienInput): Promise<Technicien | null>;
-  // false si le technicien n'appartient pas au tenant.
+  /** false si le technicien n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
 
   /*
@@ -27,7 +27,7 @@ export interface ITechnicienRepository {
    * au tenant (anti-IDOR, lecture sans oracle ; la table n'a pas d'artisanId).
    */
   listDisponibilites(ctx: TenantContext, technicienId: number): Promise<Disponibilite[]>;
-  // Définit (upsert par jourSemaine) un créneau de disponibilité — null si technicien hors tenant.
+  /** Définit (upsert par jourSemaine) un créneau de disponibilité — null si technicien hors tenant. */
   setDisponibilite(ctx: TenantContext, technicienId: number, input: SetDisponibiliteInput): Promise<Disponibilite | null>;
 
   /*
@@ -35,7 +35,7 @@ export interface ITechnicienRepository {
    * position (lecture sans oracle ; la table n'a pas d'artisanId → anti-IDOR géoloc).
    */
   getDernierePosition(ctx: TenantContext, technicienId: number): Promise<Position | null>;
-  // Enregistre une position GPS — null si le technicien n'appartient pas au tenant.
+  /** Enregistre une position GPS — null si le technicien n'appartient pas au tenant. */
   enregistrerPosition(ctx: TenantContext, technicienId: number, input: EnregistrerPositionInput): Promise<Position | null>;
 
   /*
@@ -49,7 +49,7 @@ export interface ITechnicienRepository {
    * n'appartient pas au tenant (anti-IDOR). Tri par dateExpiration (échéances d'abord).
    */
   listHabilitations(ctx: TenantContext, technicienId: number): Promise<HabilitationTechnicien[]>;
-  // Ajoute une habilitation — null si le technicien n'appartient pas au tenant.
+  /** Ajoute une habilitation — null si le technicien n'appartient pas au tenant. */
   ajouterHabilitation(
     ctx: TenantContext,
     technicienId: number,

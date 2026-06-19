@@ -72,7 +72,8 @@ export class RelanceDevisRepositoryDrizzle implements IRelanceDevisRepository {
           type: input.type,
           destinataire: input.destinataire ?? null,
           message: input.message ?? null,
-          statut: input.statut ?? undefined, // laisse le DEFAULT "envoye"
+          /** laisse le DEFAULT "envoye" */
+          statut: input.statut ?? undefined,
         })
         .returning();
       return toRelance(row);

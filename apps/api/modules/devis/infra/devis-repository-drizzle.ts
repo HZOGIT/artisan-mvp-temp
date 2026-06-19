@@ -126,7 +126,7 @@ export class DevisRepositoryDrizzle implements IDevisRepository {
 
   update(ctx: TenantContext, id: number, input: UpdateDevisInput): Promise<Devis | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Métadonnées seulement (UpdateDevisInput exclut clientId/numero/statut/totaux).
+      /** Métadonnées seulement (UpdateDevisInput exclut clientId/numero/statut/totaux). */
       const set: Partial<typeof devis.$inferInsert> = { updatedAt: new Date() };
       if (input.objet !== undefined) set.objet = input.objet;
       if (input.referenceClient !== undefined) set.referenceClient = input.referenceClient;
@@ -145,7 +145,7 @@ export class DevisRepositoryDrizzle implements IDevisRepository {
   delete(ctx: TenantContext, id: number): Promise<boolean> {
     return withTenant(this.db, ctx, async (tx) => {
       if (!(await this.ownsDevis(tx, ctx, id))) return false;
-      // Cascade : supprimer les lignes du devis (sans artisanId) dans la même transaction.
+      /** Cascade : supprimer les lignes du devis (sans artisanId) dans la même transaction. */
       await tx.delete(devisLignes).where(eq(devisLignes.devisId, id));
       const deleted = await tx
         .delete(devis)
@@ -254,7 +254,7 @@ export class DevisRepositoryDrizzle implements IDevisRepository {
 
   updateLigne(ctx: TenantContext, ligneId: number, input: UpdateDevisLigneInput): Promise<DevisLigne | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // La ligne doit relever d'un devis appartenant au tenant (anti-IDOR via le parent).
+      /** La ligne doit relever d'un devis appartenant au tenant (anti-IDOR via le parent). */
       const [ligne] = await tx.select().from(devisLignes).where(eq(devisLignes.id, ligneId)).limit(1);
       if (!ligne || !(await this.ownsDevis(tx, ctx, ligne.devisId))) return null;
 
@@ -296,7 +296,7 @@ export class DevisRepositoryDrizzle implements IDevisRepository {
     });
   }
 
-  // Recalcule les totaux du devis à partir de SES lignes (source de vérité). Server-side.
+  /** Recalcule les totaux du devis à partir de SES lignes (source de vérité). Server-side. */
   private async recalculerTotaux(tx: DbClient, devisId: number): Promise<void> {
     const lignes = await tx
       .select({ montantHT: devisLignes.montantHT, montantTVA: devisLignes.montantTVA, montantTTC: devisLignes.montantTTC })
@@ -313,7 +313,7 @@ export class DevisRepositoryDrizzle implements IDevisRepository {
       .where(eq(devis.id, devisId));
   }
 
-  // Le devis appartient-il au tenant ? (RLS + filtre artisanId)
+  /** Le devis appartient-il au tenant ? (RLS + filtre artisanId) */
   private async ownsDevis(tx: DbClient, ctx: TenantContext, devisId: number): Promise<boolean> {
     const [row] = await tx
       .select({ id: devis.id })

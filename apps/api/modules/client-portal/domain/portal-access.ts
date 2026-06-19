@@ -42,7 +42,7 @@ export interface PortalAccessStatus {
   readonly createdAt: Date;
 }
 
-// Durée de validité d'un lien d'accès (parité legacy : 90 jours).
+/** Durée de validité d'un lien d'accès (parité legacy : 90 jours). */
 export const PORTAL_ACCESS_TTL_DAYS = 90;
 
 export function computeExpiry(now: Date, ttlDays: number = PORTAL_ACCESS_TTL_DAYS): Date {
@@ -59,12 +59,12 @@ export function clientNomComplet(prenom: string | null, nom: string): string {
   return `${prenom || ""} ${nom}`.trim();
 }
 
-// Échappe le HTML inséré dans l'email d'accès (anti-injection). Parité legacy `safeHtml`.
+/** Échappe le HTML inséré dans l'email d'accès (anti-injection). Parité legacy `safeHtml`. */
 export function safeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-// Corps HTML de l'email « Accès à votre espace client » (parité legacy, structure conservée).
+/** Corps HTML de l'email « Accès à votre espace client » (parité legacy, structure conservée). */
 export function buildAccessEmailBody(artisanName: string, clientName: string, portalUrl: string): string {
   return `<!DOCTYPE html>
 <html lang="fr">

@@ -19,7 +19,7 @@ function toSettings(r: ParametresRow): VitrineSettings {
   };
 }
 
-// Ne retient que les champs vitrine réellement fournis (les autres colonnes restent inchangées).
+/** Ne retient que les champs vitrine réellement fournis (les autres colonnes restent inchangées). */
 function toSet(input: UpdateVitrineSettingsInput): Partial<ParametresInsert> {
   const set: Partial<ParametresInsert> = {};
   if (input.vitrineActive !== undefined) set.vitrineActive = input.vitrineActive;

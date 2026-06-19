@@ -25,7 +25,7 @@ const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide
 const ligneTypeEnum = z.enum(["produit", "section", "note"]);
 const typeDocumentEnum = z.enum(["facture", "avoir"]);
 
-// `dateEcheance` arrive en string ISO (transport) ; le domaine attend une `Date | null`.
+/** `dateEcheance` arrive en string ISO (transport) ; le domaine attend une `Date | null`. */
 function toDate(v: string | null | undefined): Date | null | undefined {
   if (v === undefined || v === null) return v;
   return new Date(v);
@@ -49,7 +49,7 @@ const createSchema = z.object({
   dateEcheance: isoDate.nullish(),
 });
 
-// ⚠️ clientId / devisId / numero / statut / typeDocument / totaux / montantPaye ABSENTS.
+/** ⚠️ clientId / devisId / numero / statut / typeDocument / totaux / montantPaye ABSENTS. */
 const updateSchema = z.object({
   objet: z.string().max(500).nullish(),
   referenceClient: z.string().max(100).nullish(),
@@ -83,7 +83,7 @@ const ligneUpdateSchema = z.object({
   type: ligneTypeEnum.optional(),
 });
 
-// Schéma d'avoir partagé par `creerAvoir` et son alias client `createAvoir` (même use-case).
+/** Schéma d'avoir partagé par `creerAvoir` et son alias client `createAvoir` (même use-case). */
 const avoirInputSchema = z.object({
   factureOrigineId: z.number().int(),
   objet: z.string().max(500).nullish(),
@@ -112,7 +112,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
   return router({
     list: protectedProcedure.query(({ ctx }) => listFactures(repo, ctx.tenant)),
 
-    // Détail enrichi (parité legacy : `{ ...facture, lignes, client }`) — consommé par FactureDetail.
+    /** Détail enrichi (parité legacy : `{ ...facture, lignes, client }`) — consommé par FactureDetail. */
     getById: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .query(({ ctx, input }) => getFactureDetail(repo, mailing.clientReader, ctx.tenant, input.id)),
@@ -129,7 +129,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
       .input(z.object({ factureId: z.number().int() }))
       .query(({ ctx, input }) => getAvoirsFacture(repo, ctx.tenant, input.factureId)),
 
-    // Journal d'audit d'une facture (parité client `trpc.factures.getAuditLog`). Lecture seule, scopée.
+    /** Journal d'audit d'une facture (parité client `trpc.factures.getAuditLog`). Lecture seule, scopée. */
     getAuditLog: protectedProcedure
       .input(z.object({ factureId: z.number().int() }))
       .query(({ ctx, input }) => getAuditLogFacture(repo, ctx.tenant, input.factureId)),
@@ -185,24 +185,24 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => changerStatutFacture(repo, ctx.tenant, input.id, "en_retard")),
 
-    // Convertir un devis accepté en facture (cross-domaine : lit le devis via le reader injecté).
+    /** Convertir un devis accepté en facture (cross-domaine : lit le devis via le reader injecté). */
     convertirDepuisDevis: protectedProcedure
       .input(z.object({ devisId: z.number().int() }))
       .mutation(({ ctx, input }) => convertirDevisEnFacture(repo, devisReader, ctx.tenant, input.devisId)),
 
-    // Émettre un avoir (note de crédit) sur une facture d'origine — montants négatifs.
+    /** Émettre un avoir (note de crédit) sur une facture d'origine — montants négatifs. */
     creerAvoir: protectedProcedure.input(avoirInputSchema).mutation(({ ctx, input }) => {
       const { factureOrigineId, ...data } = input;
       return creerAvoir(repo, ctx.tenant, factureOrigineId, data, compta);
     }),
 
-    // Alias de surface (parité client `trpc.factures.createAvoir`) : même use-case que `creerAvoir`.
+    /** Alias de surface (parité client `trpc.factures.createAvoir`) : même use-case que `creerAvoir`. */
     createAvoir: protectedProcedure.input(avoirInputSchema).mutation(({ ctx, input }) => {
       const { factureOrigineId, ...data } = input;
       return creerAvoir(repo, ctx.tenant, factureOrigineId, data, compta);
     }),
 
-    // Enregistrement d'un paiement (partiel ou soldant) — passe `payee` si soldée.
+    /** Enregistrement d'un paiement (partiel ou soldant) — passe `payee` si soldée. */
     enregistrerPaiement: protectedProcedure
       .input(z.object({ id: z.number().int(), montant: decimal, date: isoDate.optional(), mode: z.string().max(50).optional() }))
       .mutation(({ ctx, input }) =>

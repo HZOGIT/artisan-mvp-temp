@@ -5,7 +5,7 @@ import { computeCurrentSubscription, extraPriceId } from "../domain/subscription
 import type { CurrentSubscription, SubscriptionInterval, SubscriptionPlan, SubscriptionPrices } from "../domain/subscription";
 import type { ISubscriptionReader, ISubscriptionRepository } from "./subscription-reader";
 
-// Dépendances des effets billing (Stripe + repo + prix + URLs). `appUrl` = base de confiance des redirections.
+/** Dépendances des effets billing (Stripe + repo + prix + URLs). `appUrl` = base de confiance des redirections. */
 export interface SubscriptionEffectDeps {
   readonly repo: ISubscriptionRepository;
   readonly stripe: StripePort;
@@ -19,7 +19,7 @@ export interface CheckoutInput {
   readonly extraUsers: number;
 }
 
-// État d'abonnement courant du tenant (essai/quotas calculés). `now` injectable pour le déterminisme.
+/** État d'abonnement courant du tenant (essai/quotas calculés). `now` injectable pour le déterminisme. */
 export async function getCurrent(reader: ISubscriptionReader, ctx: TenantContext, now: () => Date = () => new Date()): Promise<CurrentSubscription> {
   return computeCurrentSubscription(await reader.getSubscription(ctx), now());
 }
@@ -59,7 +59,7 @@ export async function createCheckout(deps: SubscriptionEffectDeps, ctx: TenantCo
   return { url: session.url };
 }
 
-// Crée une session du portail de facturation Stripe (gérer carte/factures). Aucun Customer → 404.
+/** Crée une session du portail de facturation Stripe (gérer carte/factures). Aucun Customer → 404. */
 export async function createPortal(deps: SubscriptionEffectDeps, ctx: TenantContext): Promise<{ url: string | null }> {
   const sub = await deps.repo.getSubscription(ctx);
   if (!sub?.stripeCustomerId) throw new NotFoundError("Aucun abonnement actif trouve");
@@ -79,7 +79,7 @@ export async function cancelSubscription(deps: SubscriptionEffectDeps, ctx: Tena
   return { success: true };
 }
 
-// Réactive un abonnement annulé avant la fin de période (`cancel_at_period_end=false`).
+/** Réactive un abonnement annulé avant la fin de période (`cancel_at_period_end=false`). */
 export async function reactivateSubscription(deps: SubscriptionEffectDeps, ctx: TenantContext): Promise<{ success: true }> {
   const sub = await deps.repo.getSubscription(ctx);
   if (!sub?.stripeSubscriptionId) throw new NotFoundError("Aucun abonnement trouve");

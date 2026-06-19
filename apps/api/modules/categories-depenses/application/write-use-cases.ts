@@ -30,7 +30,8 @@ export async function creerCategorie(
   if (!input.nom?.trim()) throw new ValidationError("Le nom est requis");
   assertCouleur(input.couleur);
   assertPlafond(input.plafondMensuel);
-  return repo.create(ctx, input); // ConflictError (nom déjà pris) remonte du repo
+  /** ConflictError (nom déjà pris) remonte du repo */
+  return repo.create(ctx, input);
 }
 
 export async function modifierCategorie(
@@ -42,7 +43,8 @@ export async function modifierCategorie(
   if (input.nom !== undefined && !input.nom.trim()) throw new ValidationError("Le nom est requis");
   assertCouleur(input.couleur);
   assertPlafond(input.plafondMensuel);
-  const updated = await repo.update(ctx, id, input); // ConflictError (rename vers nom pris) remonte du repo
+  /** ConflictError (rename vers nom pris) remonte du repo */
+  const updated = await repo.update(ctx, id, input);
   if (!updated) throw new NotFoundError("Catégorie de dépense introuvable");
   return updated;
 }

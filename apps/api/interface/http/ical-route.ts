@@ -4,7 +4,7 @@ import { buildIcalFeed } from "../../modules/calendrier/domain/ical";
 import type { IcalPublicReader } from "../../modules/calendrier/application/ical-public-reader";
 import { extractClientIp } from "./client-ip";
 
-// Fenêtre legacy : interventions à partir d'il y a 90 jours.
+/** Fenêtre legacy : interventions à partir d'il y a 90 jours. */
 const FENETRE_MS = 90 * 24 * 60 * 60 * 1000;
 
 export interface IcalRouteDeps {

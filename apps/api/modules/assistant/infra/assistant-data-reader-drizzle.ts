@@ -53,7 +53,7 @@ export class AssistantDataReaderDrizzle implements AssistantDataReader {
     });
   }
 
-  // Métier de l'artisan (table identité, HORS RLS → filtre explicite par id).
+  /** Métier de l'artisan (table identité, HORS RLS → filtre explicite par id). */
   private async metier(tx: DbClient, ctx: TenantContext): Promise<string | null> {
     const [a] = await tx.select({ metier: artisans.metier, specialite: artisans.specialite }).from(artisans).where(eq(artisans.id, ctx.artisanId)).limit(1);
     return (a?.metier as string | null) ?? (a?.specialite as string | null) ?? null;
@@ -88,7 +88,8 @@ export class AssistantDataReaderDrizzle implements AssistantDataReader {
         .from(devis)
         .where(and(eq(devis.id, devisId), eq(devis.artisanId, ctx.artisanId)))
         .limit(1);
-      if (!d) return null; // hors tenant / inexistant → anti-IDOR
+      /** hors tenant / inexistant → anti-IDOR */
+      if (!d) return null;
 
       const [c] = await tx.select({ nom: clients.nom, prenom: clients.prenom }).from(clients).where(and(eq(clients.id, d.clientId), eq(clients.artisanId, ctx.artisanId))).limit(1);
       const lignes = await tx

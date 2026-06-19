@@ -16,14 +16,17 @@ export type DepenseFrequence = "mensuelle" | "trimestrielle" | "annuelle";
 export interface Depense {
   readonly id: number;
   readonly artisanId: number;
-  readonly userId: number; // créateur
+  /** créateur */
+  readonly userId: number;
   readonly numero: string;
-  readonly dateDepense: string; // date PG (YYYY-MM-DD)
+  /** date PG (YYYY-MM-DD) */
+  readonly dateDepense: string;
   readonly fournisseur: string | null;
   readonly categorie: string;
   readonly sousCategorie: string | null;
   readonly description: string | null;
-  readonly montantHt: string; // numeric PG en string
+  /** numeric PG en string */
+  readonly montantHt: string;
   readonly tauxTva: string | null;
   readonly montantTva: string | null;
   readonly montantTtc: string;
@@ -103,7 +106,7 @@ export interface UpdateDepenseInput {
   readonly tvaDeductible?: boolean;
 }
 
-// ── Détection de doublons (aide à la saisie) ──────────────────────────────────────────────────
+/** ── Détection de doublons (aide à la saisie) ────────────────────────────────────────────────── */
 export interface DoublonParams {
   readonly montantTtc: number;
   readonly dateDepense: string;
@@ -121,7 +124,7 @@ export interface DepenseDoublon {
   readonly statut: string;
 }
 
-// ── Statistiques de dépenses (tableau de bord) ────────────────────────────────────────────────
+/** ── Statistiques de dépenses (tableau de bord) ──────────────────────────────────────────────── */
 export interface DepenseStatsCategorie {
   readonly categorie: string;
   readonly total: string;

@@ -10,7 +10,7 @@ import type { NoteDeFrais, CreateNoteDeFraisInput, UpdateNoteDeFraisInput } from
  * d'approbation (statut/montant remboursé) est porté séparément.
  */
 
-// Dates ISO `YYYY-MM-DD` → comparaison lexicographique = chronologique.
+/** Dates ISO `YYYY-MM-DD` → comparaison lexicographique = chronologique. */
 function assertPeriodeCoherente(debut?: string, fin?: string): void {
   if (debut && fin && fin < debut) {
     throw new ValidationError("La fin de période doit être postérieure ou égale au début");
@@ -26,7 +26,7 @@ function assertMontant(valeur: string | undefined, libelle: string): void {
 export async function creerNoteDeFrais(
   repo: INoteDeFraisRepository,
   ctx: TenantContext,
-  // L'appelant ne fournit JAMAIS `userId` : il est forcé à l'utilisateur courant.
+  /** L'appelant ne fournit JAMAIS `userId` : il est forcé à l'utilisateur courant. */
   input: Omit<CreateNoteDeFraisInput, "userId">,
 ): Promise<NoteDeFrais> {
   if (!input.titre?.trim()) throw new ValidationError("Le titre est requis");
@@ -90,7 +90,8 @@ function assertPasSelfApprobation(ctx: TenantContext, note: NoteDeFrais): void {
 
 export async function soumettreNoteDeFrais(repo: INoteDeFraisRepository, ctx: TenantContext, id: number): Promise<NoteDeFrais> {
   const note = await chargerNote(repo, ctx, id);
-  if (note.statut === "soumise") return note; // idempotent
+  /** idempotent */
+  if (note.statut === "soumise") return note;
   if (note.statut !== "brouillon") throw new ConflictError("Cette note ne peut plus être soumise");
   const updated = await repo.setWorkflow(ctx, id, { statut: "soumise", dateSoumission: aujourdhui() });
   if (!updated) throw new NotFoundError("Note de frais introuvable");
@@ -105,7 +106,8 @@ export async function approuverNoteDeFrais(
   commentaire?: string | null,
 ): Promise<NoteDeFrais> {
   const note = await chargerNote(repo, ctx, id);
-  if (note.statut === "approuvee") return note; // idempotent
+  /** idempotent */
+  if (note.statut === "approuvee") return note;
   if (note.statut !== "soumise") throw new ConflictError("Seule une note soumise peut être approuvée");
   assertPasSelfApprobation(ctx, note);
   const updated = await repo.setWorkflow(ctx, id, {
@@ -125,7 +127,8 @@ export async function rejeterNoteDeFrais(
   commentaire: string,
 ): Promise<NoteDeFrais> {
   const note = await chargerNote(repo, ctx, id);
-  if (note.statut === "rejetee") return note; // idempotent
+  /** idempotent */
+  if (note.statut === "rejetee") return note;
   if (note.statut !== "soumise") throw new ConflictError("Seule une note soumise peut être rejetée");
   assertPasSelfApprobation(ctx, note);
   const updated = await repo.setWorkflow(ctx, id, { statut: "rejetee", commentaireApprobateur: commentaire });
@@ -136,7 +139,8 @@ export async function rejeterNoteDeFrais(
 
 export async function payerNoteDeFrais(repo: INoteDeFraisRepository, ctx: TenantContext, id: number): Promise<NoteDeFrais> {
   const note = await chargerNote(repo, ctx, id);
-  if (note.statut === "payee") return note; // idempotent
+  /** idempotent */
+  if (note.statut === "payee") return note;
   if (note.statut !== "approuvee") throw new ConflictError("Seule une note approuvée peut être payée");
   const jour = aujourdhui();
   const updated = await repo.setWorkflow(ctx, id, { statut: "payee", datePaiement: jour });

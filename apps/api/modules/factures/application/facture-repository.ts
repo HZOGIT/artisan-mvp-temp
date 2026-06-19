@@ -20,15 +20,15 @@ import type {
  */
 export interface IFactureRepository {
   list(ctx: TenantContext): Promise<Facture[]>;
-  // null si la facture n'appartient pas au tenant.
+  /** null si la facture n'appartient pas au tenant. */
   getById(ctx: TenantContext, id: number): Promise<Facture | null>;
   create(ctx: TenantContext, input: CreateFactureInput): Promise<Facture>;
-  // null si la facture n'appartient pas au tenant.
+  /** null si la facture n'appartient pas au tenant. */
   update(ctx: TenantContext, id: number, input: UpdateFactureInput): Promise<Facture | null>;
-  // false si la facture n'appartient pas au tenant.
+  /** false si la facture n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
 
-  // Définit le statut (transition pilotée par le use-case workflow) — null hors tenant.
+  /** Définit le statut (transition pilotée par le use-case workflow) — null hors tenant. */
   setStatut(ctx: TenantContext, id: number, statut: FactureStatut): Promise<Facture | null>;
   /*
    * Enregistre un paiement (écrit montantPaye cumulé + date/mode + statut calculés par le
@@ -36,11 +36,11 @@ export interface IFactureRepository {
    * soldée) sont portés par le use-case ; le repo ne fait qu'écrire le patch scopé tenant.
    */
   enregistrerPaiement(ctx: TenantContext, id: number, patch: PaiementPatch): Promise<Facture | null>;
-  // Prochain numéro de facture, scopé tenant, généré serveur (parité `getNextFactureNumber`).
+  /** Prochain numéro de facture, scopé tenant, généré serveur (parité `getNextFactureNumber`). */
   nextNumero(ctx: TenantContext): Promise<string>;
-  // Prochain numéro d'AVOIR (préfixe + compteur dédiés, parité `getNextAvoirNumber`).
+  /** Prochain numéro d'AVOIR (préfixe + compteur dédiés, parité `getNextAvoirNumber`). */
   nextNumeroAvoir(ctx: TenantContext): Promise<string>;
-  // Avoirs émis sur une facture d'origine (typeDocument='avoir'), scopés tenant.
+  /** Avoirs émis sur une facture d'origine (typeDocument='avoir'), scopés tenant. */
   listAvoirs(ctx: TenantContext, factureOrigineId: number): Promise<Facture[]>;
   /*
    * Journal d'audit d'une facture (table `audit_log`, scopé artisanId + entityType='facture'),
@@ -52,9 +52,9 @@ export interface IFactureRepository {
    * transaction — null si la facture d'origine n'appartient pas au tenant.
    */
   createAvoir(ctx: TenantContext, input: CreateAvoirInput): Promise<Facture | null>;
-  // true si le client référencé appartient au tenant (anti-IDOR-FK).
+  /** true si le client référencé appartient au tenant (anti-IDOR-FK). */
   ownsClient(ctx: TenantContext, clientId: number): Promise<boolean>;
-  // true si le devis référencé appartient au tenant (anti-IDOR-FK sur le lien devis→facture).
+  /** true si le devis référencé appartient au tenant (anti-IDOR-FK sur le lien devis→facture). */
   ownsDevis(ctx: TenantContext, devisId: number): Promise<boolean>;
   /*
    * true s'il existe déjà une facture (typeDocument='facture') liée à ce devis (anti-doublon
@@ -67,17 +67,17 @@ export interface IFactureRepository {
    */
   createFromDevis(ctx: TenantContext, input: CreateFromDevisInput): Promise<Facture | null>;
 
-  // Lignes d'une facture — [] si la facture n'appartient pas au tenant.
+  /** Lignes d'une facture — [] si la facture n'appartient pas au tenant. */
   listLignes(ctx: TenantContext, factureId: number): Promise<FactureLigne[]>;
-  // Ajoute une ligne (montants recalculés) — null si la facture n'appartient pas au tenant.
+  /** Ajoute une ligne (montants recalculés) — null si la facture n'appartient pas au tenant. */
   addLigne(ctx: TenantContext, factureId: number, input: CreateFactureLigneInput): Promise<FactureLigne | null>;
-  // Modifie une ligne (montants recalculés) — null si la ligne ne relève pas d'une facture du tenant.
+  /** Modifie une ligne (montants recalculés) — null si la ligne ne relève pas d'une facture du tenant. */
   updateLigne(ctx: TenantContext, ligneId: number, input: UpdateFactureLigneInput): Promise<FactureLigne | null>;
-  // false si la ligne ne relève pas d'une facture du tenant.
+  /** false si la ligne ne relève pas d'une facture du tenant. */
   deleteLigne(ctx: TenantContext, ligneId: number): Promise<boolean>;
 }
 
-// Patch d'enregistrement de paiement (valeurs déjà calculées par le use-case).
+/** Patch d'enregistrement de paiement (valeurs déjà calculées par le use-case). */
 export interface PaiementPatch {
   readonly montantPaye: string;
   readonly datePaiement: Date | null;
@@ -85,20 +85,24 @@ export interface PaiementPatch {
   readonly statut: FactureStatut;
 }
 
-// Ligne d'avoir avec montants NÉGATIFS déjà calculés (par le use-case).
+/** Ligne d'avoir avec montants NÉGATIFS déjà calculés (par le use-case). */
 export interface AvoirLigneData {
   readonly designation: string;
   readonly description: string | null;
   readonly quantite: string;
   readonly unite: string | null;
-  readonly prixUnitaireHT: string; // négatif
+  /** négatif */
+  readonly prixUnitaireHT: string;
   readonly tauxTVA: string;
-  readonly montantHT: string; // négatif
-  readonly montantTVA: string; // négatif
-  readonly montantTTC: string; // négatif
+  /** négatif */
+  readonly montantHT: string;
+  /** négatif */
+  readonly montantTVA: string;
+  /** négatif */
+  readonly montantTTC: string;
 }
 
-// Ligne copiée d'un devis vers une facture (montants déjà calculés côté devis).
+/** Ligne copiée d'un devis vers une facture (montants déjà calculés côté devis). */
 export interface CopiedLigneData {
   readonly ordre: number;
   readonly reference: string | null;

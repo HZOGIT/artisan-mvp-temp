@@ -8,7 +8,7 @@
  * doivent rester identiques au legacy** : le comportement du modèle en dépend (parité agentique).
  */
 
-// Type d'un paramètre d'outil (sous-ensemble JSON-Schema commun à Gemini/OpenAI).
+/** Type d'un paramètre d'outil (sous-ensemble JSON-Schema commun à Gemini/OpenAI). */
 export type ToolParamType = "object" | "string" | "number" | "boolean" | "array";
 
 export interface ToolParamSchema {
@@ -19,14 +19,14 @@ export interface ToolParamSchema {
   readonly required?: readonly string[];
 }
 
-// Déclaration d'un outil exposé au modèle (function-calling). `parameters` a toujours un objet racine.
+/** Déclaration d'un outil exposé au modèle (function-calling). `parameters` a toujours un objet racine. */
 export interface ToolSchema {
   readonly name: string;
   readonly description: string;
   readonly parameters: ToolParamSchema;
 }
 
-// Helpers de construction (concision sans perte de fidélité au schéma legacy).
+/** Helpers de construction (concision sans perte de fidélité au schéma legacy). */
 const str = (description?: string): ToolParamSchema => ({ type: "string", ...(description ? { description } : {}) });
 const num = (description?: string): ToolParamSchema => ({ type: "number", ...(description ? { description } : {}) });
 const obj = (properties: Record<string, ToolParamSchema>, required?: readonly string[]): ToolParamSchema => ({
@@ -40,7 +40,7 @@ const arr = (items: ToolParamSchema, description?: string): ToolParamSchema => (
   ...(description ? { description } : {}),
 });
 
-// Ligne de devis/facture (designation/quantite/prixUnitaireHT requis).
+/** Ligne de devis/facture (designation/quantite/prixUnitaireHT requis). */
 const ligneVente = obj(
   {
     designation: str(),
@@ -51,13 +51,13 @@ const ligneVente = obj(
   },
   ["designation", "quantite", "prixUnitaireHT"],
 );
-// Ligne de devis/facture sans description d'unité (variante creer_et_envoyer_devis / creer_facture).
+/** Ligne de devis/facture sans description d'unité (variante creer_et_envoyer_devis / creer_facture). */
 const ligneVenteSimple = obj(
   { designation: str(), quantite: num(), unite: str(), prixUnitaireHT: num(), tauxTVA: num() },
   ["designation", "quantite", "prixUnitaireHT"],
 );
 
-// Description (longue) de la cible de navigation — assemblée à l'identique du legacy.
+/** Description (longue) de la cible de navigation — assemblée à l'identique du legacy. */
 const naviguerPageDescription =
   "Chemin de destination. DEEP-LINKS vers un document précis (utilise l'id réel retourné par l'outil de création) : /devis/<id>, /factures/<id>, /clients/<id>, /contrats/<id>, /commandes/<id>. " +
   "PAGES LISTE / SECTIONS (liste non exhaustive, choisis la plus pertinente) : " +
@@ -71,7 +71,7 @@ const naviguerPageDescription =
   "compte & réglages → /profil, /parametres, /modules, /import, /documentation, /support. " +
   "Pas de /interventions/<id> (la nav intervention va sur /interventions ou /calendrier).";
 
-// Les 23 outils exposés au modèle (parité legacy `AGENT_TOOLS`).
+/** Les 23 outils exposés au modèle (parité legacy `AGENT_TOOLS`). */
 export const ASSISTANT_TOOLS: readonly ToolSchema[] = [
   {
     name: "chercher_client",
@@ -326,12 +326,12 @@ export const TOOL_INVALIDATIONS: Record<string, readonly string[]> = {
  */
 export const WRITE_TOOL_NAMES: ReadonlySet<string> = new Set(Object.keys(TOOL_INVALIDATIONS));
 
-// Un outil a-t-il un effet d'écriture (vs lecture/navigation) ?
+/** Un outil a-t-il un effet d'écriture (vs lecture/navigation) ? */
 export function isWriteTool(name: string): boolean {
   return WRITE_TOOL_NAMES.has(name);
 }
 
-// Recherche d'un outil par nom (null si inconnu).
+/** Recherche d'un outil par nom (null si inconnu). */
 export function findTool(name: string): ToolSchema | null {
   return ASSISTANT_TOOLS.find((t) => t.name === name) ?? null;
 }

@@ -43,7 +43,7 @@ export function registerPaiementRoute(app: FastifyInstance, deps: PaiementRouteD
     }
   });
 
-  // POST : ouvre un Checkout Stripe (mode payment) pour payer une facture (public par token portail).
+  /** POST : ouvre un Checkout Stripe (mode payment) pour payer une facture (public par token portail). */
   app.post("/api/paiement/create-checkout-session", async (req, reply) => {
     const ip = extractClientIp((req.headers ?? {}) as Record<string, unknown>, req.ip ?? null);
     if (!(await deps.rateLimiter.check(`paiement:${ip}`))) {

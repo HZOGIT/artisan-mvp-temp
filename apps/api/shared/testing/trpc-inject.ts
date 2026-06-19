@@ -25,11 +25,13 @@ export interface InjectResult {
 
 function unwrap(raw: unknown): any {
   let env: any = raw;
-  if (Array.isArray(env)) env = env[0]; // tolérant au format batch (1 appel)
+  /** tolérant au format batch (1 appel) */
+  if (Array.isArray(env)) env = env[0];
   if (env && typeof env === "object" && env.result && "data" in env.result) {
     return { ...env, result: { ...env.result, data: superjson.deserialize(env.result.data) } };
   }
-  return env; // enveloppe d'erreur (ou forme inattendue) : passthrough
+  /** enveloppe d'erreur (ou forme inattendue) : passthrough */
+  return env;
 }
 
 export async function injectTrpc(

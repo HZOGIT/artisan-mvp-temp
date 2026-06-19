@@ -14,7 +14,7 @@ export function listRdvs(repo: IRdvRepository, ctx: TenantContext): Promise<Rdv[
   return repo.list(ctx);
 }
 
-// RDV enrichi de son client (le client UI lit `rdv.client.prenom/nom`).
+/** RDV enrichi de son client (le client UI lit `rdv.client.prenom/nom`). */
 export type RdvAvecClient = Rdv & { readonly client: Client | null };
 
 /*
@@ -39,7 +39,7 @@ export async function getRdv(repo: IRdvRepository, ctx: TenantContext, id: numbe
   return rdv;
 }
 
-// Comptes des RDV par statut, scopés tenant (parité legacy `rdv.getStats`).
+/** Comptes des RDV par statut, scopés tenant (parité legacy `rdv.getStats`). */
 export interface RdvStats {
   readonly enAttente: number;
   readonly confirmes: number;
@@ -55,7 +55,7 @@ export async function getRdvStats(repo: IRdvRepository, ctx: TenantContext): Pro
   };
 }
 
-// Nombre de RDV en attente, scopé tenant (parité legacy `rdv.getPendingCount`).
+/** Nombre de RDV en attente, scopé tenant (parité legacy `rdv.getPendingCount`). */
 export async function getRdvPendingCount(repo: IRdvRepository, ctx: TenantContext): Promise<number> {
   const rdvs = await repo.list(ctx);
   return rdvs.filter((r) => r.statut === "en_attente").length;

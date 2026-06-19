@@ -1,7 +1,7 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { ClientRef } from "../domain/import";
 
-// Données d'un client importé (parité legacy createClient, champs de l'import).
+/** Données d'un client importé (parité legacy createClient, champs de l'import). */
 export interface ImportClientData {
   readonly nom: string;
   readonly prenom?: string;
@@ -13,7 +13,7 @@ export interface ImportClientData {
   readonly notes?: string;
 }
 
-// Devis « léger » importé : montant TTC brut, sans lignes (reprise de données). Numéro généré serveur.
+/** Devis « léger » importé : montant TTC brut, sans lignes (reprise de données). Numéro généré serveur. */
 export interface ImportDevisData {
   readonly clientId: number;
   readonly objet: string;
@@ -24,10 +24,10 @@ export interface ImportDevisData {
   readonly notes?: string;
 }
 
-// Facture « légère » importée : montant TTC brut, sans lignes. Numéro généré serveur.
+/** Facture « légère » importée : montant TTC brut, sans lignes. Numéro généré serveur. */
 export interface ImportFactureData {
   readonly clientId: number;
-  // Numéro LÉGAL d'origine (autre logiciel) à PRÉSERVER ; si absent/vide → numéro serveur généré.
+  /** Numéro LÉGAL d'origine (autre logiciel) à PRÉSERVER ; si absent/vide → numéro serveur généré. */
   readonly numero?: string;
   readonly objet: string;
   readonly statut: string;

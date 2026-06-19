@@ -25,7 +25,8 @@ export async function genererRappelsFacturesEnRetard(
 
   for (const f of factures) {
     const lien = `/factures/${f.id}`;
-    if (await repo.existeNotificationActive(ctx, lien)) continue; // anti-doublon
+    /** anti-doublon */
+    if (await repo.existeNotificationActive(ctx, lien)) continue;
     const joursRetard = Math.max(0, Math.floor((now - f.dateEcheance.getTime()) / MS_PAR_JOUR));
     const montant = Number.parseFloat(f.totalTTC || "0").toFixed(2);
     await repo.creer(ctx, {

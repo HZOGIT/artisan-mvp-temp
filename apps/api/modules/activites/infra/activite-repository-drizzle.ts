@@ -25,7 +25,7 @@ function toActivite(r: Row): Activite {
   };
 }
 
-// Table d'appartenance par type d'entité (toutes sous RLS + colonne `artisanId`) pour l'anti-IDOR FK.
+/** Table d'appartenance par type d'entité (toutes sous RLS + colonne `artisanId`) pour l'anti-IDOR FK. */
 const ENTITE_TABLE = { client: clients, devis, facture: factures, chantier: chantiers } as const;
 
 /*
@@ -41,7 +41,7 @@ export class ActiviteRepositoryDrizzle implements IActiviteRepository {
         .select()
         .from(activites)
         .where(eq(activites.artisanId, ctx.artisanId))
-        // Parité legacy : « à faire » d'abord (fait asc) puis échéance croissante.
+        /** Parité legacy : « à faire » d'abord (fait asc) puis échéance croissante. */
         .orderBy(asc(activites.fait), asc(activites.echeance));
       return rows.map(toActivite);
     });

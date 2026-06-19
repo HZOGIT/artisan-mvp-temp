@@ -8,7 +8,7 @@ export interface PortalDocsFakeState {
   contrats?: Record<number, PortalContrat[]>;
 }
 
-// Fake en mémoire des lectures de documents du portail (indexé par clientId).
+/** Fake en mémoire des lectures de documents du portail (indexé par clientId). */
 export class PortalDocsReaderFake implements IPortalDocsReader {
   constructor(private readonly state: PortalDocsFakeState = {}) {}
   async listDevis(_ctx: TenantContext, clientId: number): Promise<PortalDevis[]> {

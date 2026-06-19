@@ -8,7 +8,7 @@ const couleur = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB
 const coutHoraire = z.string().regex(/^\d+(\.\d{1,2})?$/, "Coût horaire invalide").max(12);
 const statut = z.enum(["actif", "inactif", "conge"]);
 
-// Bornes alignées sur la table `techniciens` (defense-in-depth).
+/** Bornes alignées sur la table `techniciens` (defense-in-depth). */
 const createSchema = z.object({
   nom: z.string().min(1).max(255),
   prenom: z.string().max(255).nullish(),
@@ -112,7 +112,7 @@ export function createTechniciensRouter(repo: ITechnicienRepository) {
         return enregistrerPosition(repo, ctx.tenant, technicienId, data);
       }),
 
-    // ── Habilitations / certifications BTP (données salarié — anti-IDOR ownership) ────────────
+    /** ── Habilitations / certifications BTP (données salarié — anti-IDOR ownership) ──────────── */
     getHabilitations: protectedProcedure
       .input(z.object({ technicienId: z.number().int() }))
       .query(({ ctx, input }) => listHabilitations(repo, ctx.tenant, input.technicienId)),
@@ -140,7 +140,7 @@ export function createTechniciensRouter(repo: ITechnicienRepository) {
         return { success: true };
       }),
 
-    // Stats d'activité d'un technicien (interventions par statut). Anti-IDOR : hors tenant → 404.
+    /** Stats d'activité d'un technicien (interventions par statut). Anti-IDOR : hors tenant → 404. */
     getStats: protectedProcedure
       .input(z.object({ technicienId: z.number().int() }))
       .query(({ ctx, input }) => getStatsTechnicien(repo, ctx.tenant, input.technicienId)),

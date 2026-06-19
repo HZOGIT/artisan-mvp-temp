@@ -10,6 +10,6 @@ export interface IcalFeedData {
 }
 
 export interface IcalPublicReader {
-  // Résout l'artisan par son `icalToken` puis charge ses interventions depuis `since`. `null` si jeton inconnu.
+  /** Résout l'artisan par son `icalToken` puis charge ses interventions depuis `since`. `null` si jeton inconnu. */
   getFeedByToken(token: string, since: Date): Promise<IcalFeedData | null>;
 }

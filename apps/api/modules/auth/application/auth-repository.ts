@@ -5,29 +5,29 @@ import type { AuthCredentials, AuthUser } from "../domain/auth";
  * utilisateur s'authentifie AVANT d'avoir un tenant résolu). Lecture/écriture minimale d'auth.
  */
 export interface IAuthRepository {
-  // Identifiants (avec hash) pour la vérification du mot de passe au login ; null si email inconnu.
+  /** Identifiants (avec hash) pour la vérification du mot de passe au login ; null si email inconnu. */
   findCredentials(email: string): Promise<AuthCredentials | null>;
-  // Utilisateur complet (sans hash) par id — pour `me` ; null si introuvable.
+  /** Utilisateur complet (sans hash) par id — pour `me` ; null si introuvable. */
   getById(userId: number): Promise<AuthUser | null>;
-  // Met à jour `lastSignedIn` après un login réussi.
+  /** Met à jour `lastSignedIn` après un login réussi. */
   touchLastSignedIn(userId: number): Promise<void>;
-  // Identifiants (avec hash + statut actif) par id — pour la vérification de l'ancien MDP (updatePassword).
+  /** Identifiants (avec hash + statut actif) par id — pour la vérification de l'ancien MDP (updatePassword). */
   findCredentialsById(userId: number): Promise<AuthCredentials | null>;
-  // Email déjà utilisé par UN AUTRE utilisateur ? (unicité à la modification d'email). null si libre.
+  /** Email déjà utilisé par UN AUTRE utilisateur ? (unicité à la modification d'email). null si libre. */
   findIdByEmail(email: string): Promise<number | null>;
-  // Met à jour l'email de l'utilisateur.
+  /** Met à jour l'email de l'utilisateur. */
   updateEmail(userId: number, email: string): Promise<void>;
-  // Met à jour le hash du mot de passe.
+  /** Met à jour le hash du mot de passe. */
   updatePassword(userId: number, passwordHash: string): Promise<void>;
-  // Pose le jeton de reset (hash + expiry) sur un utilisateur.
+  /** Pose le jeton de reset (hash + expiry) sur un utilisateur. */
   setResetToken(userId: number, tokenHash: string, expiry: Date): Promise<void>;
-  // Utilisateur dont le jeton de reset (hash) est valide (non expiré) ; null sinon.
+  /** Utilisateur dont le jeton de reset (hash) est valide (non expiré) ; null sinon. */
   findByValidResetToken(tokenHash: string): Promise<{ id: number } | null>;
-  // Applique un nouveau mot de passe ET invalide le jeton de reset (atomique côté impl).
+  /** Applique un nouveau mot de passe ET invalide le jeton de reset (atomique côté impl). */
   resetPasswordWithToken(userId: number, passwordHash: string): Promise<void>;
-  // Soft-delete : `actif=false` + email neutralisé (réutilisable).
+  /** Soft-delete : `actif=false` + email neutralisé (réutilisable). */
   softDelete(userId: number, neutralizedEmail: string): Promise<void>;
-  // Crée un utilisateur (signup) : email + hash + name, loginMethod 'email'. Renvoie l'identité.
+  /** Crée un utilisateur (signup) : email + hash + name, loginMethod 'email'. Renvoie l'identité. */
   createUser(data: { email: string; passwordHash: string; name?: string | null }): Promise<{ id: number; email: string | null }>;
   /*
    * Provisionne le compte propriétaire (idempotent, parité `bootstrapArtisanAccount`) : artisan + lien

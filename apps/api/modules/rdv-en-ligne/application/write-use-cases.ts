@@ -20,9 +20,10 @@ export async function creerRdv(repo: IRdvRepository, ctx: TenantContext, input: 
     throw new ValidationError("La date proposée est invalide");
   }
   assertDuree(input.dureeEstimee);
-  // Anti-IDOR-FK : le client doit appartenir au tenant. NotFound (ne révèle pas l'existence cross-tenant).
+  /** Anti-IDOR-FK : le client doit appartenir au tenant. NotFound (ne révèle pas l'existence cross-tenant). */
   if (!(await repo.ownsClient(ctx, input.clientId))) throw new NotFoundError("Client introuvable");
-  return repo.create(ctx, input); // statut="en_attente" forcé par l'infra
+  /** statut="en_attente" forcé par l'infra */
+  return repo.create(ctx, input);
 }
 
 export async function modifierRdv(repo: IRdvRepository, ctx: TenantContext, id: number, input: UpdateRdvInput): Promise<Rdv> {

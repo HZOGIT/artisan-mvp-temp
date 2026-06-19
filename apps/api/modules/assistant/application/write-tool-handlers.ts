@@ -11,7 +11,7 @@ import type { ToolHandler } from "./assistant-tool-registry";
 const optStr = (v: unknown): string | undefined => (typeof v === "string" && v.trim() ? v : undefined);
 const errMsg = (e: unknown, fallback: string): string => (e instanceof Error && e.message ? e.message : fallback);
 
-// ── Ports d'écriture (satisfaits par les use-cases migrés via un petit adapter au câblage) ──────
+/** ── Ports d'écriture (satisfaits par les use-cases migrés via un petit adapter au câblage) ────── */
 export interface ClientCreateInput {
   readonly nom: string;
   readonly prenom?: string;
@@ -43,7 +43,7 @@ export interface InterventionCreateInput {
 export interface InterventionWriterForAgent {
   create(ctx: TenantContext, input: InterventionCreateInput): Promise<{ id: number; titre: string; dateDebut: Date; dateFin: Date | null }>;
 }
-// `modifier_intervention` : patch partiel (champs fournis seulement) ; ownership via le use-case migré.
+/** `modifier_intervention` : patch partiel (champs fournis seulement) ; ownership via le use-case migré. */
 export interface InterventionUpdatePatch {
   readonly titre?: string;
   readonly dateDebut?: Date;
@@ -105,7 +105,7 @@ export interface DevisSenderForAgent {
 export interface FactureSenderForAgent {
   envoyer(ctx: TenantContext, factureId: number, customMessage?: string): Promise<EnvoiResultForAgent>;
 }
-// Relance d'une facture impayée (use-case migré `envoyerRelanceFacture`, sans PDF).
+/** Relance d'une facture impayée (use-case migré `envoyerRelanceFacture`, sans PDF). */
 export interface RelanceSenderForAgent {
   envoyer(ctx: TenantContext, factureId: number, customMessage?: string): Promise<EnvoiResultForAgent>;
 }
@@ -142,7 +142,7 @@ export interface AssistantWriteDeps {
   readonly commandeSender?: CommandeSenderForAgent;
 }
 
-// `creer_client` : crée un client (nom requis ; `type` archivé en notes, parité legacy). `{clientId,nom,message}`.
+/** `creer_client` : crée un client (nom requis ; `type` archivé en notes, parité legacy). `{clientId,nom,message}`. */
 function makeCreerClient(clients: ClientWriterForAgent): ToolHandler {
   return async (args, ctx: TenantContext) => {
     const nom = typeof args?.nom === "string" ? args.nom : "";
@@ -257,7 +257,7 @@ async function creerDevisOrchestration(
 
 const PARAMS_DEVIS_MANQUANTS = "Paramètres manquants : clientId, objet et au moins une ligne sont requis";
 
-// `creer_devis` : crée un devis brouillon + ses lignes. Ownership client via le use-case migré.
+/** `creer_devis` : crée un devis brouillon + ses lignes. Ownership client via le use-case migré. */
 function makeCreerDevis(devis: DevisWriterForAgent): ToolHandler {
   return async (args, ctx: TenantContext) => {
     try {
@@ -379,7 +379,7 @@ function makeEnvoyerFacture(sender: FactureSenderForAgent): ToolHandler {
   };
 }
 
-// `envoyer_relance` : relance d'une facture impayée (use-case migré, sans PDF). factureId requis.
+/** `envoyer_relance` : relance d'une facture impayée (use-case migré, sans PDF). factureId requis. */
 function makeEnvoyerRelance(sender: RelanceSenderForAgent): ToolHandler {
   return async (args, ctx: TenantContext) => {
     if (!args?.factureId) return { ok: false, error: "factureId est requis" };
@@ -434,7 +434,7 @@ function makeCreerCommande(commandes: CommandeWriterForAgent): ToolHandler {
   };
 }
 
-// `envoyer_commande_fournisseur` : envoi par email (PDF joint) via le use-case migré.
+/** `envoyer_commande_fournisseur` : envoi par email (PDF joint) via le use-case migré. */
 function makeEnvoyerCommande(sender: CommandeSenderForAgent): ToolHandler {
   return async (args, ctx: TenantContext) => {
     if (!args?.commandeId) return { ok: false, error: "commandeId est requis" };

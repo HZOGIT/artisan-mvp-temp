@@ -15,13 +15,13 @@ export interface CreateAccessData {
  * (HORS RLS). Anti-IDOR : les ops admin vérifient l'appartenance du client au tenant en amont.
  */
 export interface IPortalAccessRepository {
-  // PUBLIC (token) : accès actif + non expiré, sinon null.
+  /** PUBLIC (token) : accès actif + non expiré, sinon null. */
   resolveByToken(token: string, now: Date): Promise<PortalAccessRef | null>;
-  // Met à jour la date de dernier accès (sous le tenant résolu).
+  /** Met à jour la date de dernier accès (sous le tenant résolu). */
   touchLastAccess(ctx: TenantContext, accessId: number, now: Date): Promise<void>;
-  // Lecture du client (scopé tenant résolu).
+  /** Lecture du client (scopé tenant résolu). */
   getClientInfo(ctx: TenantContext, clientId: number): Promise<ClientPortalInfo | null>;
-  // Lecture de l'artisan (HORS RLS, par id).
+  /** Lecture de l'artisan (HORS RLS, par id). */
   getArtisanPublic(artisanId: number): Promise<ArtisanPortalInfo | null>;
 
   /*
@@ -29,8 +29,8 @@ export interface IPortalAccessRepository {
    * Crée un accès portail (désactive un éventuel accès précédent du même client — parité legacy upsert).
    */
   createAccess(ctx: TenantContext, data: CreateAccessData): Promise<void>;
-  // Statut de l'accès d'un client (null si aucun).
+  /** Statut de l'accès d'un client (null si aucun). */
   getStatusByClientId(ctx: TenantContext, clientId: number): Promise<PortalAccessStatus | null>;
-  // Désactive l'accès portail d'un client (idempotent).
+  /** Désactive l'accès portail d'un client (idempotent). */
   deactivateByClientId(ctx: TenantContext, clientId: number): Promise<void>;
 }

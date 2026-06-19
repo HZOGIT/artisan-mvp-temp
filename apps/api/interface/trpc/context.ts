@@ -51,7 +51,7 @@ export function makeCreateContext(deps: ContextDeps = {}) {
      * si aucun roleReader n'est injecté, afin de ne pas régresser le câblage/les tests existants.
      */
     const role = claims ? (deps.roleReader ? await deps.roleReader.getRole(claims.userId) : tenant?.role ?? null) : null;
-    // Permissions résolues comme le rôle (INDÉPENDANT du tenant) ; vide si pas de reader/auth.
+    /** Permissions résolues comme le rôle (INDÉPENDANT du tenant) ; vide si pas de reader/auth. */
     const permissions = claims && deps.permissionsReader ? await deps.permissionsReader.getPermissions(claims.userId) : [];
     const headers = (opts.req.headers ?? {}) as Record<string, unknown>;
     const clientIp = extractClientIp(headers, opts.req.ip ?? null);

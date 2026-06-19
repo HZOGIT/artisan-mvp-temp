@@ -10,8 +10,10 @@ import type { BudgetCategorie, CreateBudgetInput, UpdateBudgetInput } from "../d
  * d'unicité immuable : l'update ne touche que les montants. Le scoping tenant est porté par le repo.
  */
 
-const MOIS = /^\d{4}-(0[1-9]|1[0-2])$/; // "YYYY-MM"
-const DECIMAL_2 = /^\d+(\.\d{1,2})?$/; // montant ≥ 0, 2 décimales max
+/** "YYYY-MM" */
+const MOIS = /^\d{4}-(0[1-9]|1[0-2])$/;
+/** montant ≥ 0, 2 décimales max */
+const DECIMAL_2 = /^\d+(\.\d{1,2})?$/;
 
 function assertMontant(valeur: string | undefined, label: string): void {
   if (valeur === undefined) return;
@@ -27,7 +29,8 @@ export async function creerBudget(
   if (!MOIS.test(input.mois)) throw new ValidationError("Le mois doit être au format YYYY-MM");
   assertMontant(input.budget, "budget");
   assertMontant(input.depenseReelle, "montant de dépense réelle");
-  return repo.create(ctx, input); // ConflictError (budget déjà présent pour (categorie, mois)) remonte du repo
+  /** ConflictError (budget déjà présent pour (categorie, mois)) remonte du repo */
+  return repo.create(ctx, input);
 }
 
 export async function modifierBudget(
@@ -38,7 +41,8 @@ export async function modifierBudget(
 ): Promise<BudgetCategorie> {
   assertMontant(input.budget, "budget");
   assertMontant(input.depenseReelle, "montant de dépense réelle");
-  const updated = await repo.update(ctx, id, input); // montants seuls (categorie/mois immuables)
+  /** montants seuls (categorie/mois immuables) */
+  const updated = await repo.update(ctx, id, input);
   if (!updated) throw new NotFoundError("Budget introuvable");
   return updated;
 }

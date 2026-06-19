@@ -8,7 +8,7 @@ import type {
   SignatureNotificationType,
 } from "../application/signature-repository";
 
-// Repo en mémoire pour les tests (sans RLS, comme la vraie table).
+/** Repo en mémoire pour les tests (sans RLS, comme la vraie table). */
 export class FakeSignatureRepository implements ISignatureRepository {
   private rows: Signature[] = [];
   private seq = 1;
@@ -62,7 +62,7 @@ export class FakeSignatureContextReader implements SignatureDevisContextReader {
   }
 }
 
-// Notification writer fake : collecte les notifications émises pour assertions.
+/** Notification writer fake : collecte les notifications émises pour assertions. */
 export class FakeSignatureNotificationWriter implements SignatureNotificationWriter {
   public emitted: Array<{ artisanId: number; type: SignatureNotificationType; titre: string; message: string; lien?: string }> = [];
 

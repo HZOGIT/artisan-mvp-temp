@@ -7,7 +7,7 @@ import type {
   UpdateNoteDeFraisInput,
 } from "../domain/note-de-frais";
 
-// Patch appliqué par une transition du workflow (statut + dates/commentaire correspondants).
+/** Patch appliqué par une transition du workflow (statut + dates/commentaire correspondants). */
 export interface NoteDeFraisWorkflowPatch {
   readonly statut: NoteDeFraisStatut;
   readonly dateSoumission?: string;
@@ -24,12 +24,12 @@ export interface NoteDeFraisWorkflowPatch {
  */
 export interface INoteDeFraisRepository {
   list(ctx: TenantContext): Promise<NoteDeFrais[]>;
-  // null si la note n'appartient pas au tenant.
+  /** null si la note n'appartient pas au tenant. */
   getById(ctx: TenantContext, id: number): Promise<NoteDeFrais | null>;
   create(ctx: TenantContext, input: CreateNoteDeFraisInput): Promise<NoteDeFrais>;
-  // null si la note n'appartient pas au tenant.
+  /** null si la note n'appartient pas au tenant. */
   update(ctx: TenantContext, id: number, input: UpdateNoteDeFraisInput): Promise<NoteDeFrais | null>;
-  // false si la note n'appartient pas au tenant.
+  /** false si la note n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
   /*
    * Applique une transition du workflow (statut + dates/commentaire), scopé tenant. null si la
@@ -53,11 +53,11 @@ export interface INoteDeFraisRepository {
    * Dépenses liées à une note (détails affichables), scopé tenant. [] si note hors tenant/sans lien.
    */
   getDepensesForNote(ctx: TenantContext, noteId: number): Promise<NoteFraisDepense[]>;
-  // Nombre de dépenses liées par note (pour la liste), scopé tenant : Map noteId → count.
+  /** Nombre de dépenses liées par note (pour la liste), scopé tenant : Map noteId → count. */
   countDepensesByNote(ctx: TenantContext): Promise<Map<number, number>>;
 
   addDepenseLink(ctx: TenantContext, noteId: number, depenseId: number): Promise<void>;
-  // Retire le lien (note du tenant requise ; skip silencieux sinon) puis recalcule `montant_total`.
+  /** Retire le lien (note du tenant requise ; skip silencieux sinon) puis recalcule `montant_total`. */
   removeDepenseLink(ctx: TenantContext, noteId: number, depenseId: number): Promise<void>;
 
   /*

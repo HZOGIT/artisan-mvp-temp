@@ -24,20 +24,20 @@ const LIB_JOURNAL: Record<JournalComptable, string> = {
   OD: "Opérations diverses",
 };
 
-// Nettoie un libellé (retire TAB/CR/LF, qui casseraient le format tabulé) ; trim.
+/** Nettoie un libellé (retire TAB/CR/LF, qui casseraient le format tabulé) ; trim. */
 function clean(v: string | null | undefined): string {
   return String(v ?? "").replace(/[\t\r\n]+/g, " ").trim();
 }
-// Montant FEC : 2 décimales, séparateur **virgule**.
+/** Montant FEC : 2 décimales, séparateur **virgule**. */
 function amt(v: string): string {
   return (Number(v) || 0).toFixed(2).replace(".", ",");
 }
-// Date FEC : YYYYMMDD.
+/** Date FEC : YYYYMMDD. */
 function ymd(d: Date): string {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
 }
 
-// Clé de pièce : (factureId, journal) — sinon (pieceRef, journal) si pas de factureId.
+/** Clé de pièce : (factureId, journal) — sinon (pieceRef, journal) si pas de factureId. */
 function clePiece(e: EcritureComptable): string {
   return `${e.factureId ?? `P:${e.pieceRef ?? ""}`}|${e.journal}`;
 }
@@ -48,7 +48,7 @@ function clePiece(e: EcritureComptable): string {
  * la date d'écriture).
  */
 export function exporterFEC(ecritures: readonly EcritureComptable[]): string {
-  // Attribue un EcritureNum incrémental par pièce, dans l'ordre chronologique d'apparition.
+  /** Attribue un EcritureNum incrémental par pièce, dans l'ordre chronologique d'apparition. */
   const tri = ecritures
     .slice()
     .sort((a, b) => a.dateEcriture.getTime() - b.dateEcriture.getTime() || a.id - b.id);
@@ -65,24 +65,24 @@ export function exporterFEC(ecritures: readonly EcritureComptable[]): string {
     const dateF = ymd(e.dateEcriture);
     lignes.push(
       [
-        e.journal, // JournalCode
-        LIB_JOURNAL[e.journal], // JournalLib
-        String(num), // EcritureNum
-        dateF, // EcritureDate
-        e.numeroCompte, // CompteNum
-        clean(e.libelleCompte), // CompteLib
-        "", // CompAuxNum
-        "", // CompAuxLib
-        clean(e.pieceRef), // PieceRef
-        dateF, // PieceDate
-        clean(e.libelle), // EcritureLib
-        amt(e.debit), // Debit
-        amt(e.credit), // Credit
-        clean(e.lettrage), // EcritureLet
-        "", // DateLet
-        dateF, // ValidDate
-        "", // Montantdevise
-        "", // Idevise
+        e.journal,
+        LIB_JOURNAL[e.journal],
+        String(num),
+        dateF,
+        e.numeroCompte,
+        clean(e.libelleCompte),
+        "",
+        "",
+        clean(e.pieceRef),
+        dateF,
+        clean(e.libelle),
+        amt(e.debit),
+        amt(e.credit),
+        clean(e.lettrage),
+        "",
+        dateF,
+        "",
+        "",
       ].join(SEP),
     );
   }

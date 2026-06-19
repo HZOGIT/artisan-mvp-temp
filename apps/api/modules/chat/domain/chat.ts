@@ -22,7 +22,7 @@ export interface Conversation {
   readonly updatedAt: Date;
 }
 
-// Client minimal joint à la conversation (la vue artisan affiche le nom/email du client).
+/** Client minimal joint à la conversation (la vue artisan affiche le nom/email du client). */
 export interface ChatClient {
   readonly id: number;
   readonly nom: string;
@@ -45,12 +45,12 @@ export interface Message {
   readonly createdAt: Date;
 }
 
-// Aperçu du dernier message stocké sur la conversation (parité legacy : 100 premiers caractères).
+/** Aperçu du dernier message stocké sur la conversation (parité legacy : 100 premiers caractères). */
 export function apercu(contenu: string): string {
   return contenu.substring(0, 100);
 }
 
-// Échappement HTML minimal (parité legacy `safeHtml`) avant injection dans l'email de notification.
+/** Échappement HTML minimal (parité legacy `safeHtml`) avant injection dans l'email de notification. */
 export function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")

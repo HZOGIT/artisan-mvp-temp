@@ -45,9 +45,10 @@ export class ChatClientNotifierDrizzle implements ChatClientNotifier {
         portalLink: portal?.token ? `${this.appUrl}/portail/${portal.token}` : null,
       };
     });
-    if (!data) return; // pas d'email client → rien à envoyer
+    /** pas d'email client → rien à envoyer */
+    if (!data) return;
 
-    // Anti-spam : au-delà du quota, on saute l'email (le message in-app reste créé). Parité legacy.
+    /** Anti-spam : au-delà du quota, on saute l'email (le message in-app reste créé). Parité legacy. */
     if (!(await this.rateLimiter.check(`chat:${ctx.artisanId}`))) return;
 
     const { subject, body } = buildNewMessageEmail({ clientName: data.clientName, artisanName: data.artisanName, contenu, portalLink: data.portalLink });

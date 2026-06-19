@@ -13,9 +13,9 @@ import { createFacturesRouter } from "./interface/trpc/factures.router";
 export interface FacturesModuleDeps {
   readonly repository: IFactureRepository;
   readonly devisReader: IDevisReader;
-  // Port compta (FEC). Optionnel : no-op tant que le domaine compta n'est pas porté.
+  /** Port compta (FEC). Optionnel : no-op tant que le domaine compta n'est pas porté. */
   readonly compta?: ComptaPort;
-  // Composition de l'envoi par email (lecture artisan/client + PdfPort + EmailPort + rate-limiter).
+  /** Composition de l'envoi par email (lecture artisan/client + PdfPort + EmailPort + rate-limiter). */
   readonly mailing: FactureMailingDeps;
 }
 

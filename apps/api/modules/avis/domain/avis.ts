@@ -1,4 +1,4 @@
-// Types de domaine du module avis (avis clients) — découplés du schéma Drizzle.
+/** Types de domaine du module avis (avis clients) — découplés du schéma Drizzle. */
 
 export type StatutAvis = "en_attente" | "publie" | "masque";
 
@@ -17,7 +17,7 @@ export interface Avis {
   readonly updatedAt: Date;
 }
 
-// Résumés des entités liées exposés avec l'avis (lecture composite, parité legacy).
+/** Résumés des entités liées exposés avec l'avis (lecture composite, parité legacy). */
 export interface AvisClientResume {
   readonly id: number;
   readonly nom: string;
@@ -40,7 +40,7 @@ export interface AvisEnrichi extends Avis {
   readonly intervention: AvisInterventionResume | null;
 }
 
-// Répartition des notes (1 à 5) + moyenne + total.
+/** Répartition des notes (1 à 5) + moyenne + total. */
 export interface AvisStats {
   readonly moyenne: number;
   readonly total: number;

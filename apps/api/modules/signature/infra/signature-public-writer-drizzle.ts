@@ -84,7 +84,7 @@ export class SignaturePublicWriterDrizzle implements SignaturePublicWriter {
 
   getOptionDevisId(ctx: TenantContext, optionId: number): Promise<number | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // `devis_options` n'a pas d'artisanId → on vérifie l'appartenance via le devis parent (RLS).
+      /** `devis_options` n'a pas d'artisanId → on vérifie l'appartenance via le devis parent (RLS). */
       const [o] = await tx
         .select({ devisId: devisOptions.devisId })
         .from(devisOptions)
@@ -97,7 +97,7 @@ export class SignaturePublicWriterDrizzle implements SignaturePublicWriter {
 
   selectOption(ctx: TenantContext, devisId: number, optionId: number): Promise<void> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Une seule option `selectionnee` par devis : reset les autres puis set celle-ci.
+      /** Une seule option `selectionnee` par devis : reset les autres puis set celle-ci. */
       await tx.update(devisOptions).set({ selectionnee: false }).where(eq(devisOptions.devisId, devisId));
       await tx
         .update(devisOptions)

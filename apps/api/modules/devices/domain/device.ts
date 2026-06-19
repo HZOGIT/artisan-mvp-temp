@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-// Appareil/session d'un utilisateur (parité legacy `devices`). Table HORS RLS, scopée par `user_id`.
+/** Appareil/session d'un utilisateur (parité legacy `devices`). Table HORS RLS, scopée par `user_id`. */
 export interface Device {
   readonly id: number;
   readonly deviceFingerprint: string;
@@ -21,7 +21,8 @@ export function detectDeviceType(ua: string): "desktop" | "mobile" | "tablet" {
   if (!ua) return "desktop";
   if (/iPad|Tablet|PlayBook|Silk/i.test(ua)) return "tablet";
   if (/Mobile|iPhone|Android/i.test(ua)) {
-    if (/Android/i.test(ua) && !/Mobile/i.test(ua)) return "tablet"; // Android sans "Mobile" = tablette
+    /** Android sans "Mobile" = tablette */
+    if (/Android/i.test(ua) && !/Mobile/i.test(ua)) return "tablet";
     return "mobile";
   }
   return "desktop";
@@ -29,7 +30,7 @@ export function detectDeviceType(ua: string): "desktop" | "mobile" | "tablet" {
 
 export function detectBrowser(ua: string): string {
   if (!ua) return "Unknown";
-  // Ordre important : Edge contient "Chrome", Chrome contient "Safari".
+  /** Ordre important : Edge contient "Chrome", Chrome contient "Safari". */
   if (/Edg\//i.test(ua)) return "Edge";
   if (/OPR\/|Opera/i.test(ua)) return "Opera";
   if (/Firefox/i.test(ua)) return "Firefox";

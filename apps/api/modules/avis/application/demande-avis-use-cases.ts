@@ -22,7 +22,7 @@ export interface DemandeAvisDeps {
 const DUREE_VALIDITE_JOURS = 14;
 
 function rateLimitKey(artisanId: number): string {
-  // Clé dédiée (distincte des autres envois) pour ne pas partager le quota.
+  /** Clé dédiée (distincte des autres envois) pour ne pas partager le quota. */
   return `avis:${artisanId}`;
 }
 
@@ -66,7 +66,7 @@ async function creerEtEnvoyer(
   return demande;
 }
 
-// Envoie une demande d'avis pour une intervention donnée (parité legacy envoyerDemande).
+/** Envoie une demande d'avis pour une intervention donnée (parité legacy envoyerDemande). */
 export async function envoyerDemandeAvis(
   deps: DemandeAvisDeps,
   ctx: TenantContext,
@@ -82,7 +82,7 @@ export async function envoyerDemandeAvis(
   return creerEtEnvoyer(deps, ctx, { ...client, email: client.email }, intervention);
 }
 
-// Envoie une demande d'avis pour un client (trouve sa dernière intervention).
+/** Envoie une demande d'avis pour un client (trouve sa dernière intervention). */
 export async function envoyerDemandeAvisParClient(
   deps: DemandeAvisDeps,
   ctx: TenantContext,

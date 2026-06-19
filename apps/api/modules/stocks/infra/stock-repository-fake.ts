@@ -25,7 +25,7 @@ export class FakeStockRepository implements IStockRepository {
   private seq = 0;
   private mvSeq = 0;
 
-  // Aide de test (hors port) : déclare l'entrant (commandes non reçues) d'un tenant.
+  /** Aide de test (hors port) : déclare l'entrant (commandes non reçues) d'un tenant. */
   seedEntrant(artisanId: number, entrant: StockEntrant[]): void {
     this.entrants.set(artisanId, entrant);
   }
@@ -40,7 +40,7 @@ export class FakeStockRepository implements IStockRepository {
 
   async create(ctx: TenantContext, input: CreateStockInput): Promise<Stock> {
     const now = new Date();
-    // Mirroir du formatage PG numeric(_,2) (ex. "3" stocké → "3.00") pour fidélité au repo réel.
+    /** Mirroir du formatage PG numeric(_,2) (ex. "3" stocké → "3.00") pour fidélité au repo réel. */
     const num = (v: string | undefined, fallback: string) => (v != null ? Number(v).toFixed(2) : fallback);
     const s: Stock = {
       id: ++this.seq,
@@ -65,7 +65,7 @@ export class FakeStockRepository implements IStockRepository {
   async update(ctx: TenantContext, id: number, input: UpdateStockInput): Promise<Stock | null> {
     const s = await this.getById(ctx, id);
     if (!s) return null;
-    // `input` n'a pas `quantiteEnStock` → la quantité reste intacte.
+    /** `input` n'a pas `quantiteEnStock` → la quantité reste intacte. */
     const updated: Stock = { ...s, ...input, updatedAt: new Date() };
     this.store = this.store.map((x) => (x.id === id ? updated : x));
     return updated;

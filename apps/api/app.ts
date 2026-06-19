@@ -256,13 +256,13 @@ export interface AppDeps extends ContextDeps {
    */
   readonly vehiculeRepo?: IVehiculeRepository;
   readonly avisRepo?: IAvisRepository;
-  // Dépendances du workflow demande d'avis (injectables en test : email/rate-limiter fakes).
+  /** Dépendances du workflow demande d'avis (injectables en test : email/rate-limiter fakes). */
   readonly demandeAvisRepo?: IDemandeAvisRepository;
   readonly emailPort?: EmailPort;
   readonly rateLimiter?: RateLimiterPort;
-  // Port LLM (Gemini) + rate-limiter IA dédié — injectables en test (FakeLlmPort déterministe).
+  /** Port LLM (Gemini) + rate-limiter IA dédié — injectables en test (FakeLlmPort déterministe). */
   readonly llm?: LlmPort;
-  // Provider LLM AGENTIQUE (function-calling) de l'assistant ; injectable en test (FakeLlmAgenticPort).
+  /** Provider LLM AGENTIQUE (function-calling) de l'assistant ; injectable en test (FakeLlmAgenticPort). */
   readonly llmAgentic?: LlmAgenticPort;
   readonly iaRateLimiter?: RateLimiterPort;
   readonly ocrVision?: VisionPort;
@@ -322,7 +322,7 @@ export interface AppDeps extends ContextDeps {
   readonly tresorerieReader?: TresorerieReader;
 }
 
-// Construit l'instance Fastify du nouveau stack : /health + tRPC monté sur /api/trpc.
+/** Construit l'instance Fastify du nouveau stack : /health + tRPC monté sur /api/trpc. */
 export function buildApp(deps: AppDeps = {}): FastifyInstance {
   /*
    * ⚠️ maxParamLength : le client tRPC (`httpBatchLink`) concatène N procédures dans le segment
@@ -395,9 +395,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
    * (convertToFacture). Hoisté pour éviter le TDZ (devis se compose avant le module factures).
    */
   const factureRepo = deps.factureRepo ?? new FactureRepositoryDrizzle(getDbHandle().db);
-  // Repo modèles de devis partagé : module modelesDevis + composé par devis (getModeles/…).
+  /** Repo modèles de devis partagé : module modelesDevis + composé par devis (getModeles/…). */
   const modeleDevisRepo = deps.modeleDevisRepo ?? new ModeleDevisRepositoryDrizzle(getDbHandle().db);
-  // Repo relances partagé : module relancesDevis + composé par devis (envoyerRelance/…).
+  /** Repo relances partagé : module relancesDevis + composé par devis (envoyerRelance/…). */
   const relanceDevisRepo = deps.relanceDevisRepo ?? new RelanceDevisRepositoryDrizzle(getDbHandle().db);
   const fournisseurs = createFournisseursModule({
     repository: fournisseurRepo,
@@ -480,7 +480,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     noteRepository: noteDeFraisRepo,
     transactionRepository: deps.transactionBancaireRepo ?? new TransactionBancaireRepositoryDrizzle(getDbHandle().db),
     fecReader: deps.fecReader ?? new FecReaderDrizzle(getDbHandle().db),
-    // OCR justificatif : Gemini vision + rate-limiter IA dédié (injectables en test : FakeVisionPort).
+    /** OCR justificatif : Gemini vision + rate-limiter IA dédié (injectables en test : FakeVisionPort). */
     ocr: deps.ocrVision
       ? { vision: deps.ocrVision, rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000) }
       : { vision: new GeminiVisionAdapter(), rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000) },
@@ -505,13 +505,13 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
      * `factureRepo` (hoisté) + lecteur devis vu factures.
      */
     converter: new FacturesDevisToFactureConverter(factureRepo, new DevisReaderDrizzle(getDbHandle().db)),
-    // Modèles de devis exposés sous `devis.*` : repo partagé avec le module modelesDevis.
+    /** Modèles de devis exposés sous `devis.*` : repo partagé avec le module modelesDevis. */
     modeleRepository: modeleDevisRepo,
-    // Relances exposées sous `devis.*` : repo partagé avec le module relancesDevis.
+    /** Relances exposées sous `devis.*` : repo partagé avec le module relancesDevis. */
     relanceRepository: relanceDevisRepo,
-    // getDevisNonSignes : lecture signature (signatures_devis, scopée par le devis parent possédé).
+    /** getDevisNonSignes : lecture signature (signatures_devis, scopée par le devis parent possédé). */
     signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db),
-    // genererLignesIA : LlmPort (Gemini) + rate-limiter IA dédié (budget horaire par artisan).
+    /** genererLignesIA : LlmPort (Gemini) + rate-limiter IA dédié (budget horaire par artisan). */
     ia: { llm: deps.llm ?? new GeminiLlmAdapter(), rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000) },
   });
   /*
@@ -555,9 +555,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
       artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
     },
-    // Catalogue partagé (lecture publique) : reader NON tenant (table sans artisanId, RLS OFF).
+    /** Catalogue partagé (lecture publique) : reader NON tenant (table sans artisanId, RLS OFF). */
     bibliotheque: deps.bibliothequeReader ?? new BibliothequeReaderDrizzle(getDbHandle().db),
-    // Écritures catalogue : writer NON tenant, garde admin portée par la procédure tRPC.
+    /** Écritures catalogue : writer NON tenant, garde admin portée par la procédure tRPC. */
     bibliothequeWriter: deps.bibliothequeWriter ?? new BibliothequeWriterDrizzle(getDbHandle().db),
   });
   const parametres = createParametresModule({
@@ -601,9 +601,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   });
   const previsionsCA = createPrevisionsCAModule({
     repository: deps.previsionCARepo ?? new PrevisionCARepositoryDrizzle(getDbHandle().db),
-    // `calculer` agrège le CA réalisé depuis les factures PAYÉES (reader cross-domaine, scopé tenant).
+    /** `calculer` agrège le CA réalisé depuis les factures PAYÉES (reader cross-domaine, scopé tenant). */
     facturesCAReader: deps.facturesCAReader ?? new FacturesCAReaderDrizzle(getDbHandle().db),
-    // `getTresoreriePrevisionnelle` : créances + avoirs + dépenses récurrentes (reader cross-domaine).
+    /** `getTresoreriePrevisionnelle` : créances + avoirs + dépenses récurrentes (reader cross-domaine). */
     tresorerieReader: deps.tresorerieReader ?? new TresorerieReaderDrizzle(getDbHandle().db),
   });
   const artisan = createArtisanModule({
@@ -751,11 +751,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     rateLimiter: new SlidingWindowRateLimiter(5, 15 * 60 * 1000),
     destinataire: process.env.SUPPORT_EMAIL ?? "support@operioz.com",
   });
-  // Module `devices` (appareils/sessions de l'utilisateur). Table HORS RLS scopée par userId.
+  /** Module `devices` (appareils/sessions de l'utilisateur). Table HORS RLS scopée par userId. */
   const devices = createDevicesModule({ repo: new DeviceRepositoryDrizzle(getDbHandle().db) });
-  // Module `alertesPrevisions` (alertes du prévisionnel de trésorerie). Tables SOUS RLS (artisanId).
+  /** Module `alertesPrevisions` (alertes du prévisionnel de trésorerie). Tables SOUS RLS (artisanId). */
   const alertesPrevisions = createAlertesPrevisionsModule({ repo: new AlertesPrevisionsRepositoryDrizzle(getDbHandle().db) });
-  // Module `importErp` (import de reprise de données : clients/devis/factures légers). Tables SOUS RLS.
+  /** Module `importErp` (import de reprise de données : clients/devis/factures légers). Tables SOUS RLS. */
   const importErp = createImportErpModule({ repo: new ImportErpRepositoryDrizzle(getDbHandle().db) });
   /*
    * Module `interventionsMobile` (app mobile technicien). Compose les repos migrés interventions/clients/
@@ -834,9 +834,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       createContext: makeCreateContext({
         jwtSecret: deps.jwtSecret,
         resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
-        // Rôle résolu indépendamment du tenant (admin staff sans artisan) → garde `adminProcedure`.
+        /** Rôle résolu indépendamment du tenant (admin staff sans artisan) → garde `adminProcedure`. */
         roleReader: deps.roleReader ?? new DrizzleUserRoleReader(getDbHandle().db),
-        // Permissions résolues idem (table `permissions_utilisateur`) → garde `permissionProcedure`.
+        /** Permissions résolues idem (table `permissions_utilisateur`) → garde `permissionProcedure`. */
         permissionsReader: deps.permissionsReader ?? new DrizzlePermissionsReader(getDbHandle().db),
       }),
     },
@@ -887,7 +887,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     csvReader: new FacturesCsvReaderDrizzle(getDbHandle().db),
   });
 
-  // §4 HORS-tRPC : statut de paiement + ouverture d'un Checkout (portail client, public par token).
+  /** §4 HORS-tRPC : statut de paiement + ouverture d'un Checkout (portail client, public par token). */
   registerPaiementRoute(app, {
     reader: new PortalPaymentReaderDrizzle(getDbHandle().db),
     writer: new PortalPaymentWriterDrizzle(getDbHandle().db),
@@ -896,7 +896,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
   });
 
-  // §4 HORS-tRPC : recherche publique du catalogue de référence (`/api/articles/search`, sans auth).
+  /** §4 HORS-tRPC : recherche publique du catalogue de référence (`/api/articles/search`, sans auth). */
   registerArticlesSearchRoute(app, {
     reader: new PublicArticleSearchReaderDrizzle(getDbHandle().db),
     rateLimiter: new SlidingWindowRateLimiter(120, 60 * 1000),
@@ -921,7 +921,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     buildAssistantWriteHandlersFromRepos(
       { clientRepo, interventionRepo, devisRepo, factureRepo, devisReader: new DevisReaderDrizzle(getDbHandle().db), commandeRepo },
       {
-        // Mailing deps (parité des routes d'envoi migrées : readers contact + PdfPort/EmailPort legacy + rate-limit).
+        /** Mailing deps (parité des routes d'envoi migrées : readers contact + PdfPort/EmailPort legacy + rate-limit). */
         devis: { artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db), clientReader: new SharedClientReaderDrizzle(getDbHandle().db), signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db), appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com", pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
         facture: { artisanReader: new ArtisanReaderDrizzle(getDbHandle().db), clientReader: new ClientReaderDrizzle(getDbHandle().db), pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
         relance: { artisanReader: new ArtisanReaderDrizzle(getDbHandle().db), clientReader: new ClientReaderDrizzle(getDbHandle().db), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
@@ -1074,10 +1074,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
    */
   registerFontsRoute(app);
 
-  // §4 HORS-tRPC : télémétrie d'erreur fire-and-forget (`/api/voice/debug`, PUBLIC, sendBeacon).
+  /** §4 HORS-tRPC : télémétrie d'erreur fire-and-forget (`/api/voice/debug`, PUBLIC, sendBeacon). */
   registerVoiceDebugRoute(app, { rateLimiter: new SlidingWindowRateLimiter(30, 60 * 1000) });
 
-  // §4 HORS-tRPC : persistance des transcripts de la session vocale (`/api/voice/persist`, auth cookie).
+  /** §4 HORS-tRPC : persistance des transcripts de la session vocale (`/api/voice/persist`, auth cookie). */
   registerVoiceRoute(app, {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
@@ -1085,7 +1085,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     threadWriter: new AssistantThreadWriterDrizzle(getDbHandle().db),
   });
 
-  // Expose le routeur racine assemblé (introspection : garde-fou de cohérence des domaines montés).
+  /** Expose le routeur racine assemblé (introspection : garde-fou de cohérence des domaines montés). */
   app.decorate("appRouter", appRouter);
 
   return app;

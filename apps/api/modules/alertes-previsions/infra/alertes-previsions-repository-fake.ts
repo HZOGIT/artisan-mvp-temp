@@ -9,7 +9,7 @@ export interface AlertesFakeState {
   historique?: AlerteHistorique[];
 }
 
-// Fake en mémoire du repository alertes-prévisions (scope tenant implicite — un seul tenant par fake).
+/** Fake en mémoire du repository alertes-prévisions (scope tenant implicite — un seul tenant par fake). */
 export class AlertesPrevisionsRepositoryFake implements IAlertesPrevisionsRepository {
   config: AlerteConfig | null;
   previsionCA: number | null;

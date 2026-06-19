@@ -9,10 +9,11 @@ import type {
 } from "../application/portal-payment-reader";
 import type { PortalPaymentWriter } from "../application/portal-payment-writer";
 
-// Reader paiement portail fake (in-memory) pour les tests des use-cases.
+/** Reader paiement portail fake (in-memory) pour les tests des use-cases. */
 export class FakePortalPaymentReader implements PortalPaymentReader {
   private access = new Map<string, PortalAccess>();
-  private factures = new Map<string, FacturePaiementStatut>(); // clé `${artisanId}:${factureId}`
+  /** clé `${artisanId}:${factureId}` */
+  private factures = new Map<string, FacturePaiementStatut>();
   private paiements = new Map<string, DernierPaiement>();
   private checkouts = new Map<string, FactureCheckout>();
   private contacts = new Map<string, ClientContact>();
@@ -58,7 +59,7 @@ export class FakePortalPaymentReader implements PortalPaymentReader {
   }
 }
 
-// Writer paiement portail fake : collecte les paiements créés (assertions).
+/** Writer paiement portail fake : collecte les paiements créés (assertions). */
 export class FakePortalPaymentWriter implements PortalPaymentWriter {
   public created: Array<{ artisanId: number; factureId: number; stripeSessionId: string; tokenPaiement: string }> = [];
   async createPaiement(

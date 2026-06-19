@@ -1,7 +1,7 @@
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
-// Le nouveau stack est PostgreSQL-only : pas d'indirection de dialecte ici.
+/** Le nouveau stack est PostgreSQL-only : pas d'indirection de dialecte ici. */
 export type DbClient = NodePgDatabase<Record<string, never>>;
 
 export interface DbHandle {

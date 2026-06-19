@@ -10,7 +10,7 @@ import type { EquipeMembre, EquipeMembreArtisan } from "../domain/intervention";
  * (→ Forbidden sinon, parité « Technicien non autorisé »). `artisanId` forcé serveur par le repo.
  */
 
-// Membres d'équipe d'une intervention (ownership de l'intervention requis → 404 sinon).
+/** Membres d'équipe d'une intervention (ownership de l'intervention requis → 404 sinon). */
 export async function getEquipeIntervention(
   repo: IInterventionRepository,
   ctx: TenantContext,
@@ -20,12 +20,12 @@ export async function getEquipeIntervention(
   return repo.listEquipe(ctx, interventionId);
 }
 
-// Toutes les équipes du tenant (1 requête). Lecture scopée — pas d'ownership ponctuel.
+/** Toutes les équipes du tenant (1 requête). Lecture scopée — pas d'ownership ponctuel. */
 export function getEquipesArtisan(repo: IInterventionRepository, ctx: TenantContext): Promise<EquipeMembreArtisan[]> {
   return repo.listEquipesArtisan(ctx);
 }
 
-// Ajoute un membre : intervention possédée (404) + technicien du tenant (403) ; idempotent.
+/** Ajoute un membre : intervention possédée (404) + technicien du tenant (403) ; idempotent. */
 export async function ajouterMembreEquipe(
   repo: IInterventionRepository,
   ctx: TenantContext,
@@ -36,7 +36,7 @@ export async function ajouterMembreEquipe(
   return repo.addMembreEquipe(ctx, { interventionId: input.interventionId, technicienId: input.technicienId, role: input.role ?? null });
 }
 
-// Retire un membre par id de liaison (scopé tenant ; idempotent — no-op si absent/hors tenant).
+/** Retire un membre par id de liaison (scopé tenant ; idempotent — no-op si absent/hors tenant). */
 export async function retirerMembreEquipe(repo: IInterventionRepository, ctx: TenantContext, id: number): Promise<void> {
   await repo.removeMembreEquipe(ctx, id);
 }

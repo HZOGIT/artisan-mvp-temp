@@ -63,12 +63,12 @@ export function createDemandesContactRouter(repo: IDemandeContactRepository) {
         return { success: true };
       }),
 
-    // Transitions de statut (état machine) — chacune valide la légalité depuis le statut courant.
+    /** Transitions de statut (état machine) — chacune valide la légalité depuis le statut courant. */
     marquerContacte: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => marquerContacte(repo, ctx.tenant, input.id)),
 
-    // Conversion : `clientId` optionnel (anti-IDOR vérifié au use-case).
+    /** Conversion : `clientId` optionnel (anti-IDOR vérifié au use-case). */
     convertir: protectedProcedure
       .input(z.object({ id: z.number().int(), clientId: z.number().int().optional() }))
       .mutation(({ ctx, input }) => convertir(repo, ctx.tenant, input.id, input.clientId)),

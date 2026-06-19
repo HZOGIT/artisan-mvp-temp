@@ -18,15 +18,15 @@ export interface SetStatutOptions {
  */
 export interface IRdvRepository {
   list(ctx: TenantContext): Promise<Rdv[]>;
-  // null si le RDV n'appartient pas au tenant.
+  /** null si le RDV n'appartient pas au tenant. */
   getById(ctx: TenantContext, id: number): Promise<Rdv | null>;
   create(ctx: TenantContext, input: CreateRdvInput): Promise<Rdv>;
-  // Met à jour les métadonnées (jamais le statut). null si le RDV n'appartient pas au tenant.
+  /** Met à jour les métadonnées (jamais le statut). null si le RDV n'appartient pas au tenant. */
   update(ctx: TenantContext, id: number, input: UpdateRdvInput): Promise<Rdv | null>;
-  // Applique une transition de statut (+ motifRefus / interventionId optionnels). null si hors tenant.
+  /** Applique une transition de statut (+ motifRefus / interventionId optionnels). null si hors tenant. */
   setStatut(ctx: TenantContext, id: number, statut: RdvStatut, options?: SetStatutOptions): Promise<Rdv | null>;
-  // false si le RDV n'appartient pas au tenant.
+  /** false si le RDV n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
-  // Le client appartient-il au tenant ? (anti-IDOR-FK)
+  /** Le client appartient-il au tenant ? (anti-IDOR-FK) */
   ownsClient(ctx: TenantContext, clientId: number): Promise<boolean>;
 }

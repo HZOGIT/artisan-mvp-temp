@@ -1,4 +1,4 @@
-// Port de stockage d'objets (justificatifs, photos, PDF générés…).
+/** Port de stockage d'objets (justificatifs, photos, PDF générés…). */
 export interface PutOptions {
   readonly contentType?: string;
 }

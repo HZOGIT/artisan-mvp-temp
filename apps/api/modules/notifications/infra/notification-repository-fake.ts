@@ -3,7 +3,7 @@ import type { INotificationRepository } from "../application/notification-reposi
 import type { Notification, ListNotificationsOptions } from "../domain/notification";
 import type { FactureEnRetard, CreerNotificationInput } from "../domain/facture-en-retard";
 
-// Entrée de seed pour les tests (les notifications naissent côté serveur/scheduler).
+/** Entrée de seed pour les tests (les notifications naissent côté serveur/scheduler). */
 export interface SeedNotificationInput {
   readonly artisanId: number;
   readonly titre: string;
@@ -25,12 +25,12 @@ export class FakeNotificationRepository implements INotificationRepository {
   private facturesRetard = new Map<number, FactureEnRetard[]>();
   private seq = 0;
 
-  // Utilitaire de test (hors port) : déclare les factures en retard d'un tenant.
+  /** Utilitaire de test (hors port) : déclare les factures en retard d'un tenant. */
   seedFacturesEnRetard(artisanId: number, list: FactureEnRetard[]): void {
     this.facturesRetard.set(artisanId, list);
   }
 
-  // Utilitaire de test (hors port) : insère une notification d'un tenant.
+  /** Utilitaire de test (hors port) : insère une notification d'un tenant. */
   seed(input: SeedNotificationInput): Notification {
     const n: Notification = {
       id: ++this.seq,
@@ -41,7 +41,8 @@ export class FakeNotificationRepository implements INotificationRepository {
       lien: null,
       lu: input.lu ?? false,
       archived: input.archived ?? false,
-      createdAt: new Date(Date.now() + this.seq), // ordre stable d'insertion
+      /** ordre stable d'insertion */
+      createdAt: new Date(Date.now() + this.seq),
     };
     this.store.push(n);
     return n;

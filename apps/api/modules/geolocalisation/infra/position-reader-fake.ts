@@ -2,7 +2,7 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { ITechnicienPositionReader } from "../application/position-reader";
 import type { TechnicienAvecPosition } from "../domain/position";
 
-// Lecteur fake déterministe : techniciens (+ dernière position) par tenant.
+/** Lecteur fake déterministe : techniciens (+ dernière position) par tenant. */
 export class FakeTechnicienPositionReader implements ITechnicienPositionReader {
   private readonly byTenant = new Map<number, TechnicienAvecPosition[]>();
 

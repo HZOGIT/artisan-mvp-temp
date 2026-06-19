@@ -3,7 +3,7 @@
  * (cookie `token`). ⚠️ SENSIBLE : un bug = lockout. Hash bcrypt (PasswordHasher), claims JWT `{userId,email}`.
  */
 
-// Utilisateur exposé par `me`/`signin` (jamais le hash de mot de passe).
+/** Utilisateur exposé par `me`/`signin` (jamais le hash de mot de passe). */
 export interface AuthUser {
   readonly id: number;
   readonly email: string | null;
@@ -14,12 +14,12 @@ export interface AuthUser {
   readonly actif: boolean;
 }
 
-// Réponse de `me` : l'utilisateur courant + ses permissions (parité legacy : `ctx.user` enrichi).
+/** Réponse de `me` : l'utilisateur courant + ses permissions (parité legacy : `ctx.user` enrichi). */
 export interface AuthMe extends AuthUser {
   readonly permissions: string[];
 }
 
-// Identifiants internes pour la vérification du mot de passe (inclut le hash — jamais exposé au client).
+/** Identifiants internes pour la vérification du mot de passe (inclut le hash — jamais exposé au client). */
 export interface AuthCredentials {
   readonly id: number;
   readonly email: string | null;

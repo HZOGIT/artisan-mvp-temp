@@ -54,10 +54,10 @@ export function createRdvEnLigneRouter(
   clientRepo: IClientRepository,
 ) {
   return router({
-    // Liste enrichie du `client` (parité legacy — le client UI lit `rdv.client.prenom/nom`).
+    /** Liste enrichie du `client` (parité legacy — le client UI lit `rdv.client.prenom/nom`). */
     list: gerer.query(({ ctx }) => listRdvsAvecClient(repo, clientRepo, ctx.tenant)),
 
-    // Comptes par statut + nombre en attente (parité client trpc.rdv.getStats / getPendingCount).
+    /** Comptes par statut + nombre en attente (parité client trpc.rdv.getStats / getPendingCount). */
     getStats: gerer.query(({ ctx }) => getRdvStats(repo, ctx.tenant)),
 
     getPendingCount: gerer.query(({ ctx }) => getRdvPendingCount(repo, ctx.tenant)),
@@ -84,7 +84,7 @@ export function createRdvEnLigneRouter(
         return { success: true };
       }),
 
-    // Transitions de statut (état machine) — chacune valide la légalité depuis le statut courant.
+    /** Transitions de statut (état machine) — chacune valide la légalité depuis le statut courant. */
     confirmer: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => confirmerRdv(repo, ctx.tenant, input.id)),

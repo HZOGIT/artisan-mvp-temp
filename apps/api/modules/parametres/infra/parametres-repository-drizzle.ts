@@ -10,7 +10,8 @@ import type { ParametresArtisan, UpdateParametresInput } from "../domain/paramet
 type ParametresRow = typeof parametresArtisan.$inferSelect;
 type ParametresInsert = typeof parametresArtisan.$inferInsert;
 
-const D = defaultParametres(0); // socle de défauts (artisanId remplacé au mapping)
+/** socle de défauts (artisanId remplacé au mapping) */
+const D = defaultParametres(0);
 
 /*
  * Mappe une ligne PG → domaine. Les colonnes nullable avec DEFAULT (prefixes, compteurs, couleurs…)

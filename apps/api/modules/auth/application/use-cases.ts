@@ -9,18 +9,19 @@ import { resetPasswordEmail, welcomeEmail } from "./emails";
 import type { AuthMe, AuthUser } from "../domain/auth";
 import type { IAuthRepository } from "./auth-repository";
 
-// Dépendances du module auth (injectables/testables).
+/** Dépendances du module auth (injectables/testables). */
 export interface AuthDeps {
   readonly repo: IAuthRepository;
   readonly hasher: PasswordHasher;
   readonly jwtSecret: string;
-  readonly tokenTtl?: string | number; // défaut 7j (parité legacy)
+  /** défaut 7j (parité legacy) */
+  readonly tokenTtl?: string | number;
   readonly email?: EmailPort;
-  // Rate-limiter de la demande de reset (clé = email) ; anti-flood. Optionnel.
+  /** Rate-limiter de la demande de reset (clé = email) ; anti-flood. Optionnel. */
   readonly resetRateLimiter?: RateLimiterPort;
-  // Base URL de confiance pour le lien de reset (JAMAIS l'Origin) — parité legacy APP_URL.
+  /** Base URL de confiance pour le lien de reset (JAMAIS l'Origin) — parité legacy APP_URL. */
   readonly appUrl?: string;
-  // Génère le jeton de reset brut (défaut : 32 octets hex). Injectable (déterminisme test).
+  /** Génère le jeton de reset brut (défaut : 32 octets hex). Injectable (déterminisme test). */
   readonly genResetToken?: () => string;
 }
 
@@ -67,7 +68,7 @@ export async function signup(deps: AuthDeps, input: { email: string; password: s
   }
   const passwordHash = await deps.hasher.hash(input.password);
   const created = await deps.repo.createUser({ email: input.email, passwordHash, name: input.name ?? null });
-  // Provisionne le compte (artisan + abonnement d'essai + permissions owner) — requis pour utiliser l'app.
+  /** Provisionne le compte (artisan + abonnement d'essai + permissions owner) — requis pour utiliser l'app. */
   await deps.repo.bootstrapAccount(created.id);
   const token = await signAuthToken({ userId: created.id, email: created.email ?? input.email }, deps.jwtSecret, deps.tokenTtl ?? "7d");
   if (deps.email) {
@@ -81,7 +82,7 @@ export async function signup(deps: AuthDeps, input: { email: string; password: s
   return { user, token };
 }
 
-// Modifie l'email de l'utilisateur courant. Conflit si l'email est déjà pris par un AUTRE utilisateur (409).
+/** Modifie l'email de l'utilisateur courant. Conflit si l'email est déjà pris par un AUTRE utilisateur (409). */
 export async function updateEmail(deps: AuthDeps, userId: number, newEmail: string): Promise<{ success: true }> {
   const existing = await deps.repo.findIdByEmail(newEmail);
   if (existing !== null && existing !== userId) {
@@ -91,7 +92,7 @@ export async function updateEmail(deps: AuthDeps, userId: number, newEmail: stri
   return { success: true };
 }
 
-// Change le mot de passe : vérifie l'ancien (bcrypt) puis hashe le nouveau. Parité legacy.
+/** Change le mot de passe : vérifie l'ancien (bcrypt) puis hashe le nouveau. Parité legacy. */
 export async function updatePassword(deps: AuthDeps, userId: number, currentPassword: string, newPassword: string): Promise<{ success: true }> {
   const cred = await deps.repo.findCredentialsById(userId);
   if (!cred || !cred.password) {
@@ -110,16 +111,17 @@ export async function updatePassword(deps: AuthDeps, userId: number, currentPass
  */
 export async function forgotPassword(deps: AuthDeps, email: string): Promise<{ success: true }> {
   const key = email.toLowerCase().trim();
-  // Au-delà du seuil, on renvoie le même success sans rien faire (réponse constante préservée).
+  /** Au-delà du seuil, on renvoie le même success sans rien faire (réponse constante préservée). */
   if (deps.resetRateLimiter && !(await deps.resetRateLimiter.check(`reset:${key}`))) {
     return { success: true };
   }
   const cred = await deps.repo.findCredentials(email);
-  // Uniquement les comptes actifs disposant d'un mot de passe (les comptes OAuth-only n'en ont pas).
+  /** Uniquement les comptes actifs disposant d'un mot de passe (les comptes OAuth-only n'en ont pas). */
   if (cred && cred.actif !== false && cred.password) {
     const rawToken = (deps.genResetToken ?? defaultResetToken)();
     const tokenHash = sha256(rawToken);
-    const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1h
+    /** 1h */
+    const expiry = new Date(Date.now() + 60 * 60 * 1000);
     await deps.repo.setResetToken(cred.id, tokenHash, expiry);
     if (deps.email) {
       const baseUrl = deps.appUrl || "https://www.operioz.com";
@@ -147,7 +149,7 @@ export async function resetPassword(deps: AuthDeps, token: string, newPassword: 
   return { success: true };
 }
 
-// Suppression de compte (SOFT-delete : actif=false + email neutralisé réutilisable). Confirmation requise.
+/** Suppression de compte (SOFT-delete : actif=false + email neutralisé réutilisable). Confirmation requise. */
 export async function deleteAccount(deps: AuthDeps, userId: number, confirmation: string): Promise<{ success: true }> {
   if (confirmation !== "SUPPRIMER") {
     throw new ValidationError("Confirmation incorrecte");

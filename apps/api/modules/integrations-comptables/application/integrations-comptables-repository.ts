@@ -27,7 +27,7 @@ export interface IIntegrationsComptablesRepository {
   listExports(ctx: TenantContext): Promise<ExportComptableRow[]>;
   createExport(ctx: TenantContext, data: CreateExportData): Promise<ExportComptableRow>;
   updateExport(ctx: TenantContext, exportId: number, data: UpdateExportData): Promise<void>;
-  // Factures de la période (statuts hors brouillon/annulee) pour l'export IIF.
+  /** Factures de la période (statuts hors brouillon/annulee) pour l'export IIF. */
   listFacturesForIIF(ctx: TenantContext, dateDebut: Date, dateFin: Date): Promise<FactureIIF[]>;
 
   /*
@@ -40,11 +40,11 @@ export interface IIntegrationsComptablesRepository {
    * `termine` chevauchant leur date (NOT EXISTS corrélé, limite 200).
    */
   listPendingItems(ctx: TenantContext): Promise<PendingItem[]>;
-  // Met à jour `derniereSync` de la config (NOW).
+  /** Met à jour `derniereSync` de la config (NOW). */
   touchDerniereSync(ctx: TenantContext, now: Date): Promise<void>;
 }
 
-// Item en attente de synchro (facture non encore exportée).
+/** Item en attente de synchro (facture non encore exportée). */
 export interface PendingItem {
   readonly id: number;
   readonly numero: string | null;

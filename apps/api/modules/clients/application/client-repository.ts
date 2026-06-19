@@ -11,12 +11,12 @@ import type { FactureEncoursLigne } from "./encours";
  */
 export interface IClientRepository {
   list(ctx: TenantContext): Promise<Client[]>;
-  // null si le client n'appartient pas au tenant.
+  /** null si le client n'appartient pas au tenant. */
   getById(ctx: TenantContext, id: number): Promise<Client | null>;
   create(ctx: TenantContext, input: CreateClientInput): Promise<Client>;
-  // null si le client n'appartient pas au tenant.
+  /** null si le client n'appartient pas au tenant. */
   update(ctx: TenantContext, id: number, input: UpdateClientInput): Promise<Client | null>;
-  // false si le client n'appartient pas au tenant.
+  /** false si le client n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
   /*
    * Nombre de documents métier (devis/factures/interventions/chantiers/contrats) liés à ce

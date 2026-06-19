@@ -28,7 +28,7 @@ function toObjectif(r: ObjectifRow): ObjectifTechnicien {
   };
 }
 
-// Bornes de la période courante (mirror legacy). dateFin = aujourd'hui.
+/** Bornes de la période courante (mirror legacy). dateFin = aujourd'hui. */
 function bornesPeriode(periode: PeriodeClassement, now: Date): { debut: string; fin: string } {
   let debut: Date;
   if (periode === "semaine") {
@@ -100,7 +100,7 @@ function toBadgeTech(r: BadgeTechRow): BadgeTechnicien {
 export class BadgeRepositoryDrizzle implements IBadgeRepository {
   constructor(
     private readonly db: DbClient,
-    // Horloge injectable (déterminisme des tests de recalcul).
+    /** Horloge injectable (déterminisme des tests de recalcul). */
     private readonly maintenant: () => Date = () => new Date(),
   ) {}
 
@@ -177,7 +177,7 @@ export class BadgeRepositoryDrizzle implements IBadgeRepository {
 
   listObjectifsTechnicien(ctx: TenantContext, technicienId: number, annee: number): Promise<ObjectifTechnicien[]> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Anti-IDOR : le technicien doit appartenir au tenant (données salarié) → [] sinon.
+      /** Anti-IDOR : le technicien doit appartenir au tenant (données salarié) → [] sinon. */
       if (!(await this.ownsTechnicien(tx, ctx, technicienId))) return [];
       const rows = await tx
         .select()
@@ -201,11 +201,11 @@ export class BadgeRepositoryDrizzle implements IBadgeRepository {
     valeurAtteinte?: number | null,
   ): Promise<BadgeTechnicien | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Technicien ET badge doivent appartenir au tenant (anti-IDOR sur les deux FK).
+      /** Technicien ET badge doivent appartenir au tenant (anti-IDOR sur les deux FK). */
       if (!(await this.ownsTechnicien(tx, ctx, technicienId))) return null;
       if (!(await this.ownsBadge(tx, ctx, badgeId))) return null;
 
-      // Idempotent : une attribution déjà existante est renvoyée telle quelle.
+      /** Idempotent : une attribution déjà existante est renvoyée telle quelle. */
       const [existing] = await tx
         .select()
         .from(badgesTechniciens)
@@ -260,7 +260,7 @@ export class BadgeRepositoryDrizzle implements IBadgeRepository {
         .groupBy(interventions.technicienId)
         .orderBy(sql`count(*) desc`, sql`coalesce(sum(${factures.totalTTC}), 0) desc`);
 
-      // Purge le classement existant pour ce couple (artisan, période, début) puis réinsère.
+      /** Purge le classement existant pour ce couple (artisan, période, début) puis réinsère. */
       await tx
         .delete(classementTechniciens)
         .where(
@@ -291,7 +291,7 @@ export class BadgeRepositoryDrizzle implements IBadgeRepository {
         rang++;
       }
 
-      // Relit dans la MÊME transaction (les insert ci-dessus ne sont pas encore commités).
+      /** Relit dans la MÊME transaction (les insert ci-dessus ne sont pas encore commités). */
       const finaux = await tx
         .select()
         .from(classementTechniciens)
@@ -303,7 +303,7 @@ export class BadgeRepositoryDrizzle implements IBadgeRepository {
 
   verifierEtAttribuerBadges(ctx: TenantContext, technicienId: number): Promise<BadgeTechnicien[] | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Ownership technicien AVANT tout calcul (anti-IDOR).
+      /** Ownership technicien AVANT tout calcul (anti-IDOR). */
       const [tech] = await tx
         .select({ id: techniciens.id })
         .from(techniciens)
@@ -311,7 +311,7 @@ export class BadgeRepositoryDrizzle implements IBadgeRepository {
         .limit(1);
       if (!tech) return null;
 
-      // Agrégats scopés tenant : interventions terminées du technicien + avis positifs de l'artisan.
+      /** Agrégats scopés tenant : interventions terminées du technicien + avis positifs de l'artisan. */
       const [intRow] = await tx
         .select({ n: sql<number>`count(*)` })
         .from(interventions)
@@ -344,7 +344,7 @@ export class BadgeRepositoryDrizzle implements IBadgeRepository {
         else if (b.categorie === "avis") valeur = nbAvisPositifs;
         if (valeur < seuil) continue;
 
-        // Attribution idempotente (dans la même tx) : technicien + badge déjà du tenant.
+        /** Attribution idempotente (dans la même tx) : technicien + badge déjà du tenant. */
         const [existing] = await tx
           .select()
           .from(badgesTechniciens)
@@ -364,7 +364,7 @@ export class BadgeRepositoryDrizzle implements IBadgeRepository {
     });
   }
 
-  // Le badge appartient-il au tenant ? (RLS + filtre artisanId)
+  /** Le badge appartient-il au tenant ? (RLS + filtre artisanId) */
   private async ownsBadge(tx: DbClient, ctx: TenantContext, badgeId: number): Promise<boolean> {
     const [row] = await tx
       .select({ id: badges.id })
@@ -374,7 +374,7 @@ export class BadgeRepositoryDrizzle implements IBadgeRepository {
     return Boolean(row);
   }
 
-  // Le technicien appartient-il au tenant ? (techniciens a un artisanId → RLS + filtre)
+  /** Le technicien appartient-il au tenant ? (techniciens a un artisanId → RLS + filtre) */
   private async ownsTechnicien(tx: DbClient, ctx: TenantContext, technicienId: number): Promise<boolean> {
     const [row] = await tx
       .select({ id: techniciens.id })

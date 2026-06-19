@@ -23,12 +23,12 @@ export interface VoiceTokenMinted {
   readonly model: string;
   readonly expiresAt: string;
 }
-// Provider de mint (Gemini Live `v1alpha/auth_tokens`, …) — injecté ; un Fake teste l'orchestration sans réseau.
+/** Provider de mint (Gemini Live `v1alpha/auth_tokens`, …) — injecté ; un Fake teste l'orchestration sans réseau. */
 export interface RealtimeVoiceTokenPort {
   mint(setup: VoiceTokenSetup): Promise<VoiceTokenMinted>;
 }
 
-// Échec du provider de mint (réseau/API) → mappé en 502 par la route (parité legacy), distinct d'un 500.
+/** Échec du provider de mint (réseau/API) → mappé en 502 par la route (parité legacy), distinct d'un 500. */
 export class RealtimeTokenError extends Error {}
 
 export interface VoiceTokenDeps {
@@ -50,7 +50,7 @@ export interface VoiceTokenOutput extends VoiceTokenMinted {
 const HISTORY_LIMIT = 20;
 
 export async function mintVoiceToken(deps: VoiceTokenDeps, ctx: TenantContext, input: VoiceTokenInput): Promise<VoiceTokenOutput> {
-  // Thread (best-effort) : permet de persister les tours vocaux (browser↔Gemini ne touche pas le serveur).
+  /** Thread (best-effort) : permet de persister les tours vocaux (browser↔Gemini ne touche pas le serveur). */
   let threadId = input.threadId ?? 0;
   if (!threadId) {
     try {
@@ -71,7 +71,7 @@ export async function mintVoiceToken(deps: VoiceTokenDeps, ctx: TenantContext, i
   }
   const baseSystem = buildAssistantSystemPrompt({ artisanName: artisan?.nomEntreprise ?? null, metier, stats, pageContext: input.pageContext });
 
-  // Historique (best-effort) — ownership du thread vérifié avant de lire ses messages (anti-IDOR).
+  /** Historique (best-effort) — ownership du thread vérifié avant de lire ses messages (anti-IDOR). */
   let history: { role: string; transcript: string }[] = [];
   if (threadId) {
     try {

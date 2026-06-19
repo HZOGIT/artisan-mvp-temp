@@ -8,7 +8,7 @@ import type { SignaturePublicReader, SignatureDevisView } from "./signature-publ
 import type { SignaturePublicWriter } from "./signature-public-writer";
 import type { SignatureNotificationWriter } from "./signature-repository";
 
-// Dépendances de la surface PUBLIQUE par token (portail de signature).
+/** Dépendances de la surface PUBLIQUE par token (portail de signature). */
 export interface SignaturePublicDeps {
   readonly reader: SignaturePublicReader;
   readonly writer: SignaturePublicWriter;
@@ -46,7 +46,7 @@ export async function getDevisForSignature(
 
   const ctx: TenantContext = { artisanId: resolution.artisanId, userId: 0 };
 
-  // Read-receipt : marque le devis « vu » à la 1ʳᵉ consultation (idempotent + best-effort).
+  /** Read-receipt : marque le devis « vu » à la 1ʳᵉ consultation (idempotent + best-effort). */
   if (!resolution.dateVue) {
     try {
       await deps.reader.markDevisVu(ctx, resolution.devisId);
@@ -61,7 +61,7 @@ export async function getDevisForSignature(
   return { ...view, signature: resolution.signature };
 }
 
-// Contexte tenant résolu par le token (artisanId fictif userId=0, le token EST la capacité).
+/** Contexte tenant résolu par le token (artisanId fictif userId=0, le token EST la capacité). */
 function tenantOf(artisanId: number): TenantContext {
   return { artisanId, userId: 0 };
 }
@@ -151,7 +151,7 @@ export async function signDevis(
   return { success: true, signature };
 }
 
-// `signature.refuseDevis` (PUBLIC) : le client refuse le devis (+ motif optionnel).
+/** `signature.refuseDevis` (PUBLIC) : le client refuse le devis (+ motif optionnel). */
 export async function refuseDevis(
   deps: SignaturePublicDeps,
   input: { token: string; motifRefus: string | null; ipAddress: string; userAgent: string },

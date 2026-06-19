@@ -1,7 +1,7 @@
 import type { IRapportRepository } from "./application/rapport-repository";
 import { createRapportsRouter } from "./interface/trpc/rapports.router";
 
-// Wiring DI du module « rapports » (rapports personnalisables + exécution).
+/** Wiring DI du module « rapports » (rapports personnalisables + exécution). */
 export interface RapportsModuleDeps {
   readonly repository: IRapportRepository;
 }

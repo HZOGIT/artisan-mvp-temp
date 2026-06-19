@@ -20,7 +20,7 @@ import type { CreateLigneInput } from "../../domain/commande";
 
 const statutEnum = z.enum(["brouillon", "envoyee", "confirmee", "partiellement_livree", "livree", "annulee"]);
 
-// Lignes en entrée : montants en number (transport) → mappés en string pour le repo.
+/** Lignes en entrée : montants en number (transport) → mappés en string pour le repo. */
 const ligneSchema = z.object({
   articleId: z.number().int().nullish(),
   designation: z.string().min(1).max(255),
@@ -111,7 +111,7 @@ export function createCommandesRouter(
         return { success: true };
       }),
 
-    // ── Transitions de statut + indicateur retard ──
+    /** ── Transitions de statut + indicateur retard ── */
     updateStatut: protectedProcedure
       .input(z.object({ id: z.number().int(), statut: statutEnum, dateLivraisonReelle: z.string().datetime().nullish() }))
       .mutation(({ ctx, input }) =>

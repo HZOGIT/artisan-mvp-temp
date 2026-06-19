@@ -11,14 +11,18 @@ export type PrevisionMethode = "moyenne_mobile" | "regression_lineaire" | "saiso
 export interface PrevisionCA {
   readonly id: number;
   readonly artisanId: number;
-  readonly mois: number; // 1-12
+  /** 1-12 */
+  readonly mois: number;
   readonly annee: number;
-  readonly caPrevisionnel: string; // numeric PG en string
+  /** numeric PG en string */
+  readonly caPrevisionnel: string;
   readonly caRealise: string;
-  readonly ecart: string; // caRealise - caPrevisionnel (peut être négatif)
+  /** caRealise - caPrevisionnel (peut être négatif) */
+  readonly ecart: string;
   readonly ecartPourcentage: string;
   readonly methodeCalcul: PrevisionMethode;
-  readonly confiance: string | null; // % de confiance, null si non renseigné
+  /** % de confiance, null si non renseigné */
+  readonly confiance: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
@@ -34,7 +38,7 @@ export interface CreatePrevisionInput {
   readonly confiance?: string | null;
 }
 
-// Update des montants/méthode/confiance uniquement. ⚠️ `mois`/`annee` ABSENTS (période immuable).
+/** Update des montants/méthode/confiance uniquement. ⚠️ `mois`/`annee` ABSENTS (période immuable). */
 export interface UpdatePrevisionInput {
   readonly caPrevisionnel?: string;
   readonly caRealise?: string;
@@ -52,7 +56,8 @@ export interface UpdatePrevisionInput {
 export interface HistoriqueCA {
   readonly id: number;
   readonly artisanId: number;
-  readonly mois: number; // 1-12
+  /** 1-12 */
+  readonly mois: number;
   readonly annee: number;
   readonly caTotal: string;
   readonly nombreFactures: number;
@@ -70,7 +75,8 @@ export interface ComparaisonMois {
   readonly mois: number;
   readonly caPrevisionnel: number;
   readonly caRealise: number;
-  readonly ecart: number; // caRealise - caPrevisionnel
+  /** caRealise - caPrevisionnel */
+  readonly ecart: number;
   readonly ecartPourcentage: number;
 }
 
@@ -86,7 +92,7 @@ export interface CAParMois {
   readonly nombreClients: number;
 }
 
-// Upsert d'une ligne d'historique de CA (delete+insert par (artisan,mois,annee)).
+/** Upsert d'une ligne d'historique de CA (delete+insert par (artisan,mois,annee)). */
 export interface UpsertHistoriqueInput {
   readonly mois: number;
   readonly annee: number;
@@ -96,7 +102,7 @@ export interface UpsertHistoriqueInput {
   readonly panierMoyen: string;
 }
 
-// Upsert d'une prévision calculée (delete+insert par (artisan,mois,annee)).
+/** Upsert d'une prévision calculée (delete+insert par (artisan,mois,annee)). */
 export interface UpsertPrevisionInput {
   readonly mois: number;
   readonly annee: number;
@@ -105,14 +111,14 @@ export interface UpsertPrevisionInput {
   readonly confiance: string;
 }
 
-// Une prédiction mensuelle calculée (sortie de `calculer`).
+/** Une prédiction mensuelle calculée (sortie de `calculer`). */
 export interface PredictionMois {
   readonly mois: number;
   readonly caPrevisionnel: number;
   readonly confiance: number;
 }
 
-// Résultat de `calculer` : soit les prédictions calculées, soit un message (pas assez d'historique).
+/** Résultat de `calculer` : soit les prédictions calculées, soit un message (pas assez d'historique). */
 export interface CalculPrevisionsResult {
   readonly predictions?: PredictionMois[];
   readonly methode?: PrevisionMethode;
@@ -130,22 +136,25 @@ export interface Creance {
   readonly montantPaye: string;
 }
 
-// Dépense récurrente (décaissement attendu, expansé selon la fréquence à partir de `prochaineOccurrence`).
+/** Dépense récurrente (décaissement attendu, expansé selon la fréquence à partir de `prochaineOccurrence`). */
 export interface DepenseRecurrente {
   readonly montantTtc: string;
-  readonly frequence: string | null; // mensuelle | trimestrielle | annuelle
+  /** mensuelle | trimestrielle | annuelle */
+  readonly frequence: string | null;
   readonly prochaineOccurrence: string | null;
 }
 
-// Données brutes (scopées tenant) nécessaires au calcul de la trésorerie prévisionnelle.
+/** Données brutes (scopées tenant) nécessaires au calcul de la trésorerie prévisionnelle. */
 export interface TresorerieData {
   readonly creances: Creance[];
-  readonly avoirsTotalTTC: string[]; // totalTTC des avoirs (crédits client) — nettés contre les entrées
+  /** totalTTC des avoirs (crédits client) — nettés contre les entrées */
+  readonly avoirsTotalTTC: string[];
   readonly depensesRecurrentes: DepenseRecurrente[];
 }
 
 export interface TresorerieSemaine {
-  readonly debut: string; // YYYY-MM-DD (début de la semaine)
+  /** YYYY-MM-DD (début de la semaine) */
+  readonly debut: string;
   readonly entrees: number;
   readonly sorties: number;
   readonly net: number;

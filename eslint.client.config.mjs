@@ -1,11 +1,49 @@
-// Gate ESLint DÉDIÉ au FRONT NEUF de la refonte (`apps/web/src/**`). Distinct de l'ESLint global
-// (OPE-413) : il ne lint QUE le code neuf et fait respecter ses specs (frontière strangler, pas de REST,
-// kebab-case des fichiers, i18n). Enrichi itérativement. Exécution : `pnpm exec eslint -c eslint.client.config.mjs apps/web/src`.
+/**
+ * Gate ESLint DÉDIÉ au FRONT NEUF de la refonte (`apps/web/src/**`). Distinct de l'ESLint global :
+ * il ne lint QUE le code neuf et fait respecter ses specs (frontière strangler, pas de REST,
+ * kebab-case des fichiers, i18n). Enrichi itérativement.
+ * Exécution : `pnpm exec eslint -c eslint.client.config.mjs apps/web/src`
+ */
 import tseslint from "typescript-eslint";
 import i18next from "eslint-plugin-i18next";
 
-// Règle custom : nom de fichier en kebab-case (le composant exporté reste PascalCase, seul le fichier
-// est kebab). Cohérent avec les primitives shadcn et la convention imposée de la refonte.
+/**
+ * Interdit les commentaires // (sauf directives ESLint/@ts-*) et les commentaires
+ * inline non-JSDoc. Seuls /** … * / sont autorisés, inline ou non.
+ */
+const commentsJsdocOnly = {
+  meta: {
+    type: "suggestion",
+    docs: { description: "// interdit partout ; inline = JSDoc (/** */) uniquement." },
+    schema: [],
+  },
+  create(context) {
+    const src = context.sourceCode;
+    return {
+      Program(node) {
+        const allComments = src.ast?.comments ?? src.getCommentsInside?.(node) ?? [];
+        const lines = src.getText().split("\n");
+        for (const comment of allComments) {
+          if (comment.type === "Line") {
+            const v = comment.value.trimStart();
+            if (v.startsWith("eslint-") || v.startsWith("@ts-")) continue;
+            context.report({ loc: comment.loc, message: "// interdit : utiliser /** … */ à la place." });
+          } else if (comment.type === "Block" && !comment.value.startsWith("*")) {
+            const startLine = lines[comment.loc.start.line - 1] ?? "";
+            const before = startLine.substring(0, comment.loc.start.column).trim();
+            const endLine = lines[comment.loc.end.line - 1] ?? "";
+            const after = endLine.substring(comment.loc.end.column).trim();
+            if (before !== "" || after !== "") {
+              context.report({ loc: comment.loc, message: "Commentaire inline non-JSDoc : utiliser /** … */ à la place." });
+            }
+          }
+        }
+      },
+    };
+  },
+};
+
+/** Nom de fichier en kebab-case (composant exporté reste PascalCase, seul le fichier est kebab). */
 const kebabFilename = {
   meta: {
     type: "problem",
@@ -30,10 +68,10 @@ const kebabFilename = {
   },
 };
 
-// Règle custom (clean-archi) : la couche `features/<f>/ui/**` ne doit PAS importer tRPC directement —
-// elle passe par la couche application (`use-<feature>`). Rétrofit terminé (Vague R : 14/14 features) →
-// règle en **`error`** : verrou définitif de la frontière (ui = présentation pure, application = seule
-// couche tRPC). Toute nouvelle page doit naître clean-archi.
+/**
+ * Clean-archi : `features/<f>/ui/**` interdit d'importer tRPC directement — passer par
+ * `application/use-<feature>`. Vague R terminée (14/14) → règle en error (verrou définitif).
+ */
 const noTrpcInUi = {
   meta: {
     type: "suggestion",
@@ -60,17 +98,15 @@ export default tseslint.config({
     parserOptions: { ecmaFeatures: { jsx: true } },
   },
   plugins: {
-    local: { rules: { "kebab-filename": kebabFilename, "no-trpc-in-ui": noTrpcInUi } },
+    local: { rules: { "kebab-filename": kebabFilename, "no-trpc-in-ui": noTrpcInUi, "comments-jsdoc-only": commentsJsdocOnly } },
     i18next,
   },
   rules: {
     "local/kebab-filename": "error",
     "local/no-trpc-in-ui": "error",
-    // Convention commentaires : JSDoc uniquement (pas de //). Tickets OPE-XXX OK dans les JSDoc.
     "no-warning-comments": ["error", { terms: ["TODO", "FIXME", "HACK", "XXX"], location: "anywhere" }],
-    "no-inline-comments": "error",
+    "local/comments-jsdoc-only": "error",
     "multiline-comment-style": ["error", "starred-block"],
-    // Frontière strangler + pas de REST : le neuf passe par les coutures partagées.
     "no-restricted-imports": [
       "error",
       {
@@ -85,18 +121,13 @@ export default tseslint.config({
         ],
       },
     ],
-    // i18n : aucune chaîne utilisateur en dur dans le JSX (uniquement le texte visible).
-    // `words.exclude` ignore le texte SANS lettre (glyphes/ponctuation : « ✕ », séparateurs…).
     "i18next/no-literal-string": ["error", { mode: "jsx-text-only", words: { exclude: ["^[^A-Za-zÀ-ÿ]+$"] } }],
   },
 },
-// Coutures vers le legacy : SEULS endroits autorisés à importer `@/components/ui/*` (copie conforme)
-// et `@/lib/trpc` (instance partagée). On y désactive donc la frontière d'imports.
 {
   files: ["apps/web/src/shared/ui/**", "apps/web/src/shared/trpc/**"],
   rules: { "no-restricted-imports": "off" },
 },
-// Page de démonstration du socle (dev only, pas une vraie page produit) → pas d'exigence i18n.
 {
   files: ["apps/web/src/features/_demo/**"],
   rules: { "i18next/no-literal-string": "off" },

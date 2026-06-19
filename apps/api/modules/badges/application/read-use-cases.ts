@@ -45,7 +45,7 @@ export function listObjectifsDuTechnicien(
   return repo.listObjectifsTechnicien(ctx, technicienId, annee);
 }
 
-// Classement des techniciens du tenant pour une période (lecture scopée tenant).
+/** Classement des techniciens du tenant pour une période (lecture scopée tenant). */
 export function getClassementTechniciens(
   repo: IBadgeRepository,
   ctx: TenantContext,

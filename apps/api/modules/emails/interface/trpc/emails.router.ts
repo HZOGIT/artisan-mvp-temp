@@ -3,7 +3,7 @@ import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IEmailLogReader } from "../../application/email-log-reader";
 import { listEmails } from "../../application/use-cases";
 
-// Routeur tRPC du journal d'emails. Surface client = `list` (lecture seule, filtres entité + limite).
+/** Routeur tRPC du journal d'emails. Surface client = `list` (lecture seule, filtres entité + limite). */
 export function createEmailsRouter(reader: IEmailLogReader) {
   return router({
     list: protectedProcedure

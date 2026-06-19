@@ -23,7 +23,7 @@ export interface AlerteConfig {
   readonly actif: boolean | null;
 }
 
-// Patch d'upsert (toutes optionnelles ; le client ne fournit jamais artisanId).
+/** Patch d'upsert (toutes optionnelles ; le client ne fournit jamais artisanId). */
 export interface SaveAlerteConfigInput {
   readonly seuilAlertePositif?: string;
   readonly seuilAlerteNegatif?: string;
@@ -35,7 +35,7 @@ export interface SaveAlerteConfigInput {
   readonly actif?: boolean;
 }
 
-// Ligne d'historique d'alerte (lecture + insertion).
+/** Ligne d'historique d'alerte (lecture + insertion). */
 export interface AlerteHistorique {
   readonly id: number;
   readonly mois: number;
@@ -50,7 +50,7 @@ export interface AlerteHistorique {
   readonly message: string | null;
 }
 
-// Écart en % du réalisé vs prévisionnel (parité legacy). PUR.
+/** Écart en % du réalisé vs prévisionnel (parité legacy). PUR. */
 export function calculerEcartPct(caReel: number, caPrev: number): number {
   return ((caReel - caPrev) / caPrev) * 100;
 }
@@ -65,7 +65,7 @@ export function evaluerTypeAlerte(ecartPct: number, seuilPositif: number, seuilN
   return null;
 }
 
-// Canal d'envoi choisi selon la config (parité legacy : défaut email si rien). PUR.
+/** Canal d'envoi choisi selon la config (parité legacy : défaut email si rien). PUR. */
 export function choisirCanal(alerteEmail: boolean | null, alerteSms: boolean | null): AlerteCanal {
   if (alerteEmail && alerteSms) return "les_deux";
   if (alerteEmail) return "email";
@@ -73,7 +73,7 @@ export function choisirCanal(alerteEmail: boolean | null, alerteSms: boolean | n
   return "email";
 }
 
-// Message d'alerte (parité legacy, libellés/format à l'identique). PUR.
+/** Message d'alerte (parité legacy, libellés/format à l'identique). PUR. */
 export function construireMessage(type: AlerteType, caReel: number, caPrev: number, ecartPct: number, mois: number, annee: number): string {
   return type === "depassement_positif"
     ? `Bonne nouvelle : votre CA realise (${caReel.toFixed(0)} EUR) depasse de ${ecartPct.toFixed(1)}% le previsionnel (${caPrev.toFixed(0)} EUR) pour ${mois}/${annee}.`

@@ -23,7 +23,8 @@ export class FakeEcritureRepository implements IEcritureRepository {
     const now = new Date();
     const created = lignes.map((l) => ({
       id: ++this.seq,
-      artisanId: ctx.artisanId, // forcé au tenant
+      /** forcé au tenant */
+      artisanId: ctx.artisanId,
       dateEcriture: l.dateEcriture,
       journal: l.journal,
       numeroCompte: l.numeroCompte,

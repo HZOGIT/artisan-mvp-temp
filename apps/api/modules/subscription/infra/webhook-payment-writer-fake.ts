@@ -1,6 +1,6 @@
 import type { WebhookPaymentWriter, PaiementResolu } from "../application/webhook-payment-writer";
 
-// Writer paiement webhook fake (in-memory) pour les tests des use-cases.
+/** Writer paiement webhook fake (in-memory) pour les tests des use-cases. */
 export class FakeWebhookPaymentWriter implements WebhookPaymentWriter {
   private byToken = new Map<string, PaiementResolu>();
   public completed: Array<{ artisanId: number; paiementId: number; factureId: number; stripePaymentIntentId: string }> = [];

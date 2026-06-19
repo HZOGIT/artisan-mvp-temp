@@ -21,7 +21,7 @@ function assertBudget(valeur: string | null | undefined, libelle: string): void 
   }
 }
 
-// Dates ISO `YYYY-MM-DD` → comparaison lexicographique = chronologique.
+/** Dates ISO `YYYY-MM-DD` → comparaison lexicographique = chronologique. */
 function assertDatesCoherentes(dateDebut?: string | null, dateFinPrevue?: string | null): void {
   if (dateDebut && dateFinPrevue && dateFinPrevue < dateDebut) {
     throw new ValidationError("La fin prévue doit être postérieure ou égale au début");
@@ -35,7 +35,7 @@ export async function creerChantier(repo: IChantierRepository, ctx: TenantContex
   assertBudget(input.budgetPrevisionnel, "Budget prévisionnel");
   assertBudget(input.budgetRealise, "Budget réalisé");
   assertDatesCoherentes(input.dateDebut, input.dateFinPrevue);
-  // Anti-IDOR-FK : le client rattaché doit appartenir au tenant.
+  /** Anti-IDOR-FK : le client rattaché doit appartenir au tenant. */
   if (!(await repo.ownsClient(ctx, input.clientId))) throw new NotFoundError("Client introuvable");
   return repo.create(ctx, input);
 }

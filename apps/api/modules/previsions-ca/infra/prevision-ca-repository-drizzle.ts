@@ -33,7 +33,7 @@ function toHistorique(r: HistoriqueRow): HistoriqueCA {
   };
 }
 
-// Traduit une ligne PG (colonnes camelCase, pas de snake_case) → domaine. Défauts montants "0.00".
+/** Traduit une ligne PG (colonnes camelCase, pas de snake_case) → domaine. Défauts montants "0.00". */
 function toPrevision(r: PrevisionRow): PrevisionCA {
   return {
     id: r.id,
@@ -112,7 +112,8 @@ export class PrevisionCARepositoryDrizzle implements IPrevisionCARepository {
       const [row] = await tx
         .insert(previsionsCA)
         .values({
-          artisanId: ctx.artisanId, // forcé
+          /** forcé */
+          artisanId: ctx.artisanId,
           mois: input.mois,
           annee: input.annee,
           caPrevisionnel: input.caPrevisionnel ?? undefined,
@@ -179,7 +180,7 @@ export class PrevisionCARepositoryDrizzle implements IPrevisionCARepository {
     });
   }
 
-  // Upsert = delete (artisan,mois,annee) puis insert (artisanId forcé) — parité legacy.
+  /** Upsert = delete (artisan,mois,annee) puis insert (artisanId forcé) — parité legacy. */
   upsertHistorique(ctx: TenantContext, entry: UpsertHistoriqueInput): Promise<void> {
     return withTenant(this.db, ctx, async (tx) => {
       await tx

@@ -38,7 +38,7 @@ export function computeTresorerie(data: TresorerieData, semaines: number, now: D
     return idx < semaines ? idx : -1;
   };
 
-  // ── Encaissements : créances (reste dû) par date d'échéance ──
+  /** ── Encaissements : créances (reste dû) par date d'échéance ── */
   for (const f of data.creances) {
     if (!f.dateEcheance) continue;
     const reste = num(f.totalTTC) - num(f.montantPaye);
@@ -49,7 +49,7 @@ export function computeTresorerie(data: TresorerieData, semaines: number, now: D
     if (idx >= 0) buckets[idx].entrees += reste;
   }
 
-  // ── Avoirs (crédits) : nettés contre les entrées les plus PROCHES, planché à 0 ──
+  /** ── Avoirs (crédits) : nettés contre les entrées les plus PROCHES, planché à 0 ── */
   let creditAvoirs = data.avoirsTotalTTC.reduce((s, a) => s + Math.abs(num(a)), 0);
   for (const b of buckets) {
     if (creditAvoirs <= 0) break;
@@ -58,7 +58,7 @@ export function computeTresorerie(data: TresorerieData, semaines: number, now: D
     creditAvoirs -= use;
   }
 
-  // ── Décaissements : dépenses récurrentes expansées selon la fréquence ──
+  /** ── Décaissements : dépenses récurrentes expansées selon la fréquence ── */
   for (const d of data.depensesRecurrentes) {
     const montant = num(d.montantTtc);
     if (montant <= 0 || !d.prochaineOccurrence) continue;
@@ -68,7 +68,8 @@ export function computeTresorerie(data: TresorerieData, semaines: number, now: D
     while (!isNaN(occ.getTime()) && occ < windowEnd && guard++ < 60) {
       const idx = weekIndex(occ);
       if (idx >= 0) buckets[idx].sorties += montant;
-      if (step === 0) break; // fréquence inconnue → une seule occurrence
+      /** fréquence inconnue → une seule occurrence */
+      if (step === 0) break;
       occ = addMonthsClamped(occ, step);
     }
   }
@@ -86,7 +87,7 @@ export function computeTresorerie(data: TresorerieData, semaines: number, now: D
   return { semaines: out, totalEntrees: r2(totalEntrees), totalSorties: r2(totalSorties), totalNet: r2(totalEntrees - totalSorties) };
 }
 
-// Sans reader câblé → trésorerie vide (dégradation parité legacy : artisan inconnu → vide).
+/** Sans reader câblé → trésorerie vide (dégradation parité legacy : artisan inconnu → vide). */
 export async function getTresoreriePrevisionnelle(
   reader: TresorerieReader | undefined,
   ctx: TenantContext,

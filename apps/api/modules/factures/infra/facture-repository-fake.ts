@@ -26,11 +26,11 @@ export class FakeFactureRepository implements IFactureRepository {
   private avoirCompteur = new Map<number, number>();
   private ownedClients = new Set<string>();
   private ownedDevis = new Set<string>();
-  // Journal d'audit simulé (avec artisanId pour le scope tenant).
+  /** Journal d'audit simulé (avec artisanId pour le scope tenant). */
   private auditStore: Array<AuditLogEntry & { artisanId: number }> = [];
   private auditSeq = 0;
 
-  // Aide de test (hors port) : ajoute une entrée d'audit pour une facture.
+  /** Aide de test (hors port) : ajoute une entrée d'audit pour une facture. */
   seedAuditLog(artisanId: number, factureId: number, action: string, userId = 1, details: string | null = null): void {
     this.auditStore.push({
       id: ++this.auditSeq,
@@ -44,7 +44,7 @@ export class FakeFactureRepository implements IFactureRepository {
     });
   }
 
-  // Aides de test : déclarent qu'un client / devis appartient au tenant (anti-IDOR-FK).
+  /** Aides de test : déclarent qu'un client / devis appartient au tenant (anti-IDOR-FK). */
   registerClient(artisanId: number, clientId: number): void {
     this.ownedClients.add(`${artisanId}:${clientId}`);
   }
@@ -119,7 +119,8 @@ export class FakeFactureRepository implements IFactureRepository {
     const f = await this.getById(ctx, id);
     if (!f) return false;
     this.factureStore = this.factureStore.filter((x) => x.id !== id);
-    this.lignesStore = this.lignesStore.filter((l) => l.factureId !== id); // cascade
+    /** cascade */
+    this.lignesStore = this.lignesStore.filter((l) => l.factureId !== id);
     return true;
   }
 

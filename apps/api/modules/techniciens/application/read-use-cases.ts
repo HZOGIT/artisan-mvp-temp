@@ -48,7 +48,7 @@ export function getDernierePosition(
   return repo.getDernierePosition(ctx, technicienId);
 }
 
-// Utilisateurs du tenant liables à une fiche technicien (scopé artisanId explicite).
+/** Utilisateurs du tenant liables à une fiche technicien (scopé artisanId explicite). */
 export function listerUtilisateursLiables(
   repo: ITechnicienRepository,
   ctx: TenantContext,

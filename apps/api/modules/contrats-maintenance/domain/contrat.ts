@@ -17,7 +17,8 @@ export interface Contrat {
   readonly titre: string;
   readonly description: string | null;
   readonly type: ContratType;
-  readonly montantHT: string; // numeric PG en string
+  /** numeric PG en string */
+  readonly montantHT: string;
   readonly tauxTVA: string;
   readonly periodicite: ContratPeriodicite;
   readonly dateDebut: Date;
@@ -79,7 +80,7 @@ export interface ContratIntervention {
   readonly updatedAt: Date;
 }
 
-// Création : `artisanId`/`statut` ("planifiee") posés par l'infra ; `contratId` validé (possédé).
+/** Création : `artisanId`/`statut` ("planifiee") posés par l'infra ; `contratId` validé (possédé). */
 export interface CreateContratInterventionInput {
   readonly contratId: number;
   readonly titre: string;

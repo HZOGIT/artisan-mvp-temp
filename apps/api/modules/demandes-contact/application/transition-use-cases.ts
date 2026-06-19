@@ -47,7 +47,7 @@ export function marquerContacte(repo: IDemandeContactRepository, ctx: TenantCont
   return appliquerTransition(repo, ctx, id, "contacte");
 }
 
-// Conversion : si un `clientId` est fourni, il doit appartenir au tenant (anti-IDOR-FK).
+/** Conversion : si un `clientId` est fourni, il doit appartenir au tenant (anti-IDOR-FK). */
 export async function convertir(repo: IDemandeContactRepository, ctx: TenantContext, id: number, clientId?: number): Promise<DemandeContact> {
   if (clientId !== undefined && !(await repo.ownsClient(ctx, clientId))) {
     throw new NotFoundError("Client introuvable");

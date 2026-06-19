@@ -39,7 +39,7 @@ function toModele(r: ModeleRow, lignes: ModeleDevisLigne[]): ModeleDevis {
   };
 }
 
-// Valeurs d'insertion d'une ligne (modeleId imposé par le parent ; défauts PG laissés via undefined).
+/** Valeurs d'insertion d'une ligne (modeleId imposé par le parent ; défauts PG laissés via undefined). */
 function ligneValues(modeleId: number, l: CreateModeleDevisLigneInput) {
   return {
     modeleId,
@@ -71,7 +71,7 @@ export class ModeleDevisRepositoryDrizzle implements IModeleDevisRepository {
         .from(modelesDevis)
         .where(eq(modelesDevis.artisanId, ctx.artisanId))
         .orderBy(asc(modelesDevis.nom), asc(modelesDevis.id));
-      // Liste « légère » : en-têtes seuls (lignes = []). Le détail passe par getById.
+      /** Liste « légère » : en-têtes seuls (lignes = []). Le détail passe par getById. */
       return rows.map((r) => toModele(r, []));
     });
   }
@@ -96,7 +96,8 @@ export class ModeleDevisRepositoryDrizzle implements IModeleDevisRepository {
         await tx.insert(modelesDevisLignes).values(input.lignes.map((l) => ligneValues(parent.id, l)));
       }
       const aggregate = await this.loadAggregate(tx, ctx, parent.id);
-      return aggregate!; // on vient de créer l'agrégat scopé au tenant
+      /** on vient de créer l'agrégat scopé au tenant */
+      return aggregate!;
     });
   }
 
@@ -111,7 +112,7 @@ export class ModeleDevisRepositoryDrizzle implements IModeleDevisRepository {
       if (Object.keys(set).length > 0) {
         await tx.update(modelesDevis).set(set).where(and(eq(modelesDevis.id, id), eq(modelesDevis.artisanId, ctx.artisanId)));
       }
-      // Remplacement complet des lignes si fournies (sinon les lignes existantes sont conservées).
+      /** Remplacement complet des lignes si fournies (sinon les lignes existantes sont conservées). */
       if (input.lignes !== undefined) {
         await tx.delete(modelesDevisLignes).where(eq(modelesDevisLignes.modeleId, id));
         if (input.lignes.length) {
@@ -124,7 +125,7 @@ export class ModeleDevisRepositoryDrizzle implements IModeleDevisRepository {
 
   delete(ctx: TenantContext, id: number): Promise<boolean> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Ne toucher aux lignes que si le modèle appartient bien au tenant (anti-IDOR via le parent).
+      /** Ne toucher aux lignes que si le modèle appartient bien au tenant (anti-IDOR via le parent). */
       if (!(await this.owns(tx, ctx, id))) return false;
       await tx.delete(modelesDevisLignes).where(eq(modelesDevisLignes.modeleId, id));
       const deleted = await tx
@@ -156,7 +157,7 @@ export class ModeleDevisRepositoryDrizzle implements IModeleDevisRepository {
 
   addLigne(ctx: TenantContext, modeleId: number, input: CreateModeleDevisLigneInput): Promise<ModeleDevisLigne | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Scope via le parent : insertion seulement si le modèle appartient au tenant (anti-IDOR).
+      /** Scope via le parent : insertion seulement si le modèle appartient au tenant (anti-IDOR). */
       if (!(await this.owns(tx, ctx, modeleId))) return null;
       const [row] = await tx.insert(modelesDevisLignes).values(ligneValues(modeleId, input)).returning();
       return toLigne(row);

@@ -24,7 +24,7 @@ export class FakeContratRepository implements IContratRepository {
   private readonly refCounter = new Map<number, number>();
   private readonly interventions: ContratIntervention[] = [];
   private interventionSeq = 0;
-  // Factures récurrentes enregistrées (exposées pour les assertions de test).
+  /** Factures récurrentes enregistrées (exposées pour les assertions de test). */
   readonly facturesRecurrentes: RecordFactureRecurrenteInput[] = [];
 
   seedClient(artisanId: number, clientId: number, nom = "Client"): void {
@@ -65,7 +65,8 @@ export class FakeContratRepository implements IContratRepository {
       prochainFacturation: input.prochainFacturation ?? null,
       prochainPassage: input.prochainPassage ?? null,
       conditionsParticulieres: input.conditionsParticulieres ?? null,
-      statut: "actif", // forcé
+      /** forcé */
+      statut: "actif",
       notes: input.notes ?? null,
       createdAt: now,
       updatedAt: now,
@@ -94,7 +95,7 @@ export class FakeContratRepository implements IContratRepository {
       ...(input.prochainPassage !== undefined ? { prochainPassage: input.prochainPassage } : {}),
       ...(input.conditionsParticulieres !== undefined ? { conditionsParticulieres: input.conditionsParticulieres } : {}),
       ...(input.notes !== undefined ? { notes: input.notes } : {}),
-      // statut/reference/clientId jamais touchés par update
+      /** statut/reference/clientId jamais touchés par update */
       updatedAt: new Date(),
     };
     this.store[idx] = next;
@@ -150,13 +151,15 @@ export class FakeContratRepository implements IContratRepository {
     const intervention: ContratIntervention = {
       id: ++this.interventionSeq,
       contratId: input.contratId,
-      artisanId: ctx.artisanId, // forcé
+      /** forcé */
+      artisanId: ctx.artisanId,
       titre: input.titre,
       description: input.description ?? null,
       dateIntervention: input.dateIntervention,
       duree: input.duree ?? null,
       technicienNom: input.technicienNom ?? null,
-      statut: "planifiee", // forcé
+      /** forcé */
+      statut: "planifiee",
       rapport: null,
       notes: input.notes ?? null,
       createdAt: now,

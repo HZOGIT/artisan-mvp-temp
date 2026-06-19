@@ -1,7 +1,7 @@
 import type { IDeviceRepository } from "./application/device-repository";
 import { createDevicesRouter } from "./interface/trpc/devices.router";
 
-// Wiring DI du module « devices » (appareils/sessions de l'utilisateur, table HORS RLS scopée userId).
+/** Wiring DI du module « devices » (appareils/sessions de l'utilisateur, table HORS RLS scopée userId). */
 export interface DevicesModuleDeps {
   readonly repo: IDeviceRepository;
 }

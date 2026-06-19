@@ -24,7 +24,7 @@ function toTransaction(r: Row): TransactionBancaire {
   };
 }
 
-// Double cloisonnement RLS + filtre `artisan_id`. Lecture des transactions non ignorées (≤500).
+/** Double cloisonnement RLS + filtre `artisan_id`. Lecture des transactions non ignorées (≤500). */
 export class TransactionBancaireRepositoryDrizzle implements ITransactionBancaireRepository {
   constructor(private readonly db: DbClient) {}
 
@@ -78,7 +78,8 @@ export class TransactionBancaireRepositoryDrizzle implements ITransactionBancair
             releve_id: releveId,
             date_transaction: t.dateTransaction,
             libelle: t.libelle,
-            montant: String(Math.abs(t.montant)), // stocké en valeur absolue (parité legacy)
+            /** stocké en valeur absolue (parité legacy) */
+            montant: String(Math.abs(t.montant)),
             type_transaction: t.typeTransaction,
             categorie_suggeree: t.categorieSuggeree,
           });

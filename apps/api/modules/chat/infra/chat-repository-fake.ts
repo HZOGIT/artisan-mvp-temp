@@ -3,11 +3,12 @@ import type { Conversation, ConversationWithClient, Message, MessageAuteur, Conv
 import { apercu } from "../domain/chat";
 import type { IChatRepository, ChatClientNotifier } from "../application/chat-repository";
 
-// Repo chat in-memory pour les tests (scoping tenant + effets legacy reproduits).
+/** Repo chat in-memory pour les tests (scoping tenant + effets legacy reproduits). */
 export class FakeChatRepository implements IChatRepository {
   private convs: Conversation[] = [];
   private msgs: Message[] = [];
-  private ownedClients = new Set<string>(); // `${artisanId}:${clientId}`
+  /** `${artisanId}:${clientId}` */
+  private ownedClients = new Set<string>();
   private convSeq = 1;
   private msgSeq = 1;
 
@@ -79,7 +80,7 @@ export class FakeChatRepository implements IChatRepository {
   }
 }
 
-// Notifier fake : collecte les notifications émises (assertions). Et un no-op (câblage sans email).
+/** Notifier fake : collecte les notifications émises (assertions). Et un no-op (câblage sans email). */
 export class FakeChatNotifier implements ChatClientNotifier {
   public emitted: Array<{ conversationId: number; contenu: string }> = [];
   async notifyNewMessage(_ctx: TenantContext, conversation: Conversation, contenu: string): Promise<void> {

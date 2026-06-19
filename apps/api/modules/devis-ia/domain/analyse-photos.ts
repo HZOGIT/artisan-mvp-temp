@@ -30,7 +30,7 @@ export function buildImageBlocks(urls: readonly string[]): VisionImage[] {
   });
 }
 
-// Construit le system prompt (contexte métier + prompt spécialisé + spécification JSON). PUR. Parité legacy.
+/** Construit le system prompt (contexte métier + prompt spécialisé + spécification JSON). PUR. Parité legacy. */
 export function buildSystemPrompt(metier: string | null | undefined): string {
   const contexteMetier = getContexteMetier(metier);
   const promptSpecialise = metier && PROMPTS_METIER[String(metier).toLowerCase()] ? PROMPTS_METIER[String(metier).toLowerCase()] : "Analyse les photos fournies et identifie les travaux necessaires.";
@@ -84,7 +84,7 @@ export function parseAnalyseResponse(responseText: string): TravailIA[] | null {
   return Array.isArray(travaux) ? (travaux as TravailIA[]) : null;
 }
 
-// Retire tout payload data:base64 d'un message d'erreur (anti-fuite de l'image dans la stack) + tronque.
+/** Retire tout payload data:base64 d'un message d'erreur (anti-fuite de l'image dans la stack) + tronque. */
 export function sanitizeVisionError(e: unknown): string {
   let msg = String((e as { message?: string })?.message || e || "Erreur inconnue");
   msg = msg.replace(/data:[^;]+;base64,[A-Za-z0-9+/=]+/g, "[image]");
@@ -92,7 +92,7 @@ export function sanitizeVisionError(e: unknown): string {
   return msg;
 }
 
-// Cherche un article de la bibliothèque dont le nom « matche » (inclusion bidirectionnelle) le nom IA. PUR.
+/** Cherche un article de la bibliothèque dont le nom « matche » (inclusion bidirectionnelle) le nom IA. PUR. */
 export function matchBibliotheque(catalogue: readonly { id: number; nom: string }[], nomIA: string | undefined): number | null {
   const n = String(nomIA || "").toLowerCase();
   if (!n) return null;

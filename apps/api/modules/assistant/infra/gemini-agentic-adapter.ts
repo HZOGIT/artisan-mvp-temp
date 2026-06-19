@@ -7,7 +7,7 @@ import type { ToolParamSchema, ToolSchema } from "../domain/assistant-tools-cata
  * mappers `toGeminiTools`/`toGeminiContents` sont PURS et testés sans réseau ; `streamTurn` fait l'I/O.
  */
 
-// ── Types minimaux du SDK (runtime via import variable-de-chemin) ──────────────────────────────
+/** ── Types minimaux du SDK (runtime via import variable-de-chemin) ────────────────────────────── */
 interface GenAiPart {
   text?: string;
   functionCall?: { name?: string; args?: Record<string, unknown> };
@@ -23,13 +23,13 @@ interface GenAiModule {
 }
 const GENAI_MODULE: string = "@google/genai";
 
-// Contenu interne d'un `AgenticMessage` (le port le tient opaque ; ici on connaît les variantes).
+/** Contenu interne d'un `AgenticMessage` (le port le tient opaque ; ici on connaît les variantes). */
 type AgenticContent =
   | { kind: "text"; text: string }
   | { kind: "tool-results"; results: ReadonlyArray<{ name: string; response: unknown }> }
   | { kind: "raw"; parts: unknown[] };
 
-// ── Mappers PURS (testables) ───────────────────────────────────────────────────────────────────
+/** ── Mappers PURS (testables) ─────────────────────────────────────────────────────────────────── */
 
 /*
  * `ToolParamSchema` neutre → schéma de paramètres Gemini (le type devient MAJUSCULE : `Type.OBJECT`
@@ -49,7 +49,7 @@ export function toGeminiFunctionDeclaration(tool: ToolSchema): Record<string, un
   return { name: tool.name, description: tool.description, parameters: toGeminiParam(tool.parameters) };
 }
 
-// Outils → config `tools: [{ functionDeclarations }]`. Vide si aucun outil (on omettra la clé).
+/** Outils → config `tools: [{ functionDeclarations }]`. Vide si aucun outil (on omettra la clé). */
 export function toGeminiTools(tools: readonly ToolSchema[]): unknown[] {
   if (tools.length === 0) return [];
   return [{ functionDeclarations: tools.map(toGeminiFunctionDeclaration) }];
@@ -75,7 +75,7 @@ export function toGeminiContents(messages: readonly AgenticMessage[]): unknown[]
   });
 }
 
-// ── Adapter ──────────────────────────────────────────────────────────────────────────────────
+/** ── Adapter ────────────────────────────────────────────────────────────────────────────────── */
 export class GeminiAgenticAdapter implements LlmAgenticPort {
   async *streamTurn(input: AgenticTurnInput): AsyncIterable<AgenticEvent> {
     const mod = (await import(GENAI_MODULE)) as GenAiModule;
@@ -94,7 +94,7 @@ export class GeminiAgenticAdapter implements LlmAgenticPort {
       },
     });
 
-    // Parts BRUTES du tour `model` (texte + functionCall avec thoughtSignature) à réinjecter tel quel.
+    /** Parts BRUTES du tour `model` (texte + functionCall avec thoughtSignature) à réinjecter tel quel. */
     const rawFunctionCallParts: unknown[] = [];
     const functionCalls: AgenticFunctionCall[] = [];
     let textBuffer = "";
@@ -108,7 +108,8 @@ export class GeminiAgenticAdapter implements LlmAgenticPort {
         }
         if (part.functionCall) {
           functionCalls.push({ name: part.functionCall.name ?? "", args: part.functionCall.args ?? {} });
-          rawFunctionCallParts.push(part); // brute (incl. thoughtSignature)
+          /** brute (incl. thoughtSignature) */
+          rawFunctionCallParts.push(part);
         }
       }
     }

@@ -12,7 +12,7 @@ export function listDemandes(repo: IDemandeContactRepository, ctx: TenantContext
   return repo.list(ctx);
 }
 
-// Demandes filtrées par statut (scopé tenant ; [] si aucune — pas une erreur métier).
+/** Demandes filtrées par statut (scopé tenant ; [] si aucune — pas une erreur métier). */
 export function demandesParStatut(repo: IDemandeContactRepository, ctx: TenantContext, statut: DemandeContactStatut): Promise<DemandeContact[]> {
   return repo.listByStatut(ctx, statut);
 }

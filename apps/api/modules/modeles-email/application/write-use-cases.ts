@@ -47,7 +47,7 @@ export async function creerModeleEmail(
   if (!input.contenu?.trim()) throw new ValidationError("Le contenu est requis");
   if (!TYPES_MODELE_EMAIL.includes(input.type)) throw new ValidationError("Type de modèle d'email invalide");
   const created = await repo.create(ctx, input);
-  // Si ce nouveau modèle est défaut, il devient le seul défaut de son type.
+  /** Si ce nouveau modèle est défaut, il devient le seul défaut de son type. */
   if (created.isDefault) await retomberAutresDefauts(repo, ctx, created.type, created.id);
   return created;
 }

@@ -11,8 +11,10 @@ export interface BudgetCategorie {
   readonly id: number;
   readonly artisanId: number;
   readonly categorie: string;
-  readonly mois: string; // "YYYY-MM"
-  readonly budget: string; // numeric PG en string
+  /** "YYYY-MM" */
+  readonly mois: string;
+  /** numeric PG en string */
+  readonly budget: string;
   readonly depenseReelle: string;
 }
 
@@ -23,7 +25,7 @@ export interface CreateBudgetInput {
   readonly depenseReelle?: string;
 }
 
-// Update des montants uniquement. ⚠️ `categorie`/`mois` ABSENTS (clé d'unicité immuable).
+/** Update des montants uniquement. ⚠️ `categorie`/`mois` ABSENTS (clé d'unicité immuable). */
 export interface UpdateBudgetInput {
   readonly budget?: string;
   readonly depenseReelle?: string;

@@ -8,7 +8,7 @@ import type {
   AjouterMembreEquipeInput,
 } from "../domain/intervention";
 
-// Nature d'une FK référencée par une intervention (toutes des tables scopées tenant).
+/** Nature d'une FK référencée par une intervention (toutes des tables scopées tenant). */
 export type InterventionRefKind = "client" | "technicien" | "devis" | "facture";
 
 /*
@@ -19,12 +19,12 @@ export type InterventionRefKind = "client" | "technicien" | "devis" | "facture";
  */
 export interface IInterventionRepository {
   list(ctx: TenantContext): Promise<Intervention[]>;
-  // null si l'intervention n'appartient pas au tenant.
+  /** null si l'intervention n'appartient pas au tenant. */
   getById(ctx: TenantContext, id: number): Promise<Intervention | null>;
   create(ctx: TenantContext, input: CreateInterventionInput): Promise<Intervention>;
-  // null si l'intervention n'appartient pas au tenant.
+  /** null si l'intervention n'appartient pas au tenant. */
   update(ctx: TenantContext, id: number, input: UpdateInterventionInput): Promise<Intervention | null>;
-  // false si l'intervention n'appartient pas au tenant.
+  /** false si l'intervention n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
   /*
    * true si la ressource référencée (client/technicien/devis/facture) appartient au tenant.
@@ -36,7 +36,7 @@ export interface IInterventionRepository {
    * Sert au cloisonnement « un technicien ne voit que SES interventions » (minimisation RGPD).
    */
   findTechnicienIdForUser(ctx: TenantContext): Promise<number | null>;
-  // Interventions du tenant assignées à un technicien donné (scopé).
+  /** Interventions du tenant assignées à un technicien donné (scopé). */
   listByTechnicien(ctx: TenantContext, technicienId: number): Promise<Intervention[]>;
   /*
    * Interventions du tenant démarrant dans la fenêtre [dayStart, dayEnd] (hors annulées) — base de la
@@ -49,14 +49,14 @@ export interface IInterventionRepository {
    * Membres d'équipe d'une intervention (jointure technicien pour nom/prénom), triés par id de liaison.
    */
   listEquipe(ctx: TenantContext, interventionId: number): Promise<EquipeMembre[]>;
-  // Toutes les liaisons d'équipe du tenant (1 requête, anti-N+1 pour la liste/planning).
+  /** Toutes les liaisons d'équipe du tenant (1 requête, anti-N+1 pour la liste/planning). */
   listEquipesArtisan(ctx: TenantContext): Promise<EquipeMembreArtisan[]>;
   /*
    * Ajoute un membre (artisanId forcé). **Idempotent** : renvoie la liaison existante si
    * (intervention, technicien) est déjà présent.
    */
   addMembreEquipe(ctx: TenantContext, input: AjouterMembreEquipeInput): Promise<EquipeMembre>;
-  // Retire un membre par id de liaison (scopé tenant ; idempotent — no-op si absent/hors tenant).
+  /** Retire un membre par id de liaison (scopé tenant ; idempotent — no-op si absent/hors tenant). */
   removeMembreEquipe(ctx: TenantContext, id: number): Promise<void>;
 
   /*
@@ -64,6 +64,6 @@ export interface IInterventionRepository {
    * Couleurs d'affichage des interventions du tenant (préférence d'affichage par artisan).
    */
   listCouleurs(ctx: TenantContext): Promise<Array<{ interventionId: number; couleur: string }>>;
-  // Upsert de la couleur d'une intervention (scopé `ctx.artisanId` par la PK) — idempotent.
+  /** Upsert de la couleur d'une intervention (scopé `ctx.artisanId` par la PK) — idempotent. */
   setCouleur(ctx: TenantContext, interventionId: number, couleur: string): Promise<void>;
 }

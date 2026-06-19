@@ -102,7 +102,8 @@ export class ContratRepositoryDrizzle implements IContratRepository {
         .values({
           artisanId: ctx.artisanId,
           clientId: input.clientId,
-          reference, // générée serveur (argument)
+          /** générée serveur (argument) */
+          reference,
           titre: input.titre,
           description: input.description ?? null,
           type: input.type ?? undefined,
@@ -116,7 +117,8 @@ export class ContratRepositoryDrizzle implements IContratRepository {
           prochainFacturation: input.prochainFacturation ?? null,
           prochainPassage: input.prochainPassage ?? null,
           conditionsParticulieres: input.conditionsParticulieres ?? null,
-          statut: "actif", // forcé
+          /** forcé */
+          statut: "actif",
           notes: input.notes ?? null,
         })
         .returning();
@@ -126,7 +128,7 @@ export class ContratRepositoryDrizzle implements IContratRepository {
 
   update(ctx: TenantContext, id: number, input: UpdateContratInput): Promise<Contrat | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Métadonnées seulement (UpdateContratInput exclut statut/reference/clientId).
+      /** Métadonnées seulement (UpdateContratInput exclut statut/reference/clientId). */
       const set: Partial<typeof contratsMaintenance.$inferInsert> = { updatedAt: new Date() };
       if (input.titre !== undefined) set.titre = input.titre;
       if (input.description !== undefined) set.description = input.description;
@@ -227,7 +229,7 @@ export class ContratRepositoryDrizzle implements IContratRepository {
 
   listInterventions(ctx: TenantContext, contratId: number): Promise<ContratIntervention[]> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Scope via le contrat parent : si le contrat n'est pas du tenant → [].
+      /** Scope via le contrat parent : si le contrat n'est pas du tenant → []. */
       const [owned] = await tx
         .select({ id: contratsMaintenance.id })
         .from(contratsMaintenance)
@@ -260,13 +262,15 @@ export class ContratRepositoryDrizzle implements IContratRepository {
         .insert(interventionsContrat)
         .values({
           contratId: input.contratId,
-          artisanId: ctx.artisanId, // forcé
+          /** forcé */
+          artisanId: ctx.artisanId,
           titre: input.titre,
           description: input.description ?? null,
           dateIntervention: input.dateIntervention,
           duree: input.duree ?? null,
           technicienNom: input.technicienNom ?? null,
-          statut: "planifiee", // forcé
+          /** forcé */
+          statut: "planifiee",
           notes: input.notes ?? null,
         })
         .returning();

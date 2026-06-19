@@ -10,7 +10,8 @@ import type { ConfigRelancesAuto, UpdateConfigRelancesInput } from "../domain/co
 type ConfigRow = typeof configRelancesAuto.$inferSelect;
 type ConfigInsert = typeof configRelancesAuto.$inferInsert;
 
-const D = defaultConfigRelances(0); // socle de défauts (artisanId remplacé au mapping)
+/** socle de défauts (artisanId remplacé au mapping) */
+const D = defaultConfigRelances(0);
 
 function toConfig(r: ConfigRow): ConfigRelancesAuto {
   return {
@@ -25,7 +26,7 @@ function toConfig(r: ConfigRow): ConfigRelancesAuto {
   };
 }
 
-// Ne retient que les champs config réellement fournis (les autres restent inchangés).
+/** Ne retient que les champs config réellement fournis (les autres restent inchangés). */
 function toConfigSet(input: UpdateConfigRelancesInput): Partial<ConfigInsert> {
   const set: Partial<ConfigInsert> = {};
   if (input.actif !== undefined) set.actif = input.actif;

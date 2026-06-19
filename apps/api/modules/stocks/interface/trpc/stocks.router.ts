@@ -20,10 +20,10 @@ import {
   ajusterQuantiteStock,
 } from "../../application/write-use-cases";
 
-// Décimal positif (≥ 0) : la regex (pas de signe) interdit déjà toute valeur négative.
+/** Décimal positif (≥ 0) : la regex (pas de signe) interdit déjà toute valeur négative. */
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Valeur décimale invalide");
 
-// Bornes alignées sur la table `stocks` (defense-in-depth).
+/** Bornes alignées sur la table `stocks` (defense-in-depth). */
 const createSchema = z.object({
   articleId: z.number().int().nullish(),
   articleType: z.enum(["bibliotheque", "artisan"]).optional(),
@@ -87,7 +87,7 @@ export function createStocksRouter(
         return { success: true };
       }),
 
-    // ⚠️ L'UNIQUE voie de modification de la quantité : un mouvement tracé (audit).
+    /** ⚠️ L'UNIQUE voie de modification de la quantité : un mouvement tracé (audit). */
     adjustQuantity: protectedProcedure
       .input(
         z.object({
@@ -107,12 +107,12 @@ export function createStocksRouter(
       .input(z.object({ stockId: z.number().int() }))
       .query(({ ctx, input }) => getMouvementsStock(repo, ctx.tenant, input.stockId)),
 
-    // Alertes de seuil (lecture seule, scopées tenant).
+    /** Alertes de seuil (lecture seule, scopées tenant). */
     getLowStock: protectedProcedure.query(({ ctx }) => listStocksEnAlerte(repo, ctx.tenant)),
 
     getStocksEnRupture: protectedProcedure.query(({ ctx }) => listStocksEnRupture(repo, ctx.tenant)),
 
-    // Quantités en commande (non reçues) par stock (parité client trpc.stocks.getEntrant).
+    /** Quantités en commande (non reçues) par stock (parité client trpc.stocks.getEntrant). */
     getEntrant: protectedProcedure.query(({ ctx }) => listStockEntrant(repo, ctx.tenant)),
 
     /*

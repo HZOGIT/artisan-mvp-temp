@@ -9,11 +9,12 @@ export interface VitrineSettings {
   readonly vitrineActive: boolean;
   readonly vitrineDescription: string | null;
   readonly vitrineZone: string | null;
-  readonly vitrineServices: string | null; // JSON string (liste de services) — opaque côté domaine
+  /** JSON string (liste de services) — opaque côté domaine */
+  readonly vitrineServices: string | null;
   readonly vitrineExperience: number | null;
 }
 
-// Mise à jour partielle : seuls les champs fournis sont écrits (les autres restent inchangés).
+/** Mise à jour partielle : seuls les champs fournis sont écrits (les autres restent inchangés). */
 export interface UpdateVitrineSettingsInput {
   readonly vitrineActive?: boolean;
   readonly vitrineDescription?: string | null;

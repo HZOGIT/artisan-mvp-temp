@@ -6,12 +6,12 @@ import { ALL_PERMISSIONS, ROLE_TEMPLATES } from "../../../../../packages/contrac
 import type { CollaborateurRole, InviteInput, PermissionsInfo, UtilisateurListItem } from "../domain/utilisateur";
 import type { IUtilisateurRepository } from "./utilisateur-repository";
 
-// Dépendances injectables du module (testables/déterministes).
+/** Dépendances injectables du module (testables/déterministes). */
 export interface UtilisateurDeps {
   readonly repo: IUtilisateurRepository;
   readonly hasher: PasswordHasher;
   readonly email: EmailPort;
-  // Génère le mot de passe temporaire (10 car. alphanum. via RNG crypto en prod ; déterministe en test).
+  /** Génère le mot de passe temporaire (10 car. alphanum. via RNG crypto en prod ; déterministe en test). */
   readonly genTempPassword: () => string;
 }
 
@@ -29,7 +29,7 @@ async function assertNotOwner(deps: UtilisateurDeps, ctx: TenantContext, userId:
   }
 }
 
-// Échappement HTML minimal (parité legacy `safeHtml`) pour l'injection de la raison sociale dans l'email.
+/** Échappement HTML minimal (parité legacy `safeHtml`) pour l'injection de la raison sociale dans l'email. */
 function safeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
@@ -50,14 +50,14 @@ export async function inviterUtilisateur(deps: UtilisateurDeps, ctx: TenantConte
   const passwordHash = await deps.hasher.hash(tempPassword);
   const newUser = await deps.repo.createCollaborateur(ctx, { email: input.email, name: input.nom, prenom: input.prenom, role: input.role, passwordHash });
 
-  // Seed des permissions par défaut du rôle (best-effort : un échec ne bloque pas l'invitation).
+  /** Seed des permissions par défaut du rôle (best-effort : un échec ne bloque pas l'invitation). */
   try {
     await deps.repo.setPermissions(ctx, newUser.id, [...(ROLE_TEMPLATES[input.role] ?? ROLE_TEMPLATES.artisan)]);
   } catch {
     /* best-effort */
   }
 
-  // Email d'invitation (best-effort).
+  /** Email d'invitation (best-effort). */
   try {
     const nomEntreprise = (await deps.repo.getNomEntreprise(ctx)) || "Operioz";
     await deps.email.send({
@@ -82,7 +82,7 @@ export async function inviterUtilisateur(deps: UtilisateurDeps, ctx: TenantConte
   return newUser;
 }
 
-// Change le rôle d'un collaborateur (anti-IDOR strict) + réinitialise ses permissions aux défauts du rôle.
+/** Change le rôle d'un collaborateur (anti-IDOR strict) + réinitialise ses permissions aux défauts du rôle. */
 export async function changerRole(deps: UtilisateurDeps, ctx: TenantContext, userId: number, role: CollaborateurRole): Promise<{ id: number; role: string }> {
   await assertNotOwner(deps, ctx, userId);
   const updated = await deps.repo.updateRole(ctx, userId, role);
@@ -105,7 +105,7 @@ export async function lirePermissions(deps: UtilisateurDeps, ctx: TenantContext,
   return { userId, role: user.role, permissions, roleDefaults: [...(ROLE_TEMPLATES[user.role] ?? [])] };
 }
 
-// Définit les permissions : filtre celles du catalogue (anti-injection) puis applique (strict-owned).
+/** Définit les permissions : filtre celles du catalogue (anti-injection) puis applique (strict-owned). */
 export async function definirPermissions(deps: UtilisateurDeps, ctx: TenantContext, userId: number, permissions: string[]): Promise<{ success: true; count: number }> {
   await assertNotOwner(deps, ctx, userId);
   const valid = permissions.filter((p) => (ALL_PERMISSIONS as string[]).includes(p));
@@ -115,7 +115,7 @@ export async function definirPermissions(deps: UtilisateurDeps, ctx: TenantConte
   return { success: true, count: valid.length };
 }
 
-// Réinitialise les permissions aux défauts du rôle.
+/** Réinitialise les permissions aux défauts du rôle. */
 export async function reinitialiserPermissions(deps: UtilisateurDeps, ctx: TenantContext, userId: number): Promise<{ success: true; permissions: string[] }> {
   await assertNotOwner(deps, ctx, userId);
   const user = await deps.repo.getManageableUser(ctx, userId);

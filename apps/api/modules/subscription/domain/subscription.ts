@@ -4,7 +4,7 @@
  * (checkout/portal/cancel/reactivate) + le webhook signé viennent ensuite.
  */
 
-// Ligne brute d'abonnement (camelCase ; mappée depuis les colonnes snake_case par le reader).
+/** Ligne brute d'abonnement (camelCase ; mappée depuis les colonnes snake_case par le reader). */
 export interface SubscriptionRow {
   readonly id: number;
   readonly artisanId: number;
@@ -22,7 +22,7 @@ export interface SubscriptionRow {
   readonly maxConcurrentSessions: number;
 }
 
-// Sortie de `getCurrent` (statut + quotas + essai calculé). Forme exacte attendue par le client.
+/** Sortie de `getCurrent` (statut + quotas + essai calculé). Forme exacte attendue par le client. */
 export interface CurrentSubscription {
   readonly plan: string;
   readonly status: string;
@@ -55,7 +55,7 @@ export interface SubscriptionPrices {
   readonly extra: { readonly pro: PlanPriceIds; readonly entreprise: PlanPriceIds };
 }
 
-// Price ID des utilisateurs supplémentaires pour un plan donné (undefined pour essentiel). PURE.
+/** Price ID des utilisateurs supplémentaires pour un plan donné (undefined pour essentiel). PURE. */
 export function extraPriceId(prices: SubscriptionPrices, plan: SubscriptionPlan, interval: SubscriptionInterval): string | undefined {
   if (plan === "essentiel") return undefined;
   return prices.extra[plan]?.[interval];

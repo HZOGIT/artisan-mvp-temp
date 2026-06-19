@@ -10,7 +10,7 @@ export interface SearchResult {
   readonly url: string;
 }
 
-// Lignes brutes (projections minimales) renvoyées par le reader, par type d'entité.
+/** Lignes brutes (projections minimales) renvoyées par le reader, par type d'entité. */
 export interface SearchMatches {
   readonly clients: ReadonlyArray<{ id: number; nom: string; prenom: string | null; email: string | null; telephone: string | null; ville: string | null }>;
   readonly devis: ReadonlyArray<{ id: number; numero: string; objet: string | null; statut: string | null; totalTTC: string | null }>;
@@ -19,12 +19,12 @@ export interface SearchMatches {
   readonly fournisseurs: ReadonlyArray<{ id: number; nom: string; email: string | null; telephone: string | null }>;
 }
 
-// Formatage monétaire (parité legacy : en-US, 2 décimales, suffixe « € »). PURE.
+/** Formatage monétaire (parité legacy : en-US, 2 décimales, suffixe « € »). PURE. */
 export function fmtEur(v: unknown): string {
   return `${Number(v || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 }
 
-// Formatage date JJ/MM/AAAA (parité legacy ; chaîne vide si absente). PURE.
+/** Formatage date JJ/MM/AAAA (parité legacy ; chaîne vide si absente). PURE. */
 export function fmtDate(d: Date | string | null | undefined): string {
   if (!d) return "";
   const dt = new Date(d);

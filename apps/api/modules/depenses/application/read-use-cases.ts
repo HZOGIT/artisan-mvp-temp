@@ -29,7 +29,7 @@ export async function checkDoublons(repo: IDepenseRepository, ctx: TenantContext
   return repo.findDoublons(ctx, params);
 }
 
-// Statistiques du mois (défaut = mois courant `YYYY-MM`).
+/** Statistiques du mois (défaut = mois courant `YYYY-MM`). */
 export function getDepensesStats(repo: IDepenseRepository, ctx: TenantContext, mois?: string): Promise<DepenseStats> {
   const m = mois || new Date().toISOString().slice(0, 7);
   return repo.getStats(ctx, m);

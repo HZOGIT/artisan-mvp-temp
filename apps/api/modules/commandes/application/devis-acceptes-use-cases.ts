@@ -12,7 +12,8 @@ export interface DevisAccepte {
   readonly objet: string;
   readonly clientNom: string;
   readonly totalTTC: number;
-  readonly dateDevis: string; // ISO
+  /** ISO */
+  readonly dateDevis: string;
 }
 
 export async function listerDevisAcceptes(
@@ -23,7 +24,7 @@ export async function listerDevisAcceptes(
   const acceptes = (await devisRepo.list(ctx)).filter((d) => d.statut === "accepte");
   return Promise.all(
     acceptes.map(async (d) => {
-      // Best-effort : "Client" si le client n'est pas (ou plus) accessible dans le tenant.
+      /** Best-effort : "Client" si le client n'est pas (ou plus) accessible dans le tenant. */
       let clientNom = "Client";
       const c = await clientRepo.getById(ctx, d.clientId);
       if (c) clientNom = c.nom + (c.prenom ? " " + c.prenom : "");

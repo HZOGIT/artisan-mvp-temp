@@ -21,7 +21,7 @@ import type {
  *    legacy ne gardait RIEN (statut librement modifiable, cf. audit immutabilité post-signature).
  */
 
-// Entrée de création : pas de numero (généré serveur).
+/** Entrée de création : pas de numero (généré serveur). */
 export type CreerDevisInput = Omit<CreateDevisInput, "numero">;
 
 /*
@@ -51,7 +51,7 @@ function assertLigneValide(designation: string | undefined, prixUnitaireHT?: str
 }
 
 export async function creerDevis(repo: IDevisRepository, ctx: TenantContext, input: CreerDevisInput): Promise<Devis> {
-  // Anti-IDOR-FK : le client doit appartenir au tenant (ne révèle pas l'existence cross-tenant).
+  /** Anti-IDOR-FK : le client doit appartenir au tenant (ne révèle pas l'existence cross-tenant). */
   if (!(await repo.ownsClient(ctx, input.clientId))) throw new NotFoundError("Client introuvable");
   const numero = await repo.nextNumero(ctx);
   return repo.create(ctx, { ...input, numero });
@@ -72,7 +72,7 @@ export async function modifierDevis(
 
 export async function supprimerDevis(repo: IDevisRepository, ctx: TenantContext, id: number): Promise<void> {
   const devis = await getDevisOwned(repo, ctx, id);
-  // Un devis accepté ne peut pas être supprimé (engagement : on conserve la trace).
+  /** Un devis accepté ne peut pas être supprimé (engagement : on conserve la trace). */
   if (devis.statut === "accepte") throw new ConflictError("Un devis accepté ne peut pas être supprimé");
   const ok = await repo.delete(ctx, id);
   if (!ok) throw new NotFoundError("Devis introuvable");
@@ -101,7 +101,7 @@ export async function modifierLigneDevis(
 ): Promise<DevisLigne> {
   const devis = await getDevisOwned(repo, ctx, devisId);
   assertModifiable(devis);
-  // La ligne doit relever de CE devis (lie l'autorisation au devis modifiable vérifié).
+  /** La ligne doit relever de CE devis (lie l'autorisation au devis modifiable vérifié). */
   const lignes = await repo.listLignes(ctx, devisId);
   if (!lignes.some((l) => l.id === ligneId)) throw new NotFoundError("Ligne introuvable");
   assertLigneValide(input.designation, input.prixUnitaireHT, input.quantite);
@@ -130,7 +130,8 @@ export async function changerStatutDevis(
   cible: DevisStatut,
 ): Promise<Devis> {
   const devis = await getDevisOwned(repo, ctx, id);
-  if (devis.statut === cible) return devis; // idempotent
+  /** idempotent */
+  if (devis.statut === cible) return devis;
   if (!TRANSITIONS[devis.statut].includes(cible)) {
     throw new ConflictError(`Transition de statut invalide : ${devis.statut} → ${cible}`);
   }
@@ -192,7 +193,7 @@ export async function dupliquerDevis(
       type: l.type,
     });
   }
-  // Relit le devis (totaux recalculés par les addLigne) pour renvoyer l'état à jour.
+  /** Relit le devis (totaux recalculés par les addLigne) pour renvoyer l'état à jour. */
   const fresh = await repo.getById(ctx, copie.id);
   return fresh ?? copie;
 }

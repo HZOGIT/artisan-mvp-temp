@@ -23,7 +23,7 @@ import type {
 } from "../domain/dashboard";
 import type { IDashboardReader } from "./dashboard-reader";
 
-// `now` injectable pour les tests ; en prod = horloge système.
+/** `now` injectable pour les tests ; en prod = horloge système. */
 type Clock = () => Date;
 const FACTURE_PAYEE = "payee";
 
@@ -90,7 +90,7 @@ export async function getAlerts(reader: IDashboardReader, ctx: TenantContext, no
     reader.listDevis(ctx),
     reader.getUpcomingInterventions(ctx, 10),
   ]);
-  // computeAlerts attend des DashIntervention ; on adapte les items « upcoming » (titre + dateDebut suffisent).
+  /** computeAlerts attend des DashIntervention ; on adapte les items « upcoming » (titre + dateDebut suffisent). */
   const interventions = upcoming.map((u) => ({ id: u.id, titre: u.titre, statut: u.statut, dateDebut: u.dateDebut, clientId: u.clientId, createdAt: u.dateDebut }));
   return computeAlerts(factures, devis, interventions, now());
 }

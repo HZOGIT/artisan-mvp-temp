@@ -45,7 +45,7 @@ export async function getBySlug(reader: IVitrinePublicReader, slug: string): Pro
   };
 }
 
-// ── submitContact (public) ────────────────────────────────────────────────────
+/** ── submitContact (public) ──────────────────────────────────────────────────── */
 export interface SubmitContactInput {
   readonly slug: string;
   readonly nom: string;
@@ -94,9 +94,9 @@ export async function submitContact(deps: SubmitContactDeps, input: SubmitContac
         </body></html>`,
   });
 
-  // Écritures scopées sous le tenant de l'artisan résolu (RLS withCheck = artisanId).
+  /** Écritures scopées sous le tenant de l'artisan résolu (RLS withCheck = artisanId). */
   const ctx: TenantContext = { artisanId: artisan.id, userId: 0 };
-  // Notification in-app (best-effort : ne casse pas la soumission si l'insert échoue).
+  /** Notification in-app (best-effort : ne casse pas la soumission si l'insert échoue). */
   try {
     await deps.notifications.creer(ctx, {
       type: "info",
@@ -107,7 +107,7 @@ export async function submitContact(deps: SubmitContactDeps, input: SubmitContac
   } catch {
     /* best-effort */
   }
-  // Persistance du lead (best-effort, parité legacy).
+  /** Persistance du lead (best-effort, parité legacy). */
   try {
     await deps.leads.create(ctx, { nom: input.nom, email: input.email, telephone: input.telephone ?? null, message: input.message, source: "vitrine" });
   } catch {
@@ -147,7 +147,7 @@ export function getDemandesContact(deps: LeadsAdminDeps, ctx: TenantContext): Pr
   return deps.leads.list(ctx);
 }
 
-// Met à jour le statut d'un lead (suivi). Ownership scopé tenant (404 anti-IDOR), puis set direct (parité).
+/** Met à jour le statut d'un lead (suivi). Ownership scopé tenant (404 anti-IDOR), puis set direct (parité). */
 export async function updateDemandeContactStatut(deps: LeadsAdminDeps, ctx: TenantContext, id: number, statut: LeadStatut): Promise<{ success: true }> {
   const demande = await deps.leads.getById(ctx, id);
   if (!demande) throw new NotFoundError("Demande non trouvée");

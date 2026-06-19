@@ -10,7 +10,7 @@ import type { ChantierDocument, AddDocumentInput } from "../domain/chantier";
  * puis on vérifie que ce chantier appartient au tenant.
  */
 
-// Documents d'un chantier possédé (404 sinon), récents d'abord.
+/** Documents d'un chantier possédé (404 sinon), récents d'abord. */
 export async function getDocumentsChantier(repo: IChantierRepository, ctx: TenantContext, chantierId: number): Promise<ChantierDocument[]> {
   if (!(await repo.getById(ctx, chantierId))) throw new NotFoundError("Chantier introuvable");
   return repo.listDocuments(ctx, chantierId);
@@ -18,7 +18,7 @@ export async function getDocumentsChantier(repo: IChantierRepository, ctx: Tenan
 
 export type AjouterDocumentInput = AddDocumentInput;
 
-// Ajoute un document sous un chantier possédé (404 sinon).
+/** Ajoute un document sous un chantier possédé (404 sinon). */
 export async function ajouterDocument(repo: IChantierRepository, ctx: TenantContext, input: AjouterDocumentInput): Promise<ChantierDocument> {
   if (!(await repo.getById(ctx, input.chantierId))) throw new NotFoundError("Chantier introuvable");
   return repo.addDocument(ctx, input);

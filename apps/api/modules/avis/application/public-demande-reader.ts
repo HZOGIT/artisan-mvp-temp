@@ -8,7 +8,8 @@ export interface DemandeAvisPublic {
   readonly artisanId: number;
   readonly clientId: number;
   readonly interventionId: number;
-  readonly statut: string; // "envoyee" | "ouverte" | "completee" | "expiree"
+  /** "envoyee" | "ouverte" | "completee" | "expiree" */
+  readonly statut: string;
   readonly expiresAt: Date;
 }
 

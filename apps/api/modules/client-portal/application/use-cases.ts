@@ -4,18 +4,18 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IPortalAccessRepository } from "./portal-access-repository";
 import { buildAccessEmailBody, buildPortalUrl, clientNomComplet, computeExpiry, type ArtisanPortalInfo, type ClientPortalInfo, type PortalAccessStatus } from "../domain/portal-access";
 
-// Scope tenant pour les lectures résolues par token (userId non pertinent pour la RLS artisanId).
+/** Scope tenant pour les lectures résolues par token (userId non pertinent pour la RLS artisanId). */
 function tokenScope(artisanId: number): TenantContext {
   return { artisanId, userId: 0 };
 }
 
-// ── ADMIN (cookie artisan) ────────────────────────────────────────────────────
+/** ── ADMIN (cookie artisan) ──────────────────────────────────────────────────── */
 export interface ClientPortalAdminDeps {
   readonly access: IPortalAccessRepository;
   readonly clients: { getById(ctx: TenantContext, id: number): Promise<{ id: number; nom: string; prenom: string | null; email: string | null } | null> };
   readonly email: { send(message: { to: string; subject: string; body: string }): Promise<void> };
   readonly rateLimiter: { check(key: string): Promise<boolean> };
-  // Générateur de token (injecté pour la testabilité) — défaut : UUID v4.
+  /** Générateur de token (injecté pour la testabilité) — défaut : UUID v4. */
   readonly genToken?: () => string;
 }
 
@@ -54,7 +54,7 @@ export async function deactivate(deps: { access: IPortalAccessRepository }, ctx:
   return { success: true };
 }
 
-// ── PUBLIC (token) ────────────────────────────────────────────────────────────
+/** ── PUBLIC (token) ──────────────────────────────────────────────────────────── */
 export interface VerifyAccessResult {
   readonly valid: boolean;
   readonly client: Omit<ClientPortalInfo, never> | null;
@@ -86,7 +86,7 @@ export interface ClientInfoResult {
   readonly artisanEmail: string | null;
 }
 
-// Infos du client connecté au portail (token requis → 401 si invalide). null si le client n'existe plus.
+/** Infos du client connecté au portail (token requis → 401 si invalide). null si le client n'existe plus. */
 export async function getClientInfo(deps: { access: IPortalAccessRepository }, token: string, now: Date = new Date()): Promise<ClientInfoResult | null> {
   const access = await deps.access.resolveByToken(token, now);
   if (!access) throw new UnauthorizedError("Accès non autorisé");

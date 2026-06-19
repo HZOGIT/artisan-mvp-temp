@@ -5,10 +5,10 @@ import { listModelesEmail, modelesParType, getModeleEmail } from "../../applicat
 import { creerModeleEmail, modifierModeleEmail, supprimerModeleEmail } from "../../application/write-use-cases";
 import { TYPES_MODELE_EMAIL } from "../../domain/modele-email";
 
-// Enum zod aligné sur le domaine (tuple réutilisé, jamais redéclaré). z.enum exige un tuple.
+/** Enum zod aligné sur le domaine (tuple réutilisé, jamais redéclaré). z.enum exige un tuple. */
 const typeSchema = z.enum(TYPES_MODELE_EMAIL);
 
-// Bornes alignées sur la table `modeles_email` (defense-in-depth).
+/** Bornes alignées sur la table `modeles_email` (defense-in-depth). */
 const createSchema = z.object({
   nom: z.string().min(1).max(100),
   type: typeSchema,

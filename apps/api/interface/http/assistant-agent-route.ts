@@ -27,7 +27,7 @@ export function registerAssistantAgentRoute(app: FastifyInstance, deps: Assistan
 
     const gen = runAssistantAgent(deps, { artisanId: auth.artisanId, userId: auth.userId }, input);
 
-    // 1er tick : validation/rate-limit levées AVANT tout stream → mappées en JSON (parité route text).
+    /** 1er tick : validation/rate-limit levées AVANT tout stream → mappées en JSON (parité route text). */
     let first: IteratorResult<AssistantAgentEvent>;
     try {
       first = await gen.next();
@@ -37,7 +37,7 @@ export function registerAssistantAgentRoute(app: FastifyInstance, deps: Assistan
       return reply.code(500).send({ error: "Erreur serveur" });
     }
 
-    // À partir d'ici : flux SSE. On détache la réponse de Fastify (`hijack`) et on écrit le brut.
+    /** À partir d'ici : flux SSE. On détache la réponse de Fastify (`hijack`) et on écrit le brut. */
     reply.hijack();
     reply.raw.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive", "X-Accel-Buffering": "no" });
     const send = (ev: unknown): void => {

@@ -4,7 +4,7 @@ import type { ISubscriptionRepository } from "./application/subscription-reader"
 import type { SubscriptionEffectDeps } from "./application/use-cases";
 import { createSubscriptionRouter } from "./interface/trpc/subscription.router";
 
-// Wiring DI du module abonnement (lecture `getCurrent` + effets Stripe checkout/portal/cancel/reactivate).
+/** Wiring DI du module abonnement (lecture `getCurrent` + effets Stripe checkout/portal/cancel/reactivate). */
 export interface SubscriptionModuleDeps {
   readonly repository: ISubscriptionRepository;
   readonly stripe: StripePort;
@@ -22,7 +22,7 @@ export function createSubscriptionModule(deps: SubscriptionModuleDeps): Subscrip
   return { deps, router: createSubscriptionRouter(deps.repository, effectDeps) };
 }
 
-// Résout la config des price IDs depuis l'environnement (parité legacy `STRIPE_PRICE_*`).
+/** Résout la config des price IDs depuis l'environnement (parité legacy `STRIPE_PRICE_*`). */
 export function pricesFromEnv(env: NodeJS.ProcessEnv = process.env): SubscriptionPrices {
   return {
     essentiel: { month: env.STRIPE_PRICE_ESSENTIEL_MONTH, year: env.STRIPE_PRICE_ESSENTIEL_YEAR },

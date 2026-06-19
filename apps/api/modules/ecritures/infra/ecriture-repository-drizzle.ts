@@ -61,7 +61,8 @@ export class EcritureRepositoryDrizzle implements IEcritureRepository {
     return withTenant(this.db, ctx, async (tx) => {
       if (lignes.length === 0) return [];
       const values = lignes.map((l) => ({
-        artisanId: ctx.artisanId, // forcé au tenant
+        /** forcé au tenant */
+        artisanId: ctx.artisanId,
         dateEcriture: l.dateEcriture,
         journal: l.journal,
         numeroCompte: l.numeroCompte,

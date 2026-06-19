@@ -18,14 +18,16 @@ export interface SuggestionInput {
 
 export interface SuggestionTechnicien {
   readonly technicien: { readonly id: number; readonly nom: string; readonly couleur: string | null; readonly specialite: string | null };
-  readonly distance: number; // km (arrondi 0,1)
-  readonly tempsTrajet: number; // minutes estimées (~40 km/h)
+  /** km (arrondi 0,1) */
+  readonly distance: number;
+  /** minutes estimées (~40 km/h) */
+  readonly tempsTrajet: number;
   readonly disponible: boolean;
   readonly position: { readonly latitude: string; readonly longitude: string } | null;
   readonly score: number;
 }
 
-// Distance haversine (km) entre deux points GPS. Pur.
+/** Distance haversine (km) entre deux points GPS. Pur. */
 export function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -43,7 +45,7 @@ export async function getSuggestionsTechniciens(
   const techs = (await technicienRepo.list(ctx)).filter((t) => t.statut === "actif");
   if (techs.length === 0) return [];
 
-  // Interventions du jour (disponibilité : conflit si autre intervention du technicien à ±2h).
+  /** Interventions du jour (disponibilité : conflit si autre intervention du technicien à ±2h). */
   const dayStart = new Date(input.dateIntervention);
   dayStart.setUTCHours(0, 0, 0, 0);
   const dayEnd = new Date(input.dateIntervention);

@@ -9,7 +9,7 @@ export class FakeDevisReader implements IDevisReader {
   private store = new Map<number, DevisReadModel>();
   private lignes = new Map<number, DevisLigneReadModel[]>();
 
-  // Aide de test : enregistre un devis (et éventuellement ses lignes) du tenant.
+  /** Aide de test : enregistre un devis (et éventuellement ses lignes) du tenant. */
   register(devis: DevisReadModel, lignes: DevisLigneReadModel[] = []): void {
     this.store.set(devis.id, devis);
     this.lignes.set(devis.id, lignes);

@@ -3,7 +3,8 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IRdvRepository } from "./rdv-repository";
 import type { Rdv } from "../domain/rdv";
 
-const MAX_FUTUR_MS = 2 * 365 * 24 * 60 * 60 * 1000; // +2 ans (parité legacy)
+/** +2 ans (parité legacy) */
+const MAX_FUTUR_MS = 2 * 365 * 24 * 60 * 60 * 1000;
 const MOTIF_AUTRE_CRENEAU = "Creneau non disponible — un autre creneau a ete propose";
 
 /*
@@ -36,7 +37,7 @@ export async function proposerAutreCreneau(
     throw new ValidationError("La date proposée est trop éloignée");
   }
 
-  // Refuse l'ancien (motif dédié) puis crée le remplaçant (la date a déjà été validée).
+  /** Refuse l'ancien (motif dédié) puis crée le remplaçant (la date a déjà été validée). */
   await rdvRepo.setStatut(ctx, rdvId, "refuse", { motifRefus: MOTIF_AUTRE_CRENEAU });
   return rdvRepo.create(ctx, {
     clientId: rdv.clientId,

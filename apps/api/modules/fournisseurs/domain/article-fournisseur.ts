@@ -9,7 +9,8 @@ export interface ArticleFournisseur {
   readonly articleId: number;
   readonly fournisseurId: number;
   readonly referenceExterne: string | null;
-  readonly prixAchat: string | null; // numeric PG en string (précision préservée)
+  /** numeric PG en string (précision préservée) */
+  readonly prixAchat: string | null;
   readonly delaiLivraison: number | null;
   readonly createdAt: Date;
 }

@@ -35,18 +35,18 @@ export interface RecordFactureRecurrenteInput {
  */
 export interface IContratRepository {
   list(ctx: TenantContext): Promise<Contrat[]>;
-  // null si le contrat n'appartient pas au tenant.
+  /** null si le contrat n'appartient pas au tenant. */
   getById(ctx: TenantContext, id: number): Promise<Contrat | null>;
   create(ctx: TenantContext, input: CreateContratInput, reference: string): Promise<Contrat>;
-  // Met à jour les métadonnées (jamais statut/reference/clientId). null si hors tenant.
+  /** Met à jour les métadonnées (jamais statut/reference/clientId). null si hors tenant. */
   update(ctx: TenantContext, id: number, input: UpdateContratInput): Promise<Contrat | null>;
-  // Applique une transition de statut. null si hors tenant.
+  /** Applique une transition de statut. null si hors tenant. */
   setStatut(ctx: TenantContext, id: number, statut: ContratStatut): Promise<Contrat | null>;
-  // false si le contrat n'appartient pas au tenant.
+  /** false si le contrat n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
-  // Le client appartient-il au tenant ? (anti-IDOR-FK)
+  /** Le client appartient-il au tenant ? (anti-IDOR-FK) */
   ownsClient(ctx: TenantContext, clientId: number): Promise<boolean>;
-  // Génère la prochaine référence de contrat (serveur, scopée tenant) — jamais fournie par le client.
+  /** Génère la prochaine référence de contrat (serveur, scopée tenant) — jamais fournie par le client. */
   nextReference(ctx: TenantContext): Promise<string>;
 
   /*
@@ -65,9 +65,9 @@ export interface IContratRepository {
    * est vérifié par le use-case, anti-IDOR). null si hors tenant.
    */
   getInterventionById(ctx: TenantContext, id: number): Promise<ContratIntervention | null>;
-  // Crée une intervention (artisanId forcé, statut "planifiee" posé par l'infra).
+  /** Crée une intervention (artisanId forcé, statut "planifiee" posé par l'infra). */
   createIntervention(ctx: TenantContext, input: CreateContratInterventionInput): Promise<ContratIntervention>;
-  // Met à jour une intervention — null si hors tenant.
+  /** Met à jour une intervention — null si hors tenant. */
   updateIntervention(ctx: TenantContext, id: number, input: UpdateContratInterventionInput): Promise<ContratIntervention | null>;
 
   /*

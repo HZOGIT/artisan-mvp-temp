@@ -33,13 +33,13 @@ function clientNom(client: ClientInfo): string {
   return client.prenom ? `${client.prenom} ${client.nom}` : client.nom;
 }
 
-// Message de relance par défaut (parité legacy) si l'appelant n'en fournit pas.
+/** Message de relance par défaut (parité legacy) si l'appelant n'en fournit pas. */
 function messageParDefaut(numero: string, artisanName: string, nomClient?: string): string {
   const salutation = nomClient ? `Bonjour ${nomClient},` : "Bonjour,";
   return `${salutation}\n\nNous vous rappelons que le devis n°${numero} est toujours en attente de votre signature.\n\nN'hésitez pas à nous contacter pour toute question.\n\nCordialement,\n${artisanName}`;
 }
 
-// Corps HTML de l'email de relance (pur). Le message libre est échappé (anti-XSS).
+/** Corps HTML de l'email de relance (pur). Le message libre est échappé (anti-XSS). */
 function buildRelanceBody(numero: string, message: string, artisan: ArtisanInfo | null): string {
   const a = (k: string): string => escapeHtml(String(artisan?.[k] ?? ""));
   return (
@@ -52,7 +52,7 @@ function buildRelanceBody(numero: string, message: string, artisan: ArtisanInfo 
   );
 }
 
-// Envoie l'email + enregistre la relance (journal append-only). Renvoie le succès de l'envoi.
+/** Envoie l'email + enregistre la relance (journal append-only). Renvoie le succès de l'envoi. */
 async function envoyerEtEnregistrer(
   deps: DevisRelanceDeps,
   ctx: TenantContext,
@@ -70,7 +70,8 @@ async function envoyerEtEnregistrer(
       body: buildRelanceBody(numero, message, artisan),
     });
   } catch {
-    ok = false; // l'échec d'envoi n'interrompt pas : on journalise le statut (parité legacy)
+    /** l'échec d'envoi n'interrompt pas : on journalise le statut (parité legacy) */
+    ok = false;
   }
   await deps.relanceRepo.create(ctx, {
     devisId,

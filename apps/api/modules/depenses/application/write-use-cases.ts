@@ -55,7 +55,7 @@ function assertTauxValide(tauxTva: string): void {
   }
 }
 
-// Vérifie l'ownership des FK fournies (anti-IDOR-FK). `null` = on détache, pas de vérif.
+/** Vérifie l'ownership des FK fournies (anti-IDOR-FK). `null` = on détache, pas de vérif. */
 async function assertFksOwned(
   repo: IDepenseRepository,
   ctx: TenantContext,
@@ -76,7 +76,7 @@ export async function creerDepense(
   const tauxTva = input.tauxTva ?? "20";
   assertTauxValide(tauxTva);
   await assertFksOwned(repo, ctx, input);
-  // Numéro généré côté serveur (jamais fourni par le client) + TVA dérivée + userId forcé.
+  /** Numéro généré côté serveur (jamais fourni par le client) + TVA dérivée + userId forcé. */
   const numero = await repo.nextNumero(ctx);
   const { montantTva, montantTtc } = calculerTva(input.montantHt, tauxTva);
   return repo.create(ctx, { ...input, numero, tauxTva, userId: ctx.userId, montantTva, montantTtc });
@@ -93,11 +93,11 @@ export async function modifierDepense(
   if (input.tauxTva != null) assertTauxValide(input.tauxTva);
   await assertFksOwned(repo, ctx, input);
 
-  // État courant (scopé tenant) requis pour recalculer la TVA sur les valeurs effectives.
+  /** État courant (scopé tenant) requis pour recalculer la TVA sur les valeurs effectives. */
   const current = await repo.getById(ctx, id);
   if (!current) throw new NotFoundError("Dépense introuvable");
 
-  // Recalcule montantTva/montantTtc dès que montantHt OU tauxTva change (TVA dérivée).
+  /** Recalcule montantTva/montantTtc dès que montantHt OU tauxTva change (TVA dérivée). */
   const patch: { -readonly [K in keyof UpdateDepenseInput]: UpdateDepenseInput[K] } = { ...input };
   if (input.montantHt !== undefined || input.tauxTva !== undefined) {
     const montantHt = input.montantHt ?? current.montantHt;

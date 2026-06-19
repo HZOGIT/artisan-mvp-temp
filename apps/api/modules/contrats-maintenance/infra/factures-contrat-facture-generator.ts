@@ -25,7 +25,7 @@ export class FacturesContratFactureGenerator implements ContratFactureGenerator 
       prixUnitaireHT: input.montantHT,
       tauxTVA: input.tauxTVA,
     });
-    // Émission directe (pas d'écritures FEC ici — parité legacy `updateFacture(statut:"envoyee")`).
+    /** Émission directe (pas d'écritures FEC ici — parité legacy `updateFacture(statut:"envoyee")`). */
     await this.factureRepo.setStatut(ctx, facture.id, "envoyee");
     return { id: facture.id, numero: facture.numero };
   }

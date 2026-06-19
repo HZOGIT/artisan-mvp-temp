@@ -29,7 +29,7 @@ export interface PortalChantierEtape {
   readonly statut: string | null;
   readonly pourcentage: number | null;
   readonly ordre: number | null;
-  // Colonnes `date` (Drizzle mode string) — conservées telles quelles (parité).
+  /** Colonnes `date` (Drizzle mode string) — conservées telles quelles (parité). */
   readonly dateDebut: string | null;
   readonly dateFin: string | null;
   readonly commentaire: string | null;
@@ -54,10 +54,10 @@ export interface PortalChantier {
  * (anti-IDOR via le chantier parent) et limité aux étapes `visibleClient`.
  */
 export interface IPortalSchedulingReader {
-  // Occupations (interventions non annulées + RDV en attente/confirmés) sur la fenêtre.
+  /** Occupations (interventions non annulées + RDV en attente/confirmés) sur la fenêtre. */
   getCreneauxOccupes(ctx: TenantContext, debut: Date, fin: Date): Promise<CreneauOccupe[]>;
   createRdv(ctx: TenantContext, data: CreateRdvData): Promise<PortalRdv>;
   getRdvByClient(ctx: TenantContext, clientId: number): Promise<PortalRdv[]>;
-  // Chantiers du client + étapes visibles client.
+  /** Chantiers du client + étapes visibles client. */
   getChantiersWithSuivi(ctx: TenantContext, clientId: number): Promise<PortalChantier[]>;
 }

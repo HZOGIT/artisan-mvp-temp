@@ -165,7 +165,7 @@ export class VehiculeRepositoryDrizzle implements IVehiculeRepository {
 
   updateKilometrage(ctx: TenantContext, id: number, kilometrage: number): Promise<Vehicule | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Invariant : le compteur ne recule jamais.
+      /** Invariant : le compteur ne recule jamais. */
       const [row] = await tx
         .update(vehicules)
         .set({ kilometrageActuel: sql`GREATEST(${vehicules.kilometrageActuel}, ${kilometrage})` })
@@ -273,7 +273,7 @@ export class VehiculeRepositoryDrizzle implements IVehiculeRepository {
           technicienId: input.technicienId ?? null,
         })
         .returning();
-      // Met à jour le compteur du véhicule (non régressif).
+      /** Met à jour le compteur du véhicule (non régressif). */
       await tx
         .update(vehicules)
         .set({ kilometrageActuel: sql`GREATEST(${vehicules.kilometrageActuel}, ${input.kilometrage})` })
@@ -338,7 +338,7 @@ export class VehiculeRepositoryDrizzle implements IVehiculeRepository {
     });
   }
 
-  // Vérifie que le véhicule appartient au tenant (RLS + filtre artisanId).
+  /** Vérifie que le véhicule appartient au tenant (RLS + filtre artisanId). */
   private async ownsVehicule(tx: DbClient, ctx: TenantContext, vehiculeId: number): Promise<boolean> {
     const [row] = await tx
       .select({ id: vehicules.id })

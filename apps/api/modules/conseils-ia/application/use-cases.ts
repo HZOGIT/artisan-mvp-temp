@@ -8,7 +8,7 @@ import type { ConseilsResult, ConseilsStats } from "../domain/conseils";
 import { CONSEILS_VIDE, buildConseilsPrompt, parseConseils } from "../domain/conseils";
 import type { ConseilsStatsReader } from "./conseils-stats-reader";
 
-// Dépendances des conseils IA (lecture seule, non persistée). Parité legacy `conseilsIA`.
+/** Dépendances des conseils IA (lecture seule, non persistée). Parité legacy `conseilsIA`. */
 export interface ConseilsIaDeps {
   readonly llm: LlmPort;
   readonly rateLimiter: RateLimiterPort;
@@ -28,12 +28,12 @@ export async function getConseilsIA(deps: ConseilsIaDeps, ctx: TenantContext): P
   const artisan = await deps.artisanReader.getArtisan(ctx);
   if (!artisan) return CONSEILS_VIDE;
 
-  // Rate-limit IA (anti-coût). Parité legacy : pas de 429, on renvoie {conseils: []}.
+  /** Rate-limit IA (anti-coût). Parité legacy : pas de 429, on renvoie {conseils: []}. */
   if (!(await deps.rateLimiter.check(`ia:${ctx.artisanId}`))) return CONSEILS_VIDE;
 
   const metier = (artisan.metier as string | null | undefined) || (artisan.specialite as string | null | undefined) || null;
 
-  // Stats best-effort : un échec ne doit pas casser les conseils (prompt avec des zéros).
+  /** Stats best-effort : un échec ne doit pas casser les conseils (prompt avec des zéros). */
   let stats = STATS_VIDE;
   try {
     stats = await deps.statsReader.getStats(ctx);

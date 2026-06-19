@@ -48,7 +48,7 @@ export async function attribuerBadge(
   return attribution;
 }
 
-// Recalcule et persiste le classement des techniciens du tenant pour une période.
+/** Recalcule et persiste le classement des techniciens du tenant pour une période. */
 export function calculerClassement(
   repo: IBadgeRepository,
   ctx: TenantContext,

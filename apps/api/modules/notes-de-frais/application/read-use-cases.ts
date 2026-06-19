@@ -23,7 +23,7 @@ export async function getNoteDeFrais(
   return note;
 }
 
-// Liste enrichie du compteur de dépenses liées par note.
+/** Liste enrichie du compteur de dépenses liées par note. */
 export async function listNotesDeFraisAvecCompte(repo: INoteDeFraisRepository, ctx: TenantContext): Promise<NoteDeFraisListItem[]> {
   const [notes, counts] = await Promise.all([repo.list(ctx), repo.countDepensesByNote(ctx)]);
   return notes.map((n) => ({ ...n, nbDepenses: counts.get(n.id) ?? 0 }));

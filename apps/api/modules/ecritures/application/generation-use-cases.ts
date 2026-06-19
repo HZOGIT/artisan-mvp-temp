@@ -17,7 +17,8 @@ import { COMPTE_CLIENT, COMPTE_VENTES, COMPTE_BANQUE, compteTvaCollectee } from 
 interface LigneVentilee {
   readonly compte: string;
   readonly lib: string;
-  readonly montant: number; // valeur absolue, > 0
+  /** valeur absolue, > 0 */
+  readonly montant: number;
 }
 
 /*
@@ -48,7 +49,8 @@ export async function genererEcrituresVente(
   factureId: number,
 ): Promise<EcritureComptable[]> {
   const facture = await factureReader.getFacture(ctx, factureId);
-  if (!facture) return []; // facture absente / hors tenant → rien à générer
+  /** facture absente / hors tenant → rien à générer */
+  if (!facture) return [];
 
   const isAvoir = facture.typeDocument === "avoir" || Number(facture.totalTTC) < 0;
   const totalHT = Math.abs(Number(facture.totalHT) || 0);
@@ -78,7 +80,7 @@ export async function genererEcrituresVente(
     lignes.push({ ...base, numeroCompte: t.compte, libelleCompte: t.lib, ...creditFacture(t.montant) });
   }
 
-  // Idempotence : purge puis réinsertion de la pièce.
+  /** Idempotence : purge puis réinsertion de la pièce. */
   await ecritureRepo.deleteByFacture(ctx, factureId);
   return ecritureRepo.createMany(ctx, lignes);
 }
@@ -99,11 +101,12 @@ export async function genererEcrituresEncaissement(
   const facture = await factureReader.getFacture(ctx, factureId);
   if (!facture) return [];
 
-  // Idempotence sélective (BQ uniquement — on ne touche pas la vente VE).
+  /** Idempotence sélective (BQ uniquement — on ne touche pas la vente VE). */
   await ecritureRepo.deleteByFactureJournal(ctx, factureId, "BQ");
 
   const ttc = Number(facture.totalTTC) || 0;
-  if (facture.statut !== "payee" || ttc <= 0) return []; // pas réglée / avoir → pas d'encaissement
+  /** pas réglée / avoir → pas d'encaissement */
+  if (facture.statut !== "payee" || ttc <= 0) return [];
 
   const dateEcriture = facture.datePaiement ?? facture.dateFacture;
   const pieceRef = facture.numero;

@@ -3,7 +3,7 @@ import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IAlertesPrevisionsRepository } from "../../application/alertes-previsions-repository";
 import { getConfig, saveConfig, getHistorique, verifierEtEnvoyer } from "../../application/use-cases";
 
-// Bornes alignées sur le legacy. `frequenceVerification` = enum fermé. Toutes optionnelles (upsert partiel).
+/** Bornes alignées sur le legacy. `frequenceVerification` = enum fermé. Toutes optionnelles (upsert partiel). */
 const saveConfigSchema = z.object({
   seuilAlertePositif: z.string().optional(),
   seuilAlerteNegatif: z.string().optional(),

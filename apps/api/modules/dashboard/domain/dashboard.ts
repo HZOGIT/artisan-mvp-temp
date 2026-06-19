@@ -4,7 +4,7 @@
  * (`server/db.ts` get*), quirks compris — voir findings pour les incohérences legacy connues.
  */
 
-// ── Lignes brutes (projections minimales scopées tenant) ─────────────────────────────────────────
+/** ── Lignes brutes (projections minimales scopées tenant) ───────────────────────────────────────── */
 export interface DashFacture {
   readonly statut: string | null;
   readonly totalTTC: string | null;
@@ -36,7 +36,7 @@ export interface DashIntervention {
   readonly createdAt: Date;
 }
 
-// ── Sorties ──────────────────────────────────────────────────────────────────────────────────────
+/** ── Sorties ────────────────────────────────────────────────────────────────────────────────────── */
 export interface DashboardStats {
   readonly caMonth: number;
   readonly caYear: number;
@@ -47,7 +47,7 @@ export interface DashboardStats {
   readonly totalDevis: number;
   readonly totalFactures: number;
   readonly totalInterventions: number;
-  // Alias de compat (legacy) : chiffreAffaires = caYear, devisEnAttente = devisEnCours.
+  /** Alias de compat (legacy) : chiffreAffaires = caYear, devisEnAttente = devisEnCours. */
   readonly chiffreAffaires: number;
   readonly devisEnAttente: number;
 }
@@ -83,7 +83,7 @@ export interface Objectifs {
   readonly objectifClients: number;
   readonly currentClients: number;
 }
-// getUpcomingInterventions (proc) : interventions à venir + client joint (forme legacy `{...intervention, client}`).
+/** getUpcomingInterventions (proc) : interventions à venir + client joint (forme legacy `{...intervention, client}`). */
 export interface UpcomingInterventionItem {
   readonly id: number;
   readonly titre: string;
@@ -183,7 +183,7 @@ export function computeMonthlyCA(facturesPayees: readonly DashFacture[], months:
   return stats;
 }
 
-// getYearlyComparison : CA payé année courante vs année précédente (par dateFacture).
+/** getYearlyComparison : CA payé année courante vs année précédente (par dateFacture). */
 export function computeYearlyComparison(facturesPayees: readonly DashFacture[], now: Date): YearlyComparison {
   const thisYearStart = new Date(now.getFullYear(), 0, 1);
   const lastYearStart = new Date(now.getFullYear() - 1, 0, 1);
@@ -208,7 +208,7 @@ export function computeConversionRate(devis: readonly DashDevis[]): number {
   return Math.round((acceptes / devis.length) * 100);
 }
 
-// getTopClients : clients triés par CA total (somme TTC de leurs factures), top `limit`.
+/** getTopClients : clients triés par CA total (somme TTC de leurs factures), top `limit`. */
 export function computeTopClients(factures: readonly DashFacture[], clients: readonly DashClient[], limit: number): TopClient[] {
   return clients
     .map((client) => {
@@ -219,7 +219,7 @@ export function computeTopClients(factures: readonly DashFacture[], clients: rea
     .slice(0, limit);
 }
 
-// getClientEvolution : nb cumulé de clients à la fin de chaque mois, sur `months` mois.
+/** getClientEvolution : nb cumulé de clients à la fin de chaque mois, sur `months` mois. */
 export function computeClientEvolution(clients: readonly DashClient[], months: number, now: Date): ClientEvolutionPoint[] {
   const stats: ClientEvolutionPoint[] = [];
   for (let i = 0; i < months; i++) {
@@ -230,7 +230,7 @@ export function computeClientEvolution(clients: readonly DashClient[], months: n
   return stats;
 }
 
-// getObjectifs : objectifs (paramètres) vs réalisé (CA du mois, devis/clients créés ce mois).
+/** getObjectifs : objectifs (paramètres) vs réalisé (CA du mois, devis/clients créés ce mois). */
 export function computeObjectifs(objectifs: { objectifCA: string | null; objectifDevis: number | null; objectifClients: number | null }, factures: readonly DashFacture[], devis: readonly DashDevis[], clients: readonly DashClient[], now: Date): Objectifs {
   const m = now.getMonth();
   const y = now.getFullYear();

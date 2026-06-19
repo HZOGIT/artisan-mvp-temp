@@ -3,7 +3,7 @@ import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IRapportRepository } from "../../application/rapport-repository";
 import { basculerFavori, creerRapport, executerRapport, listRapports, supprimerRapport } from "../../application/use-cases";
 
-// Bornes alignées sur les colonnes `rapports_personnalises` (parité legacy `rapports.create`).
+/** Bornes alignées sur les colonnes `rapports_personnalises` (parité legacy `rapports.create`). */
 const createSchema = z.object({
   nom: z.string().min(1).max(100),
   description: z.string().max(2000).optional(),
@@ -16,7 +16,7 @@ const createSchema = z.object({
   graphiqueType: z.enum(["bar", "line", "pie", "doughnut"]).optional(),
 });
 
-// Routeur tRPC des rapports personnalisables. Surface client : list/create/delete/toggleFavori/executer.
+/** Routeur tRPC des rapports personnalisables. Surface client : list/create/delete/toggleFavori/executer. */
 export function createRapportsRouter(repo: IRapportRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listRapports(repo, ctx.tenant)),

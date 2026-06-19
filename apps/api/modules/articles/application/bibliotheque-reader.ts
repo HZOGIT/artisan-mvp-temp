@@ -29,8 +29,8 @@ export interface BibliothequeFiltre {
  * via une procédure admin — concern séparée). Pas de scope tenant : référentiel commun.
  */
 export interface BibliothequeReader {
-  // Liste filtrable par métier/catégorie (parité legacy `getBibliothequeArticles`).
+  /** Liste filtrable par métier/catégorie (parité legacy `getBibliothequeArticles`). */
   list(filtre?: BibliothequeFiltre): Promise<BibliothequeArticle[]>;
-  // Recherche plein-texte (nom/description), optionnellement bornée à un métier (limit 50).
+  /** Recherche plein-texte (nom/description), optionnellement bornée à un métier (limit 50). */
   search(query: string, metier?: string): Promise<BibliothequeArticle[]>;
 }

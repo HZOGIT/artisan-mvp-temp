@@ -9,7 +9,7 @@ import {
   supprimerOption,
 } from "../../application/use-cases";
 
-// Bornes alignées sur `devis_options` (nom varchar 100, description TEXT) — defense-in-depth.
+/** Bornes alignées sur `devis_options` (nom varchar 100, description TEXT) — defense-in-depth. */
 const createSchema = z.object({
   devisId: z.number().int(),
   nom: z.string().max(100),

@@ -9,7 +9,7 @@ export interface ComptaExportDeps extends CookieAuthDeps {
   readonly csvReader: FacturesCsvReader;
 }
 
-// Parse une date de query (YYYY-MM-DD ou ISO) ; undefined si absente/invalide.
+/** Parse une date de query (YYYY-MM-DD ou ISO) ; undefined si absente/invalide. */
 function parseDate(v: unknown): Date | undefined {
   if (typeof v !== "string" || !v) return undefined;
   const d = new Date(v);
@@ -42,11 +42,11 @@ export function registerComptabiliteExportRoute(app: FastifyInstance, deps: Comp
       .header("X-FEC-Lignes", String(exp.conformite.nbLignes))
       .header("Content-Type", "text/plain; charset=utf-8")
       .header("Content-Disposition", `attachment; filename="${exp.fileName}"`)
-      // BOM UTF-8 : aide les outils comptables (DGFiP Test Compta Demat) à détecter l'encodage.
+      /** BOM UTF-8 : aide les outils comptables (DGFiP Test Compta Demat) à détecter l'encodage. */
       .send("﻿" + exp.content);
   });
 
-  // Export CSV des factures de la période (Date;Numéro;Client;HT;TVA;TTC;Statut). Anti-injection CSV.
+  /** Export CSV des factures de la période (Date;Numéro;Client;HT;TVA;TTC;Statut). Anti-injection CSV. */
   app.get("/api/comptabilite/export-csv", async (req, reply) => {
     const auth = await authArtisanFromCookie(req, deps);
     if (auth.status === "unauthenticated") return reply.code(401).send({ error: "Non authentifié" });
@@ -63,6 +63,7 @@ export function registerComptabiliteExportRoute(app: FastifyInstance, deps: Comp
     return reply
       .header("Content-Type", "text/csv; charset=utf-8")
       .header("Content-Disposition", `attachment; filename="${exp.fileName}"`)
-      .send(exp.content); // le BOM est déjà inclus par buildFacturesCsv
+      /** le BOM est déjà inclus par buildFacturesCsv */
+      .send(exp.content);
   });
 }

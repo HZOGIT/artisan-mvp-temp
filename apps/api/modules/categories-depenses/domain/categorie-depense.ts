@@ -15,7 +15,8 @@ export interface CategorieDepense {
   readonly compteComptable: string | null;
   readonly deductibleTva: boolean;
   readonly deductibleIr: boolean;
-  readonly plafondMensuel: string | null; // numeric PG en string
+  /** numeric PG en string */
+  readonly plafondMensuel: string | null;
   readonly actif: boolean;
   readonly ordre: number;
   readonly createdAt: Date;

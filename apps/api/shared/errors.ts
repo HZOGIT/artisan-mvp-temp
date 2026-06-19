@@ -48,7 +48,7 @@ export class UnauthorizedError extends Error {
   }
 }
 
-// Limite d'usage atteinte (anti-abus). Traduite en TOO_MANY_REQUESTS côté transport.
+/** Limite d'usage atteinte (anti-abus). Traduite en TOO_MANY_REQUESTS côté transport. */
 export class TooManyRequestsError extends Error {
   readonly code = "TOO_MANY_REQUESTS" as const;
   constructor(message = "Trop de requêtes, réessayez plus tard") {

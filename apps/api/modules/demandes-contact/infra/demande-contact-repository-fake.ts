@@ -44,7 +44,8 @@ export class FakeDemandeContactRepository implements IDemandeContactRepository {
       telephone: input.telephone ?? null,
       message: input.message ?? null,
       source: input.source ?? "vitrine",
-      statut: "nouveau", // forcé
+      /** forcé */
+      statut: "nouveau",
       clientId: null,
       createdAt: now,
       updatedAt: now,
@@ -64,7 +65,7 @@ export class FakeDemandeContactRepository implements IDemandeContactRepository {
       ...(input.telephone !== undefined ? { telephone: input.telephone } : {}),
       ...(input.message !== undefined ? { message: input.message } : {}),
       ...(input.source !== undefined ? { source: input.source } : {}),
-      // statut/clientId jamais touchés par update
+      /** statut/clientId jamais touchés par update */
       updatedAt: new Date(),
     };
     this.store[idx] = next;

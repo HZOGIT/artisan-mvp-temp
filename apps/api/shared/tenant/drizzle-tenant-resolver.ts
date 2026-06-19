@@ -30,7 +30,7 @@ export class DrizzleTenantResolver implements TenantResolver {
       .where(eq(users.id, claims.userId))
       .limit(1);
 
-    // OWNER prioritaire ; sinon rattachement collaborateur via users.artisanId.
+    /** OWNER prioritaire ; sinon rattachement collaborateur via users.artisanId. */
     const artisanId = artisan?.id ?? user?.artisanId ?? null;
     if (artisanId == null) return null;
 

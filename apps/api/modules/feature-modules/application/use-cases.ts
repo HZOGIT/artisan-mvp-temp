@@ -4,7 +4,7 @@ import { enrichirModules, isPlanInsuffisant } from "../domain/plan";
 import type { ModuleAvecEtat, OnboardingStatus } from "../domain/module";
 import type { IModulesRepository } from "./modules-repository";
 
-// Onboarding par défaut (artisan sans colonnes onboarding / introuvable) — parité legacy.
+/** Onboarding par défaut (artisan sans colonnes onboarding / introuvable) — parité legacy. */
 const DEFAULT_ONBOARDING: OnboardingStatus = { onboardingCompleted: true, metier: null, plan: null };
 
 export interface CompleteOnboardingInput {
@@ -13,7 +13,7 @@ export interface CompleteOnboardingInput {
   readonly moduleSlugs?: readonly string[];
 }
 
-// Catalogue enrichi de l'état du tenant (actif/locked), trié par ordre du catalogue.
+/** Catalogue enrichi de l'état du tenant (actif/locked), trié par ordre du catalogue. */
 export async function listModules(repo: IModulesRepository, ctx: TenantContext): Promise<ModuleAvecEtat[]> {
   const [catalogue, slugsActifs, status] = await Promise.all([
     repo.listCatalogue(),
@@ -68,7 +68,7 @@ export async function completeOnboarding(repo: IModulesRepository, ctx: TenantCo
   return { success: true };
 }
 
-// Passe l'onboarding : marque terminé et active les modules par défaut.
+/** Passe l'onboarding : marque terminé et active les modules par défaut. */
 export async function skipOnboarding(repo: IModulesRepository, ctx: TenantContext): Promise<{ success: true }> {
   await repo.updateOnboarding(ctx, { onboardingCompleted: true });
   await repo.initDefaults(ctx);

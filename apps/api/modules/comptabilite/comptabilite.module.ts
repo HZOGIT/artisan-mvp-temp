@@ -1,7 +1,7 @@
 import type { IComptabiliteReader } from "./application/comptabilite-reader";
 import { createComptabiliteRouter } from "./interface/trpc/comptabilite.router";
 
-// Wiring DI du module « comptabilite » (lectures FEC/TVA/grand-livre/balance/journal).
+/** Wiring DI du module « comptabilite » (lectures FEC/TVA/grand-livre/balance/journal). */
 export interface ComptabiliteModuleDeps {
   readonly reader: IComptabiliteReader;
 }

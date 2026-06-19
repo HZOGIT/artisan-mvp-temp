@@ -22,7 +22,7 @@ export async function ignorerTransaction(repo: ITransactionBancaireRepository, c
   return { success: true };
 }
 
-// PUR : suggère une catégorie si le libellé contient le motif d'une règle ACTIVE (1ère match).
+/** PUR : suggère une catégorie si le libellé contient le motif d'une règle ACTIVE (1ère match). */
 export function suggererCategorie(libelle: string, regles: readonly RegleCategorisation[]): string | null {
   const lib = String(libelle || "").toUpperCase();
   for (const r of regles) {
@@ -45,7 +45,8 @@ export async function importReleve(
   ctx: TenantContext,
   input: ImportReleveInput,
 ): Promise<ImportReleveResult> {
-  const transactions = parseReleveCsv(input.contenuCsv); // peut lever ValidationError (>5000 lignes)
+  /** peut lever ValidationError (>5000 lignes) */
+  const transactions = parseReleveCsv(input.contenuCsv);
   if (transactions.length === 0) return { releveId: 0, nbImportees: 0, message: "CSV vide ou invalide" };
   let regles: RegleCategorisation[] = [];
   try {

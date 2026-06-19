@@ -13,13 +13,16 @@ export type NoteDeFraisStatut = "brouillon" | "soumise" | "approuvee" | "rejetee
 export interface NoteDeFrais {
   readonly id: number;
   readonly artisanId: number;
-  readonly userId: number; // demandeur
+  /** demandeur */
+  readonly userId: number;
   readonly numero: string;
   readonly titre: string;
-  readonly periodeDebut: string; // date PG (YYYY-MM-DD)
+  /** date PG (YYYY-MM-DD) */
+  readonly periodeDebut: string;
   readonly periodeFin: string;
   readonly statut: NoteDeFraisStatut;
-  readonly montantTotal: string; // numeric PG en string
+  /** numeric PG en string */
+  readonly montantTotal: string;
   readonly montantRembourse: string;
   readonly dateSoumission: string | null;
   readonly dateApprobation: string | null;
@@ -41,10 +44,10 @@ export interface NoteFraisDepense {
   readonly montantTtc: string;
 }
 
-// Détail d'une note enrichi des dépenses liées (consommé par `getNoteFraisById`).
+/** Détail d'une note enrichi des dépenses liées (consommé par `getNoteFraisById`). */
 export type NoteDeFraisDetail = NoteDeFrais & { readonly depenses: NoteFraisDepense[] };
 
-// Élément de liste enrichi du compteur de dépenses (consommé par `listNotesFrais`).
+/** Élément de liste enrichi du compteur de dépenses (consommé par `listNotesFrais`). */
 export type NoteDeFraisListItem = NoteDeFrais & { readonly nbDepenses: number };
 
 export interface CreateNoteDeFraisInput {
