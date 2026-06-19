@@ -9,6 +9,7 @@
 import { chromium } from 'playwright';
 
 const BASE = process.env.BASE || 'https://staging.operioz.com';
+const BACKEND = process.env.BACKEND || 'https://staging-backend.operioz.com';
 const EMAIL = process.env.E2E_EMAIL || 'dev@operioz.com';
 const PASS = process.env.E2E_PASS || '';
 
@@ -39,7 +40,7 @@ const browser = await chromium.launch({ args: ['--no-sandbox'] });
 const ctx = await browser.newContext({ baseURL: BASE, ignoreHTTPSErrors: true });
 
 // --- Auth par API (cookie partagé avec le contexte navigateur) ---
-const signin = await ctx.request.post('/api/trpc/auth.signin?batch=1', {
+const signin = await ctx.request.post(`${BACKEND}/api/trpc/auth.signin?batch=1`, {
   headers: { 'content-type': 'application/json' },
   data: { '0': { json: { email: EMAIL, password: PASS } } },
 });
@@ -76,8 +77,13 @@ for (const route of ROUTES) {
   try {
     await page.goto(route, { waitUntil: 'networkidle', timeout: 25000 });
     await page.waitForTimeout(1500); // laisser les queries/render finir
-    // reload loop ?
-    if (navCount > 3) add({ route, type: 'loop', text: `${navCount} navigations (reload loop suspecté)` });
+    // reload loop ? Exclure les redirects légitimes : si l'URL finale diffère de la route visitée
+    // (ex. / → /dashboard quand authentifié, /utilisateurs → /dashboard si non-autorisé),
+    // Playwright compte aussi les history.pushState/replaceState du SPA comme framenavigated,
+    // ce qui gonfle le compteur sans qu'il y ait de vraie boucle.
+    const finalPath = new URL(page.url()).pathname;
+    const redirectedAway = finalPath !== route;
+    if (navCount > 3 && !redirectedAway) add({ route, type: 'loop', text: `${navCount} navigations (reload loop suspecté)` });
     // page vide / spinner bloqué ?
     const txtLen = (await page.evaluate(() => document.body?.innerText?.trim().length || 0));
     const onlySpinner = await page.evaluate(() =>
