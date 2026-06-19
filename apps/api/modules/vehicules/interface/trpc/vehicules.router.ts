@@ -72,7 +72,11 @@ export function createVehiculesRouter(repo: IVehiculeRepository) {
 
     create: protectedProcedure
       .input(createVehiculeSchema)
-      .mutation(({ ctx, input }) => createVehicule(repo, ctx.tenant, input)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await createVehicule(repo, ctx.tenant, input);
+        ctx.log.info({ event: "vehicule_cree", vehiculeId: result.id, typeCarburant: input.typeCarburant ?? null }, "Véhicule ajouté à la flotte");
+        return result;
+      }),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int(), data: createVehiculeSchema.partial() }))
@@ -82,6 +86,7 @@ export function createVehiculesRouter(repo: IVehiculeRepository) {
       .input(idInput)
       .mutation(async ({ ctx, input }) => {
         await deleteVehicule(repo, ctx.tenant, input.id);
+        ctx.log.warn({ event: "vehicule_supprime", vehiculeId: input.id }, "Véhicule retiré de la flotte");
         return { success: true };
       }),
 
@@ -120,7 +125,11 @@ export function createVehiculesRouter(repo: IVehiculeRepository) {
 
     addEntretien: protectedProcedure
       .input(z.object({ vehiculeId: z.number().int(), data: entretienSchema }))
-      .mutation(({ ctx, input }) => ajouterEntretien(repo, ctx.tenant, input.vehiculeId, input.data)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await ajouterEntretien(repo, ctx.tenant, input.vehiculeId, input.data);
+        ctx.log.info({ event: "vehicule_entretien_ajoute", vehiculeId: input.vehiculeId, type: input.data.type }, `Entretien véhicule enregistré : ${input.data.type}`);
+        return result;
+      }),
 
     getEntretiensAVenir: protectedProcedure.query(({ ctx }) => repo.listEntretiensAVenir(ctx.tenant)),
 
@@ -130,7 +139,12 @@ export function createVehiculesRouter(repo: IVehiculeRepository) {
 
     addAssurance: protectedProcedure
       .input(z.object({ vehiculeId: z.number().int(), data: assuranceSchema }))
-      .mutation(({ ctx, input }) => ajouterAssurance(repo, ctx.tenant, input.vehiculeId, input.data)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await ajouterAssurance(repo, ctx.tenant, input.vehiculeId, input.data);
+        /** Assurance véhicule = conformité légale obligatoire — toute mise à jour doit être tracée. */
+        ctx.log.info({ event: "vehicule_assurance_ajoutee", vehiculeId: input.vehiculeId, typeAssurance: input.data.typeAssurance ?? null, dateFin: input.data.dateFin }, "Assurance véhicule enregistrée");
+        return result;
+      }),
 
     getAssurancesExpirant: protectedProcedure
       .input(z.object({ joursAvant: z.number().int().min(1).max(365).default(30) }).optional())
