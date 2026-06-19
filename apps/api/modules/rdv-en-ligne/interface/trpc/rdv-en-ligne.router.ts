@@ -68,7 +68,12 @@ export function createRdvEnLigneRouter(
 
     create: gerer
       .input(createSchema)
-      .mutation(({ ctx, input }) => creerRdv(repo, ctx.tenant, input)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await creerRdv(repo, ctx.tenant, input);
+        const level = input.urgence === "tres_urgente" ? "warn" : "info";
+        ctx.log[level]({ event: "rdv_cree", rdvId: result.id, clientId: input.clientId, urgence: input.urgence ?? "normale" }, "RDV en ligne créé");
+        return result;
+      }),
 
     update: gerer
       .input(z.object({ id: z.number().int() }).and(updateSchema))
@@ -87,38 +92,50 @@ export function createRdvEnLigneRouter(
     /** Transitions de statut (état machine) — chacune valide la légalité depuis le statut courant. */
     confirmer: gerer
       .input(z.object({ id: z.number().int() }))
-      .mutation(({ ctx, input }) => confirmerRdv(repo, ctx.tenant, input.id)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await confirmerRdv(repo, ctx.tenant, input.id);
+        ctx.log.info({ event: "rdv_confirme", rdvId: input.id }, "RDV confirmé");
+        return result;
+      }),
 
-    /*
-     * Confirmation « métier » (parité client `trpc.rdv.confirm`) : crée l'intervention planifiée +
-     * passe le RDV à confirme avec le lien interventionId. Garde en_attente (sinon 400).
-     */
     confirm: gerer
       .input(z.object({ rdvId: z.number().int() }))
-      .mutation(({ ctx, input }) => confirmerRdvAvecIntervention(repo, interventionRepo, ctx.tenant, input.rdvId)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await confirmerRdvAvecIntervention(repo, interventionRepo, ctx.tenant, input.rdvId);
+        ctx.log.info({ event: "rdv_confirme_avec_intervention", rdvId: input.rdvId }, "RDV confirmé + intervention créée");
+        return result;
+      }),
 
-    /*
-     * Refus « métier » (parité client `trpc.rdv.refuse`) : passe le RDV à refuse avec motif.
-     * (Délègue au use-case de transition — en_attente→refuse. Email client ajouté au slice email.)
-     */
     refuse: gerer
       .input(z.object({ rdvId: z.number().int(), motif: z.string().min(1).max(5000) }))
-      .mutation(({ ctx, input }) => refuserRdv(repo, ctx.tenant, input.rdvId, input.motif)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await refuserRdv(repo, ctx.tenant, input.rdvId, input.motif);
+        ctx.log.warn({ event: "rdv_refuse", rdvId: input.rdvId }, "RDV refusé");
+        return result;
+      }),
 
-    /*
-     * Proposition d'un autre créneau (parité client `trpc.rdv.proposeAutreCreneau`) : refuse l'ancien
-     * RDV + crée un nouveau RDV au créneau proposé (date validée AVANT mutation). Email au slice email.
-     */
     proposeAutreCreneau: gerer
       .input(z.object({ rdvId: z.number().int(), nouvelleDateProposee: z.string() }))
-      .mutation(({ ctx, input }) => proposerAutreCreneau(repo, ctx.tenant, input.rdvId, input.nouvelleDateProposee)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await proposerAutreCreneau(repo, ctx.tenant, input.rdvId, input.nouvelleDateProposee);
+        ctx.log.info({ event: "rdv_autre_creneau_propose", rdvId: input.rdvId }, "Autre créneau proposé au client");
+        return result;
+      }),
 
     refuser: gerer
       .input(z.object({ id: z.number().int(), motifRefus: z.string().min(1).max(5000) }))
-      .mutation(({ ctx, input }) => refuserRdv(repo, ctx.tenant, input.id, input.motifRefus)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await refuserRdv(repo, ctx.tenant, input.id, input.motifRefus);
+        ctx.log.warn({ event: "rdv_refuse", rdvId: input.id }, "RDV refusé");
+        return result;
+      }),
 
     annuler: gerer
       .input(z.object({ id: z.number().int() }))
-      .mutation(({ ctx, input }) => annulerRdv(repo, ctx.tenant, input.id)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await annulerRdv(repo, ctx.tenant, input.id);
+        ctx.log.warn({ event: "rdv_annule", rdvId: input.id }, "RDV annulé");
+        return result;
+      }),
   });
 }
