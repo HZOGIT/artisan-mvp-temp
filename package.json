@@ -11,7 +11,9 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
-    "db:push": "drizzle-kit generate && drizzle-kit migrate",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "pnpm run db:generate && pnpm run db:migrate",
     "lint:web": "eslint -c eslint.client.config.mjs apps/web/src",
     "lint:api": "eslint -c eslint.api.config.mjs apps/api"
   },
