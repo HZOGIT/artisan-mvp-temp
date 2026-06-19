@@ -16,8 +16,23 @@ const importSchema = z.object({
  */
 export function createImportErpRouter(repo: IImportErpRepository) {
   return router({
-    importClients: protectedProcedure.input(importSchema).mutation(({ ctx, input }) => importClients(repo, ctx.tenant, input)),
-    importDevis: protectedProcedure.input(importSchema).mutation(({ ctx, input }) => importDevis(repo, ctx.tenant, input)),
-    importFactures: protectedProcedure.input(importSchema).mutation(({ ctx, input }) => importFactures(repo, ctx.tenant, input)),
+    importClients: protectedProcedure.input(importSchema).mutation(async ({ ctx, input }) => {
+      ctx.log.warn({ event: "erp_import_started", type: "clients", batchSize: input.rows.length }, "Import ERP clients démarré");
+      const result = await importClients(repo, ctx.tenant, input);
+      ctx.log.warn({ event: "erp_import_completed", type: "clients", batchSize: input.rows.length }, "Import ERP clients terminé");
+      return result;
+    }),
+    importDevis: protectedProcedure.input(importSchema).mutation(async ({ ctx, input }) => {
+      ctx.log.warn({ event: "erp_import_started", type: "devis", batchSize: input.rows.length }, "Import ERP devis démarré");
+      const result = await importDevis(repo, ctx.tenant, input);
+      ctx.log.warn({ event: "erp_import_completed", type: "devis", batchSize: input.rows.length }, "Import ERP devis terminé");
+      return result;
+    }),
+    importFactures: protectedProcedure.input(importSchema).mutation(async ({ ctx, input }) => {
+      ctx.log.warn({ event: "erp_import_started", type: "factures", batchSize: input.rows.length }, "Import ERP factures démarré");
+      const result = await importFactures(repo, ctx.tenant, input);
+      ctx.log.warn({ event: "erp_import_completed", type: "factures", batchSize: input.rows.length }, "Import ERP factures terminé");
+      return result;
+    }),
   });
 }
