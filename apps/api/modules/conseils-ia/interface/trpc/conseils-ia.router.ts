@@ -1,6 +1,7 @@
 import { protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { ConseilsIaDeps } from "../../application/use-cases";
 import { getConseilsIA } from "../../application/use-cases";
+import type { AppLogger } from "../../../../shared/ports/logger";
 
 /*
  * `conseilsIA` est appelé par le client comme une procédure RACINE (`trpc.conseilsIA.useQuery()`),
@@ -8,5 +9,5 @@ import { getConseilsIA } from "../../application/use-cases";
  * dans createAppRouter). Surface protégée (tenant requis). Dégradation silencieuse côté use-case.
  */
 export function createConseilsIaProcedure(deps: ConseilsIaDeps) {
-  return protectedProcedure.query(({ ctx }) => getConseilsIA(deps, ctx.tenant!));
+  return protectedProcedure.query(({ ctx }) => getConseilsIA(deps, ctx.tenant!, ctx.log as unknown as AppLogger));
 }

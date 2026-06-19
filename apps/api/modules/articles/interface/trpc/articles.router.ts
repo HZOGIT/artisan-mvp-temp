@@ -4,6 +4,7 @@ import type { IArticleRepository } from "../../application/article-repository";
 import { listArticles, getArticle, articlesParCategorie } from "../../application/read-use-cases";
 import { creerArticle, modifierArticle, supprimerArticle } from "../../application/write-use-cases";
 import { suggererArticlesIA, type ArticlesIaDeps } from "../../application/suggerer-articles-ia";
+import type { AppLogger } from "../../../../shared/ports/logger";
 import type { BibliothequeReader } from "../../application/bibliotheque-reader";
 import type { BibliothequeWriter } from "../../application/bibliotheque-writer";
 import {
@@ -141,7 +142,7 @@ export function createArticlesRouter(
      */
     suggererArticlesIA: protectedProcedure
       .input(z.object({ query: z.string().min(2).max(200), contexte: z.string().max(2000).optional() }))
-      .query(({ ctx, input }) => (ia ? suggererArticlesIA(ia, ctx.tenant, input) : [])),
+      .query(({ ctx, input }) => (ia ? suggererArticlesIA(ia, ctx.tenant, input, ctx.log as unknown as AppLogger) : [])),
 
     /*
      * ── Bibliothèque PARTAGÉE (catalogue de référence) — lecture PUBLIQUE (non sensible) ──────────

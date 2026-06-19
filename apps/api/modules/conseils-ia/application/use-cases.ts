@@ -2,6 +2,7 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { LlmPort } from "../../../shared/ports/llm";
 import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { ArtisanReader } from "../../../shared/readers/contact-readers";
+import type { AppLogger } from "../../../shared/ports/logger";
 import { getContexteMetier } from "../../../shared/ia/contexte-metier";
 import { sanitizeIaError } from "../../../shared/ia/sanitize-ia-error";
 import type { ConseilsResult, ConseilsStats } from "../domain/conseils";
@@ -24,7 +25,7 @@ const STATS_VIDE: ConseilsStats = { nbDevisEnAttente: 0, nbFacturesImpayees: 0, 
  * tenant. ⚠️ **Dégradation SILENCIEUSE STRICTE** (parité legacy) : pas d'artisan, rate-limit atteint,
  * stats indisponibles, erreur provider ou JSON non parsable ⇒ `{conseils: []}`. Jamais d'exception.
  */
-export async function getConseilsIA(deps: ConseilsIaDeps, ctx: TenantContext): Promise<ConseilsResult> {
+export async function getConseilsIA(deps: ConseilsIaDeps, ctx: TenantContext, log?: AppLogger): Promise<ConseilsResult> {
   const artisan = await deps.artisanReader.getArtisan(ctx);
   if (!artisan) return CONSEILS_VIDE;
 
@@ -56,7 +57,7 @@ export async function getConseilsIA(deps: ConseilsIaDeps, ctx: TenantContext): P
     return { conseils, genereLe: now.toISOString() };
   } catch (e) {
      
-    console.warn("[conseilsIA]", sanitizeIaError(e));
+    log?.warn({ event: "conseils_ia_llm_error", error: sanitizeIaError(e) }, "Erreur LLM conseilsIA — retour vide");
     return CONSEILS_VIDE;
   }
 }

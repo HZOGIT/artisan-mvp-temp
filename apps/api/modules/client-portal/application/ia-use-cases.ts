@@ -2,6 +2,7 @@ import { NotFoundError, TooManyRequestsError, UnauthorizedError } from "../../..
 import type { TenantContext } from "../../../shared/tenant";
 import type { LlmPort } from "../../../shared/ports/llm";
 import type { ArtisanReader } from "../../../shared/readers/contact-readers";
+import type { AppLogger } from "../../../shared/ports/logger";
 import { getContexteMetier } from "../../../shared/ia/contexte-metier";
 import { sanitizeIaError } from "../../../shared/ia/sanitize-ia-error";
 import type { IPortalAccessRepository } from "./portal-access-repository";
@@ -35,7 +36,7 @@ function safeHtml(s: string): string {
  * Rate-limit IA côté artisan → 429 (mutation). **Dégradation propre** : LLM KO / JSON non parsable →
  * objet structuré par défaut (titre tronqué + texte brut). Notif + email artisan best-effort.
  */
-export async function soumettreDemandeIA(deps: SoumettreDemandeIADeps, token: string, description: string): Promise<{ success: true; structured: DemandeIAStructured }> {
+export async function soumettreDemandeIA(deps: SoumettreDemandeIADeps, token: string, description: string, log?: AppLogger): Promise<{ success: true; structured: DemandeIAStructured }> {
   const access = await deps.access.resolveByToken(token, new Date());
   if (!access) throw new UnauthorizedError("Accès non autorisé");
   const ctx: TenantContext = { artisanId: access.artisanId, userId: 0 };
@@ -85,7 +86,7 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte avant/apres) :
     }
   } catch (e) {
     /** dégradation : on garde `structured` par défaut */
-    console.warn("[soumettreDemandeIA]", sanitizeIaError(e));
+    log?.warn({ event: "portail_ia_llm_error", error: sanitizeIaError(e) }, "Erreur LLM soumettreDemandeIA — dégradation silencieuse");
   }
 
   const fourchette = structured.estimationMin && structured.estimationMax ? `${structured.estimationMin}-${structured.estimationMax} €` : "à chiffrer";

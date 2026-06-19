@@ -2,6 +2,7 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { LlmPort } from "../../../shared/ports/llm";
 import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { ArtisanReader } from "../../../shared/readers/contact-readers";
+import type { AppLogger } from "../../../shared/ports/logger";
 import { getContexteMetier } from "../../../shared/ia/contexte-metier";
 import { sanitizeIaError } from "../../../shared/ia/sanitize-ia-error";
 
@@ -46,6 +47,7 @@ export async function suggererArticlesIA(
   deps: ArticlesIaDeps,
   ctx: TenantContext,
   input: SuggererArticlesInput,
+  log?: AppLogger,
 ): Promise<ArticleSuggere[]> {
   /** Rate-limit IA AVANT tout (anti-coût). Parité legacy : pas de 429, on renvoie []. */
   if (!(await deps.rateLimiter.check(rateLimitKey(ctx.artisanId)))) return [];
@@ -66,7 +68,7 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte autour) :
   try {
     text = await deps.llm.complete(userPrompt, { system: contexteMetier, temperature: 0.4, maxOutputTokens: 1000 });
   } catch (e) {
-    console.warn("[suggererArticlesIA]", sanitizeIaError(e));
+    log?.warn({ event: "articles_ia_llm_error", error: sanitizeIaError(e) }, "Erreur LLM suggererArticlesIA — retour vide");
     return [];
   }
 

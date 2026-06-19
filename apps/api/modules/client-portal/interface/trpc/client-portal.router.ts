@@ -12,6 +12,7 @@ import { getDevis, getFactures, getInterventions, getContrats } from "../../appl
 import { getCreneauxDisponibles, demanderRdv, getMesRdv, getSuiviChantiers } from "../../application/scheduling-use-cases";
 import { getConversations, getConversationMessages, sendClientMessage, markClientMessagesAsRead, demanderModification } from "../../application/chat-use-cases";
 import { soumettreDemandeIA } from "../../application/ia-use-cases";
+import type { AppLogger } from "../../../../shared/ports/logger";
 
 /*
  * Toutes les dépendances des procs du portail (admin cookie + public token). Interface CONCRÈTE (les
@@ -70,6 +71,6 @@ export function createClientPortalRouter(deps: ClientPortalRouterDeps) {
     sendClientMessage: publicProcedure.input(z.object({ token: z.string(), conversationId: z.number().int().positive(), contenu: z.string().min(1).max(5000) })).mutation(({ input }) => sendClientMessage(deps, input.token, input.conversationId, input.contenu)),
     markClientMessagesAsRead: publicProcedure.input(z.object({ token: z.string(), conversationId: z.number().int().positive() })).mutation(({ input }) => markClientMessagesAsRead(deps, input.token, input.conversationId)),
     demanderModification: publicProcedure.input(z.object({ token: z.string(), message: z.string().min(1).max(5000) })).mutation(({ input }) => demanderModification(deps, input.token, input.message)),
-    soumettreDemandeIA: publicProcedure.input(z.object({ token: z.string(), description: z.string().min(10).max(2000) })).mutation(({ input }) => soumettreDemandeIA(deps, input.token, input.description)),
+    soumettreDemandeIA: publicProcedure.input(z.object({ token: z.string(), description: z.string().min(10).max(2000) })).mutation(({ ctx, input }) => soumettreDemandeIA(deps, input.token, input.description, ctx.log as unknown as AppLogger)),
   });
 }
