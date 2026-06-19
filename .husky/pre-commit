@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# 1. ESLint sur les fichiers stagés uniquement
+pnpm lint-staged
+
+# 2. TypeScript — les deux tsconfigs
+pnpm check
+
+# 3. Tests unitaires (sans DB) — API + web
+pnpm test:unit:api
+pnpm test:web

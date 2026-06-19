@@ -13,7 +13,17 @@
     "test:web": "vitest run -c vitest.web.config.ts",
     "db:generate": "drizzle-kit generate",
     "lint:web": "eslint -c eslint.web.config.mjs apps/web/src",
-    "lint:api": "eslint -c eslint.api.config.mjs apps/api"
+    "lint:api": "eslint -c eslint.api.config.mjs apps/api",
+    "test:unit:api": "vitest run -c vitest.unit.api.config.ts",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "apps/api/**/*.ts": [
+      "eslint -c eslint.api.config.mjs --max-warnings=0 --no-warn-ignored"
+    ],
+    "apps/web/src/**/*.{ts,tsx}": [
+      "eslint -c eslint.web.config.mjs --max-warnings=0"
+    ]
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",
@@ -127,6 +137,8 @@
     "esbuild": "^0.25.0",
     "eslint": "^10.5.0",
     "eslint-plugin-i18next": "^6.1.4",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.7",
     "pnpm": "^11.8.0",
     "postcss": "^8.4.47",
     "prettier": "^3.6.2",

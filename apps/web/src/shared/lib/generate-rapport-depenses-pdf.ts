@@ -38,7 +38,7 @@ export type RapportDepensesData = {
 export async function generateRapportDepensesPDF(data: RapportDepensesData) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
-  /** Charger Roboto pour les accents francais. */
+  let robotoLoaded = false;
   try {
     const [regB64, boldB64] = await Promise.all([
       loadFontBase64("/api/fonts/roboto-regular.ttf"),
@@ -49,8 +49,9 @@ export async function generateRapportDepensesPDF(data: RapportDepensesData) {
     doc.addFileToVFS("Roboto-Bold.ttf", boldB64);
     doc.addFont("Roboto-Bold.ttf", "Roboto", "bold");
     doc.setFont("Roboto", "normal");
+    robotoLoaded = true;
   } catch {
-    /** Fallback helvetica (accents possiblement remplaces par ?). */
+    doc.setFont("helvetica", "normal");
   }
 
   const W = 210;
@@ -64,14 +65,17 @@ export async function generateRapportDepensesPDF(data: RapportDepensesData) {
   const warn: [number, number, number] = [249, 115, 22];
   const danger: [number, number, number] = [239, 68, 68];
 
+  const font = robotoLoaded ? "Roboto" : "helvetica";
+  const setFont = (style: "normal" | "bold") => doc.setFont(font, style);
+
   /** ============ HEADER ============ */
   doc.setFillColor(...violet);
   doc.rect(0, 0, W, 30, "F");
   doc.setTextColor(255, 255, 255);
-  doc.setFont("Roboto", "bold");
+  setFont("bold");
   doc.setFontSize(18);
   doc.text("Rapport de dépenses", margin, 14);
-  doc.setFont("Roboto", "normal");
+  setFont("normal");
   doc.setFontSize(11);
   const [y2, m2] = data.mois.split("-").map(Number);
   const moisLib = new Date(y2, m2 - 1, 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
@@ -83,7 +87,7 @@ export async function generateRapportDepensesPDF(data: RapportDepensesData) {
 
   /** ============ RÉSUMÉ ============ */
   doc.setTextColor(...slate);
-  doc.setFont("Roboto", "bold");
+  setFont("bold");
   doc.setFontSize(13);
   doc.text("Résumé", margin, y);
   y += 6;
@@ -93,7 +97,7 @@ export async function generateRapportDepensesPDF(data: RapportDepensesData) {
   doc.line(margin, y, W - margin, y);
   y += 5;
 
-  doc.setFont("Roboto", "normal");
+  setFont("normal");
   doc.setFontSize(10);
   const resume = [
     ["Total dépenses du mois", eurFmt(data.stats.totalMois)],
@@ -120,7 +124,7 @@ export async function generateRapportDepensesPDF(data: RapportDepensesData) {
   y += 6;
 
   /** ============ PAR CATÉGORIE ============ */
-  doc.setFont("Roboto", "bold");
+  setFont("bold");
   doc.setFontSize(13);
   doc.setTextColor(...slate);
   doc.text("Par catégorie", margin, y);
@@ -129,7 +133,7 @@ export async function generateRapportDepensesPDF(data: RapportDepensesData) {
   y += 5;
 
   /** Header tableau */
-  doc.setFont("Roboto", "bold");
+  setFont("bold");
   doc.setFontSize(9);
   doc.setTextColor(...lightSlate);
   doc.text("Catégorie", margin, y);
@@ -142,7 +146,7 @@ export async function generateRapportDepensesPDF(data: RapportDepensesData) {
   doc.line(margin, y, W - margin, y);
   y += 4;
 
-  doc.setFont("Roboto", "normal");
+  setFont("normal");
   doc.setFontSize(9);
   for (const b of data.budgets) {
     if (b.budget === 0 && b.reel === 0) continue;
@@ -170,7 +174,7 @@ export async function generateRapportDepensesPDF(data: RapportDepensesData) {
       doc.addPage();
       y = margin;
     }
-    doc.setFont("Roboto", "bold");
+    setFont("bold");
     doc.setFontSize(13);
     doc.setTextColor(...slate);
     doc.text("Top dépenses", margin, y);
@@ -179,7 +183,7 @@ export async function generateRapportDepensesPDF(data: RapportDepensesData) {
     doc.line(margin, y, W - margin, y);
     y += 5;
 
-    doc.setFont("Roboto", "bold");
+    setFont("bold");
     doc.setFontSize(9);
     doc.setTextColor(...lightSlate);
     doc.text("Date", margin, y);
@@ -190,7 +194,7 @@ export async function generateRapportDepensesPDF(data: RapportDepensesData) {
     doc.line(margin, y, W - margin, y);
     y += 4;
 
-    doc.setFont("Roboto", "normal");
+    setFont("normal");
     doc.setFontSize(9);
     for (const d of data.stats.topDepenses.slice(0, 10)) {
       if (y > 270) {
@@ -212,7 +216,7 @@ export async function generateRapportDepensesPDF(data: RapportDepensesData) {
   const pageCount = doc.getNumberOfPages();
   for (let p = 1; p <= pageCount; p++) {
     doc.setPage(p);
-    doc.setFont("Roboto", "normal");
+    setFont("normal");
     doc.setFontSize(8);
     doc.setTextColor(...lightSlate);
     doc.text(

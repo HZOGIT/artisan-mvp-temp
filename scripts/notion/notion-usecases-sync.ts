@@ -243,7 +243,7 @@ async function generateNames(slugsByModule: Map<string, string[]>): Promise<Reco
   if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY absent — impossible de générer les noms.");
   const result: Record<string, string> = {};
 
-  for (const [module, slugs] of slugsByModule) {
+  await pMap([...slugsByModule.entries()], async ([module, slugs]) => {
     const prompt =
       `Tu es expert ERP pour artisans (devis, factures, paiements, RH, stocks, interventions…).\n` +
       `Pour chaque use-case TypeScript du module "${module}", génère un intitulé métier en français,\n` +
@@ -257,7 +257,7 @@ async function generateNames(slugsByModule: Map<string, string[]>): Promise<Reco
       { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) },
     );
-    if (!res.ok) { console.warn(`   ⚠️  Gemini erreur module ${module}: ${res.status}`); continue; }
+    if (!res.ok) { console.warn(`   ⚠️  Gemini erreur module ${module}: ${res.status}`); return; }
 
     const data = await res.json();
     const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
@@ -268,8 +268,7 @@ async function generateNames(slugsByModule: Map<string, string[]>): Promise<Reco
     } catch (e) {
       console.warn(`   ⚠️  Gemini parse erreur module ${module}: ${e}`);
     }
-    await sleep(300);
-  }
+  }, 5);
   return result;
 }
 
@@ -292,6 +291,25 @@ async function notion(path: string, method: string, body?: unknown): Promise<any
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function pMap<T, R>(items: T[], fn: (item: T) => Promise<R>, concurrency = 5): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += concurrency) {
+    const batch = await Promise.all(items.slice(i, i + concurrency).map(fn));
+    results.push(...batch);
+  }
+  return results;
+}
+
+async function notionWithRetry(path: string, method: string, body?: unknown, retries = 3): Promise<any> {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try { return await notion(path, method, body); }
+    catch (e: any) {
+      if (e.message?.includes("429") && attempt < retries - 1) await sleep(1000 * (attempt + 1));
+      else throw e;
+    }
+  }
+}
 
 // Schéma de la DB. ⚠️ machine = écrit par le script ; humain = jamais touché après création.
 // Nom est le TITRE Notion (visible, non cachable) → libellé métier lisible.
@@ -458,29 +476,26 @@ async function main() {
   let created = 0, updated = 0;
   const currentSlugs = new Set(useCases.map((u) => u.slug));
 
-  for (const uc of useCases) {
+  await pMap(useCases, async (uc) => {
     const pageId = existing.get(uc.slug);
     if (pageId) {
-      // Update : on ne PATCH QUE les props machine (les colonnes humaines restent intactes).
-      await notion(`/pages/${pageId}`, "PATCH", { properties: machineProps(uc) });
+      await notionWithRetry(`/pages/${pageId}`, "PATCH", { properties: machineProps(uc) });
       updated++;
     } else {
-      await notion("/pages", "POST", { parent: { database_id: dbId }, properties: machineProps(uc) });
+      await notionWithRetry("/pages", "POST", { parent: { database_id: dbId }, properties: machineProps(uc) });
       created++;
     }
-    await sleep(350); // respect du rate-limit Notion (~3 req/s)
-  }
+  }, 5);
 
   // Orphelins : use-cases disparus du code → on les marque (pas de suppression destructive).
   let orphans = 0;
-  for (const [slug, pageId] of existing) {
-    if (currentSlugs.has(slug)) continue;
-    await notion(`/pages/${pageId}`, "PATCH", {
+  const orphanEntries = [...existing.entries()].filter(([slug]) => !currentSlugs.has(slug));
+  await pMap(orphanEntries, async ([, pageId]) => {
+    await notionWithRetry(`/pages/${pageId}`, "PATCH", {
       properties: { "Présent dans le code": { checkbox: false }, "Dernier sync": { date: { start: new Date().toISOString() } } },
     });
     orphans++;
-    await sleep(350);
-  }
+  }, 5);
 
   console.log(`\n✅ Terminé. Créés: ${created} · Mis à jour: ${updated} · Orphelins marqués: ${orphans}`);
 }

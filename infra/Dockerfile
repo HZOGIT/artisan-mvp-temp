@@ -29,7 +29,7 @@ ENV NODE_ENV=production \
     HOST=0.0.0.0
 RUN npm install -g pnpm@11.5.1
 COPY package.json pnpm-lock.yaml .npmrc pnpm-workspace.yaml ./
-RUN pnpm install --prod --frozen-lockfile && pnpm store prune
+RUN HUSKY=0 pnpm install --prod --frozen-lockfile && pnpm store prune
 COPY --from=builder /app/dist-newstack ./dist-newstack
 # Migrations Drizzle (SQL + meta/_journal.json) : appliquées au boot par le SDK migrate(). Le bundle
 # esbuild n'embarque pas les .sql → on les copie. migrationsFolder = "drizzle/pg" relatif au cwd /app.

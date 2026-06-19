@@ -16,7 +16,9 @@ function fakeRes() {
   return { res, cookies };
 }
 
-const ctx = (over: Partial<AppContext>): AppContext => ({ claims: null, tenant: null, role: null, permissions: [], res: null, clientIp: "unknown", userAgent: "unknown", ...over });
+const fakeLog = { child: () => fakeLog, info: () => {}, warn: () => {}, error: () => {}, debug: () => {} } as unknown as AppContext["log"];
+
+const ctx = (over: Partial<AppContext>): AppContext => ({ claims: null, tenant: null, role: null, permissions: [], res: null, clientIp: "unknown", userAgent: "unknown", log: fakeLog, ...over });
 
 describe("auth.module (router via createCaller)", () => {
   function build() {

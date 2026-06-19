@@ -2,19 +2,14 @@ import { TooManyRequestsError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { EmailPort } from "../../../shared/ports/email";
 import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
+import type { SupportSujet, ContactSupportInput } from "../domain/support-domain";
+
+export type { SupportSujet, ContactSupportInput };
 
 /*
  * Formulaire de contact support : envoie un email à l'équipe Operioz (parité legacy `support.contact`).
  * AUCUNE table : pur effet de bord email + anti-flood. Le destinataire (boîte support) est injecté.
  */
-export type SupportSujet = "technique" | "facturation" | "suggestion" | "autre";
-
-export interface ContactSupportInput {
-  readonly nom: string;
-  readonly email: string;
-  readonly sujet: SupportSujet;
-  readonly message: string;
-}
 
 export interface SupportDeps {
   readonly email: EmailPort;
