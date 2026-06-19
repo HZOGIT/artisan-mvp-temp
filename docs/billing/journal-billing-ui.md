@@ -14,8 +14,8 @@ Backend 100% complet (84 tests) — `billing.*` tRPC prêt côté API.
 |---|---|---|
 | Voir abonnement + cartes | `billing.getBillingInfo` | ✅ |
 | Ajouter une carte | `billing.createSetupIntent` + Stripe Elements + `billing.confirmPaymentMethod` | ❌ |
-| Supprimer une carte | `billing.revokePaymentMethod` | ❌ |
-| Changer carte par défaut | `billing.setDefaultPaymentMethod` | ❌ |
+| Supprimer une carte | `billing.revokePaymentMethod` | ✅ |
+| Changer carte par défaut | `billing.setDefaultPaymentMethod` | ✅ |
 | Voir factures récentes | `billing.getBillingInfo` → `recentInvoices` | ✅ |
 
 ## Plan par phase (une phase = 1–2 itérations)
@@ -60,9 +60,19 @@ Backend 100% complet (84 tests) — `billing.*` tRPC prêt côté API.
 
 ## Prochaine cible
 
-**Phase 3** — actions simples dans `BillingMaisonSection` : boutons "Supprimer" + "Définir par défaut" avec dialog de confirmation et toast feedback
+**Phase 4** — `add-card-dialog.tsx` : Stripe Elements SetupIntent flow (createSetupIntent → stripe.confirmSetup → confirmPaymentMethod)
 
 ## Log d'itérations
+
+### Itération 3 — 2026-06-19
+**Phase 3 — Actions simples (sans Stripe)**
+- `billing-maison-section.tsx` modifié : ajout de boutons "Définir par défaut" (Star) et "Supprimer" (Trash2) sur chaque carte
+- AlertDialog de confirmation avant suppression (action destructive) — annuler/confirmer avec loading spinner
+- "Définir par défaut" = action immédiate (sans dialog) — toast succès/erreur
+- Toast feedback via `sonner` : succès + erreur pour revoke et set-default
+- États loading propagés depuis le hook (isRevoking, isSettingDefault) → spinner sur le bouton actif
+- Gate `tsc --noEmit` ✅
+**Prochaine cible :** Phase 4 — AddCardDialog (Stripe Elements)
 
 ### Itération 2 — 2026-06-19
 **Phase 2 — Affichage lecture seule**
