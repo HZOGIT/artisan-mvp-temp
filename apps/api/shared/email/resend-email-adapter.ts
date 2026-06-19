@@ -31,6 +31,10 @@ export class ResendEmailAdapter implements EmailPort {
       options.attachments = message.attachments.map((a) => ({ filename: a.filename, content: a.content }));
     }
     const { error } = await resend.emails.send(options);
-    if (error) throw new Error(`Échec envoi email : ${error.message}`);
+    if (error) {
+      console.error(`[Email] Échec envoi → ${to} | ${subject} : ${error.message}`);
+      throw new Error(`Échec envoi email : ${error.message}`);
+    }
+    console.warn(`[Email] Envoyé → ${to} | ${subject}`);
   }
 }

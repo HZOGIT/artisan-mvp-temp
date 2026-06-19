@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyInstance, type FastifyError } from "fastify";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import { randomUUID } from "node:crypto";
@@ -345,6 +345,14 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     origin: process.env.CORS_ORIGIN ?? process.env.APP_URL ?? false,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  });
+
+  app.setErrorHandler<FastifyError>((error, req, reply) => {
+    const status = error.statusCode ?? 500;
+    if (status >= 500) {
+      req.log.error({ event: "unhandled_error", error: error.message, statusCode: status }, "Erreur non gérée");
+    }
+    void reply.code(status).send({ error: error.message ?? "Erreur serveur" });
   });
 
   app.get("/health", { logLevel: "silent" }, async () => ({ status: "ok" }));

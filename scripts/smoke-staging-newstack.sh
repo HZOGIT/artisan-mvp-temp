@@ -4,7 +4,7 @@
 # appelle les endpoints servis par le nouveau stack — en vérifiant 200 (l'endpoint fonctionne
 # vraiment, pas juste 401) ET l'isolation cross-tenant (B ne voit pas forcément les données de A).
 #
-# Lancé après deploy-staging-newstack.sh à chaque itération qui active/ajoute des endpoints.
+# Lancé après deploy-backend.sh à chaque itération qui active/ajoute des endpoints.
 # Aucun secret n'est affiché. Usage : ./scripts/smoke-staging-newstack.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."

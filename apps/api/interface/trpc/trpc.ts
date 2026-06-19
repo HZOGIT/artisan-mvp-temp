@@ -19,7 +19,7 @@ export const router = t.router;
  * dont la `cause` porte l'erreur d'origine levée par le use-case. On mappe selon la cause ;
  * les erreurs déjà formées (UNAUTHORIZED, BAD_REQUEST Zod…) passent inchangées.
  */
-const mapDomainErrors = t.middleware(async ({ next }) => {
+const mapDomainErrors = t.middleware(async ({ next, ctx }) => {
   const result = await next();
   if (result.ok) return result;
   const cause: unknown = result.error.cause ?? result.error;
@@ -29,6 +29,8 @@ const mapDomainErrors = t.middleware(async ({ next }) => {
   if (cause instanceof ForbiddenError) throw new TRPCError({ code: "FORBIDDEN", message: cause.message });
   if (cause instanceof ConflictError) throw new TRPCError({ code: "CONFLICT", message: cause.message });
   if (cause instanceof TooManyRequestsError) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: cause.message });
+  const errMsg = cause instanceof Error ? cause.message : String(cause);
+  ctx.log.error({ event: "trpc_unhandled_error", error: errMsg }, "Erreur tRPC non mappée");
   return result;
 });
 

@@ -1,4 +1,4 @@
-import type { FastifyRequest, FastifyReply } from "fastify";
+import type { FastifyRequest, FastifyReply, FastifyBaseLogger } from "fastify";
 import { verifyAuthToken, type TokenClaims, type TenantContext, type TenantResolver, type UserRoleReader, type PermissionsReader } from "../../shared/tenant";
 import { extractClientIp, extractUserAgent } from "../http/client-ip";
 
@@ -25,6 +25,8 @@ export interface AppContext {
    * d'une requête HTTP réelle (tests via createCaller) → les procédures cookie doivent rester tolérantes.
    */
   readonly res: FastifyReply | null;
+  /** Logger pino de la requête courante — disponible dans les middlewares tRPC et les handlers. */
+  readonly log: FastifyBaseLogger;
   /*
    * IP cliente (valeur probante, cf-connecting-ip prioritaire, ≤45 car.) + User-Agent — pour la
    * capture lors de la signature/refus de devis. "unknown" si indéterminable.
@@ -45,6 +47,9 @@ export function makeCreateContext(deps: ContextDeps = {}) {
   return async function createContext(opts: { req: FastifyRequest; res: FastifyReply }): Promise<AppContext> {
     const token = (opts.req.cookies as Record<string, string | undefined> | undefined)?.token ?? null;
     const claims = await verifyAuthToken(token, secret);
+    if (token && !claims) {
+      opts.req.log.warn({ event: "auth_invalid_token" }, "Token JWT invalide ou expiré");
+    }
     const tenant = claims && deps.resolver ? await deps.resolver.resolve(claims) : null;
     /*
      * Rôle résolu via le roleReader (INDÉPENDANT du tenant) ; repli sur `tenant.role` (déjà résolu)
@@ -56,6 +61,6 @@ export function makeCreateContext(deps: ContextDeps = {}) {
     const headers = (opts.req.headers ?? {}) as Record<string, unknown>;
     const clientIp = extractClientIp(headers, opts.req.ip ?? null);
     const userAgent = extractUserAgent(headers);
-    return { claims, tenant, role, permissions, res: opts.res, clientIp, userAgent };
+    return { claims, tenant, role, permissions, res: opts.res, log: opts.req.log, clientIp, userAgent };
   };
 }

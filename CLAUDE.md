@@ -205,7 +205,7 @@ autres agents ») — non redétaillée ici.
   itération avance la colonne d'UNE feature (1–3 fichiers). Exécution contre le **PG local bootstrappé**
   (`DATABASE_URL=postgres://artisan_user:artisan_password@localhost:5432/artisan_mvp`, rôle `app_tenant`
   + RLS) → commit chirurgical sur `staging`. Détail/ordre : `docs/testing/journal-tests-manquants.md`.
-- **Déployer uniquement un fix `src/`** (`./scripts/deploy-staging-newstack.sh`) ; un ajout de test
+- **Déployer uniquement un fix `src/`** (`./scripts/deploy-backend.sh`) ; un ajout de test
   pur ne change pas le runtime → pas de déploiement.
 - **Documenter sur 4 canaux** : (1) le journal `.md`, (2) **Linear** — issue parent de suivi (OPE-318)
   + **une issue enfant par itération** (« test(\<module\>): … », Done), (3) **ntfy**
