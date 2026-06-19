@@ -1,13 +1,19 @@
-// Génère le SQL d'isolation multi-tenant (Row Level Security) pour toutes les tables
-// portant une colonne tenant (artisan_id ou artisanId). Idempotent : DROP POLICY IF
-// EXISTS avant CREATE. Émet vers drizzle/rls/tenant-isolation.sql.
+// Génère une MIGRATION CUSTOM Drizzle d'isolation multi-tenant (Row Level Security) pour toutes
+// les tables portant une colonne tenant (artisan_id ou artisanId). Idempotent : DROP POLICY IF
+// EXISTS avant CREATE.
+//
+// Workflow (option b) : introspecte la base → si l'ensemble des policies tenant a changé depuis
+// la dernière migration `*_rls-tenant-isolation.sql` de drizzle/pg/, crée une NOUVELLE migration
+// custom (drizzle-kit generate --custom) et y écrit le SQL. Sinon : no-op (rien à régénérer).
+// On n'édite JAMAIS une migration déjà appliquée : un changement = un nouveau fichier append.
 //
 // Expression de policy : artisan = nullif(current_setting('app.tenant', true), '')::int
 // (la GUC revient à '' hors transaction → nullif → null → 0 ligne = deny).
 //
-// Usage : PG_URL=postgres://… node scripts/rls/generate-tenant-rls.mjs
+// Usage : DATABASE_URL=postgres://… DB_DIALECT=postgresql node scripts/rls/generate-tenant-rls.mjs
 import pg from "pg";
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, readFileSync, readdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 
 const PG_URL = process.env.PG_URL || process.env.DATABASE_URL || "postgres://artisan_user:artisan_password@127.0.0.1:5432/artisan_mvp";
 const c = new pg.Client({ connectionString: PG_URL });
@@ -55,6 +61,49 @@ for (const t of excluded) {
   lines.push("");
 }
 
-mkdirSync("drizzle/rls", { recursive: true });
-writeFileSync("drizzle/rls/tenant-isolation.sql", lines.join("\n"));
-console.log(`tenant-isolation.sql généré : ${rows.length} tables tenant ; exclues (auth/plateforme) : ${excluded.join(", ") || "—"}.`);
+const PG_DIR = "drizzle/pg";
+const TAG = "rls-tenant-isolation";
+const BODY_MARKER = "-- Isolation multi-tenant (RLS)";
+const body = lines.join("\n").trim();
+
+// En-tête de migration (stable) ; le corps réel commence à BODY_MARKER → comparaison robuste.
+const header = [
+  "-- Custom migration — RLS isolation multi-tenant (générée par scripts/rls/generate-tenant-rls.mjs).",
+  "-- Régénérer après ajout/retrait d'une table tenant = NOUVELLE migration custom (append).",
+  "-- NE PAS éditer une migration déjà appliquée. Idempotente (DROP POLICY IF EXISTS + CREATE).",
+  "",
+  "",
+].join("\n");
+
+// Corps de la dernière migration tenant-isolation existante (pour détecter un changement réel).
+const previous = readdirSync(PG_DIR)
+  .filter((f) => f.endsWith(`_${TAG}.sql`))
+  .sort();
+const lastBody = previous.length
+  ? (() => {
+      const sql = readFileSync(`${PG_DIR}/${previous[previous.length - 1]}`, "utf8");
+      const i = sql.indexOf(BODY_MARKER);
+      return i >= 0 ? sql.slice(i).trim() : "";
+    })()
+  : "";
+
+if (lastBody === body) {
+  console.log(
+    `RLS tenant inchangée (${rows.length} tables) vs ${previous[previous.length - 1]} → aucune migration à créer.`,
+  );
+} else {
+  // Crée une migration custom vide + entrée _journal.json + snapshot (drizzle gère le séquençage).
+  execFileSync("pnpm", ["exec", "drizzle-kit", "generate", "--custom", `--name=${TAG}`], {
+    stdio: "inherit",
+    env: { ...process.env, DATABASE_URL: PG_URL, DB_DIALECT: "postgresql" },
+  });
+  const created = readdirSync(PG_DIR)
+    .filter((f) => f.endsWith(`_${TAG}.sql`))
+    .sort();
+  const target = `${PG_DIR}/${created[created.length - 1]}`;
+  writeFileSync(target, header + body + "\n");
+  console.log(
+    `Migration créée : ${target} (${rows.length} tables tenant ; exclues : ${excluded.join(", ") || "—"}).`,
+  );
+  console.log("→ Relis-la, puis applique : DATABASE_URL=… DB_DIALECT=postgresql pnpm exec drizzle-kit migrate");
+}
