@@ -26,8 +26,16 @@ const mapDomainErrors = t.middleware(async ({ next, ctx }) => {
   if (cause instanceof NotFoundError) throw new TRPCError({ code: "NOT_FOUND", message: cause.message });
   if (cause instanceof UnauthorizedError) throw new TRPCError({ code: "UNAUTHORIZED", message: cause.message });
   if (cause instanceof ValidationError) throw new TRPCError({ code: "BAD_REQUEST", message: cause.message });
-  if (cause instanceof ForbiddenError) throw new TRPCError({ code: "FORBIDDEN", message: cause.message });
-  if (cause instanceof ConflictError) throw new TRPCError({ code: "CONFLICT", message: cause.message });
+  if (cause instanceof ForbiddenError) {
+    /** Accès interdit depuis le domaine (ex. anti-self-approbation NDF, tentative IDOR) — signal sécurité. */
+    ctx.log.warn({ event: "trpc_forbidden", reason: cause.message }, "Accès interdit — domaine");
+    throw new TRPCError({ code: "FORBIDDEN", message: cause.message });
+  }
+  if (cause instanceof ConflictError) {
+    /** Conflit d'état machine (ex. note déjà approuvée, contrat non-soumis) — signal UX / concurrence. */
+    ctx.log.info({ event: "trpc_conflict", reason: cause.message }, "Conflit de domaine");
+    throw new TRPCError({ code: "CONFLICT", message: cause.message });
+  }
   if (cause instanceof TooManyRequestsError) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: cause.message });
   /** TRPCError déjà formé (requireTenant, requireAdmin, requirePermission…) — on laisse passer sans logger. */
   if (cause instanceof TRPCError) return result;
