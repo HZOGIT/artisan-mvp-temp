@@ -151,7 +151,17 @@ export function createInterventionsRouter(repo: IInterventionRepository, congeRe
      */
     assignerTechnicien: gerer
       .input(z.object({ interventionId: z.number().int(), technicienId: z.number().int() }))
-      .mutation(({ ctx, input }) => assignerTechnicien(repo, congeRepo, ctx.tenant, input.interventionId, input.technicienId)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await assignerTechnicien(repo, congeRepo, ctx.tenant, input.interventionId, input.technicienId);
+        const nbConflitsIntervention = result.conflits.interventions.length;
+        const nbConflitsConge = result.conflits.conges.length;
+        const hasConflicts = nbConflitsIntervention > 0 || nbConflitsConge > 0;
+        ctx.log[hasConflicts ? "warn" : "info"](
+          { event: "intervention_technicien_assigne", interventionId: input.interventionId, technicienId: input.technicienId, conflitsIntervention: nbConflitsIntervention, conflitsConge: nbConflitsConge },
+          hasConflicts ? `Technicien affecté — ${nbConflitsIntervention + nbConflitsConge} conflit(s) de planning détecté(s)` : "Technicien affecté à l'intervention",
+        );
+        return result;
+      }),
 
     /*
      * Suggestions de techniciens pour une intervention géolocalisée (proximité + disponibilité).
