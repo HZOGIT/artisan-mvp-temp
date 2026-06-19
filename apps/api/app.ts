@@ -386,7 +386,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   app.setErrorHandler<FastifyError>((error, req, reply) => {
     const status = error.statusCode ?? 500;
     if (status >= 500) {
-      req.log.error({ event: "unhandled_error", error: error.message, stack: error.stack, statusCode: status }, "Erreur non gérée");
+      req.log.error({ event: "unhandled_error", err: error, statusCode: status }, "Erreur non gérée");
     }
     void reply.code(status).send({ error: error.message ?? "Erreur serveur" });
   });

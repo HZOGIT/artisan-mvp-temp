@@ -54,16 +54,14 @@ async function main(): Promise<void> {
   process.on("SIGINT", () => void shutdown("SIGINT"));
 
   process.on("unhandledRejection", (reason: unknown) => {
-    app.log.fatal(
-      { event: "unhandled_rejection", reason: reason instanceof Error ? reason.message : String(reason) },
-      "Promesse rejetée non gérée — arrêt imminent",
-    );
+    const err = reason instanceof Error ? reason : new Error(String(reason));
+    app.log.fatal({ event: "unhandled_rejection", err }, "Promesse rejetée non gérée — arrêt imminent");
     process.exit(1);
   });
 
   process.on("uncaughtException", (error: Error) => {
     app.log.fatal(
-      { event: "uncaught_exception", error: error.message, stack: error.stack },
+      { event: "uncaught_exception", err: error },
       "Exception non capturée — arrêt imminent",
     );
     process.exit(1);

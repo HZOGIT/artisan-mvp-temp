@@ -22,6 +22,11 @@ const SERIALIZERS: PinoLoggerOptions["serializers"] = {
   res(res: { statusCode: number }) {
     return { statusCode: res.statusCode };
   },
+  /** Clé conventionnelle `err` → { type, message, stack } (convention pino-std-serializers). */
+  err(e: unknown) {
+    if (!(e instanceof Error)) return e;
+    return { type: e.name, message: e.message, stack: e.stack };
+  },
 };
 
 /**
