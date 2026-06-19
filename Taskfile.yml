@@ -3,8 +3,7 @@ version: '3'
 vars:
   DOCKER: docker
   COMPOSE: docker compose -f infra/docker-compose.yml
-  DB_USER: '{{.MYSQL_USER | default "artisan_user"}}'
-  DB_PASS: '{{.MYSQL_PASSWORD | default "artisan_password"}}'
+  DB_USER: '{{.POSTGRES_USER | default "artisan_user"}}'
   DB_NAME: artisan_mvp
   # DB locale (PG sur 5432). Les tâches drizzle/seed tournent depuis le HOST (plus de
   # conteneur bind-mount après l'unification du compose) → DATABASE_URL + DB_DIALECT injectés.
