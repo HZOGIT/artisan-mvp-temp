@@ -11,7 +11,6 @@ export interface BillingDeps {
   readonly stripe: StripePort;
 }
 
-// ── SetupIntent flow ──────────────────────────────────────────────────────────
 
 export interface CreateSetupIntentResult {
   readonly clientSecret: string;
@@ -40,7 +39,6 @@ export async function createSetupIntent(deps: BillingDeps, ctx: TenantContext): 
   return { ...result, stripeCustomerId: customerId };
 }
 
-// ── Confirmation de la carte (post-Stripe Elements) ───────────────────────────
 
 export interface ConfirmPaymentMethodParams {
   readonly stripePaymentMethodId: string;
@@ -88,11 +86,9 @@ export async function confirmPaymentMethod(
     actor: `user:${ctx.userId}`,
   });
 
-  // Reflect the is_default update in the returned object (savePaymentMethod inserts with is_default=false).
   return { paymentMethod: params.setAsDefault ? { ...pm, is_default: true } : pm };
 }
 
-// ── Révocation d'une carte ────────────────────────────────────────────────────
 
 export async function revokePaymentMethod(deps: BillingDeps, ctx: TenantContext, paymentMethodId: number): Promise<void> {
   const pm = await deps.repo.findPaymentMethodById(ctx, paymentMethodId);
@@ -108,7 +104,6 @@ export async function revokePaymentMethod(deps: BillingDeps, ctx: TenantContext,
   });
 }
 
-// ── Lecture billing info ──────────────────────────────────────────────────────
 
 export interface BillingInfo {
   readonly subscription: BillingSubscription | null;
@@ -128,7 +123,6 @@ export async function getBillingInfo(deps: Pick<BillingDeps, "repo">, ctx: Tenan
   return { subscription, paymentMethods, recentInvoices, plan };
 }
 
-// ── Changement de carte par défaut ────────────────────────────────────────────
 
 export async function setDefaultPaymentMethod(deps: BillingDeps, ctx: TenantContext, paymentMethodId: number): Promise<void> {
   const pm = await deps.repo.findPaymentMethodById(ctx, paymentMethodId);
@@ -147,7 +141,6 @@ export async function setDefaultPaymentMethod(deps: BillingDeps, ctx: TenantCont
   });
 }
 
-// ── Changement de plan ────────────────────────────────────────────────────────
 
 export class InvalidPlanError extends Error {
   constructor(message: string) {
@@ -175,7 +168,38 @@ export async function changePlan(deps: Pick<BillingDeps, "repo">, ctx: TenantCon
   });
 }
 
-// ── Erreurs domaine ───────────────────────────────────────────────────────────
+
+export async function cancelAtPeriodEnd(deps: Pick<BillingDeps, "repo">, ctx: TenantContext): Promise<void> {
+  const sub = await deps.repo.findSubscription(ctx);
+  if (!sub) throw new NotFoundError("Aucun abonnement actif");
+  if (sub.cancel_at !== null) return;
+
+  const cancelAt = sub.current_period_end ?? new Date();
+  await deps.repo.updateCancelAt(ctx, cancelAt);
+  await deps.repo.appendEvent({
+    entityType: "billing_subscription",
+    entityId: sub.id,
+    eventType: "subscription.cancel_scheduled",
+    payload: { cancelAt: cancelAt.toISOString() },
+    actor: `user:${ctx.userId}`,
+  });
+}
+
+export async function reactivateSubscription(deps: Pick<BillingDeps, "repo">, ctx: TenantContext): Promise<void> {
+  const sub = await deps.repo.findSubscription(ctx);
+  if (!sub) throw new NotFoundError("Aucun abonnement actif");
+  if (sub.cancel_at === null) return;
+
+  await deps.repo.updateCancelAt(ctx, null);
+  await deps.repo.appendEvent({
+    entityType: "billing_subscription",
+    entityId: sub.id,
+    eventType: "subscription.reactivated",
+    payload: {},
+    actor: `user:${ctx.userId}`,
+  });
+}
+
 
 export class NotFoundError extends Error {
   constructor(message: string) {

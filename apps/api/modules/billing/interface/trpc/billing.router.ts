@@ -8,6 +8,8 @@ import {
   setDefaultPaymentMethod,
   getBillingInfo,
   changePlan,
+  cancelAtPeriodEnd,
+  reactivateSubscription,
   NotFoundError,
   InvalidPlanError,
 } from "../../application/billing-use-cases";
@@ -64,6 +66,16 @@ export function createBillingRouter(deps: BillingDeps) {
       .mutation(({ ctx, input }) =>
         changePlan(deps, ctx.tenant, input.planId).catch(mapError),
       ),
+
+    /** Programme l'annulation à la fin de la période en cours. */
+    cancelAtPeriodEnd: protectedProcedure.mutation(({ ctx }) =>
+      cancelAtPeriodEnd(deps, ctx.tenant).catch(mapError),
+    ),
+
+    /** Annule l'annulation programmée (réactivation). */
+    reactivate: protectedProcedure.mutation(({ ctx }) =>
+      reactivateSubscription(deps, ctx.tenant).catch(mapError),
+    ),
 
     /** Retourne subscription + cartes + 12 dernières factures. */
     getBillingInfo: protectedProcedure.query(({ ctx }) =>

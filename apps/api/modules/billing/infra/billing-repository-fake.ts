@@ -127,6 +127,12 @@ export class FakeBillingRepository implements IBillingRepository {
     );
   }
 
+  async updateCancelAt(ctx: TenantContext, cancelAt: Date | null): Promise<void> {
+    this.subs = this.subs.map(s =>
+      s.artisan_id === ctx.artisanId ? { ...s, cancel_at: cancelAt, updated_at: this.now() } : s
+    );
+  }
+
   async findPendingCycle(subscriptionId: number): Promise<Cycle | null> {
     return this.cycles.find(c => c.subscription_id === subscriptionId && c.status === "pending") ?? null;
   }

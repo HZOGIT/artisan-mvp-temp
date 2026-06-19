@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
-import { CreditCard, Calendar, Receipt, Loader2, Trash2, Star, Plus } from "lucide-react";
+import { CreditCard, Calendar, Receipt, Loader2, Trash2, Star, Plus, XCircle, RotateCcw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -57,50 +57,140 @@ function subStatusVariant(status: string): "default" | "secondary" | "destructiv
 function SubscriptionCard({
   sub,
   planName,
+  onCancel,
+  onReactivate,
+  isCanceling,
+  isReactivating,
 }: {
   sub: BillingSubscription;
   planName: string | undefined;
+  onCancel: () => Promise<void>;
+  onReactivate: () => Promise<void>;
+  isCanceling: boolean;
+  isReactivating: boolean;
 }) {
   const { t } = useTranslation("abonnement");
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const isCancelScheduled = sub.cancel_at !== null;
+
+  const handleCancel = async () => {
+    try {
+      await onCancel();
+      toast.success(t("billingMaison.annulationProgrammee", "Annulation programmée à fin de période."));
+    } catch {
+      toast.error(t("billingMaison.erreurAnnulation", "Impossible d'annuler l'abonnement."));
+    } finally {
+      setConfirmCancel(false);
+    }
+  };
+
+  const handleReactivate = async () => {
+    try {
+      await onReactivate();
+      toast.success(t("billingMaison.reactivationOk", "Abonnement réactivé."));
+    } catch {
+      toast.error(t("billingMaison.erreurReactivation", "Impossible de réactiver l'abonnement."));
+    }
+  };
+
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          {t("billingMaison.abonnement", "Abonnement")}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">{t("billingMaison.plan", "Plan")}</span>
-          <span className="font-medium">{planName ?? sub.plan_id}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">{t("billingMaison.statut", "Statut")}</span>
-          <Badge variant={subStatusVariant(sub.status)}>
-            {STATUS_LABELS[sub.status] ?? sub.status}
-          </Badge>
-        </div>
-        {sub.current_period_start && sub.current_period_end && (
+    <>
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            {t("billingMaison.abonnement", "Abonnement")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">
-              {t("billingMaison.periode", "Période en cours")}
-            </span>
-            <span className="text-sm">
-              {fmtDate(sub.current_period_start)} → {fmtDate(sub.current_period_end)}
-            </span>
+            <span className="text-sm text-muted-foreground">{t("billingMaison.plan", "Plan")}</span>
+            <span className="font-medium">{planName ?? sub.plan_id}</span>
           </div>
-        )}
-        {sub.status === "trialing" && sub.trial_ends_at && (
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">
-              {t("billingMaison.finEssai", "Fin de l'essai")}
-            </span>
-            <span className="text-sm">{fmtDate(sub.trial_ends_at)}</span>
+            <span className="text-sm text-muted-foreground">{t("billingMaison.statut", "Statut")}</span>
+            <Badge variant={subStatusVariant(sub.status)}>
+              {STATUS_LABELS[sub.status] ?? sub.status}
+            </Badge>
           </div>
-        )}
-      </CardContent>
-    </Card>
+          {sub.current_period_start && sub.current_period_end && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">
+                {t("billingMaison.periode", "Période en cours")}
+              </span>
+              <span className="text-sm">
+                {fmtDate(sub.current_period_start)} → {fmtDate(sub.current_period_end)}
+              </span>
+            </div>
+          )}
+          {sub.status === "trialing" && sub.trial_ends_at && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">
+                {t("billingMaison.finEssai", "Fin de l'essai")}
+              </span>
+              <span className="text-sm">{fmtDate(sub.trial_ends_at)}</span>
+            </div>
+          )}
+          {isCancelScheduled && sub.cancel_at && (
+            <div className="flex items-center justify-between rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2">
+              <span className="text-sm text-destructive">
+                {t("billingMaison.annulationLe", "Annulation le")} {fmtDate(sub.cancel_at)}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={isReactivating}
+                onClick={handleReactivate}
+                className="gap-1.5"
+              >
+                {isReactivating ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RotateCcw className="h-3.5 w-3.5" />
+                )}
+                {t("billingMaison.reactiverBtn", "Réactiver")}
+              </Button>
+            </div>
+          )}
+          {!isCancelScheduled && (sub.status === "active" || sub.status === "trialing") && (
+            <div className="pt-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={isCanceling}
+                onClick={() => setConfirmCancel(true)}
+                className="gap-1.5 text-muted-foreground hover:text-destructive"
+              >
+                <XCircle className="h-3.5 w-3.5" />
+                {t("billingMaison.annulerBtn", "Annuler l'abonnement")}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("billingMaison.confirmAnnulTitre", "Annuler l'abonnement ?")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("billingMaison.confirmAnnulDesc", "L'abonnement restera actif jusqu'à la fin de la période en cours, puis ne sera pas renouvelé.")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("billingMaison.annuler", "Annuler")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancel}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isCanceling ? <Loader2 className="h-4 w-4 animate-spin" /> : t("billingMaison.confirmerAnnul", "Confirmer l'annulation")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
@@ -304,7 +394,7 @@ function PlanSelectorCard({
                 </div>
                 <span className="text-2xl font-bold tabular-nums">
                   {plan.monthly}€
-                  <span className="text-sm font-normal text-muted-foreground">/mois</span>
+                  <span className="text-sm font-normal text-muted-foreground">{t("billingMaison.parMois", "/mois")}</span>
                 </span>
                 {!isCurrent && (
                   <Button
@@ -380,6 +470,8 @@ export function BillingMaisonSection() {
     revokePaymentMethod, isRevoking,
     setDefaultPaymentMethod, isSettingDefault,
     changePlan, isChangingPlan,
+    cancelAtPeriodEnd, isCanceling,
+    reactivate, isReactivating,
   } = useBillingMaison();
   const [addCardOpen, setAddCardOpen] = useState(false);
 
@@ -407,7 +499,14 @@ export function BillingMaisonSection() {
     <div className="space-y-4">
       {subscription ? (
         <>
-          <SubscriptionCard sub={subscription} planName={plan?.name} />
+          <SubscriptionCard
+            sub={subscription}
+            planName={plan?.name}
+            onCancel={cancelAtPeriodEnd}
+            onReactivate={reactivate}
+            isCanceling={isCanceling}
+            isReactivating={isReactivating}
+          />
           <PlanSelectorCard
             currentPlanId={subscription.plan_id}
             onChangePlan={changePlan}

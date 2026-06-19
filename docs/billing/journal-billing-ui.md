@@ -60,9 +60,19 @@ Backend 100% complet (84 tests) — `billing.*` tRPC prêt côté API.
 
 ## Prochaine cible
 
-**Phase 9** — Backend: `cancelAtPeriodEnd` + `reactivate` use-cases + `updateCancelAt` repo + tRPC + boutons UI (annuler/réactiver abonnement dans `BillingMaisonSection`).
+**Phase 10** — E2E anti-régression : ajouter cas dans `scripts/staging-e2e-mutations.mjs` pour `changePlan`, `cancelAtPeriodEnd`, `reactivate` (actions UI → vérif persistance via refetch).
 
 ## Log d'itérations
+
+### Itération 9 — 2026-06-19
+**Phase 9 — `cancelAtPeriodEnd` + `reactivate` backend + UI**
+- `IBillingRepository.updateCancelAt(ctx, cancelAt: Date | null)` ajouté dans interface + Drizzle + Fake
+- `cancelAtPeriodEnd` use-case : no-op si `cancel_at` déjà posé ; fixe `cancelAt = current_period_end ?? now()` + event `subscription.cancel_scheduled`
+- `reactivateSubscription` use-case : no-op si `cancel_at` déjà null ; remet `cancel_at = null` + event `subscription.reactivated`
+- `billing.cancelAtPeriodEnd` + `billing.reactivate` tRPC procedures ajoutées (mutations sans input)
+- `use-billing-maison.ts` : `cancelAtPeriodEnd()` + `isCanceling` + `reactivate()` + `isReactivating` exposés
+- `SubscriptionCard` étendu : bandeau rouge "Annulation le <date>" + bouton "Réactiver" si `cancel_at` non-null ; bouton "Annuler l'abonnement" (XCircle) si actif/trialing sans annulation programmée ; AlertDialog de confirmation avant annulation
+- Gate `tsc --noEmit` ✅ · `pnpm build` ✅ (32s)
 
 ### Itération 8 — 2026-06-19
 **Phase 8 — `changePlan` backend + UI (upgrade/downgrade)**

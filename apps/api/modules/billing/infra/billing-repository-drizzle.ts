@@ -22,7 +22,6 @@ import type {
 export class BillingRepositoryDrizzle implements IBillingRepository {
   constructor(private readonly db: DbClient) {}
 
-  // ── Moyens de paiement ────────────────────────────────────────────────────
 
   async listPaymentMethods(ctx: TenantContext): Promise<BillingPaymentMethod[]> {
     return this.db
@@ -86,7 +85,6 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
       .where(and(eq(billingPaymentMethods.id, id), eq(billingPaymentMethods.artisan_id, ctx.artisanId)));
   }
 
-  // ── Abonnement ────────────────────────────────────────────────────────────
 
   async findSubscription(ctx: TenantContext): Promise<BillingSubscription | null> {
     const [row] = await this.db
@@ -148,7 +146,13 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
       .where(eq(billingSubscriptions.artisan_id, ctx.artisanId));
   }
 
-  // ── Cycles ────────────────────────────────────────────────────────────────
+  async updateCancelAt(ctx: TenantContext, cancelAt: Date | null): Promise<void> {
+    await this.db
+      .update(billingSubscriptions)
+      .set({ cancel_at: cancelAt, updated_at: new Date() })
+      .where(eq(billingSubscriptions.artisan_id, ctx.artisanId));
+  }
+
 
   async findPendingCycle(subscriptionId: number): Promise<BillingCycle | null> {
     const [row] = await this.db
@@ -175,7 +179,6 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
     return row!;
   }
 
-  // ── Factures ──────────────────────────────────────────────────────────────
 
   async findInvoicesByArtisan(ctx: TenantContext, limit = 24): Promise<BillingInvoice[]> {
     return this.db
@@ -186,7 +189,6 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
       .limit(limit);
   }
 
-  // ── Journal immuable ──────────────────────────────────────────────────────
 
   async appendEvent(params: AppendEventParams): Promise<BillingEvent> {
     const [row] = await this.db
@@ -202,10 +204,8 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
     return row!;
   }
 
-  // ── Stripe customer ID ────────────────────────────────────────────────────
 
   async findStripeCustomerId(artisanId: number): Promise<string | null> {
-    // Priorité 1 : PM maison déjà enregistrée
     const [pm] = await this.db
       .select({ cid: billingPaymentMethods.stripe_customer_id })
       .from(billingPaymentMethods)
@@ -213,7 +213,6 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
       .orderBy(desc(billingPaymentMethods.created_at))
       .limit(1);
     if (pm?.cid) return pm.cid;
-    // Priorité 2 : table subscriptions legacy (même Stripe customer)
     const [sub] = await this.db
       .select({ cid: subscriptions.stripe_customer_id })
       .from(subscriptions)
@@ -223,6 +222,5 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
   }
 
   async saveStripeCustomerId(_artisanId: number, _stripeCustomerId: string): Promise<void> {
-    // Le customer ID est porté par chaque billing_payment_method — pas de table dédiée.
   }
 }
