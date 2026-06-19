@@ -73,6 +73,16 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 3 — 2026-06-19
+**Cible :** Domaine edge cases — `billing-domain.test.ts` (25 → 30 tests)
+**Cas ajoutés (5) :**
+- `isZombie` boundary exact : false à T+15min pile (seuil `>` strict, pas `>=`)
+- `isZombie` boundary +1ms : true à T+15min+1ms (juste après le seuil)
+- `isDue status=skipped` : false (cycle délibérément sauté, ne pas retenter)
+- `isDue status=processing` : false (traitement async en cours)
+- `nextRetryAt attempt 4/5/10` : toujours J+7 non-null (Math.min bloque dépassement d'index — dead-code guard documenté)
+**Résultat :** 30/30 ✅ (sans DB) — commit pending
+
 ### Itération 2 — 2026-06-19
 **Cible :** L1 use-cases manquants (4 scénarios, 6 nouveaux tests)
 **Cas ajoutés :**

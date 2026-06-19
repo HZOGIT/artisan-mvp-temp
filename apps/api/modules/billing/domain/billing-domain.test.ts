@@ -75,6 +75,18 @@ describe("isZombie", () => {
   it("false si charging sans chargingStartedAt (donnée corrompue)", () => {
     expect(isZombie(baseCycle({ status: "charging", chargingStartedAt: null }), new Date())).toBe(false);
   });
+
+  it("false à EXACTEMENT 15 min (seuil strict `>`, non `>=`)", () => {
+    const started = new Date("2026-06-01T12:00:00.000Z");
+    const exact15 = new Date(started.getTime() + 15 * 60 * 1000);
+    expect(isZombie(baseCycle({ status: "charging", chargingStartedAt: started }), exact15)).toBe(false);
+  });
+
+  it("true à 15 min + 1 ms (juste après le seuil)", () => {
+    const started = new Date("2026-06-01T12:00:00.000Z");
+    const justAfter = new Date(started.getTime() + 15 * 60 * 1000 + 1);
+    expect(isZombie(baseCycle({ status: "charging", chargingStartedAt: started }), justAfter)).toBe(true);
+  });
 });
 
 describe("isDue", () => {
@@ -87,6 +99,14 @@ describe("isDue", () => {
     expect(isDue(baseCycle({ status: "paid" }), now)).toBe(false);
     expect(isDue(baseCycle({ status: "charging" }), now)).toBe(false);
     expect(isDue(baseCycle({ status: "requires_action" }), now)).toBe(false);
+  });
+
+  it("false si status = skipped (cycle délibérément sauté, ne pas retenter)", () => {
+    expect(isDue(baseCycle({ status: "skipped" }), new Date())).toBe(false);
+  });
+
+  it("false si status = processing (en cours de traitement async, ne pas re-déclencher)", () => {
+    expect(isDue(baseCycle({ status: "processing" }), new Date())).toBe(false);
   });
 
   it("true si failed et nextRetryAt échu", () => {
@@ -125,6 +145,15 @@ describe("nextRetryAt — plan de dunning J+0/J+1/J+3/J+7", () => {
     const expected = new Date(failedAt.getTime() + 7 * 24 * 3_600_000);
     expect(nextRetryAt(failedAt, 3)?.getTime()).toBe(expected.getTime());
     expect(nextRetryAt(failedAt, 99)?.getTime()).toBe(expected.getTime());
+  });
+
+  it("attempt 4, 5, 10 → toujours J+7, jamais null (Math.min bloque le dépassement d'index)", () => {
+    const j7 = new Date(failedAt.getTime() + 7 * 24 * 3_600_000);
+    for (const attempt of [4, 5, 10]) {
+      const result = nextRetryAt(failedAt, attempt);
+      expect(result, `attempt ${attempt} doit retourner J+7`).not.toBeNull();
+      expect(result?.getTime()).toBe(j7.getTime());
+    }
   });
 });
 
