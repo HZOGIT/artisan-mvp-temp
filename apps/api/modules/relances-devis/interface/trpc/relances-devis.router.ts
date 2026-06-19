@@ -34,12 +34,17 @@ export function createRelancesDevisRouter(repo: IRelanceDevisRepository) {
 
     create: protectedProcedure
       .input(createSchema)
-      .mutation(({ ctx, input }) => enregistrerRelance(repo, ctx.tenant, input)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await enregistrerRelance(repo, ctx.tenant, input);
+        ctx.log.info({ event: "relance_devis_envoyee", devisId: input.devisId, type: input.type, statut: input.statut ?? "envoyee" }, `Relance devis enregistrée (${input.type})`);
+        return result;
+      }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerRelance(repo, ctx.tenant, input.id);
+        ctx.log.warn({ event: "relance_devis_supprimee", relanceId: input.id }, "Relance devis supprimée");
         return { success: true };
       }),
   });
