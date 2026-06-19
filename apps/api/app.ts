@@ -253,6 +253,7 @@ import type { TresorerieReader } from "./modules/previsions-ca/application/treso
 import type { IPrevisionCARepository } from "./modules/previsions-ca/application/prevision-ca-repository";
 import type { EmailPort, RateLimiterPort, LlmPort, VisionPort } from "./shared/ports";
 import { ResendEmailAdapter, SlidingWindowRateLimiter, GeminiLlmAdapter, GeminiVisionAdapter } from "./shared/ports";
+import type { AppLogger } from "./shared/ports/logger";
 import { JsPdfAdapter } from "./shared/pdf/js-pdf-adapter";
 
 export interface AppDeps extends ContextDeps {
@@ -361,6 +362,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     done();
   });
 
+  /** Adapter email partagé — reçoit app.log pour que succès/erreurs d'envoi arrivent dans BetterStack. */
+  const emailAdapter = deps.emailPort ?? new ResendEmailAdapter(app.log as unknown as AppLogger);
+
   app.register(cookie);
   app.register(cors, {
     origin: process.env.CORS_ORIGIN ?? process.env.APP_URL ?? false,
@@ -383,7 +387,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     avisRepo: deps.avisRepo ?? new AvisRepositoryDrizzle(getDbHandle().db),
     demande: {
       repo: deps.demandeAvisRepo ?? new DemandeAvisRepositoryDrizzle(getDbHandle().db),
-      email: deps.emailPort ?? new ResendEmailAdapter(),
+      email: emailAdapter,
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(),
       lienBaseUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
     },
@@ -458,7 +462,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       fournisseurRepo,
       artisanReader: new CommandeArtisanReaderDrizzle(getDbHandle().db),
       pdf: new JsPdfAdapter(),
-      email: deps.emailPort ?? new ResendEmailAdapter(),
+      email: emailAdapter,
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
     },
     /*
@@ -536,7 +540,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
       clientReader: new SharedClientReaderDrizzle(getDbHandle().db),
       pdf: new JsPdfAdapter(),
-      email: deps.emailPort ?? new ResendEmailAdapter(),
+      email: emailAdapter,
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
       signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db),
       appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
@@ -574,7 +578,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       artisanReader: new ArtisanReaderDrizzle(getDbHandle().db),
       clientReader: new ClientReaderDrizzle(getDbHandle().db),
       pdf: new JsPdfAdapter(),
-      email: deps.emailPort ?? new ResendEmailAdapter(),
+      email: emailAdapter,
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
     },
   });
@@ -687,7 +691,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const utilisateurs = createUtilisateursModule({
     repository: deps.utilisateurRepo ?? new UtilisateurRepositoryDrizzle(getDbHandle().db),
     hasher: new BcryptPasswordHasher(),
-    email: deps.emailPort ?? new ResendEmailAdapter(),
+    email: emailAdapter,
   });
   /** Comptabilité (SENSIBLE, gate `comptabilite.voir`) — lectures grand-livre/balance/journal/TVA. */
   const comptabiliteReader = deps.comptabiliteReader ?? new ComptabiliteReaderDrizzle(getDbHandle().db);
@@ -700,7 +704,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     repository: deps.authRepo ?? new AuthRepositoryDrizzle(getDbHandle().db),
     hasher: new BcryptPasswordHasher(),
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
-    email: deps.emailPort ?? new ResendEmailAdapter(),
+    email: emailAdapter,
     resetRateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(5, 60 * 60 * 1000),
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
   });
@@ -718,7 +722,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
    * garantie par la garde SQL `statut='en_attente'` dans les writers.
    */
   const signatureDb = getDbHandle().db;
-  const signatureEmail = deps.emailPort ?? new ResendEmailAdapter();
+  const signatureEmail = emailAdapter;
   const signatureNotifications = new SignatureNotificationWriterDrizzle(signatureDb);
   const signature = createSignatureModule({
     protectedDeps: {
@@ -752,7 +756,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
    * `assistant.stream`) et la route HTTP brute `/api/assistant/stream` (SSE hors-tRPC).
    * Hoisté ici car le module tRPC est construit avant les routes HTTP.
    */
-  const agentEmail = deps.emailPort ?? new ResendEmailAdapter();
+  const agentEmail = emailAdapter;
   const agentRegistry = buildAssistantAgentRegistry(
     {
       clients: clientRepo,
@@ -807,7 +811,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     repo: chatRepo,
     notifier: new ChatClientNotifierDrizzle(
       chatDb,
-      deps.emailPort ?? new ResendEmailAdapter(),
+      emailAdapter,
       new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
       deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
     ),
@@ -817,7 +821,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
    * + rate-limiter anti-flood (5 / 15 min, parité legacy) + boîte support (env SUPPORT_EMAIL).
    */
   const support = createSupportModule({
-    email: deps.emailPort ?? new ResendEmailAdapter(),
+    email: emailAdapter,
     rateLimiter: new SlidingWindowRateLimiter(5, 15 * 60 * 1000),
     destinataire: process.env.SUPPORT_EMAIL ?? "support@operioz.com",
   });
@@ -846,7 +850,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     reader: new VitrinePublicReaderDrizzle(getDbHandle().db),
     settings: new VitrineSettingsRepositoryDrizzle(getDbHandle().db),
     rateLimiter: new SlidingWindowRateLimiter(5, 15 * 60 * 1000),
-    email: deps.emailPort ?? new ResendEmailAdapter(),
+    email: emailAdapter,
     notifications: notificationRepo,
     leads: demandeContactRepo,
     clients: clientRepo,
@@ -867,7 +871,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     notifications: notificationRepo,
     artisanReader: portalAccessRepo,
     artisanInfoReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
-    email: deps.emailPort ?? new ResendEmailAdapter(),
+    email: emailAdapter,
     rateLimiter: new SlidingWindowRateLimiter(5, 15 * 60 * 1000),
     llm: deps.llm ?? new GeminiLlmAdapter(),
   });
@@ -930,7 +934,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     stripe: deps.stripePort ?? new StripeAdapter(),
     writer: new SubscriptionWebhookWriterDrizzle(getDbHandle().db),
     paymentWriter: new WebhookPaymentWriterDrizzle(getDbHandle().db),
-    notifier: new SubscriptionEventNotifierDrizzle(getDbHandle().db, deps.emailPort ?? new ResendEmailAdapter()),
+    notifier: new SubscriptionEventNotifierDrizzle(getDbHandle().db, emailAdapter),
     webhookSecret: deps.stripeWebhookSecret ?? process.env.STRIPE_WEBHOOK_SECRET ?? "",
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
   });

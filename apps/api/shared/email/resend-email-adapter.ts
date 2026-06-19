@@ -1,5 +1,8 @@
 import { Resend } from "resend";
 import type { EmailPort, EmailMessage } from "../ports/email";
+import type { AppLogger } from "../ports/logger";
+import { ConsoleLogger } from "../ports/logger";
+import { maskEmail } from "../mask-email";
 
 /*
  * Adapter email INTERNALISÉ dans le new-stack (remplace LegacyEmailAdapter/sidecar legacy-email.mjs).
@@ -12,14 +15,24 @@ const EMAIL_FROM = process.env.EMAIL_FROM || "Operioz <noreply@operioz.com>";
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-if (!resend) console.warn("[Email] RESEND_API_KEY non configuré — les emails seront simulés (console.log)");
-
 export class ResendEmailAdapter implements EmailPort {
+  private readonly log: AppLogger;
+
+  constructor(logger?: AppLogger) {
+    this.log = logger ?? new ConsoleLogger();
+    if (!resend) {
+      this.log.warn({ event: "email_no_resend_key" }, "RESEND_API_KEY non configuré — emails simulés");
+    }
+  }
+
   async send(message: EmailMessage): Promise<void> {
     const { to, subject, body } = message;
     if (!to || !subject || !body) throw new Error("Paramètres d'email manquants");
     if (!EMAIL_RE.test(to)) throw new Error("Adresse email invalide");
-    if (!resend) { console.warn(`[Email][SIM] → ${to} | ${subject}`); return; }
+    if (!resend) {
+      this.log.warn({ event: "email_simulated", to: maskEmail(to), subject }, "Email simulé (Resend non configuré)");
+      return;
+    }
     const options: Parameters<typeof resend.emails.send>[0] = {
       from: EMAIL_FROM,
       replyTo: "support@operioz.com",
@@ -32,9 +45,9 @@ export class ResendEmailAdapter implements EmailPort {
     }
     const { error } = await resend.emails.send(options);
     if (error) {
-      console.error(`[Email] Échec envoi → ${to} | ${subject} : ${error.message}`);
+      this.log.error({ event: "email_send_error", to: maskEmail(to), subject, error: error.message }, "Échec envoi email");
       throw new Error(`Échec envoi email : ${error.message}`);
     }
-    console.warn(`[Email] Envoyé → ${to} | ${subject}`);
+    this.log.info({ event: "email_sent", to: maskEmail(to), subject }, "Email envoyé");
   }
 }
