@@ -15,6 +15,7 @@ import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { useSpeechRecognition } from "@/shared/hooks/use-speech-recognition";
 import { useAssistant, useStreamMessage, type DevisLigne, type Relances } from "../application/use-assistant";
 import { sliceHistory, navigateTarget, buildDevisMarkdown, buildRelancesMarkdown, type Message } from "../domain/assistant";
+import { navigate } from "@/shared/router/navigation";
 
 const THREAD_LS_KEY = "operioz.assistant.thread";
 
@@ -109,7 +110,7 @@ export default function AssistantPage({ embedded = false }: { embedded?: boolean
       abortRef.current = controller;
       const history = sliceHistory(messages);
       await streamMessage({ message: text.trim(), history, threadId }, (ev) => {
-        if (ev.threadId && !threadId) setThreadId(ev.threadId);
+        if (ev.threadId && !threadId) { setThreadId(ev.threadId); navigate(`/assistant?thread=${ev.threadId}`, { replace: true }); }
         if (ev.content) setMessages((prev) => { const u = [...prev]; const last = u[u.length - 1]; if (last.role === "assistant") u[u.length - 1] = { ...last, content: last.content + ev.content }; return u; });
         if (ev.error) toast.error(ev.error);
         if (ev.navigate) { window.location.href = navigateTarget(ev.navigate, ev.filtre); try { window.dispatchEvent(new CustomEvent("operioz:open-assistant")); } catch { /* ignore */ } }
