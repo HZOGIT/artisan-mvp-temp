@@ -210,6 +210,28 @@ describe("recoverZombies", () => {
     expect(ev).toBeDefined();
   });
 
+  it("FIX-W — zombie PI succeeded émet cycle.paid avec via:zombie_recovery + artisanId + paidAt", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    const zombieStart = new Date(Date.now() - 20 * 60 * 1000);
+    await repo.updateCycleStatus(cycle.id, { status: "charging", chargingStartedAt: zombieStart });
+    const attempt = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k2" });
+    await repo.updateChargeAttempt(attempt.id, { stripePaymentIntentId: "pi_zombie_w", status: "processing" });
+    billing.nextChargeResult = { paymentIntentId: "pi_zombie_w", status: "succeeded" };
+
+    await recoverZombies({ repo, billing });
+
+    const paidEv = repo.events.find(e => e.event_type === "cycle.paid");
+    expect(paidEv).toBeDefined();
+    expect(paidEv?.payload).toMatchObject({
+      via: "zombie_recovery",
+      paymentIntentId: "pi_zombie_w",
+      artisanId: sub.artisan_id,
+    });
+    expect(typeof (paidEv?.payload as Record<string, unknown>)["paidAt"]).toBe("string");
+  });
+
   it("cycle charging < 15 min → non zombie, ignoré", async () => {
     const { repo, billing } = makeDeps();
     const sub = await setupActiveSub(repo);

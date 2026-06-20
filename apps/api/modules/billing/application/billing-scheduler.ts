@@ -310,7 +310,15 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
     const artisanId = sub.artisan_id;
 
     if (pi.status === "succeeded") {
-      await deps.repo.updateCycleStatus(cycle.id, { status: "paid", paidAt: now });
+      const paidAt = now;
+      await deps.repo.updateCycleStatus(cycle.id, { status: "paid", paidAt });
+      await deps.repo.appendEvent({
+        entityType: "billing_cycle",
+        entityId: cycle.id,
+        eventType: "cycle.paid",
+        payload: { via: "zombie_recovery", paymentIntentId: piId, artisanId, paidAt: paidAt.toISOString() },
+        actor: "scheduler",
+      });
       if (sub) await advanceSubscriptionAfterPayment(deps.repo, cycle.subscription_id, artisanId, cycle, resolveInterval(sub.billing_interval));
     } else if (pi.status === "processing") {
       await deps.repo.updateCycleStatus(cycle.id, { status: "processing" });
