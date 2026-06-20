@@ -554,6 +554,41 @@ describe("FIX-A — webhook deduplication", () => {
   });
 });
 
+describe("FIX-S — webhook cycle.paid et subscription.period_advanced incluent artisanId et paidAt (parité scheduler)", () => {
+  it("payment_intent.succeeded → cycle.paid payload contient artisanId + paidAt", async () => {
+    const { repo } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    await repo.updateCycleStatus(cycle.id, { status: "charging", chargingStartedAt: new Date() });
+    const attempt = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k_s1" });
+    await repo.updateChargeAttempt(attempt.id, { stripePaymentIntentId: "pi_s1", status: "initiated" });
+
+    const { handleBillingWebhookEvent } = await import("./interface/http/billing-webhook-handler");
+    await handleBillingWebhookEvent({ repo }, "payment_intent.succeeded", "pi_s1", null, null, "evt_s1");
+
+    const paidEv = repo.events.find(e => e.event_type === "cycle.paid");
+    expect(paidEv).toBeDefined();
+    expect(paidEv!.payload).toMatchObject({ artisanId: ARTISAN_ID, via: "webhook" });
+    expect(typeof (paidEv!.payload as Record<string, unknown>)["paidAt"]).toBe("string");
+  });
+
+  it("payment_intent.succeeded → subscription.period_advanced payload contient artisanId", async () => {
+    const { repo } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    await repo.updateCycleStatus(cycle.id, { status: "charging", chargingStartedAt: new Date() });
+    const attempt = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k_s2" });
+    await repo.updateChargeAttempt(attempt.id, { stripePaymentIntentId: "pi_s2", status: "initiated" });
+
+    const { handleBillingWebhookEvent } = await import("./interface/http/billing-webhook-handler");
+    await handleBillingWebhookEvent({ repo }, "payment_intent.succeeded", "pi_s2", null, null, "evt_s2");
+
+    const advEv = repo.events.find(e => e.event_type === "subscription.period_advanced");
+    expect(advEv).toBeDefined();
+    expect(advEv!.payload).toMatchObject({ artisanId: ARTISAN_ID, via: "webhook" });
+  });
+});
+
 describe("FIX-B — processing timeout", () => {
   it("cycle bloqué en processing depuis 73h est inclus dans findZombieCycles", async () => {
     const { repo } = makeDeps();

@@ -31,11 +31,14 @@ export async function handleBillingWebhookEvent(
     await deps.repo.updateChargeAttempt(attempt.id, { status: "succeeded" });
 
     const cycle = await deps.repo.findCycleById(attempt.cycle_id);
+    let artisanId: number | null = null;
+
     if (cycle) {
       await deps.repo.updateCycleStatus(cycle.id, { status: "paid", paidAt: now });
 
       const sub = await deps.repo.findSubscriptionById(cycle.subscription_id);
       if (sub) {
+        artisanId = sub.artisan_id;
         const interval = sub.billing_interval === "yearly" ? "yearly" : "monthly";
         const { start, end } = nextPeriod(cycle.period_end, interval);
         await deps.repo.updateSubscriptionPeriod(sub.id, "active", cycle.period_end, end);
@@ -47,7 +50,7 @@ export async function handleBillingWebhookEvent(
           entityType: "billing_subscription",
           entityId: sub.id,
           eventType: "subscription.period_advanced",
-          payload: { via: "webhook", nextPeriodStart: start.toISOString(), nextPeriodEnd: end.toISOString() },
+          payload: { via: "webhook", artisanId, nextPeriodStart: start.toISOString(), nextPeriodEnd: end.toISOString() },
           actor: "stripe_webhook",
         });
       }
@@ -57,7 +60,7 @@ export async function handleBillingWebhookEvent(
       entityType: "billing_cycle",
       entityId: attempt.cycle_id,
       eventType: "cycle.paid",
-      payload: { paymentIntentId, via: "webhook" },
+      payload: { paymentIntentId, via: "webhook", artisanId, paidAt: now.toISOString() },
       actor: "stripe_webhook",
     });
   } else if (eventType === "payment_intent.payment_failed") {
