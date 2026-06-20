@@ -151,6 +151,7 @@ import { registerBillingSchedulerRoute } from "./interface/http/billing-schedule
 import { handleBillingWebhookEvent } from "./modules/billing/interface/http/billing-webhook-handler";
 import fastifySchedule from "@fastify/schedule";
 import { billingCronPlugin } from "./shared/infra/billing-cron";
+import { ensureStripeWebhookEndpoint } from "./shared/infra/stripe-webhook-setup";
 import { WebhookPaymentWriterDrizzle } from "./modules/subscription/infra/webhook-payment-writer-drizzle";
 import { SubscriptionEventNotifierDrizzle } from "./modules/subscription/infra/subscription-event-notifier-drizzle";
 import { registerUploadLogoRoute } from "./interface/http/upload-logo-route";
@@ -1132,6 +1133,13 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   /** Expose le routeur racine assemblé (introspection : garde-fou de cohérence des domaines montés). */
   app.decorate("appRouter", appRouter);
+
+  /** Auto-setup webhook Stripe au démarrage (idempotent — skip si endpoint déjà présent). */
+  app.addHook("onReady", async () => {
+    const appUrl = deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com";
+    const webhookUrl = `${appUrl}/api/stripe/webhook`;
+    await ensureStripeWebhookEndpoint(process.env.STRIPE_SECRET_KEY ?? "", webhookUrl, app.log as unknown as import("./shared/ports/logger").AppLogger);
+  });
 
   return app;
 }
