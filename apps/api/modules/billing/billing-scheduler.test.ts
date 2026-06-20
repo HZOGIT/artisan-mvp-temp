@@ -66,7 +66,7 @@ describe("chargeOffSessionForCycle", () => {
     expect(ev!.payload).toMatchObject({ paymentIntentId: "pi_ok" });
   });
 
-  it("requires_action : cycle → requires_action + event + attempt mis à jour", async () => {
+  it("requires_action : traité comme failed (3DS off-session = dunning) + event cycle.requires_action", async () => {
     const { repo, billing } = makeDeps();
     const sub = await setupActiveSub(repo);
     await setupPm(repo);
@@ -76,10 +76,16 @@ describe("chargeOffSessionForCycle", () => {
     await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
 
     const updated = repo.cycles.find(c => c.id === cycle.id)!;
-    expect(updated.status).toBe("requires_action");
+    expect(updated.status).toBe("failed");
+    expect(updated.next_retry_at).toBeTruthy();
+
+    const attempt = repo.chargeAttempts[0]!;
+    expect(attempt.status).toBe("failed");
+    expect(attempt.failure_code).toBe("requires_action");
 
     const ev = repo.events.find(e => e.event_type === "cycle.requires_action");
     expect(ev).toBeDefined();
+    expect(ev!.payload).toMatchObject({ treatedAsFailed: true });
   });
 
   it("Stripe throw : cycle → failed + nextRetryAt calculé + event charge_failed", async () => {
