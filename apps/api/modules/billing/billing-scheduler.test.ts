@@ -836,6 +836,33 @@ describe("FIX-A — webhook deduplication", () => {
   });
 });
 
+describe("FIX-CDP — webhook payment_intent.succeeded avec billing_interval=yearly → cycle suivant à +1 an", () => {
+  it("sub yearly + PI succeeded via webhook → nextCycle à +1 an, amount_cents annuel", async () => {
+    const { repo } = makeDeps();
+    const sub = await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "pro", billingInterval: "yearly", billingMode: "maison",
+      status: "active", currentPeriodStart: new Date("2026-01-01"), currentPeriodEnd: new Date("2027-01-01"),
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-01-01"), periodEnd: new Date("2027-01-01"),
+      amountCents: 49000, currency: "eur",
+    });
+    await repo.updateCycleStatus(cycle.id, { status: "charging", chargingStartedAt: new Date() });
+    const attempt = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k_cdp" });
+    await repo.updateChargeAttempt(attempt.id, { stripePaymentIntentId: "pi_cdp", status: "initiated" });
+
+    const { handleBillingWebhookEvent } = await import("./interface/http/billing-webhook-handler");
+    await handleBillingWebhookEvent({ repo }, "payment_intent.succeeded", "pi_cdp", null, null, "evt_cdp");
+
+    const nextCycle = repo.cycles.find(c => c.status === "pending")!;
+    expect(nextCycle).toBeDefined();
+    expect(nextCycle.period_start).toEqual(new Date("2027-01-01"));
+    expect(nextCycle.period_end).toEqual(new Date("2028-01-01"));
+    expect(nextCycle.amount_cents).toBe(49000);
+  });
+});
+
 describe("FIX-S — webhook cycle.paid et subscription.period_advanced incluent artisanId et paidAt (parité scheduler)", () => {
   it("payment_intent.succeeded → cycle.paid payload contient artisanId + paidAt", async () => {
     const { repo } = makeDeps();
