@@ -265,9 +265,11 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
       if (lastAttempt) {
         if (!zombieSub) {
           await deps.repo.updateCycleStatus(cycle.id, { status: "failed", failedAt: now });
+          await deps.repo.updateChargeAttempt(lastAttempt.id, { status: "failed", failureMessage: "zombie_orphan_no_pi" });
         } else if (zombieSub.status === "canceled") {
           /* Sub annulée pendant que le cycle était en vol (no-PI) — ne pas dunner. */
           await deps.repo.updateCycleStatus(cycle.id, { status: "failed", failedAt: now });
+          await deps.repo.updateChargeAttempt(lastAttempt.id, { status: "failed", failureMessage: "zombie_canceled_sub_no_pi" });
           await deps.repo.appendEvent({
             entityType: "billing_cycle",
             entityId: cycle.id,
