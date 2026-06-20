@@ -152,10 +152,10 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
   }
 
   async updateSubscriptionStatus(ctx: TenantContext, status: string): Promise<void> {
-    await this.db
-      .update(billingSubscriptions)
-      .set({ status, updated_at: new Date() })
-      .where(eq(billingSubscriptions.artisan_id, ctx.artisanId));
+    const now = new Date();
+    const set: Record<string, unknown> = { status, updated_at: now };
+    if (status === "canceled") set["canceled_at"] = now;
+    await this.db.update(billingSubscriptions).set(set).where(eq(billingSubscriptions.artisan_id, ctx.artisanId));
   }
 
   async updateSubscriptionPeriod(subscriptionId: number, status: string, periodStart: Date, periodEnd: Date): Promise<void> {

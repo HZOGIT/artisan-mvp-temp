@@ -129,8 +129,11 @@ export class FakeBillingRepository implements IBillingRepository {
   }
 
   async updateSubscriptionStatus(ctx: TenantContext, status: string): Promise<void> {
+    const now = this.now();
     this.subs = this.subs.map(s =>
-      s.artisan_id === ctx.artisanId ? { ...s, status, updated_at: this.now() } : s
+      s.artisan_id === ctx.artisanId
+        ? { ...s, status, canceled_at: status === "canceled" ? now : s.canceled_at, updated_at: now }
+        : s
     );
   }
 

@@ -698,6 +698,7 @@ describe("FIX-F — cancel_at : subscription annulée à période echue n'est pa
 
     const updatedSub = repo.subs.find(s => s.id === sub.id)!;
     expect(updatedSub.status).toBe("canceled");
+    expect(updatedSub.canceled_at).not.toBeNull();
 
     const skippedCycle = repo.cycles[0]!;
     expect(skippedCycle.status).toBe("skipped");
@@ -1054,5 +1055,55 @@ describe("FIX-Q — resumeBillingIfAbandoned : pas de reset attempt_count → pa
     expect(updated.status).toBe("failed");
     expect(updated.next_retry_at).toBeNull();
     expect(updated.attempt_count).toBe(5);
+  });
+});
+
+describe("FIX-R — canceled_at positionné lors de l'annulation effective de la subscription", () => {
+  it("scheduler cancel_at expiré → canceled_at renseigné avec un timestamp récent", async () => {
+    const before = new Date();
+    const { repo, billing } = makeDeps();
+    const cancelAt = new Date(Date.now() - 5000);
+    const sub = await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "active",
+      currentPeriodStart: new Date(Date.now() - 31 * 86400_000),
+      currentPeriodEnd: cancelAt,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    await repo.updateCancelAt(CTX, cancelAt);
+    await repo.createCycle({
+      subscriptionId: sub.id,
+      periodStart: cancelAt,
+      periodEnd: new Date(cancelAt.getTime() + 30 * 86400_000),
+      amountCents: 2900, currency: "eur",
+    });
+    const pm = await repo.savePaymentMethod({
+      artisanId: ARTISAN_ID, stripeCustomerId: "cus_r", stripePaymentMethodId: "pm_r",
+      brand: "visa", last4: "0001", expMonth: 12, expYear: 2028, consentedAt: new Date(),
+    });
+    await repo.setDefaultPaymentMethod(CTX, pm.id);
+
+    await runSchedulerTick({ repo, billing });
+
+    const updatedSub = repo.subs.find(s => s.id === sub.id)!;
+    expect(updatedSub.status).toBe("canceled");
+    expect(updatedSub.canceled_at).not.toBeNull();
+    expect(updatedSub.canceled_at!.getTime()).toBeGreaterThanOrEqual(before.getTime());
+  });
+
+  it("updateSubscriptionStatus('past_due') ne renseigne pas canceled_at", async () => {
+    const { repo } = makeDeps();
+    const sub = await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    expect(sub.canceled_at).toBeNull();
+
+    await repo.updateSubscriptionStatus(CTX, "past_due");
+
+    const updated = repo.subs.find(s => s.id === sub.id)!;
+    expect(updated.status).toBe("past_due");
+    expect(updated.canceled_at).toBeNull();
   });
 });
