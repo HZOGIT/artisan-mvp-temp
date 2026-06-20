@@ -758,6 +758,51 @@ describe("dunning & suspension (IT-3)", () => {
   });
 });
 
+describe("FIX-CDM — handleDunning : notif in-app et email dans des try/catch indépendants", () => {
+  it("notifyArtisan échoue → emailArtisanOwner quand même appelé (tentative non-finale)", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    billing.nextChargeResult = null;
+
+    let emailCalled = 0;
+    const fakeNotifier = {
+      notifyArtisan: async () => { throw new Error("notif service down"); },
+      emailArtisanOwner: async () => { emailCalled++; },
+    };
+
+    await chargeOffSessionForCycle({ repo, billing, notifier: fakeNotifier }, cycle.id, sub.id, ARTISAN_ID);
+
+    expect(emailCalled).toBe(1);
+  });
+
+  it("notifyArtisan échoue → email suspension quand même envoyé (tentative finale)", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"),
+      amountCents: 2900, currency: "eur",
+    });
+    /* Préchauffe le compteur à 3 (la prochaine tentative est la finale) */
+    await repo.updateCycleStatus(cycle.id, { status: "failed", failedAt: new Date(0), nextRetryAt: new Date(0), attemptCount: 3 });
+    billing.nextChargeResult = null;
+
+    let emailCalled = 0;
+    const fakeNotifier = {
+      notifyArtisan: async () => { throw new Error("notif service down"); },
+      emailArtisanOwner: async () => { emailCalled++; },
+    };
+
+    await chargeOffSessionForCycle({ repo, billing, notifier: fakeNotifier }, cycle.id, sub.id, ARTISAN_ID);
+
+    expect(emailCalled).toBe(1);
+    const updatedSub = repo.subs.find(s => s.artisan_id === ARTISAN_ID)!;
+    expect(updatedSub.status).toBe("past_due");
+  });
+});
+
 describe("FIX-A — webhook deduplication", () => {
   it("markWebhookProcessed retourne true sur le 1er appel, false sur le doublon", async () => {
     const { repo } = makeDeps();

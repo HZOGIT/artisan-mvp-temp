@@ -236,6 +236,11 @@ async function handleDunning(deps: SchedulerDeps, p: DunningParams): Promise<voi
     });
     if (deps.notifier) {
       const appUrl = deps.appUrl ?? "https://www.operioz.com";
+      /*
+       * Notif in-app et email dans des try/catch séparés (FIX-CDM) : si notifyArtisan
+       * échoue (service in-app indisponible), l'email de suspension est quand même envoyé.
+       * Un seul catch commun masquait l'échec de l'une et silençait l'autre.
+       */
       try {
         await deps.notifier.notifyArtisan(artisanId, {
           type: "erreur",
@@ -243,6 +248,8 @@ async function handleDunning(deps: SchedulerDeps, p: DunningParams): Promise<voi
           message: "Votre abonnement est suspendu suite à plusieurs échecs de prélèvement. Mettez à jour votre moyen de paiement.",
           lien: "/parametres?tab=abonnement",
         });
+      } catch { /* best-effort */ }
+      try {
         await deps.notifier.emailArtisanOwner(
           artisanId,
           "Abonnement Operioz suspendu — action requise",
@@ -257,6 +264,7 @@ async function handleDunning(deps: SchedulerDeps, p: DunningParams): Promise<voi
     }
   } else if (deps.notifier) {
     const appUrl = deps.appUrl ?? "https://www.operioz.com";
+    /* FIX-CDM : deux try/catch indépendants pour garantir l'envoi de l'email même si la notif in-app échoue */
     try {
       await deps.notifier.notifyArtisan(artisanId, {
         type: "erreur",
@@ -264,6 +272,8 @@ async function handleDunning(deps: SchedulerDeps, p: DunningParams): Promise<voi
         message: `Votre paiement a échoué (tentative ${newAttemptCount}/${MAX_DUNNING_ATTEMPTS}). Nous réessaierons automatiquement.`,
         lien: "/parametres?tab=abonnement",
       });
+    } catch { /* best-effort */ }
+    try {
       await deps.notifier.emailArtisanOwner(
         artisanId,
         "Problème de paiement — Operioz",
