@@ -85,6 +85,13 @@
       "when": 1781977774144,
       "tag": "0011_billing-webhook-events-immutable",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1781992286397,
+      "tag": "0012_drop-chk-pm-required",
+      "breakpoints": true
     }
   ]
 }

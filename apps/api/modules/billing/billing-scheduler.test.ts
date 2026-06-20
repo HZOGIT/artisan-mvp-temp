@@ -1916,6 +1916,52 @@ describe("FIX-CDJ — chargeOffSessionForCycle : DB failure post-Stripe-succeede
   });
 });
 
+describe("FIX-CDK — activateExpiredTrials sans PM : sub passe active, cycle débité dès l'ajout d'un PM (DB constraint chk_pm_required supprimée en 0012)", () => {
+  it("trial expiré sans PM → sub active + cycle pending (non chargé). Ajout PM → tick suivant facture", async () => {
+    const { repo, billing } = makeDeps();
+    const trialEnd = new Date(Date.now() - 3600_000);
+    await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: trialEnd, paymentMethodId: null,
+    });
+
+    const tick1 = await runSchedulerTick({ repo, billing });
+
+    expect(tick1.trialsActivated).toBe(1);
+    const sub = repo.subs.find(s => s.artisan_id === ARTISAN_ID)!;
+    expect(sub.status).toBe("active");
+    const cycle = repo.cycles.find(c => c.subscription_id === sub.id)!;
+    expect(cycle).toBeDefined();
+    expect(cycle.status).toBe("pending");
+
+    /*
+     * Tick 2 : sub active mais sans PM → findSubscriptionsWithDueCycles exclut la sub
+     * (PM filter). Aucun prélèvement, cycle reste pending — pas d'accès gratuit infini
+     * car l'artisan est bloqué tant qu'il n'a pas de PM actif.
+     */
+    const tick2 = await runSchedulerTick({ repo, billing });
+    expect(tick2.charged).toBe(0);
+    expect(billing.chargesAttempted).toHaveLength(0);
+    const cycleAfterTick2 = repo.cycles.find(c => c.id === cycle.id)!;
+    expect(cycleAfterTick2.status).toBe("pending");
+
+    /* Artisan ajoute un PM → tick 3 : prélèvement immédiat du cycle pending */
+    const pm = await repo.savePaymentMethod({
+      artisanId: ARTISAN_ID, stripeCustomerId: "cus_cdktest",
+      stripePaymentMethodId: "pm_cdktest", brand: "visa", last4: "4242",
+      expMonth: 12, expYear: 2029, consentedAt: new Date(),
+    });
+    await repo.setDefaultPaymentMethod({ artisanId: ARTISAN_ID, userId: 0 }, pm.id);
+    billing.nextChargeResult = { paymentIntentId: "pi_cdktest", status: "succeeded" };
+
+    const tick3 = await runSchedulerTick({ repo, billing });
+    expect(tick3.charged).toBe(1);
+    const cycleAfterTick3 = repo.cycles.find(c => c.id === cycle.id)!;
+    expect(cycleAfterTick3.status).toBe("paid");
+  });
+});
+
 describe("FIX-CDF — advanceSubscriptionAfterPayment : cycle créé avant updateSubscriptionPeriod (auto-healing)", () => {
   it("updateSubscriptionPeriod échoue après createCycle → cycle pending existe (auto-healing possible)", async () => {
     const { repo, billing } = makeDeps();
