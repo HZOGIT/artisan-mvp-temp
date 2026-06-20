@@ -18,7 +18,7 @@ import type {
   BillingChargeAttempt,
 } from "../../../../../drizzle/schema.pg";
 import type { TenantContext } from "../../../shared/tenant";
-import { isDue, isZombie } from "../domain/billing-cycle";
+import { isDue, isZombie, isStuckProcessing } from "../domain/billing-cycle";
 
 type PM = BillingPaymentMethod;
 type Sub = BillingSubscription;
@@ -34,6 +34,7 @@ export class FakeBillingRepository implements IBillingRepository {
   public chargeAttempts: BillingChargeAttempt[] = [];
   public invoices: BillingInvoice[] = [];
   public events: BillingEvent[] = [];
+  public processedWebhookIds: Set<string> = new Set();
   public customerIds: Map<number, string> = new Map();
 
   private now() { return new Date(); }
@@ -214,7 +215,7 @@ export class FakeBillingRepository implements IBillingRepository {
   }
 
   async findZombieCycles(now: Date): Promise<Cycle[]> {
-    return this.cycles.filter(c => isZombie(c as never, now));
+    return this.cycles.filter(c => isZombie(c as never, now) || isStuckProcessing(c as never, now));
   }
 
   async createChargeAttempt(params: CreateChargeAttemptParams): Promise<BillingChargeAttempt> {
@@ -250,6 +251,12 @@ export class FakeBillingRepository implements IBillingRepository {
 
   async findInvoicesByArtisan(ctx: TenantContext, limit = 12): Promise<BillingInvoice[]> {
     return this.invoices.filter(i => i.artisan_id === ctx.artisanId).slice(0, limit);
+  }
+
+  async markWebhookProcessed(stripeEventId: string, _eventType: string, _payload: Record<string, unknown>): Promise<boolean> {
+    if (this.processedWebhookIds.has(stripeEventId)) return false;
+    this.processedWebhookIds.add(stripeEventId);
+    return true;
   }
 
   async appendEvent(params: AppendEventParams): Promise<BillingEvent> {

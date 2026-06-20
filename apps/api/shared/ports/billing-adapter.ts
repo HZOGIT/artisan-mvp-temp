@@ -108,6 +108,8 @@ export class FakeBillingPort implements BillingPort {
   public nextChargeResult: ChargeResult | null = { paymentIntentId: "pi_fake_1", status: "succeeded" };
   /** Message d'erreur simulé quand nextChargeResult = null. */
   public nextChargeError = "card_declined";
+  /** Override pour simuler l'état réel d'un PI lors de la récupération zombie. */
+  public nextRetrieveResult: PaymentIntentInfo | null = null;
   private seq = 0;
 
   async createSetupIntent(customerId: string): Promise<SetupIntentResult> {
@@ -127,7 +129,7 @@ export class FakeBillingPort implements BillingPort {
   }
 
   async retrievePaymentIntent(paymentIntentId: string): Promise<PaymentIntentInfo> {
-    return { id: paymentIntentId, status: "succeeded", failureCode: null, failureMessage: null };
+    return this.nextRetrieveResult ?? { id: paymentIntentId, status: "succeeded", failureCode: null, failureMessage: null };
   }
 
   async handleRequiresAction(_paymentIntentId: string, returnUrl: string): Promise<{ redirectUrl: string }> {

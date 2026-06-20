@@ -1,7 +1,7 @@
 import type { IBillingRepository } from "./billing-repository";
 import type { BillingPort } from "../../../shared/ports/billing";
 import type { SubscriptionEventNotifier } from "../../subscription/application/subscription-event-notifier";
-import { isDue, isZombie, nextPeriod, nextRetryAt } from "../domain/billing-cycle";
+import { isDue, isZombie, isStuckProcessing, nextPeriod, nextRetryAt } from "../domain/billing-cycle";
 import { subscriptionEmail } from "../../subscription/domain/webhook";
 
 export interface SchedulerDeps {
@@ -240,7 +240,7 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
   let recovered = 0;
 
   for (const cycle of zombies) {
-    if (!isZombie(cycle, now)) continue;
+    if (!isZombie(cycle, now) && !isStuckProcessing(cycle, now)) continue;
     recovered++;
 
     const lastAttempt = await deps.repo.findLastAttemptByCycleId(cycle.id);
@@ -256,15 +256,19 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
       });
       if (lastAttempt) {
         const zombieSub = await deps.repo.findSubscriptionById(cycle.subscription_id);
-        await handleDunning(deps, {
-          cycleId: cycle.id,
-          subscriptionId: cycle.subscription_id,
-          artisanId: zombieSub?.artisan_id ?? 0,
-          now,
-          newAttemptCount: cycle.attempt_count,
-          attempt: lastAttempt,
-          failureMessage: "zombie_no_pi",
-        });
+        if (!zombieSub) {
+          await deps.repo.updateCycleStatus(cycle.id, { status: "failed", failedAt: now });
+        } else {
+          await handleDunning(deps, {
+            cycleId: cycle.id,
+            subscriptionId: cycle.subscription_id,
+            artisanId: zombieSub.artisan_id,
+            now,
+            newAttemptCount: cycle.attempt_count,
+            attempt: lastAttempt,
+            failureMessage: "zombie_no_pi",
+          });
+        }
       } else {
         await deps.repo.updateCycleStatus(cycle.id, {
           status: "failed",
@@ -286,7 +290,17 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
     });
 
     const sub = await deps.repo.findSubscriptionById(cycle.subscription_id);
-    const artisanId = sub?.artisan_id ?? 0;
+    if (!sub) {
+      await deps.repo.appendEvent({
+        entityType: "billing_cycle",
+        entityId: cycle.id,
+        eventType: "cycle.zombie_orphan",
+        payload: { subscriptionId: cycle.subscription_id, piId },
+        actor: "scheduler",
+      });
+      continue;
+    }
+    const artisanId = sub.artisan_id;
 
     if (pi.status === "succeeded") {
       await deps.repo.updateCycleStatus(cycle.id, { status: "paid", paidAt: now });

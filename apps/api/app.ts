@@ -946,8 +946,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     notifier: new SubscriptionEventNotifierDrizzle(getDbHandle().db, emailAdapter),
     webhookSecret: deps.stripeWebhookSecret ?? process.env.STRIPE_WEBHOOK_SECRET ?? "",
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
-    onBillingWebhookEvent: (eventType, piId, fc, fm) =>
-      handleBillingWebhookEvent({ repo: billingRepo }, eventType, piId, fc, fm),
+    onBillingWebhookEvent: (eventType, piId, fc, fm, stripeEventId) =>
+      handleBillingWebhookEvent({ repo: billingRepo }, eventType, piId, fc, fm, stripeEventId),
   });
 
   /** Scheduler billing maison — `POST /internal/billing/tick` sécurisé par x-scheduler-secret. */

@@ -505,3 +505,97 @@ describe("dunning & suspension (IT-3)", () => {
     calls.notifyCalls.forEach(id => expect(id).toBe(ARTISAN_ID));
   });
 });
+
+describe("FIX-A — webhook deduplication", () => {
+  it("markWebhookProcessed retourne true sur le 1er appel, false sur le doublon", async () => {
+    const { repo } = makeDeps();
+    const first = await repo.markWebhookProcessed("evt_001", "payment_intent.succeeded", {});
+    const dup = await repo.markWebhookProcessed("evt_001", "payment_intent.succeeded", {});
+    expect(first).toBe(true);
+    expect(dup).toBe(false);
+  });
+
+  it("un webhook succeeded dupliqué ne crée pas un 2ème cycle suivant", async () => {
+    const { repo } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    await repo.updateCycleStatus(cycle.id, { status: "paid", paidAt: new Date() });
+    await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k1" });
+    await repo.updateChargeAttempt(
+      repo.chargeAttempts[0]!.id,
+      { stripePaymentIntentId: "pi_ok", status: "succeeded" },
+    );
+
+    const { handleBillingWebhookEvent } = await import("./interface/http/billing-webhook-handler");
+    /* 1er appel légitime → crée le cycle de la période suivante */
+    await handleBillingWebhookEvent({ repo }, "payment_intent.succeeded", "pi_ok", null, null, "evt_dbl");
+    const afterFirst = repo.cycles.filter(c => c.status === "pending").length;
+
+    /* 2ème appel dupliqué → bloqué par markWebhookProcessed, aucun nouveau cycle */
+    await handleBillingWebhookEvent({ repo }, "payment_intent.succeeded", "pi_ok", null, null, "evt_dbl");
+    const afterDup = repo.cycles.filter(c => c.status === "pending").length;
+
+    expect(afterDup).toBe(afterFirst); /* le doublon n'ajoute rien */
+  });
+});
+
+describe("FIX-B — processing timeout", () => {
+  it("cycle bloqué en processing depuis 73h est inclus dans findZombieCycles", async () => {
+    const { repo } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"),
+      amountCents: 2900, currency: "eur",
+    });
+    /* Mettre en processing avec charging_started_at il y a 73h */
+    const longAgo = new Date(Date.now() - 73 * 3600_000);
+    repo.cycles[0] = {
+      ...cycle,
+      status: "processing",
+      charging_started_at: longAgo,
+    };
+
+    const now = new Date();
+    const zombies = await repo.findZombieCycles(now);
+    expect(zombies.some(c => c.id === cycle.id)).toBe(true);
+  });
+
+  it("cycle processing récent (1h) n'est PAS dans findZombieCycles", async () => {
+    const { repo } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"),
+      amountCents: 2900, currency: "eur",
+    });
+    const recent = new Date(Date.now() - 1 * 3600_000);
+    repo.cycles[0] = { ...cycle, status: "processing", charging_started_at: recent };
+
+    const zombies = await repo.findZombieCycles(new Date());
+    expect(zombies.some(c => c.id === cycle.id)).toBe(false);
+  });
+});
+
+describe("FIX-C — artisanId=0 guard", () => {
+  it("zombie sans subscription connue n'appelle pas handleDunning (cycle → failed)", async () => {
+    const { repo, billing } = makeDeps();
+    /* Cycle en charging sans sub en DB (sub orpheline) */
+    const cycle = await repo.createCycle({
+      subscriptionId: 9999,
+      periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"),
+      amountCents: 2900, currency: "eur",
+    });
+    const longAgo = new Date(Date.now() - 60 * 60 * 1000);
+    repo.cycles[0] = { ...cycle, status: "charging", charging_started_at: longAgo };
+    await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k" });
+    await repo.updateChargeAttempt(repo.chargeAttempts[0]!.id, { stripePaymentIntentId: "pi_x", status: "initiated" });
+
+    billing.nextRetrieveResult = { status: "canceled", paymentIntentId: "pi_x", failureMessage: null };
+
+    await recoverZombies({ repo, billing });
+
+    const orphanEvent = repo.events.find(e => e.event_type === "cycle.zombie_orphan");
+    expect(orphanEvent).toBeDefined();
+    /* Aucune notification envoyée à artisanId=0 */
+    expect(repo.events.some(e => e.event_type === "subscription.suspended")).toBe(false);
+  });
+});

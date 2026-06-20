@@ -25,11 +25,21 @@ export interface BillingCycle {
 }
 
 const ZOMBIE_THRESHOLD_MS = 15 * 60 * 1000;
+const PROCESSING_TIMEOUT_MS = 72 * 3600_000;
 
 /** Un cycle est zombie si bloqué en `charging` depuis plus de 15 min (PI perdu, timeout réseau). */
 export function isZombie(cycle: BillingCycle, now: Date): boolean {
   if (cycle.status !== "charging" || !cycle.charging_started_at) return false;
   return now.getTime() - cycle.charging_started_at.getTime() > ZOMBIE_THRESHOLD_MS;
+}
+
+/**
+ * Un cycle `processing` bloqué depuis plus de 72h doit être réconcilié avec Stripe —
+ * les virements SEPA/iDEAL peuvent prendre jusqu'à 3 jours, au-delà c'est suspect.
+ */
+export function isStuckProcessing(cycle: BillingCycle, now: Date): boolean {
+  if (cycle.status !== "processing" || !cycle.charging_started_at) return false;
+  return now.getTime() - cycle.charging_started_at.getTime() > PROCESSING_TIMEOUT_MS;
 }
 
 /** Le cycle doit être prélevé maintenant (pending ou failed avec retry échu). */

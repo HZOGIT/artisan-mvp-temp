@@ -11,7 +11,17 @@ export async function handleBillingWebhookEvent(
   paymentIntentId: string,
   failureCode?: string | null,
   failureMessage?: string | null,
+  stripeEventId?: string,
 ): Promise<void> {
+  /**
+   * Deduplication : Stripe livre les webhooks "at least once".
+   * ON CONFLICT DO NOTHING → retourne false si l'event est déjà traité.
+   */
+  if (stripeEventId) {
+    const isNew = await deps.repo.markWebhookProcessed(stripeEventId, eventType, { paymentIntentId });
+    if (!isNew) return;
+  }
+
   const attempt = await deps.repo.findChargeAttemptByPaymentIntentId(paymentIntentId);
   if (!attempt) return;
 

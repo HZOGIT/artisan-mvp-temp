@@ -1,4 +1,4 @@
-import { eq, desc, and, isNull, or, lte, lt, inArray } from "drizzle-orm";
+import { eq, desc, and, isNull, or, lte, lt, inArray, sql } from "drizzle-orm";
 import {
   billingPaymentMethods,
   billingSubscriptions,
@@ -6,6 +6,7 @@ import {
   billingChargeAttempts,
   billingInvoices,
   billingEvents,
+  billingWebhookEvents,
 } from "../../../../../drizzle/schema.pg";
 import type { BillingPaymentMethod, BillingSubscription, BillingCycle, BillingInvoice, BillingEvent, BillingChargeAttempt } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
@@ -256,11 +257,17 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
   }
 
   async findZombieCycles(now: Date): Promise<BillingCycle[]> {
-    const threshold = new Date(now.getTime() - 15 * 60 * 1000);
+    const zombieThreshold = new Date(now.getTime() - 15 * 60 * 1000);
+    const processingThreshold = new Date(now.getTime() - 72 * 3600_000);
     return this.db
       .select()
       .from(billingCycles)
-      .where(and(eq(billingCycles.status, "charging"), lt(billingCycles.charging_started_at, threshold)));
+      .where(
+        or(
+          and(eq(billingCycles.status, "charging"), lt(billingCycles.charging_started_at, zombieThreshold)),
+          and(eq(billingCycles.status, "processing"), lt(billingCycles.charging_started_at, processingThreshold)),
+        ),
+      );
   }
 
   async createChargeAttempt(params: CreateChargeAttemptParams): Promise<BillingChargeAttempt> {
@@ -313,6 +320,14 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
       .limit(limit);
   }
 
+
+  async markWebhookProcessed(stripeEventId: string, eventType: string, payload: Record<string, unknown>): Promise<boolean> {
+    const result = await this.db
+      .insert(billingWebhookEvents)
+      .values({ stripe_event_id: stripeEventId, type: eventType, payload })
+      .onConflictDoNothing({ target: billingWebhookEvents.stripe_event_id });
+    return (result.rowCount ?? 0) > 0;
+  }
 
   async appendEvent(params: AppendEventParams): Promise<BillingEvent> {
     const [row] = await this.db

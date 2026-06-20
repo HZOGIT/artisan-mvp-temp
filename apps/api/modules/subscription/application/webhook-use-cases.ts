@@ -11,7 +11,7 @@ export interface StripeWebhookDeps {
   readonly webhookSecret: string;
   readonly appUrl: string;
   readonly log?: AppLogger;
-  readonly onBillingWebhookEvent?: (eventType: string, paymentIntentId: string, failureCode?: string | null, failureMessage?: string | null) => Promise<void>;
+  readonly onBillingWebhookEvent?: (eventType: string, paymentIntentId: string, failureCode?: string | null, failureMessage?: string | null, stripeEventId?: string) => Promise<void>;
 }
 
 export interface WebhookResult {
@@ -46,13 +46,13 @@ export async function processStripeWebhook(
         const pi = event.data.object as Record<string, unknown>;
         const piId = typeof pi["id"] === "string" ? pi["id"] : "";
         const lec = pi["last_payment_error"] as Record<string, unknown> | undefined;
-        await deps.onBillingWebhookEvent(event.type, piId, lec?.["code"] as string ?? null, lec?.["message"] as string ?? null).catch(() => {});
+        await deps.onBillingWebhookEvent(event.type, piId, lec?.["code"] as string ?? null, lec?.["message"] as string ?? null, event.id).catch(() => {});
       }
     } else if (event.type === "payment_intent.succeeded") {
       if (deps.onBillingWebhookEvent) {
         const pi = event.data.object as Record<string, unknown>;
         const piId = typeof pi["id"] === "string" ? pi["id"] : "";
-        await deps.onBillingWebhookEvent(event.type, piId).catch(() => {});
+        await deps.onBillingWebhookEvent(event.type, piId, null, null, event.id).catch(() => {});
       }
     } else if (event.type === "customer.subscription.trial_will_end") {
       await handleTrialWillEnd(deps, event.data.object);

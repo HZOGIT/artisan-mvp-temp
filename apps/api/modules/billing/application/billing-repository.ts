@@ -108,6 +108,12 @@ export interface IBillingRepository {
   /** Journal immuable */
   appendEvent(params: AppendEventParams): Promise<BillingEvent>;
 
+  /**
+   * Marque un événement Stripe comme traité (INSERT ... ON CONFLICT DO NOTHING).
+   * Retourne true si l'event est nouveau, false si déjà vu (doublon Stripe at-least-once).
+   */
+  markWebhookProcessed(stripeEventId: string, eventType: string, payload: Record<string, unknown>): Promise<boolean>;
+
   /** Stripe customer ID pour l'artisan (via la table artisans) */
   findStripeCustomerId(artisanId: number): Promise<string | null>;
   saveStripeCustomerId(artisanId: number, stripeCustomerId: string): Promise<void>;
