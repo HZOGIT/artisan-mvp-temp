@@ -635,6 +635,43 @@ describe.skipIf(!URL)("BillingRepositoryDrizzle (PG, scope explicite artisan_id)
     await expect(repo.updateSubscriptionStatus(ctx(A), "active")).rejects.toThrow();
   });
 
+  it("FIX-CDR — findNonTerminalCycle : retourne failed ET pending (pas seulement pending)", async () => {
+    const sub = await repo.saveSubscription({
+      artisanId: A, planId: "starter", billingMode: "maison",
+      status: "past_due", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-06-01"),
+      periodEnd: new Date("2026-07-01"), amountCents: 2900, currency: "eur",
+    });
+    /* Passer le cycle en failed + next_retry_at = demain */
+    await admin.query(
+      "update billing_cycles set status='failed', next_retry_at=now()+interval'1 day', failed_at=now() where id=$1",
+      [cycle.id],
+    );
+
+    const found = await repo.findNonTerminalCycle(sub.id);
+    expect(found?.id).toBe(cycle.id);
+    expect(found?.status).toBe("failed");
+  });
+
+  it("FIX-CDR — findNonTerminalCycle : retourne null si seul cycle est paid", async () => {
+    const sub = await repo.saveSubscription({
+      artisanId: B, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-06-01"),
+      periodEnd: new Date("2026-07-01"), amountCents: 2900, currency: "eur",
+    });
+    await admin.query("update billing_cycles set status='paid' where id=$1", [cycle.id]);
+
+    const found = await repo.findNonTerminalCycle(sub.id);
+    expect(found).toBeNull();
+  });
+
   it("appendEvent deux fois → deux événements distincts (append-only — pas de déduplication)", async () => {
     // billing_events est un ledger immuable : deux appels identiques produisent deux lignes distinctes.
     // Important pour l'audit : chaque action génère son propre enregistrement.
