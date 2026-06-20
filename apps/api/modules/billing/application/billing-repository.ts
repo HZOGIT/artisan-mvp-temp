@@ -107,7 +107,7 @@ export interface IBillingRepository {
    */
   claimCycleForCharging(cycleId: number, now: Date, newAttemptCount: number): Promise<boolean>;
   findSubscriptionsWithDueCycles(now: Date, limit?: number): Promise<SubscriptionWithDueCycle[]>;
-  findZombieCycles(now: Date): Promise<BillingCycle[]>;
+  findZombieCycles(now: Date, limit?: number): Promise<BillingCycle[]>;
 
   /** Tentatives de prélèvement */
   createChargeAttempt(params: CreateChargeAttemptParams): Promise<BillingChargeAttempt>;

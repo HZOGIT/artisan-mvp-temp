@@ -318,7 +318,7 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
       .limit(limit);
   }
 
-  async findZombieCycles(now: Date): Promise<BillingCycle[]> {
+  async findZombieCycles(now: Date, limit = 200): Promise<BillingCycle[]> {
     const zombieThreshold = new Date(now.getTime() - 15 * 60 * 1000);
     const processingThreshold = new Date(now.getTime() - 72 * 3600_000);
     return this.db
@@ -329,7 +329,8 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
           and(eq(billingCycles.status, "charging"), lt(billingCycles.charging_started_at, zombieThreshold)),
           and(eq(billingCycles.status, "processing"), lt(billingCycles.charging_started_at, processingThreshold)),
         ),
-      );
+      )
+      .limit(limit);
   }
 
   async createChargeAttempt(params: CreateChargeAttemptParams): Promise<BillingChargeAttempt> {

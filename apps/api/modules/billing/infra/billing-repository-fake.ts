@@ -272,8 +272,8 @@ export class FakeBillingRepository implements IBillingRepository {
     return result;
   }
 
-  async findZombieCycles(now: Date): Promise<Cycle[]> {
-    return this.cycles.filter(c => isZombie(c as never, now) || isStuckProcessing(c as never, now));
+  async findZombieCycles(now: Date, limit = 200): Promise<Cycle[]> {
+    return this.cycles.filter(c => isZombie(c as never, now) || isStuckProcessing(c as never, now)).slice(0, limit);
   }
 
   async createChargeAttempt(params: CreateChargeAttemptParams): Promise<BillingChargeAttempt> {
