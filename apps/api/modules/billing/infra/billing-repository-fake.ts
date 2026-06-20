@@ -197,6 +197,18 @@ export class FakeBillingRepository implements IBillingRepository {
     );
   }
 
+  async claimCycleForCharging(cycleId: number, now: Date, newAttemptCount: number): Promise<boolean> {
+    const cycle = this.cycles.find(c => c.id === cycleId);
+    if (!cycle) return false;
+    if (!isDue(cycle as never, now)) return false;
+    this.cycles = this.cycles.map(c =>
+      c.id === cycleId
+        ? { ...c, status: "charging", charging_started_at: now, attempt_count: newAttemptCount, updated_at: this.now() }
+        : c
+    );
+    return true;
+  }
+
   async updateCycleStatus(cycleId: number, params: UpdateCycleStatusParams): Promise<void> {
     this.cycles = this.cycles.map(c => {
       if (c.id !== cycleId) return c;

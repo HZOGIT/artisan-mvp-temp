@@ -787,3 +787,74 @@ describe("FIX-I — webhook payment_failed respecte MAX_DUNNING_ATTEMPTS", () =>
     expect(repo.subs[0]!.status).toBe("active");
   });
 });
+
+describe("FIX-M — claimCycleForCharging : atomic CAS anti double-charge", () => {
+  it("premier claim réussit (true) et passe le cycle en charging", async () => {
+    const { repo } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    const now = new Date();
+
+    const claimed = await repo.claimCycleForCharging(cycle.id, now, 1);
+
+    expect(claimed).toBe(true);
+    expect(repo.cycles[0]!.status).toBe("charging");
+    expect(repo.cycles[0]!.attempt_count).toBe(1);
+  });
+
+  it("deuxième claim sur même cycle retourne false (race perdue)", async () => {
+    const { repo } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    const now = new Date();
+
+    await repo.claimCycleForCharging(cycle.id, now, 1);
+    const second = await repo.claimCycleForCharging(cycle.id, now, 1);
+
+    expect(second).toBe(false);
+    expect(repo.cycles[0]!.attempt_count).toBe(1);
+  });
+
+  it("deux chargeOffSessionForCycle concurrents → 1 seul charge Stripe, 1 seule tentative", async () => {
+    /* Simule la race condition multi-réplica : deux appels séquentiels sur le même cycle pending.
+       Après le 1er appel (qui claim), le cycle est en charging → isDue=false pour le 2ème. */
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    billing.nextChargeResult = { paymentIntentId: "pi_one", status: "processing" };
+
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+
+    expect(repo.chargeAttempts).toHaveLength(1);
+    expect(billing.chargesAttempted).toHaveLength(1);
+  });
+
+  it("claim sur cycle failed avec next_retry_at échu retourne true", async () => {
+    const { repo } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    const pastRetry = new Date(Date.now() - 1000);
+    await repo.updateCycleStatus(cycle.id, { status: "failed", failedAt: pastRetry, nextRetryAt: pastRetry });
+    const now = new Date();
+
+    const claimed = await repo.claimCycleForCharging(cycle.id, now, 1);
+
+    expect(claimed).toBe(true);
+    expect(repo.cycles[0]!.status).toBe("charging");
+  });
+
+  it("claim sur cycle failed avec next_retry_at dans le futur retourne false", async () => {
+    const { repo } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    const futureRetry = new Date(Date.now() + 3_600_000);
+    await repo.updateCycleStatus(cycle.id, { status: "failed", failedAt: new Date(), nextRetryAt: futureRetry });
+    const now = new Date();
+
+    const claimed = await repo.claimCycleForCharging(cycle.id, now, 1);
+
+    expect(claimed).toBe(false);
+  });
+});

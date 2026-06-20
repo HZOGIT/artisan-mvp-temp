@@ -89,11 +89,8 @@ export async function chargeOffSessionForCycle(
     return;
   }
 
-  await deps.repo.updateCycleStatus(cycleId, {
-    status: "charging",
-    chargingStartedAt: now,
-    attemptCount: newAttemptCount,
-  });
+  const claimed = await deps.repo.claimCycleForCharging(cycleId, now, newAttemptCount);
+  if (!claimed) return;
 
   const attempt = await deps.repo.createChargeAttempt({
     cycleId,

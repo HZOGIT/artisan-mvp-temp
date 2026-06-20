@@ -96,6 +96,12 @@ export interface IBillingRepository {
   createCycle(params: CreateCycleParams): Promise<BillingCycle>;
   updateCycleStatus(cycleId: number, params: UpdateCycleStatusParams): Promise<void>;
   updateCycleAmount(cycleId: number, amountCents: number): Promise<void>;
+  /**
+   * Atomic CAS : passe le cycle à `charging` seulement s'il est encore `pending` ou
+   * `failed` avec `next_retry_at <= now`. Retourne false si un autre worker a gagné la race.
+   * Prévient le double-prélèvement en multi-réplica.
+   */
+  claimCycleForCharging(cycleId: number, now: Date, newAttemptCount: number): Promise<boolean>;
   findSubscriptionsWithDueCycles(now: Date, limit?: number): Promise<SubscriptionWithDueCycle[]>;
   findZombieCycles(now: Date): Promise<BillingCycle[]>;
 

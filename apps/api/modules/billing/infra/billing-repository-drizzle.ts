@@ -240,6 +240,22 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
       .where(eq(billingCycles.id, cycleId));
   }
 
+  async claimCycleForCharging(cycleId: number, now: Date, newAttemptCount: number): Promise<boolean> {
+    const result = await this.db
+      .update(billingCycles)
+      .set({ status: "charging", charging_started_at: now, attempt_count: newAttemptCount, updated_at: now })
+      .where(
+        and(
+          eq(billingCycles.id, cycleId),
+          or(
+            eq(billingCycles.status, "pending"),
+            and(eq(billingCycles.status, "failed"), lte(billingCycles.next_retry_at, now)),
+          ),
+        ),
+      );
+    return (result.rowCount ?? 0) > 0;
+  }
+
   async findSubscriptionsWithDueCycles(now: Date, limit = 200): Promise<SubscriptionWithDueCycle[]> {
     const dueCycles = await this.db
       .select()
