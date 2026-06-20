@@ -329,7 +329,7 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
  * Idempotent : ne crée pas de cycle si un pending existe déjà pour cette période.
  */
 async function activateExpiredTrials(deps: SchedulerDeps, now: Date): Promise<number> {
-  const expired = await deps.repo.findExpiredTrials(now);
+  const expired = await deps.repo.findExpiredTrials(now, TICK_BATCH_SIZE);
   let activated = 0;
 
   for (const sub of expired) {
@@ -337,12 +337,15 @@ async function activateExpiredTrials(deps: SchedulerDeps, now: Date): Promise<nu
       const interval = resolveInterval(sub.billing_interval);
       const trialEnd = sub.trial_ends_at!;
       const { end: periodEnd } = nextPeriod(trialEnd, interval);
-
-      await deps.repo.updateSubscriptionPeriod(sub.id, "active", trialEnd, periodEnd);
-
       const plan = planById(sub.plan_id);
       const amountCents = plan ? plan.amountCentsByInterval[interval] : 0;
 
+      /*
+       * Cycle créé AVANT updateSubscriptionPeriod(active).
+       * Si createCycle échoue, la sub reste trialing → retentée au tick suivant (idempotent).
+       * Si updateSubscriptionPeriod échoue APRÈS createCycle, le cycle existe déjà → guard
+       * findPendingCycleForPeriod empêche le doublon, et updateSubscriptionPeriod est retentée.
+       */
       const existing = await deps.repo.findPendingCycleForPeriod(sub.id, trialEnd);
       if (!existing) {
         await deps.repo.createCycle({
@@ -353,6 +356,8 @@ async function activateExpiredTrials(deps: SchedulerDeps, now: Date): Promise<nu
           currency: "eur",
         });
       }
+
+      await deps.repo.updateSubscriptionPeriod(sub.id, "active", trialEnd, periodEnd);
 
       await deps.repo.appendEvent({
         entityType: "billing_subscription",

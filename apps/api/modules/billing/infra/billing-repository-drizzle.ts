@@ -49,7 +49,13 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
     const [row] = await this.db
       .select()
       .from(billingPaymentMethods)
-      .where(and(eq(billingPaymentMethods.artisan_id, ctx.artisanId), eq(billingPaymentMethods.is_default, true)))
+      .where(
+        and(
+          eq(billingPaymentMethods.artisan_id, ctx.artisanId),
+          eq(billingPaymentMethods.is_default, true),
+          isNull(billingPaymentMethods.revoked_at),
+        ),
+      )
       .limit(1);
     return row ?? null;
   }
@@ -132,11 +138,12 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
     return row!;
   }
 
-  async findExpiredTrials(now: Date): Promise<BillingSubscription[]> {
+  async findExpiredTrials(now: Date, limit = 200): Promise<BillingSubscription[]> {
     return this.db
       .select()
       .from(billingSubscriptions)
-      .where(and(eq(billingSubscriptions.status, "trialing"), lte(billingSubscriptions.trial_ends_at, now)));
+      .where(and(eq(billingSubscriptions.status, "trialing"), lte(billingSubscriptions.trial_ends_at, now)))
+      .limit(limit);
   }
 
   async findSubscriptionById(subscriptionId: number): Promise<typeof billingSubscriptions.$inferSelect | null> {

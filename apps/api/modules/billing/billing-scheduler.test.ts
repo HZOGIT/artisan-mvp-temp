@@ -946,3 +946,46 @@ describe("FIX-N — activateExpiredTrials : transition trialing→active au tick
     expect(repo.cycles[0]!.status).toBe("paid");
   });
 });
+
+describe("FIX-O — activateExpiredTrials : robustesse ordre + limit", () => {
+  it("cycle créé avant updateSubscriptionPeriod : ordre idempotent après échec partiel", async () => {
+    /* Simule un 1er tick où le cycle est créé mais findExpiredTrials repick la sub
+       (en la remettant trialing manuellement) → le 2ème tick trouve le cycle existant via
+       findPendingCycleForPeriod et n'en crée pas un deuxième. */
+    const { repo, billing } = makeDeps();
+    const trialEnd = new Date(Date.now() - 3600_000);
+    await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: trialEnd, paymentMethodId: null,
+    });
+
+    await runSchedulerTick({ repo, billing });
+    const cycleCountAfterFirst = repo.cycles.length;
+    expect(cycleCountAfterFirst).toBe(1);
+
+    /* Remet la sub en trialing pour simuler un second passage (partial failure) */
+    await repo.updateSubscriptionStatus(CTX, "trialing");
+    await runSchedulerTick({ repo, billing });
+
+    /* Pas de cycle en double */
+    expect(repo.cycles).toHaveLength(1);
+  });
+
+  it("findExpiredTrials respecte la limite — seuls N subs sont activées par tick", async () => {
+    const { repo, billing } = makeDeps();
+    const trialEnd = new Date(Date.now() - 3600_000);
+    /* Crée 3 subs trialing expirées pour 3 artisans différents */
+    for (let i = 1; i <= 3; i++) {
+      await repo.saveSubscription({
+        artisanId: i, planId: "starter", billingMode: "maison",
+        status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+        trialEndsAt: trialEnd, paymentMethodId: null,
+      });
+    }
+
+    /* Simule un limit=2 en appelant directement findExpiredTrials */
+    const found = await repo.findExpiredTrials(new Date(), 2);
+    expect(found).toHaveLength(2);
+  });
+});
