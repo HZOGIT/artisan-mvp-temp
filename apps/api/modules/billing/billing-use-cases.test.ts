@@ -551,7 +551,7 @@ describe("revokePaymentMethod — carte default", () => {
 
 
 describe("createSetupIntent — customer pré-existant (legacy ou maison)", () => {
-  it("customer trouvé via repo → createCustomer Stripe jamais appelé", async () => {
+  it("customer trouvé via repo (customerIds) → createCustomer Stripe jamais appelé", async () => {
     let createCustomerCalls = 0;
     const trackingStripe = {
       createCustomer: async () => { createCustomerCalls++; return { id: "cus_new" }; },
@@ -566,6 +566,28 @@ describe("createSetupIntent — customer pré-existant (legacy ou maison)", () =
     const result = await createSetupIntent(deps, A);
 
     expect(result.stripeCustomerId).toBe("cus_legacy_42");
+    expect(createCustomerCalls).toBe(0);
+  });
+
+  it("FIX-CDN — customer trouvé via PM record (Fake aligné sur Drizzle) → createCustomer jamais appelé", async () => {
+    let createCustomerCalls = 0;
+    const trackingStripe = {
+      createCustomer: async () => { createCustomerCalls++; return { id: "cus_new" }; },
+      constructEvent: () => { throw new Error("not used"); },
+      createInvoiceCheckout: async () => ({ url: "" }),
+    } as unknown as StripePort;
+
+    const repo = new FakeBillingRepository();
+    await repo.savePaymentMethod({
+      artisanId: A.artisanId, stripeCustomerId: "cus_from_pm",
+      stripePaymentMethodId: "pm_cdn", brand: "visa", last4: "4242",
+      expMonth: 12, expYear: 2030, consentedAt: new Date(),
+    });
+    const deps = { repo, billing: new FakeBillingPort(), stripe: trackingStripe };
+
+    const result = await createSetupIntent(deps, A);
+
+    expect(result.stripeCustomerId).toBe("cus_from_pm");
     expect(createCustomerCalls).toBe(0);
   });
 });

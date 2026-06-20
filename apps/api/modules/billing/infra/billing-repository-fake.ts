@@ -369,7 +369,10 @@ export class FakeBillingRepository implements IBillingRepository {
   }
 
   async findStripeCustomerId(artisanId: number): Promise<string | null> {
-    return this.customerIds.get(artisanId) ?? null;
+    const pm = [...this.pms]
+      .filter(p => p.artisan_id === artisanId)
+      .sort((a, b) => b.created_at.getTime() - a.created_at.getTime())[0];
+    return pm?.stripe_customer_id ?? this.customerIds.get(artisanId) ?? null;
   }
 
   async saveStripeCustomerId(artisanId: number, stripeCustomerId: string): Promise<void> {
