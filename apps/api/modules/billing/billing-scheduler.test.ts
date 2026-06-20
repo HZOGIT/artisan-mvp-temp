@@ -62,6 +62,8 @@ describe("chargeOffSessionForCycle", () => {
 
     const ev = repo.events.find(e => e.event_type === "cycle.paid");
     expect(ev).toBeDefined();
+    expect(ev!.payload).toMatchObject({ via: "scheduler", artisanId: ARTISAN_ID });
+    expect(typeof (ev!.payload as Record<string, unknown>)["paidAt"]).toBe("string");
 
     /* Cycle suivant créé automatiquement (anti-régression P0.1) */
     const nextCycle = repo.cycles.find(c => c.status === "pending")!;

@@ -129,7 +129,7 @@ export async function chargeOffSessionForCycle(
         entityType: "billing_cycle",
         entityId: cycleId,
         eventType: "cycle.paid",
-        payload: { paymentIntentId: result.paymentIntentId, artisanId },
+        payload: { via: "scheduler", paymentIntentId: result.paymentIntentId, artisanId, paidAt: paidAt.toISOString() },
         actor: "scheduler",
       });
       const sub = await deps.repo.findSubscriptionById(subscriptionId);
