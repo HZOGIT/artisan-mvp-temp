@@ -539,6 +539,36 @@ describe("FIX-CDD — cycle.zombie_recovery_error porte artisanId (filtrage audi
   });
 });
 
+describe("FIX-CDQ — recoverZombies isStuckProcessing + PI succeeded → période avancée (SEPA confirmé après 72h)", () => {
+  it("cycle processing bloqué 73h, PI succeeded → cycle paid + sous-période avancée", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const periodEnd = new Date("2026-07-01T00:00:00Z");
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-06-01T00:00:00Z"), periodEnd,
+      amountCents: 2900, currency: "eur",
+    });
+    const stuckStart = new Date(Date.now() - 73 * 3600_000);
+    await repo.updateCycleStatus(cycle.id, { status: "processing", chargingStartedAt: stuckStart, attemptCount: 1 });
+    const attempt = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k_cdq" });
+    await repo.updateChargeAttempt(attempt.id, { stripePaymentIntentId: "pi_sepa_ok", status: "processing" });
+    billing.retrievePaymentIntent = async () => ({ id: "pi_sepa_ok", status: "succeeded", failureCode: null, failureMessage: null });
+
+    await recoverZombies({ repo, billing });
+
+    const updatedCycle = repo.cycles.find(c => c.id === cycle.id)!;
+    expect(updatedCycle.status).toBe("paid");
+    const nextCycle = repo.cycles.find(c => c.status === "pending")!;
+    expect(nextCycle).toBeDefined();
+    expect(nextCycle.period_start).toEqual(periodEnd);
+    const updatedSub = repo.subs.find(s => s.id === sub.id)!;
+    expect(updatedSub.status).toBe("active");
+    const paidEv = repo.events.find(e => e.event_type === "cycle.paid");
+    expect(paidEv).toBeDefined();
+    expect((paidEv!.payload as Record<string, unknown>)["via"]).toBe("zombie_recovery");
+  });
+});
+
 describe("FIX-CV — recoverZombies : branche canceled-sub+PI met à jour billing_charge_attempts", () => {
   async function setupZombieWithPiAndCanceledSub(repo: FakeBillingRepository, billing: FakeBillingPort, piStatus: string) {
     const sub = await setupActiveSub(repo);
