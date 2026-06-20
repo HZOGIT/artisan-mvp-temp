@@ -1514,3 +1514,65 @@ describe("FIX-CG — isDue : cycle pending avec period_start futur non prélevé
     expect(repo.chargeAttempts.filter(a => a.cycle_id === futureCycle.id)).toHaveLength(0);
   });
 });
+
+describe("FIX-CY — handleDunning : payload cycle.charge_failed nextRetryAt nul pour tentative finale", () => {
+  it("4e tentative (finale) scheduler : cycle.charge_failed.payload.nextRetryAt=null (pas +7j)", async () => {
+    /* Bug : handleDunning calculait retryAt = nextRetryAt(now, 4) = +7j TOUJOURS,
+     * puis utilisait retryAt brut dans le payload même pour isFinalAttempt (attempt 4).
+     * DB : next_retry_at=null (correct), event payload : nextRetryAt="+7j" (faux).
+     * Fix : payload utilise isFinalAttempt ? null : retryAt */
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    /* attempt_count=3 → newAttemptCount=4 → isFinalAttempt */
+    repo.cycles[0] = { ...repo.cycles[0]!, attempt_count: 3 };
+    billing.chargeOffSession = async () => { throw new Error("card_declined_final"); };
+
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+
+    const updatedCycle = repo.cycles.find(c => c.id === cycle.id)!;
+    expect(updatedCycle.next_retry_at).toBeNull(); /* DB : pas de retry */
+
+    const ev = repo.events.find(e => e.event_type === "cycle.charge_failed");
+    expect(ev).toBeDefined();
+    expect(ev!.payload.nextRetryAt).toBeNull(); /* payload cohérent avec DB */
+    expect(ev!.payload.attemptNo).toBe(4);
+  });
+
+  it("tentative non-finale (1-3) scheduler : cycle.charge_failed.payload.nextRetryAt non nul", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+    const cycle = await setupPendingCycle(repo, sub.id); /* attempt_count=0, newAttemptCount=1 */
+    billing.chargeOffSession = async () => { throw new Error("card_declined"); };
+
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+
+    const ev = repo.events.find(e => e.event_type === "cycle.charge_failed");
+    expect(ev).toBeDefined();
+    /* attempt 1 : nextRetryAt = now+24h (non-nul) — cohérent avec next_retry_at DB */
+    expect(ev!.payload.nextRetryAt).not.toBeNull();
+    expect(repo.cycles.find(c => c.id === cycle.id)!.next_retry_at).not.toBeNull();
+  });
+
+  it("recoverZombies : zombie au 4e attempt → cycle.charge_failed.payload.nextRetryAt=null", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    const zombieStart = new Date(Date.now() - 20 * 60 * 1000);
+    /* attempt_count=4 → isFinalAttempt dans handleDunning appelé depuis recoverZombies */
+    await repo.updateCycleStatus(cycle.id, { status: "charging", chargingStartedAt: zombieStart, attemptCount: 4 });
+    const attempt = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 4, idempotencyKey: "k4z" });
+    await repo.updateChargeAttempt(attempt.id, { stripePaymentIntentId: "pi_zombie_final", status: "processing" });
+    billing.retrievePaymentIntent = async () => ({ id: "pi_zombie_final", status: "canceled", failureCode: null, failureMessage: null });
+
+    await recoverZombies({ repo, billing });
+
+    const updatedCycle = repo.cycles.find(c => c.id === cycle.id)!;
+    expect(updatedCycle.next_retry_at).toBeNull();
+    const ev = repo.events.find(e => e.event_type === "cycle.charge_failed");
+    expect(ev).toBeDefined();
+    expect(ev!.payload.nextRetryAt).toBeNull(); /* cohérent avec DB */
+  });
+});
