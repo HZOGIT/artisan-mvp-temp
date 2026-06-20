@@ -217,7 +217,12 @@ export async function cancelAtPeriodEnd(deps: Pick<BillingDeps, "repo">, ctx: Te
   if (sub.status === "canceled") return;
   if (sub.cancel_at !== null) return;
 
-  const cancelAt = sub.current_period_end ?? new Date();
+  /*
+   * Pour une sub trialing, current_period_end est null (la période de facturation démarre
+   * à la fin du trial). On utilise trial_ends_at comme date d'annulation effective, sinon
+   * l'annulation serait planifiée à now() et la sub serait annulée immédiatement à l'activation.
+   */
+  const cancelAt = sub.current_period_end ?? sub.trial_ends_at ?? new Date();
   await deps.repo.updateCancelAt(ctx, cancelAt);
   await deps.repo.appendEvent({
     entityType: "billing_subscription",

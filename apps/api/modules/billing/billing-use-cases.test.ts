@@ -719,6 +719,24 @@ describe("cancelAtPeriodEnd", () => {
     expect(ev).toBeDefined();
   });
 
+  it("FIX-CD — sub trialing avec trial_ends_at → cancel_at = trial_ends_at (pas now())", async () => {
+    const deps = makeDeps();
+    const trialEnd = new Date("2026-07-03T00:00:00Z");
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: trialEnd, paymentMethodId: null,
+    });
+
+    await cancelAtPeriodEnd(deps, A);
+
+    const sub = await deps.repo.findSubscription(A);
+    expect(sub?.cancel_at?.toISOString()).toBe(trialEnd.toISOString());
+    const ev = deps.repo.events.find(e => e.event_type === "subscription.cancel_scheduled");
+    expect(ev).toBeDefined();
+    expect((ev!.payload as Record<string, unknown>)["cancelAt"]).toBe(trialEnd.toISOString());
+  });
+
   it("sub sans current_period_end → cancel_at ≈ now()", async () => {
     const deps = makeDeps();
     await deps.repo.saveSubscription({
