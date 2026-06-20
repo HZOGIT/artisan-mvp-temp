@@ -1195,6 +1195,26 @@ describe("FIX-Z — activateExpiredTrials : plan inconnu → skip, pas de cycle 
     const errEv = repo.events.find(e => e.event_type === "subscription.trial_activation_error");
     expect(errEv).toBeDefined();
     expect(String((errEv!.payload as Record<string, unknown>)["error"])).toContain("legacy_plan_unknown");
+    expect((errEv!.payload as Record<string, unknown>)["artisanId"]).toBe(ARTISAN_ID);
+  });
+
+  it("FIX-CH — catch-all trial_activation_error inclut artisanId (cohérence payload)", async () => {
+    const { repo, billing } = makeDeps();
+    const trialEnd = new Date(Date.now() - 1000);
+    await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: trialEnd, paymentMethodId: null,
+    });
+    repo.simulateCreateCycleError = new Error("db connection lost");
+
+    const result = await runSchedulerTick({ repo, billing });
+
+    expect(result.trialsActivated).toBe(0);
+    const errEv = repo.events.find(e => e.event_type === "subscription.trial_activation_error");
+    expect(errEv).toBeDefined();
+    expect((errEv!.payload as Record<string, unknown>)["artisanId"]).toBe(ARTISAN_ID);
+    expect(String((errEv!.payload as Record<string, unknown>)["error"])).toContain("db connection lost");
   });
 
   it("plan_id valide → cycle amount_cents > 0 (pas de cycle €0)", async () => {

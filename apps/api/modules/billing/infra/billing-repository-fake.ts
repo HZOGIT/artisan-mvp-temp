@@ -36,6 +36,8 @@ export class FakeBillingRepository implements IBillingRepository {
   public events: BillingEvent[] = [];
   public processedWebhookIds: Set<string> = new Set();
   public customerIds: Map<number, string> = new Map();
+  /** Injecte une erreur dans le prochain appel createCycle (test catch dans activateExpiredTrials). */
+  public simulateCreateCycleError: Error | null = null;
 
   private now() { return new Date(); }
 
@@ -197,6 +199,11 @@ export class FakeBillingRepository implements IBillingRepository {
   }
 
   async createCycle(params: CreateCycleParams): Promise<Cycle> {
+    if (this.simulateCreateCycleError) {
+      const err = this.simulateCreateCycleError;
+      this.simulateCreateCycleError = null;
+      throw err;
+    }
     const cycle: Cycle = {
       id: nextId(),
       subscription_id: params.subscriptionId,

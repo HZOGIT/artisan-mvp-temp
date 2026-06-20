@@ -430,7 +430,7 @@ async function activateExpiredTrials(deps: SchedulerDeps, now: Date): Promise<nu
         entityType: "billing_subscription",
         entityId: sub.id,
         eventType: "subscription.trial_activation_error",
-        payload: { error: err instanceof Error ? err.message : String(err) },
+        payload: { artisanId: sub.artisan_id, error: err instanceof Error ? err.message : String(err) },
         actor: "scheduler",
       });
     }
