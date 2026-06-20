@@ -6,7 +6,6 @@ import {
   billingChargeAttempts,
   billingInvoices,
   billingEvents,
-  subscriptions,
 } from "../../../../../drizzle/schema.pg";
 import type { BillingPaymentMethod, BillingSubscription, BillingCycle, BillingInvoice, BillingEvent, BillingChargeAttempt } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
@@ -309,13 +308,7 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
       .where(eq(billingPaymentMethods.artisan_id, artisanId))
       .orderBy(desc(billingPaymentMethods.created_at))
       .limit(1);
-    if (pm?.cid) return pm.cid;
-    const [sub] = await this.db
-      .select({ cid: subscriptions.stripe_customer_id })
-      .from(subscriptions)
-      .where(eq(subscriptions.artisan_id, artisanId))
-      .limit(1);
-    return sub?.cid ?? null;
+    return pm?.cid ?? null;
   }
 
   async saveStripeCustomerId(_artisanId: number, _stripeCustomerId: string): Promise<void> {

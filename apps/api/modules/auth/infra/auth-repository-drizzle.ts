@@ -1,5 +1,5 @@
 import { and, eq, gte } from "drizzle-orm";
-import { artisans, permissionsUtilisateur, subscriptions, users } from "../../../../../drizzle/schema.pg";
+import { artisans, billingSubscriptions, permissionsUtilisateur, users } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import type { IAuthRepository } from "../application/auth-repository";
 import type { AuthCredentials, AuthUser } from "../domain/auth";
@@ -86,15 +86,15 @@ export class AuthRepositoryDrizzle implements IAuthRepository {
     const artisanId = artisan.id;
     /** 2. Lier le propriétaire à son entreprise (requis par subscription/permissions ; idempotent). */
     await this.db.update(users).set({ artisanId }).where(eq(users.id, userId));
-    /** 3. Abonnement d'essai 14 j (si absent) — best-effort. */
+    /** 3. Abonnement d'essai (billing maison, si absent) — best-effort. */
     try {
-      const [sub] = await this.db.select({ id: subscriptions.id }).from(subscriptions).where(eq(subscriptions.artisan_id, artisanId)).limit(1);
+      const [sub] = await this.db.select({ id: billingSubscriptions.id }).from(billingSubscriptions).where(eq(billingSubscriptions.artisan_id, artisanId)).limit(1);
       if (!sub) {
         const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
         await this.db
-          .insert(subscriptions)
-          .values({ artisan_id: artisanId, plan: "trial", status: "trialing", trial_ends_at: trialEndsAt, max_users: 1 })
-          .onConflictDoNothing({ target: subscriptions.artisan_id });
+          .insert(billingSubscriptions)
+          .values({ artisan_id: artisanId, plan_id: "starter", billing_mode: "maison", status: "trialing", trial_ends_at: trialEndsAt })
+          .onConflictDoNothing({ target: billingSubscriptions.artisan_id });
       }
     } catch {
       /* best-effort */

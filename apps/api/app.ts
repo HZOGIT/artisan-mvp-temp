@@ -151,7 +151,6 @@ import { registerBillingSchedulerRoute } from "./interface/http/billing-schedule
 import { handleBillingWebhookEvent } from "./modules/billing/interface/http/billing-webhook-handler";
 import fastifySchedule from "@fastify/schedule";
 import { billingCronPlugin } from "./shared/infra/billing-cron";
-import { SubscriptionWebhookWriterDrizzle } from "./modules/subscription/infra/subscription-webhook-writer-drizzle";
 import { WebhookPaymentWriterDrizzle } from "./modules/subscription/infra/webhook-payment-writer-drizzle";
 import { SubscriptionEventNotifierDrizzle } from "./modules/subscription/infra/subscription-event-notifier-drizzle";
 import { registerUploadLogoRoute } from "./interface/http/upload-logo-route";
@@ -942,7 +941,6 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   /** Webhook Stripe SIGNÉ `/api/stripe/webhook` — vérif signature fail-closed → sync `subscriptions`. */
   registerStripeWebhookRoute(app, {
     stripe: deps.stripePort ?? new StripeAdapter(),
-    writer: new SubscriptionWebhookWriterDrizzle(getDbHandle().db),
     paymentWriter: new WebhookPaymentWriterDrizzle(getDbHandle().db),
     notifier: new SubscriptionEventNotifierDrizzle(getDbHandle().db, emailAdapter),
     webhookSecret: deps.stripeWebhookSecret ?? process.env.STRIPE_WEBHOOK_SECRET ?? "",
