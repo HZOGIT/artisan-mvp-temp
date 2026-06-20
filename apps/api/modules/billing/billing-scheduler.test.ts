@@ -234,6 +234,40 @@ describe("recoverZombies", () => {
     expect(typeof (paidEv?.payload as Record<string, unknown>)["paidAt"]).toBe("string");
   });
 
+  it("FIX-CL — zombie PI succeeded : charge attempt mise à jour succeeded (pas initiée)", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    const zombieStart = new Date(Date.now() - 20 * 60 * 1000);
+    await repo.updateCycleStatus(cycle.id, { status: "charging", chargingStartedAt: zombieStart });
+    const attempt = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k-cl" });
+    await repo.updateChargeAttempt(attempt.id, { stripePaymentIntentId: "pi_cl", status: "processing" });
+    billing.nextRetrieveResult = { id: "pi_cl", status: "succeeded", failureCode: null, failureMessage: null };
+
+    await recoverZombies({ repo, billing });
+
+    const updatedAttempt = repo.chargeAttempts.find(a => a.id === attempt.id)!;
+    expect(updatedAttempt.status).toBe("succeeded");
+    expect(repo.cycles.find(c => c.id === cycle.id)!.status).toBe("paid");
+  });
+
+  it("FIX-CL — zombie PI processing : charge attempt mise à jour processing (pas initiée)", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    const zombieStart = new Date(Date.now() - 20 * 60 * 1000);
+    await repo.updateCycleStatus(cycle.id, { status: "charging", chargingStartedAt: zombieStart });
+    const attempt = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k-cl2" });
+    await repo.updateChargeAttempt(attempt.id, { stripePaymentIntentId: "pi_cl2", status: "initiated" });
+    billing.nextRetrieveResult = { id: "pi_cl2", status: "processing", failureCode: null, failureMessage: null };
+
+    await recoverZombies({ repo, billing });
+
+    const updatedAttempt = repo.chargeAttempts.find(a => a.id === attempt.id)!;
+    expect(updatedAttempt.status).toBe("processing");
+    expect(repo.cycles.find(c => c.id === cycle.id)!.status).toBe("processing");
+  });
+
   it("cycle charging < 15 min → non zombie, ignoré", async () => {
     const { repo, billing } = makeDeps();
     const sub = await setupActiveSub(repo);

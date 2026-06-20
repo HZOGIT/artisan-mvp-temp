@@ -344,6 +344,7 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
     if (pi.status === "succeeded") {
       const paidAt = now;
       await deps.repo.updateCycleStatus(cycle.id, { status: "paid", paidAt });
+      if (lastAttempt) await deps.repo.updateChargeAttempt(lastAttempt.id, { status: "succeeded" });
       await deps.repo.appendEvent({
         entityType: "billing_cycle",
         entityId: cycle.id,
@@ -354,6 +355,7 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
       if (sub) await advanceSubscriptionAfterPayment(deps.repo, cycle.subscription_id, artisanId, cycle, resolveInterval(sub.billing_interval));
     } else if (pi.status === "processing") {
       await deps.repo.updateCycleStatus(cycle.id, { status: "processing" });
+      if (lastAttempt) await deps.repo.updateChargeAttempt(lastAttempt.id, { status: "processing" });
     } else {
       /* requires_action, canceled, failed, état inconnu → dunning complet (notif + suspension) */
       await handleDunning(deps, {
