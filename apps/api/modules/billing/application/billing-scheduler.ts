@@ -12,6 +12,8 @@ export interface SchedulerDeps {
 }
 
 const MAX_DUNNING_ATTEMPTS = 4;
+const TICK_BATCH_SIZE = 200;
+const NO_PM_RETRY_DELAY_MS = 24 * 3600_000;
 
 function resolveInterval(raw: string | null | undefined): "monthly" | "yearly" {
   return raw === "yearly" ? "yearly" : "monthly";
@@ -76,7 +78,8 @@ export async function chargeOffSessionForCycle(
   const pm = await deps.repo.findDefaultPaymentMethod(ctx);
   const customerId = pm?.stripe_customer_id;
   if (!pm || !customerId) {
-    await deps.repo.updateCycleStatus(cycleId, { status: "failed", failedAt: now, nextRetryAt: nextRetryAt(now, cycle.attempt_count) });
+    const pmRetryAt = new Date(now.getTime() + NO_PM_RETRY_DELAY_MS);
+    await deps.repo.updateCycleStatus(cycleId, { status: "failed", failedAt: now, nextRetryAt: pmRetryAt });
     await deps.repo.appendEvent({
       entityType: "billing_cycle",
       entityId: cycleId,
@@ -330,7 +333,7 @@ export async function runSchedulerTick(deps: SchedulerDeps): Promise<{ charged: 
   const zombiesRecovered = await recoverZombies(deps);
 
   const now = new Date();
-  const due = await deps.repo.findSubscriptionsWithDueCycles(now);
+  const due = await deps.repo.findSubscriptionsWithDueCycles(now, TICK_BATCH_SIZE);
 
   let charged = 0;
   for (const { subscription, cycle } of due) {

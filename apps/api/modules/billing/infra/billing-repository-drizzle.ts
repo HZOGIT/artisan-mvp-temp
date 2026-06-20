@@ -223,7 +223,7 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
     await this.db.update(billingCycles).set(set).where(eq(billingCycles.id, cycleId));
   }
 
-  async findSubscriptionsWithDueCycles(now: Date): Promise<SubscriptionWithDueCycle[]> {
+  async findSubscriptionsWithDueCycles(now: Date, limit = 200): Promise<SubscriptionWithDueCycle[]> {
     const dueCycles = await this.db
       .select()
       .from(billingCycles)
@@ -232,7 +232,8 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
           eq(billingCycles.status, "pending"),
           and(eq(billingCycles.status, "failed"), lte(billingCycles.next_retry_at, now)),
         ),
-      );
+      )
+      .limit(limit);
     if (dueCycles.length === 0) return [];
 
     const subIds = Array.from(new Set(dueCycles.map(c => c.subscription_id)));

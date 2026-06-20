@@ -201,9 +201,10 @@ export class FakeBillingRepository implements IBillingRepository {
     });
   }
 
-  async findSubscriptionsWithDueCycles(now: Date): Promise<SubscriptionWithDueCycle[]> {
+  async findSubscriptionsWithDueCycles(now: Date, limit = 200): Promise<SubscriptionWithDueCycle[]> {
     const result: SubscriptionWithDueCycle[] = [];
     for (const sub of this.subs) {
+      if (result.length >= limit) break;
       if (sub.status !== "active" && sub.status !== "past_due") continue;
       const cycle = this.cycles.find(c => c.subscription_id === sub.id && isDue(c as never, now));
       if (!cycle) continue;

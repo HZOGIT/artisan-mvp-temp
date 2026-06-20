@@ -599,3 +599,53 @@ describe("FIX-C — artisanId=0 guard", () => {
     expect(repo.events.some(e => e.event_type === "subscription.suspended")).toBe(false);
   });
 });
+
+describe("FIX-D — BATCH_SIZE : findSubscriptionsWithDueCycles respecte la limite", () => {
+  it("avec limit=2 et 5 subs dues, ne retourne que 2", async () => {
+    const { repo } = makeDeps();
+    for (let i = 1; i <= 5; i++) {
+      const sub = await repo.saveSubscription({
+        artisanId: i, planId: "starter", billingMode: "maison",
+        status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+        trialEndsAt: null, paymentMethodId: null,
+      });
+      await repo.createCycle({
+        subscriptionId: sub.id,
+        periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"),
+        amountCents: 2900, currency: "eur",
+      });
+      const pm = await repo.savePaymentMethod({
+        artisanId: i, stripeCustomerId: `cus_${i}`, stripePaymentMethodId: `pm_${i}`,
+        brand: "visa", last4: "4242", expMonth: 12, expYear: 2028, consentedAt: new Date(),
+      });
+      await repo.setDefaultPaymentMethod({ artisanId: i, userId: 0 }, pm.id);
+    }
+    const result = await repo.findSubscriptionsWithDueCycles(new Date(), 2);
+    expect(result).toHaveLength(2);
+  });
+});
+
+describe("FIX-E — no_payment_method retry : délai 24h, pas immédiat", () => {
+  it("cycle sans PM a nextRetryAt dans ~24h (pas now)", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    /* Pas de PM enregistré intentionnellement */
+    const cycle = await setupPendingCycle(repo, sub.id);
+
+    const before = Date.now();
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+    const after = Date.now();
+
+    const updated = repo.cycles.find(c => c.id === cycle.id)!;
+    expect(updated.status).toBe("failed");
+    /* nextRetryAt doit être dans ~24h, pas dans les prochaines minutes */
+    const retryMs = updated.next_retry_at!.getTime();
+    const minExpected = before + 23 * 3600_000;
+    const maxExpected = after + 25 * 3600_000;
+    expect(retryMs).toBeGreaterThan(minExpected);
+    expect(retryMs).toBeLessThan(maxExpected);
+
+    /* attempt_count non incrémenté — la PM check ne consomme pas de tentative dunning */
+    expect(updated.attempt_count).toBe(0);
+  });
+});
