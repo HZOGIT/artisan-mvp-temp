@@ -858,3 +858,91 @@ describe("FIX-M — claimCycleForCharging : atomic CAS anti double-charge", () =
     expect(claimed).toBe(false);
   });
 });
+
+describe("FIX-N — activateExpiredTrials : transition trialing→active au tick", () => {
+  it("sub trialing avec trial_ends_at échu → active + cycle pending créé", async () => {
+    const { repo, billing } = makeDeps();
+    const trialEnd = new Date(Date.now() - 3600_000);
+    const sub = await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: trialEnd, paymentMethodId: null,
+    });
+
+    const result = await runSchedulerTick({ repo, billing });
+
+    expect(result.trialsActivated).toBe(1);
+    const updated = repo.subs.find(s => s.id === sub.id)!;
+    expect(updated.status).toBe("active");
+    const cycle = repo.cycles.find(c => c.subscription_id === sub.id);
+    expect(cycle).toBeDefined();
+    expect(cycle?.status).toBe("pending");
+    expect(cycle?.amount_cents).toBeGreaterThan(0);
+    const ev = repo.events.find(e => e.event_type === "subscription.trial_expired");
+    expect(ev).toBeDefined();
+  });
+
+  it("sub trialing avec trial_ends_at dans le futur → inchangée", async () => {
+    const { repo, billing } = makeDeps();
+    const futureEnd = new Date(Date.now() + 86_400_000);
+    await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: futureEnd, paymentMethodId: null,
+    });
+
+    const result = await runSchedulerTick({ repo, billing });
+
+    expect(result.trialsActivated).toBe(0);
+    expect(repo.subs[0]!.status).toBe("trialing");
+    expect(repo.cycles).toHaveLength(0);
+  });
+
+  it("sub trialing sans trial_ends_at → inchangée (pas de date d'expiration)", async () => {
+    const { repo, billing } = makeDeps();
+    await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+
+    const result = await runSchedulerTick({ repo, billing });
+
+    expect(result.trialsActivated).toBe(0);
+    expect(repo.subs[0]!.status).toBe("trialing");
+  });
+
+  it("idempotent : deuxième tick ne crée pas un deuxième cycle", async () => {
+    const { repo, billing } = makeDeps();
+    const trialEnd = new Date(Date.now() - 3600_000);
+    await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: trialEnd, paymentMethodId: null,
+    });
+
+    await runSchedulerTick({ repo, billing });
+    await runSchedulerTick({ repo, billing });
+
+    expect(repo.cycles).toHaveLength(1);
+  });
+
+  it("trial expiré + PM présente → prélèvement effectué dans le même tick", async () => {
+    const { repo, billing } = makeDeps();
+    const trialEnd = new Date(Date.now() - 3600_000);
+    await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: trialEnd, paymentMethodId: null,
+    });
+    await setupPm(repo);
+    billing.nextChargeResult = { paymentIntentId: "pi_trial_ok", status: "succeeded" };
+
+    const result = await runSchedulerTick({ repo, billing });
+
+    expect(result.trialsActivated).toBe(1);
+    expect(result.charged).toBe(1);
+    expect(billing.chargesAttempted).toHaveLength(1);
+    expect(repo.cycles[0]!.status).toBe("paid");
+  });
+});

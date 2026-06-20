@@ -132,6 +132,13 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
     return row!;
   }
 
+  async findExpiredTrials(now: Date): Promise<BillingSubscription[]> {
+    return this.db
+      .select()
+      .from(billingSubscriptions)
+      .where(and(eq(billingSubscriptions.status, "trialing"), lte(billingSubscriptions.trial_ends_at, now)));
+  }
+
   async findSubscriptionById(subscriptionId: number): Promise<typeof billingSubscriptions.$inferSelect | null> {
     const [row] = await this.db.select().from(billingSubscriptions).where(eq(billingSubscriptions.id, subscriptionId)).limit(1);
     return row ?? null;

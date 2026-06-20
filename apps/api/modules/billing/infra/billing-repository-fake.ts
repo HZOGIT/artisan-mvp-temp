@@ -91,6 +91,12 @@ export class FakeBillingRepository implements IBillingRepository {
     return this.subs.find(s => s.artisan_id === ctx.artisanId) ?? null;
   }
 
+  async findExpiredTrials(now: Date): Promise<Sub[]> {
+    return this.subs.filter(
+      s => s.status === "trialing" && s.trial_ends_at !== null && s.trial_ends_at <= now,
+    );
+  }
+
   async saveSubscription(params: SaveSubscriptionParams): Promise<Sub> {
     const existing = this.subs.find(s => s.artisan_id === params.artisanId);
     if (existing) {

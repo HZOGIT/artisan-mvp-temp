@@ -2,6 +2,7 @@ import type { IBillingRepository } from "./billing-repository";
 import type { BillingPort } from "../../../shared/ports/billing";
 import type { SubscriptionEventNotifier } from "../../subscription/application/subscription-event-notifier";
 import { isDue, isZombie, isStuckProcessing, nextPeriod, nextRetryAt, MAX_DUNNING_ATTEMPTS } from "../domain/billing-cycle";
+import { planById } from "../domain/plan";
 import { subscriptionEmail } from "../../subscription/domain/webhook";
 
 export interface SchedulerDeps {
@@ -323,10 +324,66 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
 }
 
 /**
- * Tick principal du scheduler : récupère les zombies puis prélève tous les cycles échus.
+ * Fait passer les abonnements en période d'essai expirée de trialing → active
+ * et crée le premier cycle de facturation.
+ * Idempotent : ne crée pas de cycle si un pending existe déjà pour cette période.
  */
-export async function runSchedulerTick(deps: SchedulerDeps): Promise<{ charged: number; zombiesRecovered: number; cancelled: number }> {
+async function activateExpiredTrials(deps: SchedulerDeps, now: Date): Promise<number> {
+  const expired = await deps.repo.findExpiredTrials(now);
+  let activated = 0;
+
+  for (const sub of expired) {
+    try {
+      const interval = resolveInterval(sub.billing_interval);
+      const trialEnd = sub.trial_ends_at!;
+      const { end: periodEnd } = nextPeriod(trialEnd, interval);
+
+      await deps.repo.updateSubscriptionPeriod(sub.id, "active", trialEnd, periodEnd);
+
+      const plan = planById(sub.plan_id);
+      const amountCents = plan ? plan.amountCentsByInterval[interval] : 0;
+
+      const existing = await deps.repo.findPendingCycleForPeriod(sub.id, trialEnd);
+      if (!existing) {
+        await deps.repo.createCycle({
+          subscriptionId: sub.id,
+          periodStart: trialEnd,
+          periodEnd,
+          amountCents,
+          currency: "eur",
+        });
+      }
+
+      await deps.repo.appendEvent({
+        entityType: "billing_subscription",
+        entityId: sub.id,
+        eventType: "subscription.trial_expired",
+        payload: { artisanId: sub.artisan_id, planId: sub.plan_id, interval },
+        actor: "scheduler",
+      });
+
+      activated++;
+    } catch (err) {
+      await deps.repo.appendEvent({
+        entityType: "billing_subscription",
+        entityId: sub.id,
+        eventType: "subscription.trial_activation_error",
+        payload: { error: err instanceof Error ? err.message : String(err) },
+        actor: "scheduler",
+      });
+    }
+  }
+
+  return activated;
+}
+
+/**
+ * Tick principal du scheduler : récupère les zombies, active les trials expirés,
+ * puis prélève tous les cycles échus.
+ */
+export async function runSchedulerTick(deps: SchedulerDeps): Promise<{ charged: number; zombiesRecovered: number; cancelled: number; trialsActivated: number }> {
   const zombiesRecovered = await recoverZombies(deps);
+  const trialsActivated = await activateExpiredTrials(deps, new Date());
 
   const now = new Date();
   const due = await deps.repo.findSubscriptionsWithDueCycles(now, TICK_BATCH_SIZE);
@@ -361,5 +418,5 @@ export async function runSchedulerTick(deps: SchedulerDeps): Promise<{ charged: 
     }
   }
 
-  return { charged, zombiesRecovered, cancelled };
+  return { charged, zombiesRecovered, cancelled, trialsActivated };
 }
