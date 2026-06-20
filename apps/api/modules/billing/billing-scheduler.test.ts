@@ -649,3 +649,76 @@ describe("FIX-E — no_payment_method retry : délai 24h, pas immédiat", () => 
     expect(updated.attempt_count).toBe(0);
   });
 });
+
+describe("FIX-F — cancel_at : subscription annulée à période echue n'est pas prélevée", () => {
+  it("sub avec cancel_at <= now → cycle skipped + sub canceled, pas de prélèvement Stripe", async () => {
+    const { repo, billing } = makeDeps();
+    const cancelAt = new Date(Date.now() - 1000);
+    const sub = await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "active",
+      currentPeriodStart: new Date(Date.now() - 31 * 86400_000),
+      currentPeriodEnd: cancelAt,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    await repo.updateCancelAt(CTX, cancelAt);
+
+    await repo.createCycle({
+      subscriptionId: sub.id,
+      periodStart: cancelAt,
+      periodEnd: new Date(cancelAt.getTime() + 30 * 86400_000),
+      amountCents: 2900, currency: "eur",
+    });
+    const pm = await repo.savePaymentMethod({
+      artisanId: ARTISAN_ID, stripeCustomerId: "cus_x", stripePaymentMethodId: "pm_x",
+      brand: "visa", last4: "4242", expMonth: 12, expYear: 2028, consentedAt: new Date(),
+    });
+    await repo.setDefaultPaymentMethod(CTX, pm.id);
+
+    const result = await runSchedulerTick({ repo, billing });
+
+    expect(billing.chargesAttempted).toHaveLength(0);
+    expect(result.cancelled).toBe(1);
+    expect(result.charged).toBe(0);
+
+    const updatedSub = repo.subs.find(s => s.id === sub.id)!;
+    expect(updatedSub.status).toBe("canceled");
+
+    const skippedCycle = repo.cycles[0]!;
+    expect(skippedCycle.status).toBe("skipped");
+
+    const ev = repo.events.find(e => e.event_type === "subscription.canceled");
+    expect(ev).toBeDefined();
+  });
+
+  it("sub avec cancel_at dans le futur est bien prélevée", async () => {
+    const { repo, billing } = makeDeps();
+    const futureCancel = new Date(Date.now() + 30 * 86400_000);
+    const sub = await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "active",
+      currentPeriodStart: new Date("2026-06-01"),
+      currentPeriodEnd: new Date("2026-07-01"),
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    await repo.updateCancelAt(CTX, futureCancel);
+
+    await repo.createCycle({
+      subscriptionId: sub.id,
+      periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"),
+      amountCents: 2900, currency: "eur",
+    });
+    const pm = await repo.savePaymentMethod({
+      artisanId: ARTISAN_ID, stripeCustomerId: "cus_y", stripePaymentMethodId: "pm_y",
+      brand: "visa", last4: "4242", expMonth: 12, expYear: 2028, consentedAt: new Date(),
+    });
+    await repo.setDefaultPaymentMethod(CTX, pm.id);
+    billing.nextChargeResult = { paymentIntentId: "pi_ok", status: "succeeded" };
+
+    const result = await runSchedulerTick({ repo, billing });
+
+    expect(billing.chargesAttempted).toHaveLength(1);
+    expect(result.charged).toBe(1);
+    expect(result.cancelled).toBe(0);
+  });
+});

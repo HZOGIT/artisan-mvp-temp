@@ -329,15 +329,29 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
 /**
  * Tick principal du scheduler : récupère les zombies puis prélève tous les cycles échus.
  */
-export async function runSchedulerTick(deps: SchedulerDeps): Promise<{ charged: number; zombiesRecovered: number }> {
+export async function runSchedulerTick(deps: SchedulerDeps): Promise<{ charged: number; zombiesRecovered: number; cancelled: number }> {
   const zombiesRecovered = await recoverZombies(deps);
 
   const now = new Date();
   const due = await deps.repo.findSubscriptionsWithDueCycles(now, TICK_BATCH_SIZE);
 
   let charged = 0;
+  let cancelled = 0;
   for (const { subscription, cycle } of due) {
     try {
+      if (subscription.cancel_at !== null && subscription.cancel_at <= now) {
+        await deps.repo.updateCycleStatus(cycle.id, { status: "skipped" });
+        await deps.repo.updateSubscriptionStatus({ artisanId: subscription.artisan_id, userId: 0 }, "canceled");
+        await deps.repo.appendEvent({
+          entityType: "billing_subscription",
+          entityId: subscription.id,
+          eventType: "subscription.canceled",
+          payload: { artisanId: subscription.artisan_id, cancelAt: subscription.cancel_at.toISOString(), via: "scheduler" },
+          actor: "scheduler",
+        });
+        cancelled++;
+        continue;
+      }
       await chargeOffSessionForCycle(deps, cycle.id, subscription.id, subscription.artisan_id);
       charged++;
     } catch (err) {
@@ -351,5 +365,5 @@ export async function runSchedulerTick(deps: SchedulerDeps): Promise<{ charged: 
     }
   }
 
-  return { charged, zombiesRecovered };
+  return { charged, zombiesRecovered, cancelled };
 }
