@@ -78,14 +78,17 @@ export interface IBillingRepository {
 
   /** Abonnement maison */
   findSubscription(ctx: TenantContext): Promise<BillingSubscription | null>;
+  findSubscriptionById(subscriptionId: number): Promise<BillingSubscription | null>;
   saveSubscription(params: SaveSubscriptionParams): Promise<BillingSubscription>;
   updateSubscriptionStatus(ctx: TenantContext, status: string): Promise<void>;
+  updateSubscriptionPeriod(subscriptionId: number, status: string, periodStart: Date, periodEnd: Date): Promise<void>;
   updateSubscriptionPaymentMethod(ctx: TenantContext, paymentMethodId: number): Promise<void>;
   updateSubscriptionPlan(ctx: TenantContext, planId: string): Promise<void>;
   updateCancelAt(ctx: TenantContext, cancelAt: Date | null): Promise<void>;
 
   /** Cycles */
   findPendingCycle(subscriptionId: number): Promise<BillingCycle | null>;
+  findCycleById(cycleId: number): Promise<BillingCycle | null>;
   createCycle(params: CreateCycleParams): Promise<BillingCycle>;
   updateCycleStatus(cycleId: number, params: UpdateCycleStatusParams): Promise<void>;
   findSubscriptionsWithDueCycles(now: Date): Promise<SubscriptionWithDueCycle[]>;

@@ -1,6 +1,6 @@
 import type { IBillingRepository } from "./billing-repository";
 import type { BillingPort } from "../../../shared/ports/billing";
-import { isDue, isZombie, nextRetryAt } from "../domain/billing-cycle";
+import { isDue, isZombie, nextPeriod, nextRetryAt } from "../domain/billing-cycle";
 
 export interface SchedulerDeps {
   readonly repo: IBillingRepository;
@@ -8,6 +8,31 @@ export interface SchedulerDeps {
 }
 
 const MAX_DUNNING_ATTEMPTS = 4;
+
+/**
+ * Après un cycle paid : met la subscription à `active` + crée le cycle de la période suivante.
+ * Idempotent : si un cycle pending existe déjà pour cette subscription, ne crée pas de doublon.
+ */
+async function advanceSubscriptionAfterPayment(
+  repo: IBillingRepository,
+  subscriptionId: number,
+  artisanId: number,
+  paidCycle: { period_end: Date; amount_cents: number; currency: string },
+): Promise<void> {
+  const { start, end } = nextPeriod(paidCycle.period_end, "monthly");
+  await repo.updateSubscriptionPeriod(subscriptionId, "active", paidCycle.period_end, end);
+  const existing = await repo.findPendingCycle(subscriptionId);
+  if (!existing) {
+    await repo.createCycle({ subscriptionId, periodStart: start, periodEnd: end, amountCents: paidCycle.amount_cents, currency: paidCycle.currency });
+  }
+  await repo.appendEvent({
+    entityType: "billing_subscription",
+    entityId: subscriptionId,
+    eventType: "subscription.period_advanced",
+    payload: { artisanId, nextPeriodStart: start.toISOString(), nextPeriodEnd: end.toISOString() },
+    actor: "scheduler",
+  });
+}
 
 export class MaxAttemptsReachedError extends Error {
   constructor(cycleId: number) {
@@ -80,7 +105,8 @@ export async function chargeOffSessionForCycle(
     });
 
     if (result.status === "succeeded") {
-      await deps.repo.updateCycleStatus(cycleId, { status: "paid", paidAt: new Date() });
+      const paidAt = new Date();
+      await deps.repo.updateCycleStatus(cycleId, { status: "paid", paidAt });
       await deps.repo.appendEvent({
         entityType: "billing_cycle",
         entityId: cycleId,
@@ -88,6 +114,7 @@ export async function chargeOffSessionForCycle(
         payload: { paymentIntentId: result.paymentIntentId, artisanId },
         actor: "scheduler",
       });
+      await advanceSubscriptionAfterPayment(deps.repo, subscriptionId, artisanId, cycle);
     } else if (result.status === "requires_action") {
       /*
        * Off-session 3DS : l'artisan doit mettre à jour son moyen de paiement (on ne peut pas
@@ -167,8 +194,14 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<void> {
 
     if (pi.status === "succeeded") {
       await deps.repo.updateCycleStatus(cycle.id, { status: "paid", paidAt: now });
-    } else if (pi.status === "requires_action") {
-      await deps.repo.updateCycleStatus(cycle.id, { status: "requires_action" });
+      const sub = await deps.repo.findSubscriptionById(cycle.subscription_id);
+      if (sub) await advanceSubscriptionAfterPayment(deps.repo, cycle.subscription_id, sub.artisan_id, cycle);
+    } else if (pi.status === "requires_action" || pi.status === "canceled") {
+      await deps.repo.updateCycleStatus(cycle.id, {
+        status: "failed",
+        failedAt: now,
+        nextRetryAt: nextRetryAt(now, cycle.attempt_count),
+      });
     } else if (pi.status === "processing") {
       await deps.repo.updateCycleStatus(cycle.id, { status: "processing" });
     } else {

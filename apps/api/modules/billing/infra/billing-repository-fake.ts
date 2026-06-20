@@ -116,9 +116,19 @@ export class FakeBillingRepository implements IBillingRepository {
     return sub;
   }
 
+  async findSubscriptionById(subscriptionId: number) {
+    return this.subs.find(s => s.id === subscriptionId) ?? null;
+  }
+
   async updateSubscriptionStatus(ctx: TenantContext, status: string): Promise<void> {
     this.subs = this.subs.map(s =>
       s.artisan_id === ctx.artisanId ? { ...s, status, updated_at: this.now() } : s
+    );
+  }
+
+  async updateSubscriptionPeriod(subscriptionId: number, status: string, periodStart: Date, periodEnd: Date): Promise<void> {
+    this.subs = this.subs.map(s =>
+      s.id === subscriptionId ? { ...s, status, current_period_start: periodStart, current_period_end: periodEnd, updated_at: this.now() } : s
     );
   }
 
@@ -142,6 +152,10 @@ export class FakeBillingRepository implements IBillingRepository {
 
   async findPendingCycle(subscriptionId: number): Promise<Cycle | null> {
     return this.cycles.find(c => c.subscription_id === subscriptionId && c.status === "pending") ?? null;
+  }
+
+  async findCycleById(cycleId: number): Promise<Cycle | null> {
+    return this.cycles.find(c => c.id === cycleId) ?? null;
   }
 
   async createCycle(params: CreateCycleParams): Promise<Cycle> {

@@ -129,11 +129,23 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
     return row!;
   }
 
+  async findSubscriptionById(subscriptionId: number): Promise<typeof billingSubscriptions.$inferSelect | null> {
+    const [row] = await this.db.select().from(billingSubscriptions).where(eq(billingSubscriptions.id, subscriptionId)).limit(1);
+    return row ?? null;
+  }
+
   async updateSubscriptionStatus(ctx: TenantContext, status: string): Promise<void> {
     await this.db
       .update(billingSubscriptions)
       .set({ status, updated_at: new Date() })
       .where(eq(billingSubscriptions.artisan_id, ctx.artisanId));
+  }
+
+  async updateSubscriptionPeriod(subscriptionId: number, status: string, periodStart: Date, periodEnd: Date): Promise<void> {
+    await this.db
+      .update(billingSubscriptions)
+      .set({ status, current_period_start: periodStart, current_period_end: periodEnd, updated_at: new Date() })
+      .where(eq(billingSubscriptions.id, subscriptionId));
   }
 
   async updateSubscriptionPaymentMethod(ctx: TenantContext, paymentMethodId: number): Promise<void> {
@@ -165,6 +177,11 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
       .where(and(eq(billingCycles.subscription_id, subscriptionId), eq(billingCycles.status, "pending")))
       .orderBy(desc(billingCycles.period_start))
       .limit(1);
+    return row ?? null;
+  }
+
+  async findCycleById(cycleId: number): Promise<BillingCycle | null> {
+    const [row] = await this.db.select().from(billingCycles).where(eq(billingCycles.id, cycleId)).limit(1);
     return row ?? null;
   }
 

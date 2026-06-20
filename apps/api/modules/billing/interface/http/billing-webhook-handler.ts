@@ -1,14 +1,10 @@
 import type { IBillingRepository } from "../../application/billing-repository";
-import { nextRetryAt } from "../../domain/billing-cycle";
+import { nextPeriod, nextRetryAt } from "../../domain/billing-cycle";
 
 export interface BillingWebhookDeps {
   readonly repo: IBillingRepository;
 }
 
-/**
- * Traite les événements Stripe relatifs aux PaymentIntents du billing maison.
- * Appelé depuis le webhook Stripe global après vérification de signature.
- */
 export async function handleBillingWebhookEvent(
   deps: BillingWebhookDeps,
   eventType: string,
@@ -23,7 +19,29 @@ export async function handleBillingWebhookEvent(
 
   if (eventType === "payment_intent.succeeded") {
     await deps.repo.updateChargeAttempt(attempt.id, { status: "succeeded" });
-    await deps.repo.updateCycleStatus(attempt.cycle_id, { status: "paid", paidAt: now });
+
+    const cycle = await deps.repo.findCycleById(attempt.cycle_id);
+    if (cycle) {
+      await deps.repo.updateCycleStatus(cycle.id, { status: "paid", paidAt: now });
+
+      const sub = await deps.repo.findSubscriptionById(cycle.subscription_id);
+      if (sub) {
+        const { start, end } = nextPeriod(cycle.period_end, "monthly");
+        await deps.repo.updateSubscriptionPeriod(sub.id, "active", cycle.period_end, end);
+        const existing = await deps.repo.findPendingCycle(sub.id);
+        if (!existing) {
+          await deps.repo.createCycle({ subscriptionId: sub.id, periodStart: start, periodEnd: end, amountCents: cycle.amount_cents, currency: cycle.currency });
+        }
+        await deps.repo.appendEvent({
+          entityType: "billing_subscription",
+          entityId: sub.id,
+          eventType: "subscription.period_advanced",
+          payload: { via: "webhook", nextPeriodStart: start.toISOString(), nextPeriodEnd: end.toISOString() },
+          actor: "stripe_webhook",
+        });
+      }
+    }
+
     await deps.repo.appendEvent({
       entityType: "billing_cycle",
       entityId: attempt.cycle_id,
@@ -37,14 +55,10 @@ export async function handleBillingWebhookEvent(
       failureCode: failureCode ?? null,
       failureMessage: failureMessage ?? null,
     });
-    const cycle = await deps.repo.findPendingCycle(attempt.cycle_id);
+    const cycle = await deps.repo.findCycleById(attempt.cycle_id);
     const attemptCount = cycle?.attempt_count ?? attempt.attempt_no;
     const retryAt = nextRetryAt(now, attemptCount);
-    await deps.repo.updateCycleStatus(attempt.cycle_id, {
-      status: "failed",
-      failedAt: now,
-      nextRetryAt: retryAt,
-    });
+    await deps.repo.updateCycleStatus(attempt.cycle_id, { status: "failed", failedAt: now, nextRetryAt: retryAt });
     await deps.repo.appendEvent({
       entityType: "billing_cycle",
       entityId: attempt.cycle_id,

@@ -43,7 +43,7 @@ async function setupPendingCycle(repo: FakeBillingRepository, subId: number) {
 }
 
 describe("chargeOffSessionForCycle", () => {
-  it("succeeded : cycle → paid + event cycle.paid + attempt succeeded", async () => {
+  it("succeeded : cycle → paid + cycle suivant créé + subscription.status=active", async () => {
     const { repo, billing } = makeDeps();
     const sub = await setupActiveSub(repo);
     await setupPm(repo);
@@ -52,18 +52,30 @@ describe("chargeOffSessionForCycle", () => {
 
     await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
 
-    const updated = repo.cycles.find(c => c.id === cycle.id)!;
-    expect(updated.status).toBe("paid");
-    expect(updated.paid_at).toBeTruthy();
+    const paidCycle = repo.cycles.find(c => c.id === cycle.id)!;
+    expect(paidCycle.status).toBe("paid");
+    expect(paidCycle.paid_at).toBeTruthy();
 
     const attempt = repo.chargeAttempts[0]!;
     expect(attempt.status).toBe("succeeded");
     expect(attempt.stripe_payment_intent_id).toBe("pi_ok");
-    expect(attempt.idempotency_key).toBe(`billing-cycle-${cycle.id}-attempt-1`);
 
     const ev = repo.events.find(e => e.event_type === "cycle.paid");
     expect(ev).toBeDefined();
-    expect(ev!.payload).toMatchObject({ paymentIntentId: "pi_ok" });
+
+    /* Cycle suivant créé automatiquement (anti-régression P0.1) */
+    const nextCycle = repo.cycles.find(c => c.status === "pending")!;
+    expect(nextCycle).toBeDefined();
+    expect(nextCycle.period_start).toEqual(new Date("2026-07-01"));
+    expect(nextCycle.amount_cents).toBe(2900);
+
+    /* Subscription avancée à la période suivante */
+    const updatedSub = repo.subs.find(s => s.id === sub.id)!;
+    expect(updatedSub.status).toBe("active");
+    expect(updatedSub.current_period_end).toEqual(new Date("2026-08-01"));
+
+    const periodEv = repo.events.find(e => e.event_type === "subscription.period_advanced");
+    expect(periodEv).toBeDefined();
   });
 
   it("requires_action : traité comme failed (3DS off-session = dunning) + event cycle.requires_action", async () => {

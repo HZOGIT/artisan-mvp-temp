@@ -41,6 +41,18 @@ export function isDue(cycle: BillingCycle, now: Date): boolean {
   return false;
 }
 
+/** Calcule les dates de la période suivante (monthly = +1 mois, yearly = +1 an, même jour). */
+export function nextPeriod(periodEnd: Date, interval: "monthly" | "yearly"): { start: Date; end: Date } {
+  const start = new Date(periodEnd);
+  const end = new Date(periodEnd);
+  if (interval === "yearly") {
+    end.setFullYear(end.getFullYear() + 1);
+  } else {
+    end.setMonth(end.getMonth() + 1);
+  }
+  return { start, end };
+}
+
 const RETRY_DELAYS_MS = [0, 24 * 3600_000, 3 * 24 * 3600_000, 7 * 24 * 3600_000];
 
 /** Calcule la prochaine tentative selon le plan de dunning (J+0, J+1, J+3, J+7). */
