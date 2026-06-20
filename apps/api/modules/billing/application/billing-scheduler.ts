@@ -408,6 +408,32 @@ async function activateExpiredTrials(deps: SchedulerDeps, now: Date): Promise<nu
 }
 
 /**
+ * Annule toutes les subs dont cancel_at est échu, indépendamment de la présence d'un PM.
+ * Les subs déjà annulées par la boucle principale (PM présent) sont absentes de findDueCancellations
+ * (elles ont déjà status=canceled) — pas de double-traitement.
+ */
+async function processDueCancellations(deps: SchedulerDeps, now: Date): Promise<number> {
+  const subs = await deps.repo.findDueCancellations(now);
+  let count = 0;
+  for (const sub of subs) {
+    const pendingCycle = await deps.repo.findPendingCycle(sub.id);
+    if (pendingCycle) {
+      await deps.repo.updateCycleStatus(pendingCycle.id, { status: "skipped" });
+    }
+    await deps.repo.updateSubscriptionStatus({ artisanId: sub.artisan_id, userId: 0 }, "canceled");
+    await deps.repo.appendEvent({
+      entityType: "billing_subscription",
+      entityId: sub.id,
+      eventType: "subscription.canceled",
+      payload: { artisanId: sub.artisan_id, cancelAt: sub.cancel_at!.toISOString(), via: "scheduler" },
+      actor: "scheduler",
+    });
+    count++;
+  }
+  return count;
+}
+
+/**
  * Tick principal du scheduler : récupère les zombies, active les trials expirés,
  * puis prélève tous les cycles échus.
  */
@@ -447,6 +473,8 @@ export async function runSchedulerTick(deps: SchedulerDeps): Promise<{ charged: 
       });
     }
   }
+
+  cancelled += await processDueCancellations(deps, now);
 
   return { charged, zombiesRecovered, cancelled, trialsActivated };
 }

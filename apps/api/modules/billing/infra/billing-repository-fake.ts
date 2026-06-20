@@ -97,6 +97,12 @@ export class FakeBillingRepository implements IBillingRepository {
       .slice(0, limit);
   }
 
+  async findDueCancellations(now: Date, limit = 200): Promise<Sub[]> {
+    return this.subs
+      .filter(s => (s.status === "active" || s.status === "past_due") && s.cancel_at !== null && s.cancel_at <= now)
+      .slice(0, limit);
+  }
+
   async saveSubscription(params: SaveSubscriptionParams): Promise<Sub> {
     const existing = this.subs.find(s => s.artisan_id === params.artisanId);
     if (existing) {

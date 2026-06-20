@@ -82,6 +82,8 @@ export interface IBillingRepository {
   findSubscriptionById(subscriptionId: number): Promise<BillingSubscription | null>;
   /** Abonnements trialing dont trial_ends_at est échu — à activer par le scheduler. */
   findExpiredTrials(now: Date, limit?: number): Promise<BillingSubscription[]>;
+  /** Abonnements actifs/past_due dont cancel_at est échu — à annuler indépendamment du PM. */
+  findDueCancellations(now: Date, limit?: number): Promise<BillingSubscription[]>;
   saveSubscription(params: SaveSubscriptionParams): Promise<BillingSubscription>;
   updateSubscriptionStatus(ctx: TenantContext, status: string): Promise<void>;
   updateSubscriptionPeriod(subscriptionId: number, status: string, periodStart: Date, periodEnd: Date): Promise<void>;

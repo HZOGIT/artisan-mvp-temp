@@ -1154,6 +1154,83 @@ describe("FIX-Z — activateExpiredTrials : plan inconnu → skip, pas de cycle 
   });
 });
 
+describe("FIX-AA — processDueCancellations : annulation planifiée sans PM", () => {
+  it("cancel_at échu SANS PM → sub annulée + cycle skipped + event emitted", async () => {
+    const { repo, billing } = makeDeps();
+    const cancelAt = new Date(Date.now() - 5000);
+    const sub = await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "active",
+      currentPeriodStart: new Date(Date.now() - 31 * 86400_000),
+      currentPeriodEnd: cancelAt,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    await repo.updateCancelAt(CTX, cancelAt);
+    await repo.createCycle({
+      subscriptionId: sub.id, periodStart: cancelAt,
+      periodEnd: new Date(cancelAt.getTime() + 30 * 86400_000),
+      amountCents: 2900, currency: "eur",
+    });
+
+    const result = await runSchedulerTick({ repo, billing });
+
+    expect(result.cancelled).toBe(1);
+    expect(repo.subs[0]!.status).toBe("canceled");
+    expect(repo.cycles[0]!.status).toBe("skipped");
+    const ev = repo.events.find(e => e.event_type === "subscription.canceled");
+    expect(ev).toBeDefined();
+    expect((ev!.payload as Record<string, unknown>)["artisanId"]).toBe(ARTISAN_ID);
+  });
+
+  it("cancel_at échu AVEC PM → annulée une seule fois (main loop), pas double-traitement", async () => {
+    const { repo, billing } = makeDeps();
+    const cancelAt = new Date(Date.now() - 5000);
+    const sub = await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "active",
+      currentPeriodStart: new Date(Date.now() - 31 * 86400_000),
+      currentPeriodEnd: cancelAt,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    await repo.updateCancelAt(CTX, cancelAt);
+    await repo.createCycle({
+      subscriptionId: sub.id, periodStart: cancelAt,
+      periodEnd: new Date(cancelAt.getTime() + 30 * 86400_000),
+      amountCents: 2900, currency: "eur",
+    });
+    const pm = await repo.savePaymentMethod({
+      artisanId: ARTISAN_ID, stripeCustomerId: "cus_aa", stripePaymentMethodId: "pm_aa",
+      brand: "visa", last4: "9999", expMonth: 12, expYear: 2028, consentedAt: new Date(),
+    });
+    await repo.setDefaultPaymentMethod(CTX, pm.id);
+
+    const result = await runSchedulerTick({ repo, billing });
+
+    expect(result.cancelled).toBe(1);
+    expect(repo.subs[0]!.status).toBe("canceled");
+    const cancelEvents = repo.events.filter(e => e.event_type === "subscription.canceled");
+    expect(cancelEvents).toHaveLength(1);
+  });
+
+  it("cancel_at dans le futur → sub non annulée", async () => {
+    const { repo, billing } = makeDeps();
+    const cancelAt = new Date(Date.now() + 86400_000);
+    const sub = await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "active",
+      currentPeriodStart: new Date(Date.now() - 5 * 86400_000),
+      currentPeriodEnd: cancelAt,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    await repo.updateCancelAt(CTX, cancelAt);
+
+    const result = await runSchedulerTick({ repo, billing });
+
+    expect(result.cancelled).toBe(0);
+    expect(repo.subs.find(s => s.id === sub.id)!.status).toBe("active");
+  });
+});
+
 describe("FIX-R — canceled_at positionné lors de l'annulation effective de la subscription", () => {
   it("scheduler cancel_at expiré → canceled_at renseigné avec un timestamp récent", async () => {
     const before = new Date();

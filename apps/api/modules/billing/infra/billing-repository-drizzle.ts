@@ -1,4 +1,4 @@
-import { eq, desc, and, isNull, or, lte, lt, inArray, sql } from "drizzle-orm";
+import { eq, desc, and, isNull, isNotNull, or, lte, lt, inArray, sql } from "drizzle-orm";
 import {
   billingPaymentMethods,
   billingSubscriptions,
@@ -302,6 +302,20 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
       if (cycle && pm) result.push({ subscription: sub, cycle, paymentMethod: pm });
     }
     return result;
+  }
+
+  async findDueCancellations(now: Date, limit = 200): Promise<BillingSubscription[]> {
+    return this.db
+      .select()
+      .from(billingSubscriptions)
+      .where(
+        and(
+          inArray(billingSubscriptions.status, ["active", "past_due"]),
+          isNotNull(billingSubscriptions.cancel_at),
+          lte(billingSubscriptions.cancel_at, now),
+        ),
+      )
+      .limit(limit);
   }
 
   async findZombieCycles(now: Date): Promise<BillingCycle[]> {
