@@ -250,6 +250,7 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
     if (!isZombie(cycle, now) && !isStuckProcessing(cycle, now)) continue;
     recovered++;
 
+    try {
     const lastAttempt = await deps.repo.findLastAttemptByCycleId(cycle.id);
     const piId = lastAttempt?.stripe_payment_intent_id ?? null;
 
@@ -333,6 +334,7 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
         status: finalStatus,
         ...(finalStatus === "paid" ? { paidAt: now } : { failedAt: now }),
       });
+      if (lastAttempt) await deps.repo.updateChargeAttempt(lastAttempt.id, { status: pi.status === "succeeded" ? "succeeded" : "failed" });
       await deps.repo.appendEvent({
         entityType: "billing_cycle",
         entityId: cycle.id,
@@ -368,6 +370,15 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
         newAttemptCount: cycle.attempt_count,
         attempt: lastAttempt,
         failureMessage: pi.failureMessage ?? pi.status,
+      });
+    }
+    } catch (err) {
+      await deps.repo.appendEvent({
+        entityType: "billing_cycle",
+        entityId: cycle.id,
+        eventType: "cycle.zombie_recovery_error",
+        payload: { cycleId: cycle.id, error: err instanceof Error ? err.message : String(err) },
+        actor: "scheduler",
       });
     }
   }

@@ -456,6 +456,73 @@ describe("FIX-CC — recoverZombies : sub canceled pendant PI en vol (SEPA) ne d
   });
 });
 
+describe("FIX-CU — recoverZombies : isolation par zombie (erreur Stripe sur zombie N ne bloque pas zombie N+1)", () => {
+  it("retrievePaymentIntent throw sur zombie#1 → cycle.zombie_recovery_error + zombie#2 récupéré normalement", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const zombieStart = new Date(Date.now() - 20 * 60 * 1000);
+
+    const cycle1 = await repo.createCycle({ subscriptionId: sub.id, periodStart: new Date("2026-05-01"), periodEnd: new Date("2026-06-01"), amountCents: 2900, currency: "eur" });
+    await repo.updateCycleStatus(cycle1.id, { status: "charging", chargingStartedAt: zombieStart });
+    const att1 = await repo.createChargeAttempt({ cycleId: cycle1.id, attemptNo: 1, idempotencyKey: "k_cu1" });
+    await repo.updateChargeAttempt(att1.id, { stripePaymentIntentId: "pi_zombie1", status: "initiated" });
+
+    const cycle2 = await repo.createCycle({ subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"), amountCents: 2900, currency: "eur" });
+    await repo.updateCycleStatus(cycle2.id, { status: "charging", chargingStartedAt: zombieStart });
+    const att2 = await repo.createChargeAttempt({ cycleId: cycle2.id, attemptNo: 1, idempotencyKey: "k_cu2" });
+    await repo.updateChargeAttempt(att2.id, { stripePaymentIntentId: "pi_zombie2", status: "initiated" });
+
+    billing.retrievePaymentIntent = async (piId: string) => {
+      if (piId === "pi_zombie1") throw new Error("Stripe API temporairement indisponible");
+      return { id: piId, status: "processing" as const, failureCode: null, failureMessage: null };
+    };
+
+    await recoverZombies({ repo, billing });
+
+    const errEv = repo.events.find(e => e.event_type === "cycle.zombie_recovery_error" && (e.payload as Record<string, unknown>)["cycleId"] === cycle1.id);
+    expect(errEv).toBeDefined();
+    expect((errEv!.payload as Record<string, unknown>)["error"]).toContain("Stripe API");
+
+    expect(repo.cycles.find(c => c.id === cycle2.id)!.status).toBe("processing");
+  });
+});
+
+describe("FIX-CV — recoverZombies : branche canceled-sub+PI met à jour billing_charge_attempts", () => {
+  async function setupZombieWithPiAndCanceledSub(repo: FakeBillingRepository, billing: FakeBillingPort, piStatus: string) {
+    const sub = await setupActiveSub(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    const zombieStart = new Date(Date.now() - 20 * 60 * 1000);
+    await repo.updateCycleStatus(cycle.id, { status: "charging", chargingStartedAt: zombieStart });
+    const att = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k_cv" });
+    await repo.updateChargeAttempt(att.id, { stripePaymentIntentId: "pi_cv", status: "initiated" });
+    billing.retrievePaymentIntent = async () => ({ id: "pi_cv", status: piStatus as "succeeded" | "processing" | "requires_action" | "canceled", failureCode: null, failureMessage: null });
+    await repo.updateSubscriptionStatus(CTX, "canceled");
+    return { sub, cycle, att };
+  }
+
+  it("PI succeeded + sub canceled → attempt.status = 'succeeded'", async () => {
+    const { repo, billing } = makeDeps();
+    const { cycle, att } = await setupZombieWithPiAndCanceledSub(repo, billing, "succeeded");
+
+    await recoverZombies({ repo, billing });
+
+    expect(repo.cycles.find(c => c.id === cycle.id)!.status).toBe("paid");
+    const updatedAtt = repo.chargeAttempts.find(a => a.id === att.id)!;
+    expect(updatedAtt.status).toBe("succeeded");
+  });
+
+  it("PI canceled + sub canceled → attempt.status = 'failed'", async () => {
+    const { repo, billing } = makeDeps();
+    const { cycle, att } = await setupZombieWithPiAndCanceledSub(repo, billing, "canceled");
+
+    await recoverZombies({ repo, billing });
+
+    expect(repo.cycles.find(c => c.id === cycle.id)!.status).toBe("failed");
+    const updatedAtt = repo.chargeAttempts.find(a => a.id === att.id)!;
+    expect(updatedAtt.status).toBe("failed");
+  });
+});
+
 describe("FIX-4 — requires_action : un seul updateChargeAttempt avec failure_code", () => {
   it("failure_code=requires_action présent + failure_message absent après requires_action", async () => {
     const { repo, billing } = makeDeps();
