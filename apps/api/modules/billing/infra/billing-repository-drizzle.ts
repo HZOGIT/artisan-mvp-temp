@@ -198,6 +198,16 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
     return row ?? null;
   }
 
+  async findNonTerminalCycle(subscriptionId: number): Promise<BillingCycle | null> {
+    const [row] = await this.db
+      .select()
+      .from(billingCycles)
+      .where(and(eq(billingCycles.subscription_id, subscriptionId), inArray(billingCycles.status, ["pending", "failed"])))
+      .orderBy(desc(billingCycles.period_start))
+      .limit(1);
+    return row ?? null;
+  }
+
   async findPendingCycleForPeriod(subscriptionId: number, periodStart: Date): Promise<BillingCycle | null> {
     const [row] = await this.db
       .select()

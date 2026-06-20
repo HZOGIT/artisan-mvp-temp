@@ -1749,6 +1749,73 @@ describe("FIX-CDA — processDueCancellations : isolation par item + status proc
   });
 });
 
+describe("FIX-CDL — processDueCancellations : cycle failed (retry non encore échu) passé en skipped lors de l'annulation", () => {
+  it("cancel_at échu + cycle failed next_retry_at=futur → cycle skipped + sub canceled (pas de cycle.paid orphelin)", async () => {
+    const { repo, billing } = makeDeps();
+    const cancelAt = new Date(Date.now() - 5_000);
+
+    const sub = await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: new Date(Date.now() - 31 * 86400_000),
+      currentPeriodEnd: cancelAt, trialEndsAt: null, paymentMethodId: null,
+    });
+    await repo.updateCancelAt(CTX, cancelAt);
+
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date(Date.now() - 31 * 86400_000),
+      periodEnd: cancelAt, amountCents: 2900, currency: "eur",
+    });
+    /* Cycle failed avec next_retry_at dans 3 jours (non encore échu → exclu de findSubscriptionsWithDueCycles) */
+    await repo.updateCycleStatus(cycle.id, {
+      status: "failed", failedAt: new Date(Date.now() - 86400_000),
+      nextRetryAt: new Date(Date.now() + 3 * 86400_000), attemptCount: 2,
+    });
+
+    await runSchedulerTick({ repo, billing });
+
+    const updatedCycle = repo.cycles.find(c => c.id === cycle.id)!;
+    expect(updatedCycle.status).toBe("skipped");
+
+    const updatedSub = repo.subs.find(s => s.artisan_id === ARTISAN_ID)!;
+    expect(updatedSub.status).toBe("canceled");
+
+    expect(billing.chargesAttempted).toHaveLength(0);
+
+    const canceledEv = repo.events.find(e => e.event_type === "subscription.canceled" && e.entity_id === sub.id);
+    expect(canceledEv).toBeDefined();
+  });
+
+  it("cancel_at échu + cycle failed next_retry_at=null (dunning épuisé) → cycle skipped + sub canceled", async () => {
+    const { repo, billing } = makeDeps();
+    const cancelAt = new Date(Date.now() - 5_000);
+
+    const sub = await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "past_due", currentPeriodStart: new Date(Date.now() - 31 * 86400_000),
+      currentPeriodEnd: cancelAt, trialEndsAt: null, paymentMethodId: null,
+    });
+    await repo.updateCancelAt(CTX, cancelAt);
+
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date(Date.now() - 31 * 86400_000),
+      periodEnd: cancelAt, amountCents: 2900, currency: "eur",
+    });
+    /* Cycle failed abandoned (dunning épuisé, next_retry_at=null) */
+    await repo.updateCycleStatus(cycle.id, {
+      status: "failed", failedAt: new Date(Date.now() - 86400_000),
+      nextRetryAt: null, attemptCount: 4,
+    });
+
+    await runSchedulerTick({ repo, billing });
+
+    const updatedCycle = repo.cycles.find(c => c.id === cycle.id)!;
+    expect(updatedCycle.status).toBe("skipped");
+
+    const updatedSub = repo.subs.find(s => s.artisan_id === ARTISAN_ID)!;
+    expect(updatedSub.status).toBe("canceled");
+  });
+});
+
 describe("FIX-CDB — recoverZombies processing : reset charging_started_at pour éviter polling Stripe toutes les 10 min", () => {
   it("PI toujours processing → charging_started_at remis à now → cycle absent du prochain findZombieCycles (72h)", async () => {
     const { repo, billing } = makeDeps();

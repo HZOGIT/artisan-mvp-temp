@@ -533,9 +533,14 @@ async function processDueCancellations(deps: SchedulerDeps, now: Date): Promise<
   let count = 0;
   for (const sub of subs) {
     try {
-      const pendingCycle = await deps.repo.findPendingCycle(sub.id);
-      if (pendingCycle) {
-        await deps.repo.updateCycleStatus(pendingCycle.id, { status: "skipped" });
+      /*
+       * findNonTerminalCycle couvre aussi les cycles "failed" avec next_retry_at dans le
+       * futur : sans ce fix, le cycle resterait "failed" avec un next_retry_at qui ne
+       * sera jamais déclenché (sub annulée → exclue de findSubscriptionsWithDueCycles).
+       */
+      const nonTerminalCycle = await deps.repo.findNonTerminalCycle(sub.id);
+      if (nonTerminalCycle) {
+        await deps.repo.updateCycleStatus(nonTerminalCycle.id, { status: "skipped" });
       }
       await deps.repo.updateSubscriptionStatus({ artisanId: sub.artisan_id, userId: 0 }, "canceled");
       await deps.repo.appendEvent({
