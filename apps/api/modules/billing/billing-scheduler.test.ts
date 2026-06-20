@@ -1696,3 +1696,49 @@ describe("FIX-CDA — processDueCancellations : isolation par item + status proc
     expect(updated.next_retry_at).toBeNull();
   });
 });
+
+describe("FIX-CDB — recoverZombies processing : reset charging_started_at pour éviter polling Stripe toutes les 10 min", () => {
+  it("PI toujours processing → charging_started_at remis à now → cycle absent du prochain findZombieCycles (72h)", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    const stuckStart = new Date(Date.now() - 73 * 3600_000);
+    await repo.updateCycleStatus(cycle.id, { status: "processing", chargingStartedAt: stuckStart, failedAt: new Date("2026-06-01"), nextRetryAt: new Date("2026-06-02"), attemptCount: 1 });
+    const attempt = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k_proc" });
+    await repo.updateChargeAttempt(attempt.id, { stripePaymentIntentId: "pi_sepa_stuck", status: "processing" });
+    billing.retrievePaymentIntent = async () => ({ id: "pi_sepa_stuck", status: "processing", failureCode: null, failureMessage: null });
+
+    const before = new Date();
+    await recoverZombies({ repo, billing });
+    const after = new Date();
+
+    const updated = repo.cycles.find(c => c.id === cycle.id)!;
+    expect(updated.status).toBe("processing");
+    expect(updated.charging_started_at!.getTime()).toBeGreaterThanOrEqual(before.getTime());
+    expect(updated.charging_started_at!.getTime()).toBeLessThanOrEqual(after.getTime());
+    expect(updated.failed_at).toBeNull();
+    expect(updated.next_retry_at).toBeNull();
+  });
+
+  it("après reset, findZombieCycles ne retrouve plus le cycle dans le même tick (threshold 72h)", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    const stuckStart = new Date(Date.now() - 73 * 3600_000);
+    await repo.updateCycleStatus(cycle.id, { status: "processing", chargingStartedAt: stuckStart, attemptCount: 1 });
+    const attempt = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k_proc2" });
+    await repo.updateChargeAttempt(attempt.id, { stripePaymentIntentId: "pi_sepa2", status: "processing" });
+    billing.retrievePaymentIntent = async () => ({ id: "pi_sepa2", status: "processing", failureCode: null, failureMessage: null });
+
+    let stripeCallCount = 0;
+    const original = billing.retrievePaymentIntent.bind(billing);
+    billing.retrievePaymentIntent = async (id) => { stripeCallCount++; return original(id); };
+
+    await recoverZombies({ repo, billing });
+    expect(stripeCallCount).toBe(1);
+
+    stripeCallCount = 0;
+    await recoverZombies({ repo, billing });
+    expect(stripeCallCount).toBe(0);
+  });
+});

@@ -358,7 +358,14 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
       });
       if (sub) await advanceSubscriptionAfterPayment(deps.repo, cycle.subscription_id, artisanId, cycle, resolveInterval(sub.billing_interval));
     } else if (pi.status === "processing") {
-      await deps.repo.updateCycleStatus(cycle.id, { status: "processing" });
+      /*
+       * Le PI est toujours en cours (SEPA/virement, jusqu'à 14 jours ouvrés).
+       * On remet chargingStartedAt à maintenant pour décaler la prochaine vérification
+       * zombie de 72h — sans ce reset, findZombieCycles retrouve le cycle à chaque tick
+       * (toutes les 10 min) et provoque un appel Stripe inutile toutes les 10 min.
+       * On nettoie aussi les stale fields d'un éventuel dunning précédent.
+       */
+      await deps.repo.updateCycleStatus(cycle.id, { status: "processing", chargingStartedAt: now, failedAt: null, nextRetryAt: null });
       if (lastAttempt) await deps.repo.updateChargeAttempt(lastAttempt.id, { status: "processing" });
     } else {
       /* requires_action, canceled, failed, état inconnu → dunning complet (notif + suspension) */
