@@ -402,6 +402,24 @@ describe("FIX-CC — recoverZombies : sub canceled pendant PI en vol (SEPA) ne d
     const suspended = repo.events.find(e => e.event_type === "subscription.suspended");
     expect(suspended).toBeUndefined();
   });
+
+  it("FIX-CF — zombie no-PI + sub canceled → cycle failed, pas de dunning, sub reste canceled", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    const zombieStart = new Date(Date.now() - 20 * 60 * 1000);
+    await repo.updateCycleStatus(cycle.id, { status: "charging", chargingStartedAt: zombieStart });
+    await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k_cf" });
+    await repo.updateSubscriptionStatus(CTX, "canceled");
+
+    await recoverZombies({ repo, billing });
+
+    expect(repo.cycles.find(c => c.id === cycle.id)!.status).toBe("failed");
+    expect(repo.subs.find(s => s.id === sub.id)!.status).toBe("canceled");
+    expect(repo.events.find(e => e.event_type === "subscription.suspended")).toBeUndefined();
+    const ev = repo.events.find(e => e.event_type === "cycle.zombie_canceled_sub");
+    expect(ev).toBeDefined();
+  });
 });
 
 describe("FIX-4 — requires_action : un seul updateChargeAttempt avec failure_code", () => {

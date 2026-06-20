@@ -265,6 +265,16 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
       if (lastAttempt) {
         if (!zombieSub) {
           await deps.repo.updateCycleStatus(cycle.id, { status: "failed", failedAt: now });
+        } else if (zombieSub.status === "canceled") {
+          /* Sub annulée pendant que le cycle était en vol (no-PI) — ne pas dunner. */
+          await deps.repo.updateCycleStatus(cycle.id, { status: "failed", failedAt: now });
+          await deps.repo.appendEvent({
+            entityType: "billing_cycle",
+            entityId: cycle.id,
+            eventType: "cycle.zombie_canceled_sub",
+            payload: { artisanId: zombieSub.artisan_id, piStatus: "none", paymentIntentId: null, cycleMarkedAs: "failed" },
+            actor: "scheduler",
+          });
         } else {
           await handleDunning(deps, {
             cycleId: cycle.id,
