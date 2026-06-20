@@ -124,6 +124,15 @@ export async function chargeOffSessionForCycle(
     idempotencyKey,
   });
 
+  /*
+   * Flag positionné dès que Stripe confirme "succeeded" — avant toute mise à jour DB.
+   * Si une erreur DB survient en post-traitement (updateCycleStatus, advanceSubscriptionAfterPayment…),
+   * le catch NE doit PAS appeler handleDunning : le prélèvement a déjà eu lieu, et dunning
+   * fixerait next_retry_at → le scheduler rechargerait à J+1 avec une clé d'idempotence
+   * différente → double-prélèvement. L'auto-healing via le cycle pending de la période suivante
+   * (créé avant updateSubscriptionPeriod, cf. FIX-CDF) corrige l'état de la sub.
+   */
+  let chargeSucceeded = false;
   try {
     const result = await deps.billing.chargeOffSession({
       customerId,
@@ -134,6 +143,8 @@ export async function chargeOffSessionForCycle(
       metadata: { artisan_id: String(artisanId), cycle_id: String(cycleId) },
       idempotencyKey,
     });
+
+    if (result.status === "succeeded") chargeSucceeded = true;
 
     await deps.repo.updateChargeAttempt(attempt.id, {
       stripePaymentIntentId: result.paymentIntentId,
@@ -177,6 +188,7 @@ export async function chargeOffSessionForCycle(
       await deps.repo.updateCycleStatus(cycleId, { status: "processing", failedAt: null, nextRetryAt: null });
     }
   } catch (err) {
+    if (chargeSucceeded) return;
     const failureMessage = err instanceof Error ? err.message : String(err);
     await handleDunning(deps, { cycleId, subscriptionId, artisanId, now, newAttemptCount, attempt, failureMessage });
   }

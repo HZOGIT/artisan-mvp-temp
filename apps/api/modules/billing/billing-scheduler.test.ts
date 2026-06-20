@@ -1873,6 +1873,49 @@ describe("FIX-CDG — chargeOffSessionForCycle : sub canceled pendant le PI en v
   });
 });
 
+describe("FIX-CDJ — chargeOffSessionForCycle : DB failure post-Stripe-succeeded ne déclenche pas handleDunning", () => {
+  it("Stripe succeeded + updateSubscriptionPeriod échoue → cycle reste paid, pas de cycle.charge_failed, pas de next_retry_at", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    billing.nextChargeResult = { paymentIntentId: "pi_cdj", status: "succeeded" };
+
+    repo.simulateUpdateSubscriptionPeriodError = new Error("DB transitoire après Stripe");
+
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+
+    /* Le cycle DOIT rester "paid" — handleDunning ne doit pas l'overwrite en "failed" */
+    const updatedCycle = repo.cycles.find(c => c.id === cycle.id)!;
+    expect(updatedCycle.status).toBe("paid");
+    expect(updatedCycle.next_retry_at).toBeNull();
+    expect(updatedCycle.failed_at).toBeNull();
+
+    /* Aucun événement de dunning ne doit avoir été émis */
+    const dunningEv = repo.events.find(e => e.event_type === "cycle.charge_failed" || e.event_type === "subscription.suspended");
+    expect(dunningEv).toBeUndefined();
+
+    /* Le cycle.paid est bien émis (avant l'erreur) */
+    expect(repo.events.find(e => e.event_type === "cycle.paid")).toBeDefined();
+  });
+
+  it("Stripe failed → handleDunning déclenché normalement (chemin normal non affecté)", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    billing.nextChargeResult = null;
+    billing.nextChargeError = "card_declined";
+
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+
+    const updatedCycle = repo.cycles.find(c => c.id === cycle.id)!;
+    expect(updatedCycle.status).toBe("failed");
+    expect(updatedCycle.next_retry_at).not.toBeNull();
+    expect(repo.events.find(e => e.event_type === "cycle.charge_failed")).toBeDefined();
+  });
+});
+
 describe("FIX-CDF — advanceSubscriptionAfterPayment : cycle créé avant updateSubscriptionPeriod (auto-healing)", () => {
   it("updateSubscriptionPeriod échoue après createCycle → cycle pending existe (auto-healing possible)", async () => {
     const { repo, billing } = makeDeps();
