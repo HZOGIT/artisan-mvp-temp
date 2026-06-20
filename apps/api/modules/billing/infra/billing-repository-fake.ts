@@ -100,7 +100,18 @@ export class FakeBillingRepository implements IBillingRepository {
   async saveSubscription(params: SaveSubscriptionParams): Promise<Sub> {
     const existing = this.subs.find(s => s.artisan_id === params.artisanId);
     if (existing) {
-      const updated = { ...existing, ...params, artisan_id: params.artisanId, updated_at: this.now() } as Sub;
+      const updated: Sub = {
+        ...existing,
+        plan_id: params.planId,
+        billing_interval: params.billingInterval ?? "monthly",
+        billing_mode: params.billingMode,
+        status: params.status,
+        current_period_start: params.currentPeriodStart,
+        current_period_end: params.currentPeriodEnd,
+        trial_ends_at: params.trialEndsAt,
+        payment_method_id: params.paymentMethodId,
+        updated_at: this.now(),
+      };
       this.subs = this.subs.map(s => s.artisan_id === params.artisanId ? updated : s);
       return updated;
     }
@@ -253,6 +264,8 @@ export class FakeBillingRepository implements IBillingRepository {
   }
 
   async createChargeAttempt(params: CreateChargeAttemptParams): Promise<BillingChargeAttempt> {
+    const duplicate = this.chargeAttempts.find(a => a.cycle_id === params.cycleId && a.attempt_no === params.attemptNo);
+    if (duplicate) throw new Error(`duplicate key value violates unique constraint "billing_charge_attempts_cycle_id_attempt_no_key"`);
     const attempt: BillingChargeAttempt = {
       id: nextId(),
       cycle_id: params.cycleId,

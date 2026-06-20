@@ -1094,3 +1094,71 @@ describe("FIX-X — artisanId uniforme dans tous les payloads billing_events", (
     expect(ev?.payload).toMatchObject({ artisanId: A.artisanId });
   });
 });
+
+describe("FIX-Y — FakeBillingRepository fidélité au Drizzle", () => {
+  it("saveSubscription upsert : tous les champs mis à jour (plan_id, billing_interval, billing_mode, period, trial)", async () => {
+    const repo = new FakeBillingRepository();
+    const periodStart = new Date("2026-06-01");
+    const periodEnd = new Date("2026-07-01");
+    const trialEnd = new Date("2026-06-15");
+
+    await repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingInterval: "monthly",
+      billingMode: "maison", status: "trialing",
+      currentPeriodStart: null, currentPeriodEnd: null, trialEndsAt: trialEnd, paymentMethodId: null,
+    });
+
+    const pmId = 42;
+    await repo.saveSubscription({
+      artisanId: A.artisanId, planId: "pro", billingInterval: "yearly",
+      billingMode: "stripe", status: "active",
+      currentPeriodStart: periodStart, currentPeriodEnd: periodEnd, trialEndsAt: null, paymentMethodId: pmId,
+    });
+
+    const sub = await repo.findSubscription(A);
+    expect(sub?.plan_id).toBe("pro");
+    expect(sub?.billing_interval).toBe("yearly");
+    expect(sub?.billing_mode).toBe("stripe");
+    expect(sub?.status).toBe("active");
+    expect(sub?.current_period_start?.toISOString()).toBe(periodStart.toISOString());
+    expect(sub?.current_period_end?.toISOString()).toBe(periodEnd.toISOString());
+    expect(sub?.trial_ends_at).toBeNull();
+    expect(sub?.payment_method_id).toBe(pmId);
+  });
+
+  it("saveSubscription upsert : id et cancel_at préservés (non écrasés)", async () => {
+    const repo = new FakeBillingRepository();
+    const cancelAt = new Date("2026-07-31");
+
+    const first = await repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    await repo.updateCancelAt(A, cancelAt);
+
+    await repo.saveSubscription({
+      artisanId: A.artisanId, planId: "pro", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+
+    const sub = await repo.findSubscription(A);
+    expect(sub?.id).toBe(first.id);
+    expect(sub?.cancel_at?.toISOString()).toBe(cancelAt.toISOString());
+  });
+
+  it("createChargeAttempt UNIQUE(cycle_id, attempt_no) : doublon → erreur comme Drizzle", async () => {
+    const repo = new FakeBillingRepository();
+    await repo.createChargeAttempt({ cycleId: 1, attemptNo: 1, idempotencyKey: "k1" });
+    await expect(repo.createChargeAttempt({ cycleId: 1, attemptNo: 1, idempotencyKey: "k2" }))
+      .rejects.toThrow("unique constraint");
+  });
+
+  it("createChargeAttempt : même cycle_id, attempt_no différent → autorisé", async () => {
+    const repo = new FakeBillingRepository();
+    await repo.createChargeAttempt({ cycleId: 1, attemptNo: 1, idempotencyKey: "k1" });
+    await expect(repo.createChargeAttempt({ cycleId: 1, attemptNo: 2, idempotencyKey: "k2" }))
+      .resolves.toBeDefined();
+  });
+});
