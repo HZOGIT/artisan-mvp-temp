@@ -487,6 +487,58 @@ describe("FIX-CU — recoverZombies : isolation par zombie (erreur Stripe sur zo
   });
 });
 
+describe("FIX-CDD — cycle.zombie_recovery_error porte artisanId (filtrage audit log par artisan)", () => {
+  it("retrievePaymentIntent throw → zombie_recovery_error.payload.artisanId = artisanId du cycle", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const zombieStart = new Date(Date.now() - 20 * 60 * 1000);
+
+    const cycle = await repo.createCycle({ subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"), amountCents: 2900, currency: "eur" });
+    await repo.updateCycleStatus(cycle.id, { status: "charging", chargingStartedAt: zombieStart });
+    const att = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k_cdd1" });
+    await repo.updateChargeAttempt(att.id, { stripePaymentIntentId: "pi_cdd1", status: "initiated" });
+
+    billing.retrievePaymentIntent = async () => { throw new Error("stripe timeout"); };
+
+    await recoverZombies({ repo, billing });
+
+    const errEv = repo.events.find(e => e.event_type === "cycle.zombie_recovery_error");
+    expect(errEv).toBeDefined();
+    expect((errEv!.payload as Record<string, unknown>)["artisanId"]).toBe(ARTISAN_ID);
+    expect((errEv!.payload as Record<string, unknown>)["cycleId"]).toBe(cycle.id);
+  });
+
+  it("erreur sur findLastAttemptByCycleId (avant sub fetch) → artisanId = null dans le payload", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const zombieStart = new Date(Date.now() - 20 * 60 * 1000);
+
+    const cycle = await repo.createCycle({ subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"), amountCents: 2900, currency: "eur" });
+    await repo.updateCycleStatus(cycle.id, { status: "charging", chargingStartedAt: zombieStart });
+
+    const origFindLastAttempt = repo.findLastAttemptByCycleId.bind(repo);
+    let callCount = 0;
+    repo.findLastAttemptByCycleId = async (cycleId: number) => {
+      callCount++;
+      /* Sub est fetchée en premier (avant findLastAttempt), donc cycleArtisanId est déjà positionné */
+      return origFindLastAttempt(cycleId);
+    };
+
+    /* On simule une erreur sur retrievePaymentIntent pour déclencher le catch */
+    billing.retrievePaymentIntent = async () => { throw new Error("forced error after sub fetch"); };
+    const att = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k_cdd2" });
+    await repo.updateChargeAttempt(att.id, { stripePaymentIntentId: "pi_cdd2", status: "initiated" });
+
+    await recoverZombies({ repo, billing });
+
+    const errEv = repo.events.find(e => e.event_type === "cycle.zombie_recovery_error");
+    expect(errEv).toBeDefined();
+    /* Sub fetchée AVANT la tentative Stripe → artisanId disponible même en cas d'erreur Stripe */
+    expect((errEv!.payload as Record<string, unknown>)["artisanId"]).toBe(ARTISAN_ID);
+    expect(callCount).toBeGreaterThan(0);
+  });
+});
+
 describe("FIX-CV — recoverZombies : branche canceled-sub+PI met à jour billing_charge_attempts", () => {
   async function setupZombieWithPiAndCanceledSub(repo: FakeBillingRepository, billing: FakeBillingPort, piStatus: string) {
     const sub = await setupActiveSub(repo);

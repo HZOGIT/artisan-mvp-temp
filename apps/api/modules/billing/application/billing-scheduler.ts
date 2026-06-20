@@ -258,24 +258,32 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
     if (!isZombie(cycle, now) && !isStuckProcessing(cycle, now)) continue;
     recovered++;
 
+    /*
+     * Déclaré avant le try pour rendre artisanId disponible dans le catch.
+     * Sub fetché en premier dans le try : une seule requête au lieu de deux
+     * (l'ancienne version fetché sub deux fois : dans le branch no-PI et dans le branch PI).
+     */
+    let cycleArtisanId: number | null = null;
     try {
+    const sub = await deps.repo.findSubscriptionById(cycle.subscription_id);
+    cycleArtisanId = sub?.artisan_id ?? null;
+
     const lastAttempt = await deps.repo.findLastAttemptByCycleId(cycle.id);
     const piId = lastAttempt?.stripe_payment_intent_id ?? null;
 
     if (!piId || !lastAttempt) {
-      const zombieSub = await deps.repo.findSubscriptionById(cycle.subscription_id);
       await deps.repo.appendEvent({
         entityType: "billing_cycle",
         entityId: cycle.id,
         eventType: "cycle.zombie_recovered",
-        payload: { reason: "no_payment_intent_id", artisanId: zombieSub?.artisan_id ?? null },
+        payload: { reason: "no_payment_intent_id", artisanId: cycleArtisanId },
         actor: "scheduler",
       });
       if (lastAttempt) {
-        if (!zombieSub) {
+        if (!sub) {
           await deps.repo.updateCycleStatus(cycle.id, { status: "failed", failedAt: now });
           await deps.repo.updateChargeAttempt(lastAttempt.id, { status: "failed", failureMessage: "zombie_orphan_no_pi" });
-        } else if (zombieSub.status === "canceled") {
+        } else if (sub.status === "canceled") {
           /* Sub annulée pendant que le cycle était en vol (no-PI) — ne pas dunner. */
           await deps.repo.updateCycleStatus(cycle.id, { status: "failed", failedAt: now });
           await deps.repo.updateChargeAttempt(lastAttempt.id, { status: "failed", failureMessage: "zombie_canceled_sub_no_pi" });
@@ -283,14 +291,14 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
             entityType: "billing_cycle",
             entityId: cycle.id,
             eventType: "cycle.zombie_canceled_sub",
-            payload: { artisanId: zombieSub.artisan_id, piStatus: "none", paymentIntentId: null, cycleMarkedAs: "failed" },
+            payload: { artisanId: sub.artisan_id, piStatus: "none", paymentIntentId: null, cycleMarkedAs: "failed" },
             actor: "scheduler",
           });
         } else {
           await handleDunning(deps, {
             cycleId: cycle.id,
             subscriptionId: cycle.subscription_id,
-            artisanId: zombieSub.artisan_id,
+            artisanId: sub.artisan_id,
             now,
             newAttemptCount: cycle.attempt_count,
             attempt: lastAttempt,
@@ -309,13 +317,11 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
 
     const pi = await deps.billing.retrievePaymentIntent(piId);
 
-    /* Fetch sub avant l'event pour inclure artisanId dans le payload (FIX-BB). */
-    const sub = await deps.repo.findSubscriptionById(cycle.subscription_id);
     await deps.repo.appendEvent({
       entityType: "billing_cycle",
       entityId: cycle.id,
       eventType: "cycle.zombie_recovered",
-      payload: { piStatus: pi.status, paymentIntentId: piId, artisanId: sub?.artisan_id ?? null },
+      payload: { piStatus: pi.status, paymentIntentId: piId, artisanId: cycleArtisanId },
       actor: "scheduler",
     });
 
@@ -364,7 +370,7 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
         payload: { via: "zombie_recovery", paymentIntentId: piId, artisanId, paidAt: paidAt.toISOString() },
         actor: "scheduler",
       });
-      if (sub) await advanceSubscriptionAfterPayment(deps.repo, cycle.subscription_id, artisanId, cycle, resolveInterval(sub.billing_interval));
+      await advanceSubscriptionAfterPayment(deps.repo, cycle.subscription_id, artisanId, cycle, resolveInterval(sub.billing_interval));
     } else if (pi.status === "processing") {
       /*
        * Le PI est toujours en cours (SEPA/virement, jusqu'à 14 jours ouvrés).
@@ -392,7 +398,7 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
         entityType: "billing_cycle",
         entityId: cycle.id,
         eventType: "cycle.zombie_recovery_error",
-        payload: { cycleId: cycle.id, error: err instanceof Error ? err.message : String(err) },
+        payload: { cycleId: cycle.id, artisanId: cycleArtisanId, error: err instanceof Error ? err.message : String(err) },
         actor: "scheduler",
       });
     }
