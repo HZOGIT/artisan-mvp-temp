@@ -240,6 +240,215 @@ describe("runSchedulerTick", () => {
   });
 });
 
+describe("FIX-2 — billing_interval yearly", () => {
+  it("subscription yearly → cycle suivant à +1 an", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "pro-yearly", billingInterval: "yearly", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    await setupPm(repo);
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-01-01"), periodEnd: new Date("2027-01-01"),
+      amountCents: 29000, currency: "eur",
+    });
+    billing.nextChargeResult = { paymentIntentId: "pi_yr", status: "succeeded" };
+
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+
+    const nextCycle = repo.cycles.find(c => c.status === "pending")!;
+    expect(nextCycle).toBeDefined();
+    expect(nextCycle.period_start).toEqual(new Date("2027-01-01"));
+    expect(nextCycle.period_end).toEqual(new Date("2028-01-01"));
+
+    const updatedSub = repo.subs.find(s => s.id === sub.id)!;
+    expect(updatedSub.current_period_end).toEqual(new Date("2028-01-01"));
+  });
+});
+
+describe("FIX-3 — zombie PI failed passe par handleDunning", () => {
+  async function setupZombie(repo: FakeBillingRepository, billing: FakeBillingPort, piStatus: string) {
+    const sub = await setupActiveSub(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    const zombieStart = new Date(Date.now() - 20 * 60 * 1000);
+    await repo.updateCycleStatus(cycle.id, { status: "charging", chargingStartedAt: zombieStart, attemptCount: 1 });
+    const attempt = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k1" });
+    await repo.updateChargeAttempt(attempt.id, { stripePaymentIntentId: "pi_z", status: "processing" });
+    billing.retrievePaymentIntent = async () => ({ id: "pi_z", status: piStatus, failureCode: "card_declined", failureMessage: "declined" });
+    return { sub, cycle };
+  }
+
+  it("zombie PI requires_action → cycle failed + event charge_failed", async () => {
+    const { repo, billing } = makeDeps();
+    await setupZombie(repo, billing, "requires_action");
+
+    await recoverZombies({ repo, billing });
+
+    const cycle = repo.cycles[0]!;
+    expect(cycle.status).toBe("failed");
+    expect(cycle.next_retry_at).not.toBeNull();
+    const ev = repo.events.find(e => e.event_type === "cycle.charge_failed");
+    expect(ev).toBeDefined();
+  });
+
+  it("zombie PI canceled → cycle failed + event charge_failed", async () => {
+    const { repo, billing } = makeDeps();
+    await setupZombie(repo, billing, "canceled");
+
+    await recoverZombies({ repo, billing });
+
+    const cycle = repo.cycles[0]!;
+    expect(cycle.status).toBe("failed");
+    const ev = repo.events.find(e => e.event_type === "cycle.charge_failed");
+    expect(ev).toBeDefined();
+  });
+
+  it("zombie PI failed à la dernière tentative → subscription.status=past_due", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    const zombieStart = new Date(Date.now() - 20 * 60 * 1000);
+    await repo.updateCycleStatus(cycle.id, { status: "charging", chargingStartedAt: zombieStart, attemptCount: 4 });
+    const attempt = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 4, idempotencyKey: "k4" });
+    await repo.updateChargeAttempt(attempt.id, { stripePaymentIntentId: "pi_final", status: "processing" });
+    billing.retrievePaymentIntent = async () => ({ id: "pi_final", status: "canceled", failureCode: null, failureMessage: null });
+
+    await recoverZombies({ repo, billing });
+
+    const updatedSub = repo.subs.find(s => s.id === sub.id)!;
+    expect(updatedSub.status).toBe("past_due");
+    const suspendedEv = repo.events.find(e => e.event_type === "subscription.suspended");
+    expect(suspendedEv).toBeDefined();
+  });
+});
+
+describe("FIX-4 — requires_action : un seul updateChargeAttempt avec failure_code", () => {
+  it("failure_code=requires_action présent + failure_message absent après requires_action", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    billing.nextChargeResult = { paymentIntentId: "pi_3ds", status: "requires_action", clientSecret: "cs" };
+
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+
+    const attempt = repo.chargeAttempts[0]!;
+    expect(attempt.failure_code).toBe("requires_action");
+    expect(attempt.failure_message).toBeNull();
+  });
+});
+
+describe("FIX-5 — runSchedulerTick.zombiesRecovered compte les zombies traités", () => {
+  it("1 zombie récupéré → zombiesRecovered=1", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    const zombieStart = new Date(Date.now() - 20 * 60 * 1000);
+    await repo.updateCycleStatus(cycle.id, { status: "charging", chargingStartedAt: zombieStart });
+    const attempt = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k1" });
+    await repo.updateChargeAttempt(attempt.id, { stripePaymentIntentId: "pi_z", status: "processing" });
+    billing.nextChargeResult = { paymentIntentId: "pi_z", status: "succeeded" };
+
+    const result = await runSchedulerTick({ repo, billing });
+
+    expect(result.zombiesRecovered).toBe(1);
+  });
+
+  it("aucun zombie → zombiesRecovered=0", async () => {
+    const { repo, billing } = makeDeps();
+    await setupActiveSub(repo);
+    await setupPm(repo);
+
+    const result = await runSchedulerTick({ repo, billing });
+
+    expect(result.zombiesRecovered).toBe(0);
+  });
+});
+
+describe("FIX-6 — PM absente ne consomme pas une tentative de dunning", () => {
+  it("sans PM : attempt_count reste 0 + event cycle.no_payment_method", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+
+    const updated = repo.cycles.find(c => c.id === cycle.id)!;
+    expect(updated.attempt_count).toBe(0);
+    expect(billing.chargesAttempted).toHaveLength(0);
+
+    const ev = repo.events.find(e => e.event_type === "cycle.no_payment_method");
+    expect(ev).toBeDefined();
+  });
+
+  it("PM absente ne bloque pas le dunning réel : 2 tentatives avec PM comptent 2", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    billing.nextChargeResult = null;
+
+    /* 1ère tentative sans PM — ne compte pas */
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+    expect(repo.cycles[0]!.attempt_count).toBe(0);
+
+    /* Ajout de la PM */
+    await setupPm(repo);
+    await repo.updateCycleStatus(cycle.id, { status: "failed", failedAt: new Date(0), nextRetryAt: new Date(0) });
+
+    /* 1ère vraie tentative Stripe */
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+    expect(repo.cycles[0]!.attempt_count).toBe(1);
+  });
+});
+
+describe("FIX-7 — findPendingCycleForPeriod : idempotence par period_start", () => {
+  it("double appel succeeded ne crée pas de doublon de cycle suivant", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    billing.nextChargeResult = { paymentIntentId: "pi_ok", status: "succeeded" };
+
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+
+    /* Simule un webhook redondant qui rappelle advanceSubscriptionAfterPayment */
+    billing.nextChargeResult = { paymentIntentId: "pi_ok2", status: "succeeded" };
+    const nextCycle = repo.cycles.find(c => c.status === "pending")!;
+    /* On force une 2ème avance sur le même paid cycle → ne doit pas doubler */
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+
+    const pendingCycles = repo.cycles.filter(c => c.status === "pending");
+    expect(pendingCycles).toHaveLength(1);
+  });
+
+  it("cycle pending stale (ancienne période) n'empêche pas la création du cycle suivant", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+
+    /* Cycle payé — période juin */
+    const june = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"),
+      amountCents: 2900, currency: "eur",
+    });
+    /* Cycle stale pending d'une ancienne période (mai) — laissé en DB */
+    await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-05-01"), periodEnd: new Date("2026-06-01"),
+      amountCents: 2900, currency: "eur",
+    });
+    billing.nextChargeResult = { paymentIntentId: "pi_june", status: "succeeded" };
+
+    await chargeOffSessionForCycle({ repo, billing }, june.id, sub.id, ARTISAN_ID);
+
+    /* Le cycle juillet DOIT être créé malgré le cycle mai pending */
+    const julyCycle = repo.cycles.find(c =>
+      c.period_start.getTime() === new Date("2026-07-01").getTime() && c.status === "pending"
+    );
+    expect(julyCycle).toBeDefined();
+  });
+});
+
 describe("dunning & suspension (IT-3)", () => {
   const MAX_ATTEMPTS = 4;
 
