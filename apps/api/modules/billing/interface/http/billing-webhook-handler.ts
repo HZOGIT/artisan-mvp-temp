@@ -29,7 +29,7 @@ export async function handleBillingWebhookEvent(
         const interval = sub.billing_interval === "yearly" ? "yearly" : "monthly";
         const { start, end } = nextPeriod(cycle.period_end, interval);
         await deps.repo.updateSubscriptionPeriod(sub.id, "active", cycle.period_end, end);
-        const existing = await deps.repo.findPendingCycle(sub.id);
+        const existing = await deps.repo.findPendingCycleForPeriod(sub.id, start);
         if (!existing) {
           await deps.repo.createCycle({ subscriptionId: sub.id, periodStart: start, periodEnd: end, amountCents: cycle.amount_cents, currency: cycle.currency });
         }

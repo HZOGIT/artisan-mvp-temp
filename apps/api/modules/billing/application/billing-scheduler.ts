@@ -30,7 +30,7 @@ async function advanceSubscriptionAfterPayment(
 ): Promise<void> {
   const { start, end } = nextPeriod(paidCycle.period_end, interval);
   await repo.updateSubscriptionPeriod(subscriptionId, "active", paidCycle.period_end, end);
-  const existing = await repo.findPendingCycle(subscriptionId);
+  const existing = await repo.findPendingCycleForPeriod(subscriptionId, start);
   if (!existing) {
     await repo.createCycle({ subscriptionId, periodStart: start, periodEnd: end, amountCents: paidCycle.amount_cents, currency: paidCycle.currency });
   }
@@ -71,6 +71,22 @@ export async function chargeOffSessionForCycle(
 
   const idempotencyKey = `billing-cycle-${cycleId}-attempt-${newAttemptCount}`;
 
+  /* Vérif PM avant de consommer une tentative de dunning */
+  const ctx = { artisanId, userId: 0 } as const;
+  const pm = await deps.repo.findDefaultPaymentMethod(ctx);
+  const customerId = pm?.stripe_customer_id;
+  if (!pm || !customerId) {
+    await deps.repo.updateCycleStatus(cycleId, { status: "failed", failedAt: now, nextRetryAt: nextRetryAt(now, cycle.attempt_count) });
+    await deps.repo.appendEvent({
+      entityType: "billing_cycle",
+      entityId: cycleId,
+      eventType: "cycle.no_payment_method",
+      payload: { artisanId },
+      actor: "scheduler",
+    });
+    return;
+  }
+
   await deps.repo.updateCycleStatus(cycleId, {
     status: "charging",
     chargingStartedAt: now,
@@ -82,19 +98,6 @@ export async function chargeOffSessionForCycle(
     attemptNo: newAttemptCount,
     idempotencyKey,
   });
-
-  const ctx = { artisanId, userId: 0 } as const;
-  const pm = await deps.repo.findDefaultPaymentMethod(ctx);
-  const customerId = pm?.stripe_customer_id;
-  if (!pm || !customerId) {
-    await deps.repo.updateCycleStatus(cycleId, {
-      status: "failed",
-      failedAt: now,
-      nextRetryAt: nextRetryAt(now, newAttemptCount),
-    });
-    await deps.repo.updateChargeAttempt(attempt.id, { status: "failed", failureCode: "no_payment_method" });
-    return;
-  }
 
   try {
     const result = await deps.billing.chargeOffSession({
@@ -127,7 +130,6 @@ export async function chargeOffSessionForCycle(
       await advanceSubscriptionAfterPayment(deps.repo, subscriptionId, artisanId, cycle, interval);
     } else if (result.status === "requires_action") {
       /* Off-session 3DS impossible sans présence de l'utilisateur — traité comme un échec de paiement. */
-      await deps.repo.updateChargeAttempt(attempt.id, { status: "failed", failureCode: "requires_action" });
       await deps.repo.appendEvent({
         entityType: "billing_cycle",
         entityId: cycleId,
@@ -135,7 +137,7 @@ export async function chargeOffSessionForCycle(
         payload: { paymentIntentId: result.paymentIntentId, artisanId, treatedAsFailed: true },
         actor: "scheduler",
       });
-      await handleDunning(deps, { cycleId, subscriptionId, artisanId, now, newAttemptCount, attempt, failureMessage: "requires_action" });
+      await handleDunning(deps, { cycleId, subscriptionId, artisanId, now, newAttemptCount, attempt, failureCode: "requires_action", failureMessage: null });
     } else {
       await deps.repo.updateCycleStatus(cycleId, { status: "processing" });
     }
@@ -153,6 +155,7 @@ interface DunningParams {
   newAttemptCount: number;
   attempt: { id: number };
   failureMessage: string | null;
+  failureCode?: string | null;
 }
 
 async function handleDunning(deps: SchedulerDeps, p: DunningParams): Promise<void> {
@@ -166,7 +169,7 @@ async function handleDunning(deps: SchedulerDeps, p: DunningParams): Promise<voi
     nextRetryAt: isFinalAttempt ? null : retryAt,
     attemptCount: newAttemptCount,
   });
-  await deps.repo.updateChargeAttempt(attempt.id, { status: "failed", failureMessage });
+  await deps.repo.updateChargeAttempt(attempt.id, { status: "failed", failureCode: p.failureCode ?? undefined, failureMessage });
   await deps.repo.appendEvent({
     entityType: "billing_cycle",
     entityId: cycleId,
@@ -231,12 +234,14 @@ async function handleDunning(deps: SchedulerDeps, p: DunningParams): Promise<voi
 /**
  * Réconcilie les cycles zombies (bloqués en `charging` > 15 min) via l'état réel du PaymentIntent.
  */
-export async function recoverZombies(deps: SchedulerDeps): Promise<void> {
+export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
   const now = new Date();
   const zombies = await deps.repo.findZombieCycles(now);
+  let recovered = 0;
 
   for (const cycle of zombies) {
     if (!isZombie(cycle, now)) continue;
+    recovered++;
 
     const lastAttempt = await deps.repo.findLastAttemptByCycleId(cycle.id);
     const piId = lastAttempt?.stripe_payment_intent_id ?? null;
@@ -301,13 +306,14 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<void> {
       });
     }
   }
+  return recovered;
 }
 
 /**
  * Tick principal du scheduler : récupère les zombies puis prélève tous les cycles échus.
  */
 export async function runSchedulerTick(deps: SchedulerDeps): Promise<{ charged: number; zombiesRecovered: number }> {
-  await recoverZombies(deps);
+  const zombiesRecovered = await recoverZombies(deps);
 
   const now = new Date();
   const due = await deps.repo.findSubscriptionsWithDueCycles(now);
@@ -328,6 +334,5 @@ export async function runSchedulerTick(deps: SchedulerDeps): Promise<{ charged: 
     }
   }
 
-  const zombies = await deps.repo.findZombieCycles(now);
-  return { charged, zombiesRecovered: zombies.length };
+  return { charged, zombiesRecovered };
 }
