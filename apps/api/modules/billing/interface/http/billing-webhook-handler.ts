@@ -116,7 +116,13 @@ export async function handleBillingWebhookEvent(
       payload: { paymentIntentId, via: "webhook", artisanId, attemptNo: attempt.attempt_no, failureCode, failureMessage, nextRetryAt: retryAt?.toISOString() ?? null },
       actor: "stripe_webhook",
     });
-    if (isFinalAttempt && cycle && sub) {
+    /*
+     * Guard symétrique de FIX-CE : ne pas forcer past_due si la sub est déjà canceled.
+     * Exemple : SEPA en vol, processDueCancellations annule la sub, puis Stripe livre
+     * payment_intent.payment_failed en retard → sans ce guard, sub "canceled" → "past_due"
+     * (résurrection involontaire + notification de suspension d'un abo déjà annulé).
+     */
+    if (isFinalAttempt && cycle && sub && sub.status !== "canceled") {
       await deps.repo.updateSubscriptionStatus({ artisanId: sub.artisan_id, userId: 0 }, "past_due");
       await deps.repo.appendEvent({
         entityType: "billing_subscription",

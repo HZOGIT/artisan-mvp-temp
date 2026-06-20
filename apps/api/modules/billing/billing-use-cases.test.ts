@@ -1467,3 +1467,70 @@ describe("FIX-CDC — webhook payment_intent.succeeded : prochain cycle au tarif
     expect(nextCycle.amount_cents).toBe(4900);
   });
 });
+
+describe("FIX-CDE — webhook payment_intent.payment_failed : ne pas ressusciter une sub canceled en past_due", () => {
+  async function setupCanceledSubWithProcessingCycle(repo: FakeBillingRepository, piId: string, attemptNo: number) {
+    const sub = await repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison", status: "active",
+      currentPeriodStart: new Date("2026-06-01"), currentPeriodEnd: new Date("2026-07-01"),
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"),
+      amountCents: 2900, currency: "eur",
+    });
+    await repo.updateCycleStatus(cycle.id, { status: "processing", chargingStartedAt: new Date(), attemptCount: attemptNo });
+    const att = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo, idempotencyKey: `k_cde_${attemptNo}` });
+    await repo.updateChargeAttempt(att.id, { stripePaymentIntentId: piId, status: "processing" });
+    /* processDueCancellations annule la sub avant l'arrivée du webhook */
+    await repo.updateSubscriptionStatus(A, "canceled");
+    return { sub, cycle, att };
+  }
+
+  it("sub canceled + tentative finale → webhook ne remet PAS sub en past_due", async () => {
+    const repo = new FakeBillingRepository();
+    const { sub } = await setupCanceledSubWithProcessingCycle(repo, "pi_cde_final", 4);
+
+    await handleBillingWebhookEvent({ repo }, "payment_intent.payment_failed", "pi_cde_final", "insufficient_funds", null, "evt_cde_final");
+
+    const updatedSub = repo.subs.find(s => s.id === sub.id)!;
+    expect(updatedSub.status).toBe("canceled"); /* ne doit PAS passer à past_due */
+    const suspended = repo.events.find(e => e.event_type === "subscription.suspended");
+    expect(suspended).toBeUndefined(); /* pas de notification de suspension */
+  });
+
+  it("sub canceled + tentative finale → cycle marqué failed + cycle.charge_failed émis (audit trail OK)", async () => {
+    const repo = new FakeBillingRepository();
+    const { cycle } = await setupCanceledSubWithProcessingCycle(repo, "pi_cde_audit", 4);
+
+    await handleBillingWebhookEvent({ repo }, "payment_intent.payment_failed", "pi_cde_audit", "card_declined", null, "evt_cde_audit");
+
+    const updatedCycle = repo.cycles.find(c => c.id === cycle.id)!;
+    expect(updatedCycle.status).toBe("failed"); /* cycle correctement marqué */
+    const failEv = repo.events.find(e => e.event_type === "cycle.charge_failed");
+    expect(failEv).toBeDefined(); /* audit trail préservé */
+  });
+
+  it("sub active + tentative finale → comportement normal : sub → past_due + subscription.suspended", async () => {
+    const repo = new FakeBillingRepository();
+    const sub = await repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison", status: "active",
+      currentPeriodStart: new Date("2026-06-01"), currentPeriodEnd: new Date("2026-07-01"),
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"),
+      amountCents: 2900, currency: "eur",
+    });
+    await repo.updateCycleStatus(cycle.id, { status: "processing", chargingStartedAt: new Date(), attemptCount: 4 });
+    const att = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 4, idempotencyKey: "k_cde_active" });
+    await repo.updateChargeAttempt(att.id, { stripePaymentIntentId: "pi_cde_active", status: "processing" });
+
+    await handleBillingWebhookEvent({ repo }, "payment_intent.payment_failed", "pi_cde_active", "insufficient_funds", null, "evt_cde_active");
+
+    const updatedSub = repo.subs.find(s => s.id === sub.id)!;
+    expect(updatedSub.status).toBe("past_due"); /* sub active → suspension normale */
+    const suspended = repo.events.find(e => e.event_type === "subscription.suspended");
+    expect(suspended).toBeDefined();
+  });
+});
