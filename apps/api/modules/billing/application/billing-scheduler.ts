@@ -581,13 +581,19 @@ export async function runSchedulerTick(deps: SchedulerDeps): Promise<{ charged: 
       await chargeOffSessionForCycle(deps, cycle.id, subscription.id, subscription.artisan_id);
       charged++;
     } catch (err) {
-      await deps.repo.appendEvent({
-        entityType: "billing_cycle",
-        entityId: cycle.id,
-        eventType: "cycle.tick_error",
-        payload: { artisanId: subscription.artisan_id, error: err instanceof Error ? err.message : String(err) },
-        actor: "scheduler",
-      });
+      /*
+       * appendEvent peut échouer si la DB est down (même contexte que l'erreur dans le try).
+       * Sans protection, un throw ici avorterait la boucle pour tous les abonnés restants.
+       */
+      try {
+        await deps.repo.appendEvent({
+          entityType: "billing_cycle",
+          entityId: cycle.id,
+          eventType: "cycle.tick_error",
+          payload: { artisanId: subscription.artisan_id, error: err instanceof Error ? err.message : String(err) },
+          actor: "scheduler",
+        });
+      } catch { /* best-effort — ne pas avorter la boucle sur échec de logging */ }
     }
   }
 

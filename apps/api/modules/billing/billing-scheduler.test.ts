@@ -1913,6 +1913,43 @@ describe("FIX-CDF — advanceSubscriptionAfterPayment : cycle créé avant updat
   });
 });
 
+describe("FIX-CDI — runSchedulerTick boucle principale : appendEvent cycle.tick_error wrappé", () => {
+  it("appendEvent dans le catch tick_error throw → swallowed, sub suivante facturée normalement", async () => {
+    const { repo, billing } = makeDeps();
+    const ARTISAN_ID_2 = 2;
+    const pastRetry = new Date(Date.now() - 3600_000);
+
+    /* sub1 — cycle failed max tentatives → MaxAttemptsReachedError → catch → appendEvent échoue */
+    const sub1 = await setupActiveSub(repo);
+    await setupPm(repo);
+    const cycle1 = await repo.createCycle({ subscriptionId: sub1.id, periodStart: new Date("2026-05-01"), periodEnd: new Date("2026-06-01"), amountCents: 2900, currency: "eur" });
+    await repo.updateCycleStatus(cycle1.id, { status: "failed", failedAt: pastRetry, nextRetryAt: pastRetry, attemptCount: 4 });
+
+    /* sub2 — cycle pending normal → doit être facturé malgré l'erreur sur sub1 */
+    const sub2 = await repo.saveSubscription({
+      artisanId: ARTISAN_ID_2, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const pm2 = await repo.savePaymentMethod({
+      artisanId: ARTISAN_ID_2, stripeCustomerId: "cus_2", stripePaymentMethodId: "pm_2",
+      brand: "visa", last4: "4242", expMonth: 12, expYear: 2028, consentedAt: new Date(),
+    });
+    await repo.setDefaultPaymentMethod({ artisanId: ARTISAN_ID_2, userId: 0 }, pm2.id);
+    await repo.createCycle({ subscriptionId: sub2.id, periodStart: new Date("2026-05-01"), periodEnd: new Date("2026-06-01"), amountCents: 2900, currency: "eur" });
+
+    repo.simulateAppendEventError = new Error("DB down during tick_error log");
+    billing.nextChargeResult = { paymentIntentId: "pi_cdi_ok", status: "succeeded" };
+
+    await runSchedulerTick({ repo, billing });
+
+    /* sub2 doit avoir été facturée malgré la double erreur (MaxAttempts + appendEvent) sur sub1 */
+    expect(billing.chargesAttempted.some(c => c.customerId === "cus_2")).toBe(true);
+    const cycle2 = repo.cycles.find(c => c.subscription_id === sub2.id)!;
+    expect(cycle2.status).toBe("paid");
+  });
+});
+
 describe("FIX-CDH — protection catch blocks : appendEvent en échec ne doit pas avorter la boucle", () => {
   describe("recoverZombies", () => {
     it("appendEvent dans le catch throw → swallowed, zombie#2 traité normalement", async () => {
