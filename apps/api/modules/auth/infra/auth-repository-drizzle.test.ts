@@ -53,4 +53,26 @@ describe.skipIf(!URL)("AuthRepositoryDrizzle (PG : users HORS RLS, accès par id
     const after = (await admin.query('select "lastSignedIn" from users where id=$1', [U1])).rows[0].lastSignedIn;
     expect(new Date(after).getTime()).toBeGreaterThanOrEqual(new Date(before).getTime());
   });
+
+  it("FIX-CK — bootstrapAccount : crée artisan + abonnement trialing + subscription.created dans billing_events", async () => {
+    const testUserId = 9943003;
+    try {
+      await admin.query("delete from users where id=$1", [testUserId]);
+      await admin.query("insert into users (id, email, password, name, role, actif) values ($1,'ck@t.fr','hash','CK','artisan',true)", [testUserId]);
+      await repo.bootstrapAccount(testUserId);
+      const artisanRow = (await admin.query("select id from artisans where \"userId\"=$1", [testUserId])).rows[0];
+      expect(artisanRow, "artisan créé").toBeDefined();
+      const subRow = (await admin.query("select id, status, plan_id from billing_subscriptions where artisan_id=$1", [artisanRow.id])).rows[0];
+      expect(subRow?.status).toBe("trialing");
+      expect(subRow?.plan_id).toBe("starter");
+      const evtRow = (await admin.query(
+        "select event_type, entity_id, payload from billing_events where entity_type='billing_subscription' AND entity_id=$1 AND event_type='subscription.created'",
+        [subRow.id],
+      )).rows[0];
+      expect(evtRow, "subscription.created dans billing_events").toBeDefined();
+      expect(evtRow?.payload?.artisanId).toBe(artisanRow.id);
+    } finally {
+      await admin.query("delete from users where id=$1", [testUserId]);
+    }
+  });
 });

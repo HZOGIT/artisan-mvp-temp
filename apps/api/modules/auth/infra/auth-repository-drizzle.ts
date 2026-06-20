@@ -1,5 +1,5 @@
 import { and, eq, gte } from "drizzle-orm";
-import { artisans, billingSubscriptions, permissionsUtilisateur, users } from "../../../../../drizzle/schema.pg";
+import { artisans, billingEvents, billingSubscriptions, permissionsUtilisateur, users } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import type { IAuthRepository } from "../application/auth-repository";
 import type { AuthCredentials, AuthUser } from "../domain/auth";
@@ -88,13 +88,23 @@ export class AuthRepositoryDrizzle implements IAuthRepository {
     await this.db.update(users).set({ artisanId }).where(eq(users.id, userId));
     /** 3. Abonnement d'essai (billing maison, si absent) — best-effort. */
     try {
-      const [sub] = await this.db.select({ id: billingSubscriptions.id }).from(billingSubscriptions).where(eq(billingSubscriptions.artisan_id, artisanId)).limit(1);
-      if (!sub) {
+      const [existing] = await this.db.select({ id: billingSubscriptions.id }).from(billingSubscriptions).where(eq(billingSubscriptions.artisan_id, artisanId)).limit(1);
+      if (!existing) {
         const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
-        await this.db
+        const [newSub] = await this.db
           .insert(billingSubscriptions)
           .values({ artisan_id: artisanId, plan_id: "starter", billing_mode: "maison", status: "trialing", trial_ends_at: trialEndsAt })
-          .onConflictDoNothing({ target: billingSubscriptions.artisan_id });
+          .onConflictDoNothing({ target: billingSubscriptions.artisan_id })
+          .returning({ id: billingSubscriptions.id });
+        if (newSub) {
+          await this.db.insert(billingEvents).values({
+            entity_type: "billing_subscription",
+            entity_id: newSub.id,
+            event_type: "subscription.created",
+            payload: { artisanId, planId: "starter", billingMode: "maison", status: "trialing", trialEndsAt: trialEndsAt.toISOString() },
+            actor: "system:registration",
+          });
+        }
       }
     } catch {
       /* best-effort */
