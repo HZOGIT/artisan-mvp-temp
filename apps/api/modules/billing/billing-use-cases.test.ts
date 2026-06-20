@@ -316,6 +316,20 @@ describe("setDefaultPaymentMethod", () => {
     }
   });
 
+  it("FIX-CR — setDefault sur PM révoqué → NotFoundError (n'efface pas le default actuel)", async () => {
+    const deps = makeDeps();
+    const { paymentMethod: pm1 } = await confirmPaymentMethod(deps, A, { stripePaymentMethodId: "pm_cr1", stripeCustomerId: "cus_test", setAsDefault: true, consentedAt: new Date() });
+    const { paymentMethod: pm2 } = await confirmPaymentMethod(deps, A, { stripePaymentMethodId: "pm_cr2", stripeCustomerId: "cus_test", setAsDefault: false, consentedAt: new Date() });
+    await revokePaymentMethod(deps, A, pm2.id);
+
+    await expect(setDefaultPaymentMethod(deps, A, pm2.id)).rejects.toThrow(NotFoundError);
+
+    const pms = await deps.repo.listPaymentMethods(A);
+    const defaults = pms.filter(p => p.is_default);
+    expect(defaults).toHaveLength(1);
+    expect(defaults[0]!.id).toBe(pm1.id);
+  });
+
   it("change la carte par défaut — une seule carte default à la fois", async () => {
     const deps = makeDeps();
     const { paymentMethod: pm1 } = await confirmPaymentMethod(deps, A, { stripePaymentMethodId: "pm_1", stripeCustomerId: "cus_test", setAsDefault: true, consentedAt: new Date() });

@@ -158,6 +158,7 @@ async function resumeBillingIfAbandoned(repo: IBillingRepository, ctx: TenantCon
 export async function setDefaultPaymentMethod(deps: BillingDeps, ctx: TenantContext, paymentMethodId: number): Promise<void> {
   const pm = await deps.repo.findPaymentMethodById(ctx, paymentMethodId);
   if (!pm) throw new NotFoundError(`Moyen de paiement ${paymentMethodId} introuvable`);
+  if (pm.revoked_at !== null) throw new NotFoundError(`Moyen de paiement ${paymentMethodId} révoqué`);
 
   await deps.repo.setDefaultPaymentMethod(ctx, paymentMethodId);
   const sub = await deps.repo.findSubscription(ctx);
