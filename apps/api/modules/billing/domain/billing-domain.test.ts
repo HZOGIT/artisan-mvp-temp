@@ -273,9 +273,33 @@ describe("FIX-G — nextPeriod : clampage fin de mois (setMonth overflow)", () =
     expect(end.toISOString().slice(0, 10)).toBe("2026-02-15");
   });
 
-  it("Jan 31 + 1 an → Jan 31 (yearly inchangé)", () => {
+  it("Jan 31 + 1 an → Jan 31 (yearly, mois avec 31 jours)", () => {
     const periodEnd = new Date("2026-01-31T00:00:00.000Z");
     const { end } = nextPeriod(periodEnd, "yearly");
     expect(end.toISOString().slice(0, 10)).toBe("2027-01-31");
+  });
+
+  it("FIX-K — Fév 29 2024 + 1 an → Fév 28 2025 (setFullYear overflow sur jour bissextile)", () => {
+    const periodEnd = new Date("2024-02-29T00:00:00.000Z");
+    const { start, end } = nextPeriod(periodEnd, "yearly");
+    expect(start.toISOString().slice(0, 10)).toBe("2024-02-29");
+    expect(end.toISOString().slice(0, 10)).toBe("2025-02-28");
+  });
+
+  it("FIX-K — Fév 29 2024 renouvelé 4× → Fév 28 2028 (clamp permanent, standard Stripe)", () => {
+    /* Une fois clampé à Fév 28, l'ancre est perdue et reste 28 même les années bissextiles.
+       C'est le comportement standard Stripe : pas de "retour" au 29 des années suivantes. */
+    let d = new Date("2024-02-29T00:00:00.000Z");
+    for (let i = 0; i < 4; i++) {
+      const { end } = nextPeriod(d, "yearly");
+      d = end;
+    }
+    expect(d.toISOString().slice(0, 10)).toBe("2028-02-28");
+  });
+
+  it("FIX-K — Fév 28 2025 + 1 an → Fév 28 2026 (non-bissextile, pas de débordement)", () => {
+    const periodEnd = new Date("2025-02-28T00:00:00.000Z");
+    const { end } = nextPeriod(periodEnd, "yearly");
+    expect(end.toISOString().slice(0, 10)).toBe("2026-02-28");
   });
 });

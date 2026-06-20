@@ -61,10 +61,17 @@ export function isDue(cycle: BillingCycle, now: Date): boolean {
 export function nextPeriod(periodEnd: Date, interval: "monthly" | "yearly"): { start: Date; end: Date } {
   const start = new Date(periodEnd);
   const end = new Date(periodEnd);
+  const anchorDay = periodEnd.getDate();
   if (interval === "yearly") {
+    /*
+     * setDate(1) avant setFullYear : même pattern que monthly (FIX-G) pour éviter
+     * le débordement Feb 29 → Mar 1 lors du passage à une année non-bissextile.
+     */
+    end.setDate(1);
     end.setFullYear(end.getFullYear() + 1);
+    const lastDayOfTargetMonth = new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate();
+    end.setDate(Math.min(anchorDay, lastDayOfTargetMonth));
   } else {
-    const anchorDay = periodEnd.getDate();
     end.setDate(1);
     end.setMonth(end.getMonth() + 1);
     const lastDayOfTargetMonth = new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate();
