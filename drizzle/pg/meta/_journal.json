@@ -50,6 +50,13 @@
       "when": 1781855622387,
       "tag": "0006_billing-maison-extras",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1781943626507,
+      "tag": "0007_billing-events-immutable",
+      "breakpoints": true
     }
   ]
 }
