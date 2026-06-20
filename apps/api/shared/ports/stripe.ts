@@ -28,6 +28,4 @@ export interface StripePort {
   constructEvent(rawBody: Buffer, signature: string, secret: string): Promise<StripeWebhookEvent>;
   createCustomer(params: CreateCustomerParams): Promise<{ id: string }>;
   createInvoiceCheckout(params: CreateInvoiceCheckoutParams): Promise<{ url: string | null; sessionId: string }>;
-  setCancelAtPeriodEnd(subscriptionId: string, cancel: boolean): Promise<void>;
-  retrieveSubscription(subscriptionId: string): Promise<{ status: string; currentPeriodStart: Date | null; currentPeriodEnd: Date | null }>;
 }

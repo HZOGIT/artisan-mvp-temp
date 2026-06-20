@@ -5,14 +5,8 @@ const STRIPE_MODULE = "stripe";
 type StripeSDK = {
   customers: { create(p: unknown): Promise<{ id: string }> };
   checkout: { sessions: { create(p: unknown): Promise<{ id: string; url: string | null }> } };
-  subscriptions: {
-    update(id: string, p: unknown): Promise<unknown>;
-    retrieve(id: string): Promise<{ status?: string; current_period_start?: number; current_period_end?: number }>;
-  };
   webhooks: { constructEvent(payload: Buffer, signature: string, secret: string): StripeWebhookEvent };
 };
-
-const epochToDate = (s: number | undefined): Date | null => (typeof s === "number" && s > 0 ? new Date(s * 1000) : null);
 
 export class StripeAdapter implements StripePort {
   private client: StripeSDK | null = null;
@@ -69,22 +63,10 @@ export class StripeAdapter implements StripePort {
     });
     return { url: session.url, sessionId: session.id };
   }
-
-  async setCancelAtPeriodEnd(subscriptionId: string, cancel: boolean): Promise<void> {
-    const s = await this.sdk();
-    await s.subscriptions.update(subscriptionId, { cancel_at_period_end: cancel });
-  }
-
-  async retrieveSubscription(subscriptionId: string): Promise<{ status: string; currentPeriodStart: Date | null; currentPeriodEnd: Date | null }> {
-    const s = await this.sdk();
-    const sub = await s.subscriptions.retrieve(subscriptionId);
-    return { status: sub.status ?? "active", currentPeriodStart: epochToDate(sub.current_period_start), currentPeriodEnd: epochToDate(sub.current_period_end) };
-  }
 }
 
 export class FakeStripePort implements StripePort {
   public customers: CreateCustomerParams[] = [];
-  public cancelToggles: { subscriptionId: string; cancel: boolean }[] = [];
   private seq = 0;
   public acceptSignature = "valid-sig";
 
@@ -103,14 +85,5 @@ export class FakeStripePort implements StripePort {
     this.invoiceCheckouts.push(p);
     const id = `cs_invoice_${++this.seq}`;
     return { url: `https://checkout.stripe.test/${id}`, sessionId: id };
-  }
-
-  async setCancelAtPeriodEnd(subscriptionId: string, cancel: boolean): Promise<void> {
-    this.cancelToggles.push({ subscriptionId, cancel });
-  }
-
-  public retrievedSubscription = { status: "active", currentPeriodStart: null as Date | null, currentPeriodEnd: null as Date | null };
-  async retrieveSubscription(): Promise<{ status: string; currentPeriodStart: Date | null; currentPeriodEnd: Date | null }> {
-    return this.retrievedSubscription;
   }
 }
