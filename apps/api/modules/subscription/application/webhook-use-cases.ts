@@ -46,13 +46,17 @@ export async function processStripeWebhook(
         const pi = event.data.object as Record<string, unknown>;
         const piId = typeof pi["id"] === "string" ? pi["id"] : "";
         const lec = pi["last_payment_error"] as Record<string, unknown> | undefined;
-        await deps.onBillingWebhookEvent(event.type, piId, lec?.["code"] as string ?? null, lec?.["message"] as string ?? null, event.id).catch(() => {});
+        await deps.onBillingWebhookEvent(event.type, piId, lec?.["code"] as string ?? null, lec?.["message"] as string ?? null, event.id).catch((err) => {
+          deps.log?.error({ event: "billing_webhook_handler_error", stripeEvent: event.type, paymentIntentId: piId, error: err instanceof Error ? err.message : String(err) }, "billing maison webhook handler failed — event not processed");
+        });
       }
     } else if (event.type === "payment_intent.succeeded") {
       if (deps.onBillingWebhookEvent) {
         const pi = event.data.object as Record<string, unknown>;
         const piId = typeof pi["id"] === "string" ? pi["id"] : "";
-        await deps.onBillingWebhookEvent(event.type, piId, null, null, event.id).catch(() => {});
+        await deps.onBillingWebhookEvent(event.type, piId, null, null, event.id).catch((err) => {
+          deps.log?.error({ event: "billing_webhook_handler_error", stripeEvent: event.type, paymentIntentId: piId, error: err instanceof Error ? err.message : String(err) }, "billing maison webhook handler failed — event not processed");
+        });
       }
     } else if (event.type === "customer.subscription.trial_will_end") {
       await handleTrialWillEnd(deps, event.data.object);

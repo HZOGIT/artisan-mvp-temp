@@ -113,4 +113,30 @@ describe("processStripeWebhook (fail-closed)", () => {
     await processStripeWebhook({ ...deps, onBillingWebhookEvent: async (t) => { billingEvents.push(t); } }, { rawBody: raw(event), signature: SIG });
     expect(billingEvents).toEqual(["payment_intent.succeeded"]);
   });
+
+  it("FIX-CT — onBillingWebhookEvent erreur DB logguée, retourne 200 (ne laisse pas Stripe sans retry silencieux)", async () => {
+    const { deps } = build();
+    const logged: string[] = [];
+    const fakeLog = { error: (obj: unknown, msg: string) => { logged.push(msg); }, info: () => {}, warn: () => {}, debug: () => {} };
+    const event = { id: "evt_ct", type: "payment_intent.succeeded", data: { object: { id: "pi_ct" } } };
+    const r = await processStripeWebhook(
+      { ...deps, log: fakeLog as never, onBillingWebhookEvent: async () => { throw new Error("DB connexion perdue"); } },
+      { rawBody: raw(event), signature: SIG },
+    );
+    expect(r.http).toBe(200);
+    expect(logged.some(m => m.includes("billing maison webhook handler failed"))).toBe(true);
+  });
+
+  it("FIX-CT — onBillingWebhookEvent erreur payment_failed logguée, retourne 200", async () => {
+    const { deps } = build();
+    const logged: string[] = [];
+    const fakeLog = { error: (obj: unknown, msg: string) => { logged.push(msg); }, info: () => {}, warn: () => {}, debug: () => {} };
+    const event = { id: "evt_ct2", type: "payment_intent.payment_failed", data: { object: { id: "pi_ct2", metadata: {} } } };
+    const r = await processStripeWebhook(
+      { ...deps, log: fakeLog as never, onBillingWebhookEvent: async () => { throw new Error("DB timeout"); } },
+      { rawBody: raw(event), signature: SIG },
+    );
+    expect(r.http).toBe(200);
+    expect(logged.some(m => m.includes("billing maison webhook handler failed"))).toBe(true);
+  });
 });
