@@ -310,6 +310,27 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
     }
     const artisanId = sub.artisan_id;
 
+    /*
+     * Guard : sub annulée pendant que le PI était en vol (ex. virement SEPA 1-3 jours).
+     * Ne jamais dunner ni avancer la période — cela ressusciterait une sub annulée.
+     * On marque le cycle paid/failed selon le PI et on laisse la sub canceled.
+     */
+    if (sub.status === "canceled") {
+      const finalStatus = pi.status === "succeeded" ? "paid" : "failed";
+      await deps.repo.updateCycleStatus(cycle.id, {
+        status: finalStatus,
+        ...(finalStatus === "paid" ? { paidAt: now } : { failedAt: now }),
+      });
+      await deps.repo.appendEvent({
+        entityType: "billing_cycle",
+        entityId: cycle.id,
+        eventType: "cycle.zombie_canceled_sub",
+        payload: { artisanId, piStatus: pi.status, paymentIntentId: piId, cycleMarkedAs: finalStatus },
+        actor: "scheduler",
+      });
+      continue;
+    }
+
     if (pi.status === "succeeded") {
       const paidAt = now;
       await deps.repo.updateCycleStatus(cycle.id, { status: "paid", paidAt });

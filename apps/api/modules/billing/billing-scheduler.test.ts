@@ -364,6 +364,46 @@ describe("FIX-3 — zombie PI failed passe par handleDunning", () => {
   });
 });
 
+describe("FIX-CC — recoverZombies : sub canceled pendant PI en vol (SEPA) ne doit pas être ressuscitée", () => {
+  async function setupZombieForCanceledSub(repo: FakeBillingRepository, billing: FakeBillingPort, piStatus: string) {
+    const sub = await setupActiveSub(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    const zombieStart = new Date(Date.now() - 20 * 60 * 1000);
+    await repo.updateCycleStatus(cycle.id, { status: "charging", chargingStartedAt: zombieStart });
+    const attempt = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k_cc" });
+    await repo.updateChargeAttempt(attempt.id, { stripePaymentIntentId: "pi_sepa", status: "processing" });
+    billing.retrievePaymentIntent = async () => ({ id: "pi_sepa", status: piStatus as "succeeded" | "processing" | "requires_action" | "canceled", failureCode: null, failureMessage: null });
+    await repo.updateSubscriptionStatus(CTX, "canceled");
+    return { sub, cycle };
+  }
+
+  it("PI succeeded + sub canceled → cycle paid, sub reste canceled, période NON avancée", async () => {
+    const { repo, billing } = makeDeps();
+    const { sub, cycle } = await setupZombieForCanceledSub(repo, billing, "succeeded");
+
+    await recoverZombies({ repo, billing });
+
+    expect(repo.cycles.find(c => c.id === cycle.id)!.status).toBe("paid");
+    expect(repo.subs.find(s => s.id === sub.id)!.status).toBe("canceled");
+    expect(repo.cycles.filter(c => c.subscription_id === sub.id)).toHaveLength(1);
+    const ev = repo.events.find(e => e.event_type === "cycle.zombie_canceled_sub");
+    expect(ev).toBeDefined();
+    expect((ev!.payload as Record<string, unknown>)["piStatus"]).toBe("succeeded");
+  });
+
+  it("PI failed + sub canceled → cycle failed, sub reste canceled (pas de past_due)", async () => {
+    const { repo, billing } = makeDeps();
+    const { sub, cycle } = await setupZombieForCanceledSub(repo, billing, "canceled");
+
+    await recoverZombies({ repo, billing });
+
+    expect(repo.cycles.find(c => c.id === cycle.id)!.status).toBe("failed");
+    expect(repo.subs.find(s => s.id === sub.id)!.status).toBe("canceled");
+    const suspended = repo.events.find(e => e.event_type === "subscription.suspended");
+    expect(suspended).toBeUndefined();
+  });
+});
+
 describe("FIX-4 — requires_action : un seul updateChargeAttempt avec failure_code", () => {
   it("failure_code=requires_action présent + failure_message absent après requires_action", async () => {
     const { repo, billing } = makeDeps();
