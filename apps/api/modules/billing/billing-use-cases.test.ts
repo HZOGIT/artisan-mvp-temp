@@ -914,7 +914,8 @@ describe("FIX-J — reprise facturation après dunning épuisé (resumeBillingIf
 
     expect(deps.repo.cycles[0]!.status).toBe("pending");
     expect(deps.repo.cycles[0]!.next_retry_at).toBeNull();
-    expect(deps.repo.cycles[0]!.attempt_count).toBe(0);
+    /* FIX-Q : attempt_count NON remis à 0 — évite collision UNIQUE sur (cycle_id, attempt_no) */
+    expect(deps.repo.cycles[0]!.attempt_count).toBe(4);
     expect(deps.repo.subs[0]!.status).toBe("active");
 
     const ev = deps.repo.events.find(e => e.event_type === "subscription.billing_resumed");

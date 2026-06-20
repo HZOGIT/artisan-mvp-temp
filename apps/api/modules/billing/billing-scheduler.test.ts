@@ -1004,3 +1004,55 @@ describe("FIX-O — activateExpiredTrials : robustesse ordre + limit", () => {
     expect(found).toHaveLength(2);
   });
 });
+
+describe("FIX-Q — resumeBillingIfAbandoned : pas de reset attempt_count → pas de collision (cycle_id,attempt_no)", () => {
+  it("cycle repris avec attempt_count=4 → attempt_no=5 créé sans collision", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+
+    /* Simule un cycle qui a épuisé le dunning (4 tentatives, abandonné) puis repris */
+    const cycle = await setupPendingCycle(repo, sub.id);
+    repo.cycles[0] = {
+      ...cycle,
+      status: "pending",
+      attempt_count: 4,   /* repris par resumeBillingIfAbandoned, count non réinitialisé */
+    };
+
+    /* Pré-remplir les 4 tentatives précédentes pour activer la contrainte UNIQUE simulée */
+    for (let n = 1; n <= 4; n++) {
+      await repo.createChargeAttempt({
+        cycleId: cycle.id,
+        attemptNo: n,
+        idempotencyKey: `billing-cycle-${cycle.id}-attempt-${n}`,
+      });
+    }
+
+    billing.nextChargeResult = { paymentIntentId: "pi_resumed", status: "succeeded" };
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+
+    /* La nouvelle tentative doit être attempt_no=5 (pas de collision avec 1-4) */
+    const newAttempt = repo.chargeAttempts.find(a => a.attempt_no === 5);
+    expect(newAttempt).toBeDefined();
+    expect(billing.chargesAttempted).toHaveLength(1);
+    expect(repo.cycles[0]!.status).toBe("paid");
+  });
+
+  it("cycle repris → si charge échoue → isFinalAttempt (attempt_no=5 >= MAX=4) → abandonné de nouveau", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+
+    const cycle = await setupPendingCycle(repo, sub.id);
+    repo.cycles[0] = { ...cycle, status: "pending", attempt_count: 4 };
+
+    billing.chargeOffSession = async () => { throw new Error("insufficient_funds"); };
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+
+    /* Charge échouée sur la tentative #5 → isFinalAttempt → nextRetryAt=null (abandonné) */
+    const updated = repo.cycles[0]!;
+    expect(updated.status).toBe("failed");
+    expect(updated.next_retry_at).toBeNull();
+    expect(updated.attempt_count).toBe(5);
+  });
+});

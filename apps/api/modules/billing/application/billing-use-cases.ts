@@ -132,11 +132,18 @@ async function resumeBillingIfAbandoned(repo: IBillingRepository, ctx: TenantCon
   const abandoned = await repo.findAbandonedCycle(sub.id);
   if (!abandoned) return;
 
+  /*
+   * attempt_count intentionnellement NON réinitialisé à 0.
+   * billing_charge_attempts a une contrainte UNIQUE sur (cycle_id, attempt_no) :
+   * remettre attempt_count=0 provoquerait une violation de clé unique au prochain
+   * createChargeAttempt (attempt_no=1 déjà pris par la première tentative de dunning).
+   * Les nouvelles tentatives post-reprise continuent depuis le compteur courant
+   * (ex. attempt_no=5 après un dunning complet à 4 tentatives).
+   */
   await repo.updateCycleStatus(abandoned.id, {
     status: "pending",
     nextRetryAt: null,
     failedAt: null,
-    attemptCount: 0,
   });
   await repo.updateSubscriptionStatus(ctx, "active");
   await repo.appendEvent({

@@ -69,7 +69,14 @@ export async function chargeOffSessionForCycle(
   if (!isDue(cycle, now)) return;
 
   const newAttemptCount = cycle.attempt_count + 1;
-  if (newAttemptCount > MAX_DUNNING_ATTEMPTS) throw new MaxAttemptsReachedError(cycleId);
+  /*
+   * MaxAttemptsReachedError n'est levée QUE pour les cycles `failed` (dunning normal).
+   * Un cycle `pending` avec attempt_count élevé est un cycle repris après dunning épuisé
+   * (resumeBillingIfAbandoned) : on laisse passer pour éviter de bloquer indéfiniment.
+   */
+  if (newAttemptCount > MAX_DUNNING_ATTEMPTS && cycle.status !== "pending") {
+    throw new MaxAttemptsReachedError(cycleId);
+  }
 
   const idempotencyKey = `billing-cycle-${cycleId}-attempt-${newAttemptCount}`;
 
