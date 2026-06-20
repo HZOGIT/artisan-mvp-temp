@@ -779,6 +779,48 @@ describe("reactivateSubscription", () => {
     const deps = makeDeps();
     await expect(reactivateSubscription(deps, A)).rejects.toBeInstanceOf(NotFoundError);
   });
+
+  it("FIX-L — sub canceled avec cancel_at (scheduler exécuté) → no-op, cancel_at conservé", async () => {
+    /* Bug : le scheduler passe status→canceled mais ne clear pas cancel_at.
+       reactivateSubscription ne doit pas effacer cancel_at sans remettre status→active. */
+    const deps = makeDeps();
+    const pastCancelAt = new Date("2026-05-01T00:00:00Z");
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "pro", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: pastCancelAt,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    await deps.repo.updateCancelAt(A, pastCancelAt);
+    await deps.repo.updateSubscriptionStatus(A, "canceled");
+
+    await reactivateSubscription(deps, A);
+
+    const sub = await deps.repo.findSubscription(A);
+    expect(sub?.status).toBe("canceled");
+    expect(sub?.cancel_at).not.toBeNull();
+    const events = deps.repo.events.filter(e => e.event_type === "subscription.reactivated");
+    expect(events).toHaveLength(0);
+  });
+});
+
+describe("cancelAtPeriodEnd — FIX-L — status guard", () => {
+  it("sub canceled → no-op (aucun event, cancel_at inchangé)", async () => {
+    /* Bug symétrique : cancelAtPeriodEnd ne doit pas planifier une annulation sur une sub déjà annulée. */
+    const deps = makeDeps();
+    const periodEnd = new Date("2026-05-01T00:00:00Z");
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "canceled", currentPeriodStart: null, currentPeriodEnd: periodEnd,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+
+    await cancelAtPeriodEnd(deps, A);
+
+    const sub = await deps.repo.findSubscription(A);
+    expect(sub?.cancel_at).toBeNull();
+    const events = deps.repo.events.filter(e => e.event_type === "subscription.cancel_scheduled");
+    expect(events).toHaveLength(0);
+  });
 });
 
 describe("changements de plan — nextCycleAmount", () => {

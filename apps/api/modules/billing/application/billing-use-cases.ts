@@ -206,6 +206,7 @@ export async function changePlan(deps: Pick<BillingDeps, "repo">, ctx: TenantCon
 export async function cancelAtPeriodEnd(deps: Pick<BillingDeps, "repo">, ctx: TenantContext): Promise<void> {
   const sub = await deps.repo.findSubscription(ctx);
   if (!sub) throw new NotFoundError("Aucun abonnement actif");
+  if (sub.status === "canceled") return;
   if (sub.cancel_at !== null) return;
 
   const cancelAt = sub.current_period_end ?? new Date();
@@ -222,6 +223,12 @@ export async function cancelAtPeriodEnd(deps: Pick<BillingDeps, "repo">, ctx: Te
 export async function reactivateSubscription(deps: Pick<BillingDeps, "repo">, ctx: TenantContext): Promise<void> {
   const sub = await deps.repo.findSubscription(ctx);
   if (!sub) throw new NotFoundError("Aucun abonnement actif");
+  /*
+   * Sub réellement annulée par le scheduler (status=canceled, cancel_at toujours présent) :
+   * effacer cancel_at sans remettre status→active laisserait la sub coincée canceled.
+   * La réactivation passe par la création d'un nouvel abonnement, pas par ce chemin.
+   */
+  if (sub.status === "canceled") return;
   if (sub.cancel_at === null) return;
 
   await deps.repo.updateCancelAt(ctx, null);
