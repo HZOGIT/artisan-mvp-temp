@@ -28,9 +28,19 @@ export async function handleBillingWebhookEvent(
   const now = new Date();
 
   if (eventType === "payment_intent.succeeded") {
+    const cycle = await deps.repo.findCycleById(attempt.cycle_id);
+    /*
+     * Idempotence scheduler↔webhook (paiements synchrones carte) :
+     * Le scheduler traite le PI.succeeded immédiatement et marque le cycle "paid".
+     * Le webhook Stripe arrive ensuite avec un event.id distinct — markWebhookProcessed
+     * le considère nouveau — et retraiterait le cycle en double (cycle.paid +
+     * subscription.period_advanced dupliqués dans billing_events).
+     * Guard : si le cycle est déjà "paid", le webhook est un no-op.
+     */
+    if (cycle?.status === "paid") return;
+
     await deps.repo.updateChargeAttempt(attempt.id, { status: "succeeded" });
 
-    const cycle = await deps.repo.findCycleById(attempt.cycle_id);
     let artisanId: number | null = null;
 
     if (cycle) {

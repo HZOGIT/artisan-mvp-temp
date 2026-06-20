@@ -1353,3 +1353,56 @@ describe("FIX-CE — webhook payment_intent.succeeded : sub canceled → ne pas 
     expect(repo.events.find(e => e.event_type === "cycle.paid")).toBeDefined();
   });
 });
+
+describe("FIX-CX — webhook payment_intent.succeeded : idempotence sur cycle déjà paid (scheduler sync)", () => {
+  it("PI succeeded webhook après paiement synchrone scheduler → no-op (aucun cycle.paid ou period_advanced dupliqué)", async () => {
+    const repo = new FakeBillingRepository();
+    const periodEnd = new Date("2026-07-01T00:00:00Z");
+    const sub = await repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: new Date("2026-06-01"), currentPeriodEnd: periodEnd,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id,
+      periodStart: new Date("2026-06-01"), periodEnd,
+      amountCents: 2900, currency: "eur",
+    });
+    /* État post-scheduler : cycle "paid", sub "active", attempt "succeeded" */
+    await repo.updateCycleStatus(cycle.id, { status: "paid", paidAt: new Date("2026-06-15T10:00:00Z") });
+    const attempt = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k_cx" });
+    await repo.updateChargeAttempt(attempt.id, { stripePaymentIntentId: "pi_cx", status: "succeeded" });
+    /* Events déjà émis par le scheduler (ils sont là avant l'arrivée du webhook) */
+    await repo.appendEvent({ entityType: "billing_cycle", entityId: cycle.id, eventType: "cycle.paid", payload: { via: "scheduler" }, actor: "scheduler" });
+    await repo.appendEvent({ entityType: "billing_subscription", entityId: sub.id, eventType: "subscription.period_advanced", payload: { via: "scheduler" }, actor: "scheduler" });
+    const eventCountBefore = repo.events.length;
+
+    /* Webhook Stripe arrive après, avec un event.id distinct (at-least-once delivery) */
+    await handleBillingWebhookEvent({ repo }, "payment_intent.succeeded", "pi_cx", null, null, "evt_cx_webhook");
+
+    expect(repo.events).toHaveLength(eventCountBefore); /* aucun event dupliqué */
+    expect(repo.cycles[0]!.status).toBe("paid"); /* statut inchangé */
+  });
+
+  it("PI succeeded webhook cycle déjà paid → attempt reste succeeded (aucune réécriture)", async () => {
+    const repo = new FakeBillingRepository();
+    const sub = await repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"),
+      amountCents: 2900, currency: "eur",
+    });
+    await repo.updateCycleStatus(cycle.id, { status: "paid", paidAt: new Date() });
+    const attempt = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k_cx2" });
+    await repo.updateChargeAttempt(attempt.id, { stripePaymentIntentId: "pi_cx2", status: "succeeded" });
+
+    await handleBillingWebhookEvent({ repo }, "payment_intent.succeeded", "pi_cx2", null, null, "evt_cx2");
+
+    const updatedAttempt = repo.chargeAttempts.find(a => a.id === attempt.id)!;
+    expect(updatedAttempt.status).toBe("succeeded"); /* no-op, attempt inchangé */
+    expect(repo.events.filter(e => e.event_type === "cycle.paid")).toHaveLength(0); /* pas de cycle.paid via webhook */
+  });
+});
