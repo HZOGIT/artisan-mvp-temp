@@ -71,6 +71,13 @@
       "when": 1781965881685,
       "tag": "0009_billing-status-check-constraints",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1781969135010,
+      "tag": "0010_billing-plan-id-check",
+      "breakpoints": true
     }
   ]
 }

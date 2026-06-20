@@ -1118,6 +1118,42 @@ describe("FIX-Q — resumeBillingIfAbandoned : pas de reset attempt_count → pa
   });
 });
 
+describe("FIX-Z — activateExpiredTrials : plan inconnu → skip, pas de cycle €0", () => {
+  it("plan_id inconnu → event trial_activation_error, sub reste trialing, aucun cycle créé", async () => {
+    const { repo, billing } = makeDeps();
+    const trialEnd = new Date(Date.now() - 3600_000);
+    await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "legacy_plan_unknown", billingMode: "maison",
+      status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: trialEnd, paymentMethodId: null,
+    });
+
+    const result = await runSchedulerTick({ repo, billing });
+
+    expect(result.trialsActivated).toBe(0);
+    expect(repo.subs[0]!.status).toBe("trialing");
+    expect(repo.cycles).toHaveLength(0);
+    const errEv = repo.events.find(e => e.event_type === "subscription.trial_activation_error");
+    expect(errEv).toBeDefined();
+    expect(String((errEv!.payload as Record<string, unknown>)["error"])).toContain("legacy_plan_unknown");
+  });
+
+  it("plan_id valide → cycle amount_cents > 0 (pas de cycle €0)", async () => {
+    const { repo, billing } = makeDeps();
+    const trialEnd = new Date(Date.now() - 3600_000);
+    await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "pro", billingMode: "maison",
+      status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: trialEnd, paymentMethodId: null,
+    });
+
+    await runSchedulerTick({ repo, billing });
+
+    expect(repo.cycles[0]?.amount_cents).toBeGreaterThan(0);
+    expect(repo.subs[0]!.status).toBe("active");
+  });
+});
+
 describe("FIX-R — canceled_at positionné lors de l'annulation effective de la subscription", () => {
   it("scheduler cancel_at expiré → canceled_at renseigné avec un timestamp récent", async () => {
     const before = new Date();

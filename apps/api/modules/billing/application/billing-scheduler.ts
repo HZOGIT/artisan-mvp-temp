@@ -353,7 +353,17 @@ async function activateExpiredTrials(deps: SchedulerDeps, now: Date): Promise<nu
       const trialEnd = sub.trial_ends_at!;
       const { end: periodEnd } = nextPeriod(trialEnd, interval);
       const plan = planById(sub.plan_id);
-      const amountCents = plan ? plan.amountCentsByInterval[interval] : 0;
+      if (!plan) {
+        await deps.repo.appendEvent({
+          entityType: "billing_subscription",
+          entityId: sub.id,
+          eventType: "subscription.trial_activation_error",
+          payload: { artisanId: sub.artisan_id, error: `plan inconnu : ${sub.plan_id}` },
+          actor: "scheduler",
+        });
+        continue;
+      }
+      const amountCents = plan.amountCentsByInterval[interval];
 
       /*
        * Cycle créé AVANT updateSubscriptionPeriod(active).
