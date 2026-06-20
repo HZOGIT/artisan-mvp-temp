@@ -1243,3 +1243,31 @@ describe("FIX-BB — cycle.charge_failed webhook : artisanId + attemptNo dans le
     expect((suspEv!.payload as Record<string, unknown>)["artisanId"]).toBe(sub.artisan_id);
   });
 });
+
+describe("FIX-CE — webhook payment_intent.succeeded : sub canceled → ne pas ressusciter", () => {
+  it("PI succeeded reçu après annulation de la sub → cycle paid, aucun period_advanced, sub reste canceled", async () => {
+    const repo = new FakeBillingRepository();
+    const periodEnd = new Date("2026-07-01T00:00:00Z");
+    const sub = await repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "canceled", currentPeriodStart: new Date("2026-06-01"), currentPeriodEnd: periodEnd,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id,
+      periodStart: new Date("2026-06-01"), periodEnd,
+      amountCents: 2900, currency: "eur",
+    });
+    await repo.updateCycleStatus(cycle.id, { status: "charging", chargingStartedAt: new Date() });
+    const attempt = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k_ce" });
+    await repo.updateChargeAttempt(attempt.id, { stripePaymentIntentId: "pi_ce", status: "processing" });
+
+    await handleBillingWebhookEvent({ repo }, "payment_intent.succeeded", "pi_ce", null, null, "evt_ce1");
+
+    expect(repo.cycles.find(c => c.id === cycle.id)!.status).toBe("paid");
+    expect(repo.subs.find(s => s.id === sub.id)!.status).toBe("canceled");
+    expect(repo.cycles.filter(c => c.subscription_id === sub.id)).toHaveLength(1);
+    expect(repo.events.find(e => e.event_type === "subscription.period_advanced")).toBeUndefined();
+    expect(repo.events.find(e => e.event_type === "cycle.paid")).toBeDefined();
+  });
+});

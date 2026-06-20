@@ -39,20 +39,28 @@ export async function handleBillingWebhookEvent(
       const sub = await deps.repo.findSubscriptionById(cycle.subscription_id);
       if (sub) {
         artisanId = sub.artisan_id;
-        const interval = sub.billing_interval === "yearly" ? "yearly" : "monthly";
-        const { start, end } = nextPeriod(cycle.period_end, interval);
-        await deps.repo.updateSubscriptionPeriod(sub.id, "active", cycle.period_end, end);
-        const existing = await deps.repo.findPendingCycleForPeriod(sub.id, start);
-        if (!existing) {
-          await deps.repo.createCycle({ subscriptionId: sub.id, periodStart: start, periodEnd: end, amountCents: cycle.amount_cents, currency: cycle.currency });
+        /*
+         * Guard : sub annulée entre l'émission du PI et la réception du webhook (livraison
+         * différée Stripe, ou processDueCancellations exécuté en parallèle).
+         * Ne pas forcer status='active' ni créer le prochain cycle — cela ressusciterait
+         * une sub que l'artisan a explicitement annulée.
+         */
+        if (sub.status !== "canceled") {
+          const interval = sub.billing_interval === "yearly" ? "yearly" : "monthly";
+          const { start, end } = nextPeriod(cycle.period_end, interval);
+          await deps.repo.updateSubscriptionPeriod(sub.id, "active", cycle.period_end, end);
+          const existing = await deps.repo.findPendingCycleForPeriod(sub.id, start);
+          if (!existing) {
+            await deps.repo.createCycle({ subscriptionId: sub.id, periodStart: start, periodEnd: end, amountCents: cycle.amount_cents, currency: cycle.currency });
+          }
+          await deps.repo.appendEvent({
+            entityType: "billing_subscription",
+            entityId: sub.id,
+            eventType: "subscription.period_advanced",
+            payload: { via: "webhook", artisanId, nextPeriodStart: start.toISOString(), nextPeriodEnd: end.toISOString() },
+            actor: "stripe_webhook",
+          });
         }
-        await deps.repo.appendEvent({
-          entityType: "billing_subscription",
-          entityId: sub.id,
-          eventType: "subscription.period_advanced",
-          payload: { via: "webhook", artisanId, nextPeriodStart: start.toISOString(), nextPeriodEnd: end.toISOString() },
-          actor: "stripe_webhook",
-        });
       }
     }
 
