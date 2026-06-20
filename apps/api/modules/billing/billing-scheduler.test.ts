@@ -1827,6 +1827,52 @@ describe("FIX-CDC — advanceSubscriptionAfterPayment utilise le tarif du plan c
   });
 });
 
+describe("FIX-CDG — chargeOffSessionForCycle : sub canceled pendant le PI en vol → pas de résurrection en active", () => {
+  it("sub canceled avant le retour Stripe succeeded → cycle paid, aucun cycle suivant créé, sub reste canceled", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    billing.nextChargeResult = { paymentIntentId: "pi_cdg", status: "succeeded" };
+
+    /* Simule une annulation de la sub pendant que le PI est en vol */
+    await repo.updateSubscriptionStatus(CTX, "canceled");
+
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+
+    const updatedSub = repo.subs.find(s => s.id === sub.id)!;
+    expect(updatedSub.status).toBe("canceled"); /* ne doit PAS revenir à active */
+
+    const nextCycle = repo.cycles.find(c => c.status === "pending");
+    expect(nextCycle).toBeUndefined(); /* pas de prochain cycle créé */
+
+    const paidCycle = repo.cycles.find(c => c.id === cycle.id)!;
+    expect(paidCycle.status).toBe("paid"); /* audit trail : cycle marqué paid */
+
+    const paidEv = repo.events.find(e => e.event_type === "cycle.paid");
+    expect(paidEv).toBeDefined(); /* cycle.paid émis */
+
+    const periodEv = repo.events.find(e => e.event_type === "subscription.period_advanced");
+    expect(periodEv).toBeUndefined(); /* pas d'avancement de période */
+  });
+
+  it("sub active (cas normal) → cycle paid + cycle suivant créé + period_advanced", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    billing.nextChargeResult = { paymentIntentId: "pi_cdg_ok", status: "succeeded" };
+
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+
+    const nextCycle = repo.cycles.find(c => c.status === "pending");
+    expect(nextCycle).toBeDefined();
+    const updatedSub = repo.subs.find(s => s.id === sub.id)!;
+    expect(updatedSub.status).toBe("active");
+    expect(repo.events.find(e => e.event_type === "subscription.period_advanced")).toBeDefined();
+  });
+});
+
 describe("FIX-CDF — advanceSubscriptionAfterPayment : cycle créé avant updateSubscriptionPeriod (auto-healing)", () => {
   it("updateSubscriptionPeriod échoue après createCycle → cycle pending existe (auto-healing possible)", async () => {
     const { repo, billing } = makeDeps();

@@ -152,7 +152,17 @@ export async function chargeOffSessionForCycle(
       });
       const sub = await deps.repo.findSubscriptionById(subscriptionId);
       const interval = resolveInterval(sub?.billing_interval);
-      await advanceSubscriptionAfterPayment(deps.repo, subscriptionId, artisanId, cycle, interval);
+      /*
+       * Guard symétrique de FIX-CE (webhook) et FIX-CC (zombie recovery) :
+       * ne pas avancer la période si la sub a été annulée entre le claimCycleForCharging
+       * et le retour Stripe (ex. multi-réplica : processDueCancellations d'un autre tick
+       * annule la sub pendant que le PI est en vol).
+       * Le cycle est déjà marqué "paid" (audit trail préservé) ; on ne crée pas le prochain
+       * cycle et on ne remet pas le status à "active" → sub reste canceled.
+       */
+      if (sub?.status !== "canceled") {
+        await advanceSubscriptionAfterPayment(deps.repo, subscriptionId, artisanId, cycle, interval);
+      }
     } else if (result.status === "requires_action") {
       /* Off-session 3DS impossible sans présence de l'utilisateur — traité comme un échec de paiement. */
       await deps.repo.appendEvent({
