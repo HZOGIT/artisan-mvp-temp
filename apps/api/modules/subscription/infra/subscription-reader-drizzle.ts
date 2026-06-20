@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
-import { artisans, billingSubscriptions } from "../../../../../drizzle/schema.pg";
+import { billingSubscriptions } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
-import type { ISubscriptionRepository } from "../application/subscription-reader";
+import type { ISubscriptionReader } from "../application/subscription-reader";
 import type { SubscriptionRow } from "../domain/subscription";
 import { planLimits } from "../../billing/domain/plan";
 
@@ -26,7 +26,7 @@ function toSubscriptionRow(r: BillingSub): SubscriptionRow {
 }
 
 /** Lit depuis `billing_subscriptions` (billing maison). HORS RLS → scope explicite par `artisan_id`. */
-export class SubscriptionReaderDrizzle implements ISubscriptionRepository {
+export class SubscriptionReaderDrizzle implements ISubscriptionReader {
   constructor(private readonly db: DbClient) {}
 
   async getSubscription(ctx: TenantContext): Promise<SubscriptionRow | null> {
@@ -36,18 +36,5 @@ export class SubscriptionReaderDrizzle implements ISubscriptionRepository {
       .where(eq(billingSubscriptions.artisan_id, ctx.artisanId))
       .limit(1);
     return row ? toSubscriptionRow(row) : null;
-  }
-
-  async setCancelAtPeriodEnd(_ctx: TenantContext, _cancel: boolean): Promise<void> {
-    /* no-op : billing maison gère via billing.cancelAtPeriodEnd / billing.reactivate */
-  }
-
-  async setStripeCustomerId(_ctx: TenantContext, _customerId: string): Promise<void> {
-    /* no-op : plus de customer Stripe stocké ici */
-  }
-
-  async getNomEntreprise(ctx: TenantContext): Promise<string | null> {
-    const [a] = await this.db.select({ nom: artisans.nomEntreprise }).from(artisans).where(eq(artisans.id, ctx.artisanId)).limit(1);
-    return a?.nom ?? null;
   }
 }
