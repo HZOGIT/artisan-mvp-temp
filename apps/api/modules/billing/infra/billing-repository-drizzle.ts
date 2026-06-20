@@ -105,6 +105,7 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
       .values({
         artisan_id: params.artisanId,
         plan_id: params.planId,
+        billing_interval: params.billingInterval ?? "monthly",
         billing_mode: params.billingMode,
         status: params.status,
         current_period_start: params.currentPeriodStart ?? undefined,
@@ -116,6 +117,7 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
         target: billingSubscriptions.artisan_id,
         set: {
           plan_id: params.planId,
+          billing_interval: params.billingInterval ?? "monthly",
           billing_mode: params.billingMode,
           status: params.status,
           current_period_start: params.currentPeriodStart ?? undefined,

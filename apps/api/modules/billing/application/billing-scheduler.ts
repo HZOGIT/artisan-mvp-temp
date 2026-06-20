@@ -13,6 +13,10 @@ export interface SchedulerDeps {
 
 const MAX_DUNNING_ATTEMPTS = 4;
 
+function resolveInterval(raw: string | null | undefined): "monthly" | "yearly" {
+  return raw === "yearly" ? "yearly" : "monthly";
+}
+
 /**
  * Après un cycle paid : met la subscription à `active` + crée le cycle de la période suivante.
  * Idempotent : si un cycle pending existe déjà pour cette subscription, ne crée pas de doublon.
@@ -22,8 +26,9 @@ async function advanceSubscriptionAfterPayment(
   subscriptionId: number,
   artisanId: number,
   paidCycle: { period_end: Date; amount_cents: number; currency: string },
+  interval: "monthly" | "yearly" = "monthly",
 ): Promise<void> {
-  const { start, end } = nextPeriod(paidCycle.period_end, "monthly");
+  const { start, end } = nextPeriod(paidCycle.period_end, interval);
   await repo.updateSubscriptionPeriod(subscriptionId, "active", paidCycle.period_end, end);
   const existing = await repo.findPendingCycle(subscriptionId);
   if (!existing) {
@@ -117,7 +122,9 @@ export async function chargeOffSessionForCycle(
         payload: { paymentIntentId: result.paymentIntentId, artisanId },
         actor: "scheduler",
       });
-      await advanceSubscriptionAfterPayment(deps.repo, subscriptionId, artisanId, cycle);
+      const sub = await deps.repo.findSubscriptionById(subscriptionId);
+      const interval = resolveInterval(sub?.billing_interval);
+      await advanceSubscriptionAfterPayment(deps.repo, subscriptionId, artisanId, cycle, interval);
     } else if (result.status === "requires_action") {
       /* Off-session 3DS impossible sans présence de l'utilisateur — traité comme un échec de paiement. */
       await deps.repo.updateChargeAttempt(attempt.id, { status: "failed", failureCode: "requires_action" });
@@ -255,7 +262,7 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<void> {
     if (pi.status === "succeeded") {
       await deps.repo.updateCycleStatus(cycle.id, { status: "paid", paidAt: now });
       const sub = await deps.repo.findSubscriptionById(cycle.subscription_id);
-      if (sub) await advanceSubscriptionAfterPayment(deps.repo, cycle.subscription_id, sub.artisan_id, cycle);
+      if (sub) await advanceSubscriptionAfterPayment(deps.repo, cycle.subscription_id, sub.artisan_id, cycle, resolveInterval(sub.billing_interval));
     } else if (pi.status === "requires_action" || pi.status === "canceled") {
       await deps.repo.updateCycleStatus(cycle.id, {
         status: "failed",

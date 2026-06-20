@@ -57,6 +57,13 @@
       "when": 1781943626507,
       "tag": "0007_billing-events-immutable",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1781943823544,
+      "tag": "0008_uneven_iron_fist",
+      "breakpoints": true
     }
   ]
 }

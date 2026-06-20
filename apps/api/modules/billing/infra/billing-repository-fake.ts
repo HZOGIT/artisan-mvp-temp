@@ -101,6 +101,7 @@ export class FakeBillingRepository implements IBillingRepository {
       id: nextId(),
       artisan_id: params.artisanId,
       plan_id: params.planId,
+      billing_interval: params.billingInterval ?? "monthly",
       billing_mode: params.billingMode,
       status: params.status,
       current_period_start: params.currentPeriodStart,

@@ -1983,6 +1983,7 @@ export const billingSubscriptions = pgTable("billing_subscriptions", {
   id: serial("id").primaryKey(),
   artisan_id: integer("artisan_id").notNull().unique(),
   plan_id: varchar("plan_id", { length: 50 }).notNull(),
+  billing_interval: varchar("billing_interval", { length: 10 }).default("monthly").notNull(),
   billing_mode: varchar("billing_mode", { length: 20 }).default("maison").notNull(),
   status: varchar("status", { length: 50 }).notNull(),
   current_period_start: timestamp("current_period_start"),

@@ -15,6 +15,7 @@ export interface SavePaymentMethodParams {
 export interface SaveSubscriptionParams {
   readonly artisanId: number;
   readonly planId: string;
+  readonly billingInterval?: "monthly" | "yearly";
   readonly billingMode: "maison" | "stripe";
   readonly status: string;
   readonly currentPeriodStart: Date | null;
