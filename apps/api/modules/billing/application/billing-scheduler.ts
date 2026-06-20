@@ -241,12 +241,7 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<void> {
     const lastAttempt = await deps.repo.findLastAttemptByCycleId(cycle.id);
     const piId = lastAttempt?.stripe_payment_intent_id ?? null;
 
-    if (!piId) {
-      await deps.repo.updateCycleStatus(cycle.id, {
-        status: "failed",
-        failedAt: now,
-        nextRetryAt: nextRetryAt(now, cycle.attempt_count),
-      });
+    if (!piId || !lastAttempt) {
       await deps.repo.appendEvent({
         entityType: "billing_cycle",
         entityId: cycle.id,
@@ -254,30 +249,28 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<void> {
         payload: { reason: "no_payment_intent_id" },
         actor: "scheduler",
       });
+      if (lastAttempt) {
+        const zombieSub = await deps.repo.findSubscriptionById(cycle.subscription_id);
+        await handleDunning(deps, {
+          cycleId: cycle.id,
+          subscriptionId: cycle.subscription_id,
+          artisanId: zombieSub?.artisan_id ?? 0,
+          now,
+          newAttemptCount: cycle.attempt_count,
+          attempt: lastAttempt,
+          failureMessage: "zombie_no_pi",
+        });
+      } else {
+        await deps.repo.updateCycleStatus(cycle.id, {
+          status: "failed",
+          failedAt: now,
+          nextRetryAt: nextRetryAt(now, cycle.attempt_count),
+        });
+      }
       continue;
     }
 
     const pi = await deps.billing.retrievePaymentIntent(piId);
-
-    if (pi.status === "succeeded") {
-      await deps.repo.updateCycleStatus(cycle.id, { status: "paid", paidAt: now });
-      const sub = await deps.repo.findSubscriptionById(cycle.subscription_id);
-      if (sub) await advanceSubscriptionAfterPayment(deps.repo, cycle.subscription_id, sub.artisan_id, cycle, resolveInterval(sub.billing_interval));
-    } else if (pi.status === "requires_action" || pi.status === "canceled") {
-      await deps.repo.updateCycleStatus(cycle.id, {
-        status: "failed",
-        failedAt: now,
-        nextRetryAt: nextRetryAt(now, cycle.attempt_count),
-      });
-    } else if (pi.status === "processing") {
-      await deps.repo.updateCycleStatus(cycle.id, { status: "processing" });
-    } else {
-      await deps.repo.updateCycleStatus(cycle.id, {
-        status: "failed",
-        failedAt: now,
-        nextRetryAt: nextRetryAt(now, cycle.attempt_count),
-      });
-    }
 
     await deps.repo.appendEvent({
       entityType: "billing_cycle",
@@ -286,6 +279,27 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<void> {
       payload: { piStatus: pi.status, paymentIntentId: piId },
       actor: "scheduler",
     });
+
+    const sub = await deps.repo.findSubscriptionById(cycle.subscription_id);
+    const artisanId = sub?.artisan_id ?? 0;
+
+    if (pi.status === "succeeded") {
+      await deps.repo.updateCycleStatus(cycle.id, { status: "paid", paidAt: now });
+      if (sub) await advanceSubscriptionAfterPayment(deps.repo, cycle.subscription_id, artisanId, cycle, resolveInterval(sub.billing_interval));
+    } else if (pi.status === "processing") {
+      await deps.repo.updateCycleStatus(cycle.id, { status: "processing" });
+    } else {
+      /* requires_action, canceled, failed, état inconnu → dunning complet (notif + suspension) */
+      await handleDunning(deps, {
+        cycleId: cycle.id,
+        subscriptionId: cycle.subscription_id,
+        artisanId,
+        now,
+        newAttemptCount: cycle.attempt_count,
+        attempt: lastAttempt,
+        failureMessage: pi.failureMessage ?? pi.status,
+      });
+    }
   }
 }
 
