@@ -102,7 +102,7 @@ import type { IComptabiliteReader } from "./modules/comptabilite/application/com
 import { createAuthModule } from "./modules/auth/auth.module";
 import { AuthRepositoryDrizzle } from "./modules/auth/infra/auth-repository-drizzle";
 import type { IAuthRepository } from "./modules/auth/application/auth-repository";
-import { createSubscriptionModule, pricesFromEnv } from "./modules/subscription/subscription.module";
+import { createSubscriptionModule } from "./modules/subscription/subscription.module";
 import { createBillingModule } from "./modules/billing/billing.module";
 import { BillingRepositoryDrizzle } from "./modules/billing/infra/billing-repository-drizzle";
 import { BillingAdapter } from "./shared/ports/billing-adapter";
@@ -724,13 +724,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     resetRateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(5, 60 * 60 * 1000),
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
   });
-  /** Abonnement (SENSIBLE/billing) — checkout, portal, webhooks Stripe. Table subscriptions HORS RLS, scope explicite. */
-  const subscription = createSubscriptionModule({
-    repository: deps.subscriptionRepo ?? new SubscriptionReaderDrizzle(getDbHandle().db),
-    stripe: deps.stripePort ?? new StripeAdapter(),
-    prices: pricesFromEnv(),
-    appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
-  });
+  const subscription = createSubscriptionModule(deps.subscriptionRepo ?? new SubscriptionReaderDrizzle(getDbHandle().db));
   /*
    * Signature électronique de devis (SENSIBLE) — surface ARTISAN protégée + surface PUBLIQUE par
    * token (portail de signature, RLS public-token sur `devis`). `signatures_devis` est HORS RLS :

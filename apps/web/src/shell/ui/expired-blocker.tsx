@@ -6,18 +6,10 @@ import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
 import { trpc } from "@/shared/trpc";
 
-/*
- * Écran de blocage du SHELL modern (abonnement expiré). PORT FIDÈLE d'ExpiredBlocker : rendu À LA PLACE des
- * children quand `accountBlockState().isBlocked` et que la route n'est pas tolérée (cf. layout/câblage).
- * Renouvellement → abonnement ; portail Stripe ; auto-reload si le sub redevient actif.
- */
 export function ExpiredBlocker({ onExportData }: { onExportData?: () => void }) {
   const { t } = useTranslation("shell");
   const [, setLocation] = useLocation();
   const { data: sub } = trpc.subscription.getCurrent.useQuery();
-  const portalMut = trpc.subscription.createPortal.useMutation({
-    onSuccess: (res) => { if (res.url) window.location.href = res.url; },
-  });
 
   useEffect(() => {
     if (sub && (sub.status === "active" || sub.status === "trialing")) window.location.reload();
@@ -38,11 +30,6 @@ export function ExpiredBlocker({ onExportData }: { onExportData?: () => void }) 
             <Button className="w-full" onClick={() => setLocation("/parametres?tab=abonnement")}>
               <RefreshCw className="h-4 w-4 mr-2" />{t("renouvelerAbo")}
             </Button>
-            {sub?.stripeSubscriptionId && (
-              <Button variant="outline" className="w-full" onClick={() => portalMut.mutate()} disabled={portalMut.isPending}>
-                {t("gererAboStripe")}
-              </Button>
-            )}
             {onExportData && (
               <Button variant="ghost" className="w-full" onClick={onExportData}>
                 <Download className="h-4 w-4 mr-2" />{t("exporterDonnees")}
