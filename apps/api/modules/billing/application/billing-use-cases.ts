@@ -94,6 +94,7 @@ export async function confirmPaymentMethod(
 export async function revokePaymentMethod(deps: BillingDeps, ctx: TenantContext, paymentMethodId: number): Promise<void> {
   const pm = await deps.repo.findPaymentMethodById(ctx, paymentMethodId);
   if (!pm) throw new NotFoundError(`Moyen de paiement ${paymentMethodId} introuvable`);
+  if (pm.revoked_at !== null) return;
 
   await deps.repo.revokePaymentMethod(ctx, paymentMethodId);
   await deps.repo.appendEvent({

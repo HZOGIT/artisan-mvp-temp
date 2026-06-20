@@ -284,9 +284,7 @@ describe("revokePaymentMethod", () => {
     expect(sub?.payment_method_id).toBe(pm.id);
   });
 
-  it("idempotent — révoquer deux fois la même carte ne lève pas d'erreur", async () => {
-    // findPaymentMethodById ne filtre PAS revoked_at : un PM révoqué reste trouvable.
-    // Important pour l'idempotence des webhooks (Stripe peut renvoyer le même événement).
+  it("FIX-CS — idempotent : révoquer deux fois la même carte ne lève pas d'erreur et n'émet pas de doublon d'événement", async () => {
     const deps = makeDeps();
     const { paymentMethod: pm } = await confirmPaymentMethod(deps, A, {
       stripePaymentMethodId: "pm_idem",
@@ -296,6 +294,8 @@ describe("revokePaymentMethod", () => {
     });
     await revokePaymentMethod(deps, A, pm.id);
     await expect(revokePaymentMethod(deps, A, pm.id)).resolves.toBeUndefined();
+    const revokedEvts = deps.repo.events.filter(e => e.event_type === "payment_method.revoked" && e.entity_id === pm.id);
+    expect(revokedEvts).toHaveLength(1);
   });
 });
 
