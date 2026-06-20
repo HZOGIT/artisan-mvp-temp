@@ -1621,3 +1621,78 @@ describe("FIX-CZ — updateCycleStatus paid efface failed_at et next_retry_at", 
     expect(updated.next_retry_at).toBeNull();
   });
 });
+
+describe("FIX-CDA — processDueCancellations : isolation par item + status processing nettoie failed_at", () => {
+  const ARTISAN_ID_2 = 2;
+  const CTX_2 = { artisanId: ARTISAN_ID_2, userId: 0 };
+
+  it("erreur updateSubscriptionStatus sur sub#1 → sub#2 quand même annulée", async () => {
+    const { repo, billing } = makeDeps();
+    const cancelAt = new Date(Date.now() - 5000);
+
+    await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: new Date(Date.now() - 31 * 86400_000),
+      currentPeriodEnd: cancelAt, trialEndsAt: null, paymentMethodId: null,
+    });
+    await repo.updateCancelAt(CTX, cancelAt);
+
+    await repo.saveSubscription({
+      artisanId: ARTISAN_ID_2, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: new Date(Date.now() - 31 * 86400_000),
+      currentPeriodEnd: cancelAt, trialEndsAt: null, paymentMethodId: null,
+    });
+    await repo.updateCancelAt(CTX_2, cancelAt);
+
+    repo.simulateUpdateSubStatusError = new Error("DB timeout");
+
+    await runSchedulerTick({ repo, billing });
+
+    const sub1 = repo.subs.find(s => s.artisan_id === ARTISAN_ID)!;
+    const sub2 = repo.subs.find(s => s.artisan_id === ARTISAN_ID_2)!;
+    expect(sub1.status).toBe("active");
+    expect(sub2.status).toBe("canceled");
+  });
+
+  it("erreur sur sub#1 → subscription.cancel_error émis pour sub#1", async () => {
+    const { repo, billing } = makeDeps();
+    const cancelAt = new Date(Date.now() - 5000);
+
+    const sub1 = await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: new Date(Date.now() - 31 * 86400_000),
+      currentPeriodEnd: cancelAt, trialEndsAt: null, paymentMethodId: null,
+    });
+    await repo.updateCancelAt(CTX, cancelAt);
+
+    repo.simulateUpdateSubStatusError = new Error("network error");
+
+    await runSchedulerTick({ repo, billing });
+
+    const errEv = repo.events.find(e => e.event_type === "subscription.cancel_error" && e.entity_id === sub1.id);
+    expect(errEv).toBeDefined();
+    expect((errEv!.payload as Record<string, unknown>)["artisanId"]).toBe(ARTISAN_ID);
+    expect((errEv!.payload as Record<string, unknown>)["error"]).toContain("network error");
+  });
+
+  it("chargeOffSessionForCycle processing (SEPA) → failed_at et next_retry_at effacés", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    await repo.updateCycleStatus(cycle.id, {
+      status: "failed",
+      failedAt: new Date("2026-06-01T10:00:00Z"),
+      nextRetryAt: new Date(Date.now() - 1000),
+    });
+
+    billing.nextChargeResult = { paymentIntentId: "pi_sepa_1", status: "processing" };
+
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+
+    const updated = repo.cycles.find(c => c.id === cycle.id)!;
+    expect(updated.status).toBe("processing");
+    expect(updated.failed_at).toBeNull();
+    expect(updated.next_retry_at).toBeNull();
+  });
+});

@@ -38,6 +38,8 @@ export class FakeBillingRepository implements IBillingRepository {
   public customerIds: Map<number, string> = new Map();
   /** Injecte une erreur dans le prochain appel createCycle (test catch dans activateExpiredTrials). */
   public simulateCreateCycleError: Error | null = null;
+  /** Injecte une erreur dans le prochain appel updateSubscriptionStatus (test catch dans processDueCancellations). */
+  public simulateUpdateSubStatusError: Error | null = null;
 
   private now() { return new Date(); }
 
@@ -148,6 +150,11 @@ export class FakeBillingRepository implements IBillingRepository {
   }
 
   async updateSubscriptionStatus(ctx: TenantContext, status: string): Promise<void> {
+    if (this.simulateUpdateSubStatusError) {
+      const err = this.simulateUpdateSubStatusError;
+      this.simulateUpdateSubStatusError = null;
+      throw err;
+    }
     const now = this.now();
     this.subs = this.subs.map(s =>
       s.artisan_id === ctx.artisanId

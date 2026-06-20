@@ -146,7 +146,7 @@ export async function chargeOffSessionForCycle(
       });
       await handleDunning(deps, { cycleId, subscriptionId, artisanId, now, newAttemptCount, attempt, failureCode: "requires_action", failureMessage: null });
     } else {
-      await deps.repo.updateCycleStatus(cycleId, { status: "processing" });
+      await deps.repo.updateCycleStatus(cycleId, { status: "processing", failedAt: null, nextRetryAt: null });
     }
   } catch (err) {
     const failureMessage = err instanceof Error ? err.message : String(err);
@@ -463,19 +463,29 @@ async function processDueCancellations(deps: SchedulerDeps, now: Date): Promise<
   const subs = await deps.repo.findDueCancellations(now);
   let count = 0;
   for (const sub of subs) {
-    const pendingCycle = await deps.repo.findPendingCycle(sub.id);
-    if (pendingCycle) {
-      await deps.repo.updateCycleStatus(pendingCycle.id, { status: "skipped" });
+    try {
+      const pendingCycle = await deps.repo.findPendingCycle(sub.id);
+      if (pendingCycle) {
+        await deps.repo.updateCycleStatus(pendingCycle.id, { status: "skipped" });
+      }
+      await deps.repo.updateSubscriptionStatus({ artisanId: sub.artisan_id, userId: 0 }, "canceled");
+      await deps.repo.appendEvent({
+        entityType: "billing_subscription",
+        entityId: sub.id,
+        eventType: "subscription.canceled",
+        payload: { artisanId: sub.artisan_id, cancelAt: sub.cancel_at!.toISOString(), via: "scheduler" },
+        actor: "scheduler",
+      });
+      count++;
+    } catch (err) {
+      await deps.repo.appendEvent({
+        entityType: "billing_subscription",
+        entityId: sub.id,
+        eventType: "subscription.cancel_error",
+        payload: { artisanId: sub.artisan_id, error: err instanceof Error ? err.message : String(err) },
+        actor: "scheduler",
+      });
     }
-    await deps.repo.updateSubscriptionStatus({ artisanId: sub.artisan_id, userId: 0 }, "canceled");
-    await deps.repo.appendEvent({
-      entityType: "billing_subscription",
-      entityId: sub.id,
-      eventType: "subscription.canceled",
-      payload: { artisanId: sub.artisan_id, cancelAt: sub.cancel_at!.toISOString(), via: "scheduler" },
-      actor: "scheduler",
-    });
-    count++;
   }
   return count;
 }
