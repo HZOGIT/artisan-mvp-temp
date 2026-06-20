@@ -1394,6 +1394,28 @@ describe("FIX-R — canceled_at positionné lors de l'annulation effective de la
   });
 });
 
+describe("FIX-CO — cycle.tick_error inclut artisanId dans le payload", () => {
+  it("MaxAttemptsReachedError sur cycle failed=4 → cycle.tick_error avec artisanId", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+    const pastRetry = new Date(Date.now() - 3600_000);
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-05-01"), periodEnd: new Date("2026-06-01"),
+      amountCents: 2900, currency: "eur",
+    });
+    /* Simule cycle failed avec max tentatives épuisées + retry échu */
+    await repo.updateCycleStatus(cycle.id, { status: "failed", failedAt: pastRetry, nextRetryAt: pastRetry, attemptCount: 4 });
+
+    await runSchedulerTick({ repo, billing });
+
+    const errEvt = repo.events.find(e => e.event_type === "cycle.tick_error" && e.entity_id === cycle.id);
+    expect(errEvt, "cycle.tick_error émis").toBeDefined();
+    expect(errEvt?.payload?.artisanId).toBe(sub.artisan_id);
+    expect(errEvt?.payload?.error).toContain(String(cycle.id));
+  });
+});
+
 describe("FIX-CG — isDue : cycle pending avec period_start futur non prélevé", () => {
   it("cycle period_start dans 30 jours → scheduler tick ne le prélève pas", async () => {
     const { repo, billing } = makeDeps();

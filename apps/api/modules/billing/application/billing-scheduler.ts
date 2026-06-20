@@ -504,7 +504,7 @@ export async function runSchedulerTick(deps: SchedulerDeps): Promise<{ charged: 
         entityType: "billing_cycle",
         entityId: cycle.id,
         eventType: "cycle.tick_error",
-        payload: { error: err instanceof Error ? err.message : String(err) },
+        payload: { artisanId: subscription.artisan_id, error: err instanceof Error ? err.message : String(err) },
         actor: "scheduler",
       });
     }
