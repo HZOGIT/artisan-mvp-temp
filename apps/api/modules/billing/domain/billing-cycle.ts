@@ -51,14 +51,22 @@ export function isDue(cycle: BillingCycle, now: Date): boolean {
   return false;
 }
 
-/** Calcule les dates de la période suivante (monthly = +1 mois, yearly = +1 an, même jour). */
+/**
+ * Calcule les dates de la période suivante (monthly = +1 mois, yearly = +1 an).
+ * Pour "monthly" : clamp au dernier jour du mois cible pour éviter le débordement
+ * de setMonth() sur les jours 29-31 (ex: Jan 31 + 1 mois → Fév 28, pas Mar 3).
+ */
 export function nextPeriod(periodEnd: Date, interval: "monthly" | "yearly"): { start: Date; end: Date } {
   const start = new Date(periodEnd);
   const end = new Date(periodEnd);
   if (interval === "yearly") {
     end.setFullYear(end.getFullYear() + 1);
   } else {
+    const anchorDay = periodEnd.getDate();
+    end.setDate(1);
     end.setMonth(end.getMonth() + 1);
+    const lastDayOfTargetMonth = new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate();
+    end.setDate(Math.min(anchorDay, lastDayOfTargetMonth));
   }
   return { start, end };
 }

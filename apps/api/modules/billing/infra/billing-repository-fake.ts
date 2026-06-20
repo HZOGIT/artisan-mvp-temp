@@ -185,6 +185,12 @@ export class FakeBillingRepository implements IBillingRepository {
     return cycle;
   }
 
+  async updateCycleAmount(cycleId: number, amountCents: number): Promise<void> {
+    this.cycles = this.cycles.map(c =>
+      c.id === cycleId ? { ...c, amount_cents: amountCents, updated_at: this.now() } : c
+    );
+  }
+
   async updateCycleStatus(cycleId: number, params: UpdateCycleStatusParams): Promise<void> {
     this.cycles = this.cycles.map(c => {
       if (c.id !== cycleId) return c;

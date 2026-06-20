@@ -650,6 +650,37 @@ describe("changePlan", () => {
     const deps = makeDeps();
     await expect(changePlan(deps, A, "pro")).rejects.toBeInstanceOf(NotFoundError);
   });
+
+  it("FIX-H : upgrade starter→pro met à jour amount_cents du cycle pending au tarif pro", async () => {
+    const deps = makeDeps();
+    const sub = await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: new Date("2026-06-01"), currentPeriodEnd: new Date("2026-07-01"),
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    await deps.repo.createCycle({
+      subscriptionId: sub.id,
+      periodStart: new Date("2026-07-01"), periodEnd: new Date("2026-08-01"),
+      amountCents: 2900,
+      currency: "eur",
+    });
+
+    await changePlan(deps, A, "pro");
+
+    const updatedCycle = deps.repo.cycles[0]!;
+    expect(updatedCycle.amount_cents).toBe(4900);
+  });
+
+  it("FIX-H : changePlan sans cycle pending n'échoue pas", async () => {
+    const deps = makeDeps();
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+
+    await expect(changePlan(deps, A, "pro")).resolves.toBeUndefined();
+  });
 });
 
 

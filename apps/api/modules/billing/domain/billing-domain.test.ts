@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { planById, planLimits, PLANS } from "./plan";
-import { isZombie, isDue, nextRetryAt } from "./billing-cycle";
+import { isZombie, isDue, nextRetryAt, nextPeriod } from "./billing-cycle";
 import { isActive, isCancelable, nextCycleAmount } from "./subscription-maison";
 import type { BillingCycle } from "./billing-cycle";
 import type { SubscriptionMaison } from "./subscription-maison";
@@ -250,5 +250,32 @@ describe("nextCycleAmount", () => {
     // Le scheduler ne doit jamais appeler cette fonction pour une sub canceled.
     // Ce test documente le comportement attendu et protège contre l'ajout accidentel d'un guard.
     expect(nextCycleAmount(baseSub({ status: "canceled" }), pro, "monthly")).toBe(pro.amountCentsByInterval.monthly);
+  });
+});
+
+describe("FIX-G — nextPeriod : clampage fin de mois (setMonth overflow)", () => {
+  it("Jan 31 + 1 mois → Fév 28 (pas Mar 3)", () => {
+    const periodEnd = new Date("2026-01-31T00:00:00.000Z");
+    const { start, end } = nextPeriod(periodEnd, "monthly");
+    expect(start.toISOString().slice(0, 10)).toBe("2026-01-31");
+    expect(end.toISOString().slice(0, 10)).toBe("2026-02-28");
+  });
+
+  it("Mar 31 + 1 mois → Avr 30", () => {
+    const periodEnd = new Date("2026-03-31T00:00:00.000Z");
+    const { end } = nextPeriod(periodEnd, "monthly");
+    expect(end.toISOString().slice(0, 10)).toBe("2026-04-30");
+  });
+
+  it("Jan 15 + 1 mois → Fév 15 (jour normal, pas clampé)", () => {
+    const periodEnd = new Date("2026-01-15T00:00:00.000Z");
+    const { end } = nextPeriod(periodEnd, "monthly");
+    expect(end.toISOString().slice(0, 10)).toBe("2026-02-15");
+  });
+
+  it("Jan 31 + 1 an → Jan 31 (yearly inchangé)", () => {
+    const periodEnd = new Date("2026-01-31T00:00:00.000Z");
+    const { end } = nextPeriod(periodEnd, "yearly");
+    expect(end.toISOString().slice(0, 10)).toBe("2027-01-31");
   });
 });

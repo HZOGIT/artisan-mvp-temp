@@ -159,11 +159,19 @@ export async function changePlan(deps: Pick<BillingDeps, "repo">, ctx: TenantCon
   if (sub.plan_id === newPlanId) return;
 
   await deps.repo.updateSubscriptionPlan(ctx, newPlanId);
+
+  const pendingCycle = await deps.repo.findPendingCycle(sub.id);
+  if (pendingCycle) {
+    const interval = sub.billing_interval === "yearly" ? "yearly" : "monthly";
+    const newAmountCents = knownPlan.amountCentsByInterval[interval];
+    await deps.repo.updateCycleAmount(pendingCycle.id, newAmountCents);
+  }
+
   await deps.repo.appendEvent({
     entityType: "billing_subscription",
     entityId: sub.id,
     eventType: "subscription.plan_changed",
-    payload: { from: sub.plan_id, to: newPlanId },
+    payload: { from: sub.plan_id, to: newPlanId, pendingCycleUpdated: !!pendingCycle },
     actor: `user:${ctx.userId}`,
   });
 }

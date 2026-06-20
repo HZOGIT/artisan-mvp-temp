@@ -223,6 +223,13 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
     await this.db.update(billingCycles).set(set).where(eq(billingCycles.id, cycleId));
   }
 
+  async updateCycleAmount(cycleId: number, amountCents: number): Promise<void> {
+    await this.db
+      .update(billingCycles)
+      .set({ amount_cents: amountCents, updated_at: new Date() })
+      .where(eq(billingCycles.id, cycleId));
+  }
+
   async findSubscriptionsWithDueCycles(now: Date, limit = 200): Promise<SubscriptionWithDueCycle[]> {
     const dueCycles = await this.db
       .select()

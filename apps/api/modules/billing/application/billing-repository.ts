@@ -93,6 +93,7 @@ export interface IBillingRepository {
   findCycleById(cycleId: number): Promise<BillingCycle | null>;
   createCycle(params: CreateCycleParams): Promise<BillingCycle>;
   updateCycleStatus(cycleId: number, params: UpdateCycleStatusParams): Promise<void>;
+  updateCycleAmount(cycleId: number, amountCents: number): Promise<void>;
   findSubscriptionsWithDueCycles(now: Date, limit?: number): Promise<SubscriptionWithDueCycle[]>;
   findZombieCycles(now: Date): Promise<BillingCycle[]>;
 
