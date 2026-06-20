@@ -1339,3 +1339,21 @@ describe("FIX-R — canceled_at positionné lors de l'annulation effective de la
     expect(updated.canceled_at).toBeNull();
   });
 });
+
+describe("FIX-CG — isDue : cycle pending avec period_start futur non prélevé", () => {
+  it("cycle period_start dans 30 jours → scheduler tick ne le prélève pas", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+    const futureStart = new Date(Date.now() + 30 * 24 * 3600_000);
+    const futureEnd = new Date(Date.now() + 61 * 24 * 3600_000);
+    const futureCycle = await repo.createCycle({ subscriptionId: sub.id, periodStart: futureStart, periodEnd: futureEnd, amountCents: 2900, currency: "eur" });
+    billing.nextChargeResult = { paymentIntentId: "pi_future", status: "succeeded" };
+
+    const result = await runSchedulerTick({ repo, billing });
+
+    expect(result.charged).toBe(0);
+    expect(repo.cycles.find(c => c.id === futureCycle.id)!.status).toBe("pending");
+    expect(repo.chargeAttempts.filter(a => a.cycle_id === futureCycle.id)).toHaveLength(0);
+  });
+});

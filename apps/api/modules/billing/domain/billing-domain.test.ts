@@ -139,6 +139,18 @@ describe("isDue", () => {
     const exactlyNow = new Date("2026-06-01T12:00:00.000Z");
     expect(isDue(baseCycle({ status: "failed", next_retry_at: exactlyNow }), exactlyNow)).toBe(true);
   });
+
+  it("FIX-CG — false si pending avec period_start dans le futur (early billing interdit)", () => {
+    const now = new Date("2026-06-20T00:00:00Z");
+    const futurePeriodStart = new Date("2026-07-01T00:00:00Z");
+    expect(isDue(baseCycle({ status: "pending", period_start: futurePeriodStart }), now)).toBe(false);
+  });
+
+  it("FIX-CG — true si pending avec period_start échu (cycle dû)", () => {
+    const now = new Date("2026-07-01T00:00:00Z");
+    const periodStart = new Date("2026-07-01T00:00:00Z");
+    expect(isDue(baseCycle({ status: "pending", period_start: periodStart }), now)).toBe(true);
+  });
 });
 
 describe("nextRetryAt — plan de dunning J+0/J+1/J+3/J+7", () => {

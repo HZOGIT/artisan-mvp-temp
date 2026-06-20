@@ -276,7 +276,7 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
       .from(billingCycles)
       .where(
         or(
-          eq(billingCycles.status, "pending"),
+          and(eq(billingCycles.status, "pending"), lte(billingCycles.period_start, now)),
           and(eq(billingCycles.status, "failed"), lte(billingCycles.next_retry_at, now)),
         ),
       )
