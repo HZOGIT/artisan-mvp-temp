@@ -31,7 +31,15 @@ async function advanceSubscriptionAfterPayment(
   interval: "monthly" | "yearly" = "monthly",
 ): Promise<void> {
   const { start, end } = nextPeriod(paidCycle.period_end, interval);
-  await repo.updateSubscriptionPeriod(subscriptionId, "active", paidCycle.period_end, end);
+
+  /*
+   * Cycle créé AVANT updateSubscriptionPeriod — même pattern que activateExpiredTrials.
+   * Si createCycle réussit mais updateSubscriptionPeriod échoue (erreur DB transitoire,
+   * crash), le scheduler retrouve le cycle pending au tick suivant (period_start <= now)
+   * et le charge → advanceSubscriptionAfterPayment relancée → auto-healing.
+   * À l'inverse (updateSubscriptionPeriod en premier), un échec de createCycle laisse
+   * la sub en période suivante sans cycle → periode de facturation perdue, jamais rattrapée.
+   */
   const existing = await repo.findPendingCycleForPeriod(subscriptionId, start);
   if (!existing) {
     /*
@@ -44,6 +52,8 @@ async function advanceSubscriptionAfterPayment(
     const amountCents = plan ? plan.amountCentsByInterval[interval] : paidCycle.amount_cents;
     await repo.createCycle({ subscriptionId, periodStart: start, periodEnd: end, amountCents, currency: paidCycle.currency });
   }
+
+  await repo.updateSubscriptionPeriod(subscriptionId, "active", paidCycle.period_end, end);
   await repo.appendEvent({
     entityType: "billing_subscription",
     entityId: subscriptionId,

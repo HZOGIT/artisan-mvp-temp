@@ -1534,3 +1534,36 @@ describe("FIX-CDE — webhook payment_intent.payment_failed : ne pas ressusciter
     expect(suspended).toBeDefined();
   });
 });
+
+describe("FIX-CDF — webhook payment_intent.succeeded : cycle créé avant updateSubscriptionPeriod (auto-healing)", () => {
+  it("updateSubscriptionPeriod échoue après createCycle → cycle pending existe (scheduler peut rattraper)", async () => {
+    const repo = new FakeBillingRepository();
+    const sub = await repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison", status: "active",
+      currentPeriodStart: new Date("2026-06-01"), currentPeriodEnd: new Date("2026-07-01"),
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"),
+      amountCents: 2900, currency: "eur",
+    });
+    await repo.updateCycleStatus(cycle.id, { status: "processing", chargingStartedAt: new Date() });
+    const att = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k_cdf_wh" });
+    await repo.updateChargeAttempt(att.id, { stripePaymentIntentId: "pi_cdf_wh", status: "processing" });
+
+    repo.simulateUpdateSubscriptionPeriodError = new Error("DB transitoire");
+
+    try {
+      await handleBillingWebhookEvent({ repo }, "payment_intent.succeeded", "pi_cdf_wh", null, null, "evt_cdf_wh");
+    } catch { /* erreur remonte */ }
+
+    /* Le cycle suivant DOIT exister malgré l'échec du period update */
+    const nextCycle = repo.cycles.find(c => c.status === "pending");
+    expect(nextCycle).toBeDefined();
+    expect(nextCycle!.period_start).toEqual(new Date("2026-07-01"));
+
+    /* La sub garde son period_end initial — period update échoué */
+    const updatedSub = repo.subs.find(s => s.id === sub.id)!;
+    expect(updatedSub.current_period_end).toEqual(new Date("2026-07-01")); /* inchangé */
+  });
+});

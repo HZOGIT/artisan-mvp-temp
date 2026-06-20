@@ -1826,3 +1826,43 @@ describe("FIX-CDC — advanceSubscriptionAfterPayment utilise le tarif du plan c
     expect(nextCycle.amount_cents).toBe(2900);
   });
 });
+
+describe("FIX-CDF — advanceSubscriptionAfterPayment : cycle créé avant updateSubscriptionPeriod (auto-healing)", () => {
+  it("updateSubscriptionPeriod échoue après createCycle → cycle pending existe (auto-healing possible)", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    billing.nextChargeResult = { paymentIntentId: "pi_cdf", status: "succeeded" };
+
+    repo.simulateUpdateSubscriptionPeriodError = new Error("DB transitoire");
+
+    try {
+      await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+    } catch { /* l'erreur remonte */ }
+
+    /* Le cycle suivant DOIT exister malgré l'échec du period update */
+    const nextCycle = repo.cycles.find(c => c.status === "pending");
+    expect(nextCycle).toBeDefined();
+    expect(nextCycle!.period_start).toEqual(new Date("2026-07-01"));
+
+    /* La sub garde son period_end initial (null) — period update échoué */
+    const updatedSub = repo.subs.find(s => s.id === sub.id)!;
+    expect(updatedSub.current_period_end).toBeNull();
+  });
+
+  it("updateSubscriptionPeriod réussit → cycle + period tous deux mis à jour (chemin normal)", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    billing.nextChargeResult = { paymentIntentId: "pi_cdf_ok", status: "succeeded" };
+
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+
+    const nextCycle = repo.cycles.find(c => c.status === "pending")!;
+    expect(nextCycle).toBeDefined();
+    const updatedSub = repo.subs.find(s => s.id === sub.id)!;
+    expect(updatedSub.current_period_end).toEqual(new Date("2026-08-01"));
+  });
+});

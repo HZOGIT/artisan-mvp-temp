@@ -59,13 +59,18 @@ export async function handleBillingWebhookEvent(
         if (sub.status !== "canceled") {
           const interval = sub.billing_interval === "yearly" ? "yearly" : "monthly";
           const { start, end } = nextPeriod(cycle.period_end, interval);
-          await deps.repo.updateSubscriptionPeriod(sub.id, "active", cycle.period_end, end);
+          /*
+           * Cycle créé AVANT updateSubscriptionPeriod (même pattern que activateExpiredTrials).
+           * Si updateSubscriptionPeriod échoue après createCycle, le scheduler retrouve
+           * le cycle pending au tick suivant et le charge → auto-healing.
+           */
           const existing = await deps.repo.findPendingCycleForPeriod(sub.id, start);
           if (!existing) {
             const plan = planById(sub.plan_id);
             const amountCents = plan ? plan.amountCentsByInterval[interval] : cycle.amount_cents;
             await deps.repo.createCycle({ subscriptionId: sub.id, periodStart: start, periodEnd: end, amountCents, currency: cycle.currency });
           }
+          await deps.repo.updateSubscriptionPeriod(sub.id, "active", cycle.period_end, end);
           await deps.repo.appendEvent({
             entityType: "billing_subscription",
             entityId: sub.id,

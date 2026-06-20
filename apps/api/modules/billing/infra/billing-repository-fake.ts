@@ -40,6 +40,8 @@ export class FakeBillingRepository implements IBillingRepository {
   public simulateCreateCycleError: Error | null = null;
   /** Injecte une erreur dans le prochain appel updateSubscriptionStatus (test catch dans processDueCancellations). */
   public simulateUpdateSubStatusError: Error | null = null;
+  /** Injecte une erreur dans le prochain appel updateSubscriptionPeriod (test ordre cycle-avant-période). */
+  public simulateUpdateSubscriptionPeriodError: Error | null = null;
 
   private now() { return new Date(); }
 
@@ -164,6 +166,11 @@ export class FakeBillingRepository implements IBillingRepository {
   }
 
   async updateSubscriptionPeriod(subscriptionId: number, status: string, periodStart: Date, periodEnd: Date): Promise<void> {
+    if (this.simulateUpdateSubscriptionPeriodError) {
+      const err = this.simulateUpdateSubscriptionPeriodError;
+      this.simulateUpdateSubscriptionPeriodError = null;
+      throw err;
+    }
     this.subs = this.subs.map(s =>
       s.id === subscriptionId ? { ...s, status, current_period_start: periodStart, current_period_end: periodEnd, updated_at: this.now() } : s
     );
