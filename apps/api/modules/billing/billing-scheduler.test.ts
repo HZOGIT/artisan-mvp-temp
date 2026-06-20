@@ -1742,3 +1742,35 @@ describe("FIX-CDB — recoverZombies processing : reset charging_started_at pour
     expect(stripeCallCount).toBe(0);
   });
 });
+
+describe("FIX-CDC — advanceSubscriptionAfterPayment utilise le tarif du plan courant", () => {
+  it("plan changé en pro pendant le dunning → prochain cycle créé au tarif pro (4900)", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    await repo.updateCycleStatus(cycle.id, { status: "failed", failedAt: new Date(Date.now() - 86400_000), nextRetryAt: new Date(Date.now() - 1000), attemptCount: 1 });
+
+    await repo.updateSubscriptionPlan(CTX, "pro");
+
+    billing.nextChargeResult = { paymentIntentId: "pi_pro", status: "succeeded" };
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+
+    const nextCycle = repo.cycles.find(c => c.status === "pending")!;
+    expect(nextCycle).toBeDefined();
+    expect(nextCycle.amount_cents).toBe(4900);
+  });
+
+  it("plan inchangé (starter) → prochain cycle créé au tarif starter (2900)", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+
+    billing.nextChargeResult = { paymentIntentId: "pi_starter", status: "succeeded" };
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+
+    const nextCycle = repo.cycles.find(c => c.status === "pending")!;
+    expect(nextCycle.amount_cents).toBe(2900);
+  });
+});

@@ -1441,3 +1441,29 @@ describe("FIX-CZ — webhook payment_intent.succeeded efface failed_at et next_r
     expect(updated.paid_at).toBeTruthy();
   });
 });
+
+describe("FIX-CDC — webhook payment_intent.succeeded : prochain cycle au tarif du plan courant", () => {
+  it("plan changé en pro avant le webhook → prochain cycle créé à 4900 (pas 2900)", async () => {
+    const repo = new FakeBillingRepository();
+    const sub = await repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison", status: "processing",
+      currentPeriodStart: new Date("2026-06-01"), currentPeriodEnd: new Date("2026-07-01"),
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"),
+      amountCents: 2900, currency: "eur",
+    });
+    await repo.updateCycleStatus(cycle.id, { status: "processing", chargingStartedAt: new Date() });
+    const attempt = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k_sepa_pro" });
+    await repo.updateChargeAttempt(attempt.id, { stripePaymentIntentId: "pi_sepa_pro", status: "processing" });
+
+    await repo.updateSubscriptionPlan(A, "pro");
+
+    await handleBillingWebhookEvent({ repo }, "payment_intent.succeeded", "pi_sepa_pro", null, null, "evt_pro_ok");
+
+    const nextCycle = repo.cycles.find(c => c.status === "pending")!;
+    expect(nextCycle).toBeDefined();
+    expect(nextCycle.amount_cents).toBe(4900);
+  });
+});

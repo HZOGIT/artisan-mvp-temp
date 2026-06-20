@@ -34,7 +34,15 @@ async function advanceSubscriptionAfterPayment(
   await repo.updateSubscriptionPeriod(subscriptionId, "active", paidCycle.period_end, end);
   const existing = await repo.findPendingCycleForPeriod(subscriptionId, start);
   if (!existing) {
-    await repo.createCycle({ subscriptionId, periodStart: start, periodEnd: end, amountCents: paidCycle.amount_cents, currency: paidCycle.currency });
+    /*
+     * Utilise le tarif du plan courant (pas le montant du cycle expiré).
+     * Si l'artisan a changé de plan pendant le dunning, le prochain cycle reflète
+     * le nouveau tarif — paidCycle.amount_cents est celui de la période précédente.
+     */
+    const sub = await repo.findSubscriptionById(subscriptionId);
+    const plan = sub ? planById(sub.plan_id) : undefined;
+    const amountCents = plan ? plan.amountCentsByInterval[interval] : paidCycle.amount_cents;
+    await repo.createCycle({ subscriptionId, periodStart: start, periodEnd: end, amountCents, currency: paidCycle.currency });
   }
   await repo.appendEvent({
     entityType: "billing_subscription",

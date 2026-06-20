@@ -1,5 +1,6 @@
 import type { IBillingRepository } from "../../application/billing-repository";
 import { nextPeriod, nextRetryAt, MAX_DUNNING_ATTEMPTS } from "../../domain/billing-cycle";
+import { planById } from "../../domain/plan";
 
 export interface BillingWebhookDeps {
   readonly repo: IBillingRepository;
@@ -61,7 +62,9 @@ export async function handleBillingWebhookEvent(
           await deps.repo.updateSubscriptionPeriod(sub.id, "active", cycle.period_end, end);
           const existing = await deps.repo.findPendingCycleForPeriod(sub.id, start);
           if (!existing) {
-            await deps.repo.createCycle({ subscriptionId: sub.id, periodStart: start, periodEnd: end, amountCents: cycle.amount_cents, currency: cycle.currency });
+            const plan = planById(sub.plan_id);
+            const amountCents = plan ? plan.amountCentsByInterval[interval] : cycle.amount_cents;
+            await deps.repo.createCycle({ subscriptionId: sub.id, periodStart: start, periodEnd: end, amountCents, currency: cycle.currency });
           }
           await deps.repo.appendEvent({
             entityType: "billing_subscription",
