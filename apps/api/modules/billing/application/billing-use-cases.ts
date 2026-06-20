@@ -83,7 +83,7 @@ export async function confirmPaymentMethod(
     entityType: "billing_payment_method",
     entityId: pm.id,
     eventType: "payment_method.confirmed",
-    payload: { brand: pm.brand, last4: pm.last4, isDefault: params.setAsDefault },
+    payload: { artisanId: ctx.artisanId, brand: pm.brand, last4: pm.last4, isDefault: params.setAsDefault },
     actor: `user:${ctx.userId}`,
   });
 
@@ -100,7 +100,7 @@ export async function revokePaymentMethod(deps: BillingDeps, ctx: TenantContext,
     entityType: "billing_payment_method",
     entityId: paymentMethodId,
     eventType: "payment_method.revoked",
-    payload: { last4: pm.last4, brand: pm.brand },
+    payload: { artisanId: ctx.artisanId, last4: pm.last4, brand: pm.brand },
     actor: `user:${ctx.userId}`,
   });
 }
@@ -150,7 +150,7 @@ async function resumeBillingIfAbandoned(repo: IBillingRepository, ctx: TenantCon
     entityType: "billing_subscription",
     entityId: sub.id,
     eventType: "subscription.billing_resumed",
-    payload: { cycleId: abandoned.id, reason: "payment_method_updated" },
+    payload: { artisanId: sub.artisan_id, cycleId: abandoned.id, reason: "payment_method_updated" },
     actor: `user:${ctx.userId}`,
   });
 }
@@ -169,7 +169,7 @@ export async function setDefaultPaymentMethod(deps: BillingDeps, ctx: TenantCont
     entityType: "billing_payment_method",
     entityId: paymentMethodId,
     eventType: "payment_method.set_default",
-    payload: { last4: pm.last4 },
+    payload: { artisanId: ctx.artisanId, last4: pm.last4 },
     actor: `user:${ctx.userId}`,
   });
 }
@@ -205,7 +205,7 @@ export async function changePlan(deps: Pick<BillingDeps, "repo">, ctx: TenantCon
     entityType: "billing_subscription",
     entityId: sub.id,
     eventType: "subscription.plan_changed",
-    payload: { from: sub.plan_id, to: newPlanId, pendingCycleUpdated: !!pendingCycle },
+    payload: { artisanId: sub.artisan_id, from: sub.plan_id, to: newPlanId, pendingCycleUpdated: !!pendingCycle },
     actor: `user:${ctx.userId}`,
   });
 }
@@ -223,7 +223,7 @@ export async function cancelAtPeriodEnd(deps: Pick<BillingDeps, "repo">, ctx: Te
     entityType: "billing_subscription",
     entityId: sub.id,
     eventType: "subscription.cancel_scheduled",
-    payload: { cancelAt: cancelAt.toISOString() },
+    payload: { artisanId: sub.artisan_id, cancelAt: cancelAt.toISOString() },
     actor: `user:${ctx.userId}`,
   });
 }
@@ -244,7 +244,7 @@ export async function reactivateSubscription(deps: Pick<BillingDeps, "repo">, ct
     entityType: "billing_subscription",
     entityId: sub.id,
     eventType: "subscription.reactivated",
-    payload: {},
+    payload: { artisanId: sub.artisan_id },
     actor: `user:${ctx.userId}`,
   });
 }

@@ -78,6 +78,7 @@ describe("chargeOffSessionForCycle", () => {
 
     const periodEv = repo.events.find(e => e.event_type === "subscription.period_advanced");
     expect(periodEv).toBeDefined();
+    expect(periodEv!.payload).toMatchObject({ via: "scheduler", artisanId: ARTISAN_ID });
   });
 
   it("requires_action : traité comme failed (3DS off-session = dunning) + event cycle.requires_action", async () => {

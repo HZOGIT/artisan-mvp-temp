@@ -1001,3 +1001,96 @@ describe("FIX-V — normalizeStatus : mapping statuts Stripe legacy → state ma
     expect(normalizeStatus(undefined)).toBe("active");
   });
 });
+
+describe("FIX-X — artisanId uniforme dans tous les payloads billing_events", () => {
+  it("payment_method.confirmed payload contient artisanId", async () => {
+    const deps = makeDeps();
+    await confirmPaymentMethod(deps, A, {
+      stripePaymentMethodId: "pm_fixX_1", stripeCustomerId: "cus_x",
+      setAsDefault: false, consentedAt: new Date(),
+    });
+    const ev = deps.repo.events.find(e => e.event_type === "payment_method.confirmed");
+    expect(ev?.payload).toMatchObject({ artisanId: A.artisanId });
+  });
+
+  it("payment_method.revoked payload contient artisanId", async () => {
+    const deps = makeDeps();
+    const pm = await deps.repo.savePaymentMethod({
+      artisanId: A.artisanId, stripeCustomerId: "cus_x", stripePaymentMethodId: "pm_fixX_2",
+      brand: "visa", last4: "1234", expMonth: 12, expYear: 2027, consentedAt: new Date(),
+    });
+    await revokePaymentMethod(deps, A, pm.id);
+    const ev = deps.repo.events.find(e => e.event_type === "payment_method.revoked");
+    expect(ev?.payload).toMatchObject({ artisanId: A.artisanId });
+  });
+
+  it("payment_method.set_default payload contient artisanId", async () => {
+    const deps = makeDeps();
+    const pm = await deps.repo.savePaymentMethod({
+      artisanId: A.artisanId, stripeCustomerId: "cus_x", stripePaymentMethodId: "pm_fixX_3",
+      brand: "mc", last4: "5678", expMonth: 6, expYear: 2028, consentedAt: new Date(),
+    });
+    await setDefaultPaymentMethod(deps, A, pm.id);
+    const ev = deps.repo.events.find(e => e.event_type === "payment_method.set_default");
+    expect(ev?.payload).toMatchObject({ artisanId: A.artisanId });
+  });
+
+  it("subscription.billing_resumed payload contient artisanId", async () => {
+    const deps = makeDeps();
+    const sub = await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "past_due", currentPeriodStart: new Date("2026-06-01"), currentPeriodEnd: new Date("2026-07-01"),
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const cycle = await deps.repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"),
+      amountCents: 2900, currency: "eur",
+    });
+    deps.repo.cycles[0] = { ...cycle, status: "failed", next_retry_at: null, attempt_count: 4, failed_at: new Date() };
+    const pm = await deps.repo.savePaymentMethod({
+      artisanId: A.artisanId, stripeCustomerId: "cus_x", stripePaymentMethodId: "pm_fixX_4",
+      brand: "visa", last4: "9999", expMonth: 12, expYear: 2029, consentedAt: new Date(),
+    });
+    await setDefaultPaymentMethod(deps, A, pm.id);
+    const ev = deps.repo.events.find(e => e.event_type === "subscription.billing_resumed");
+    expect(ev?.payload).toMatchObject({ artisanId: A.artisanId });
+  });
+
+  it("subscription.reactivated payload contient artisanId", async () => {
+    const deps = makeDeps();
+    const cancelAt = new Date(Date.now() + 86400_000);
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: new Date(Date.now() + 86400_000),
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    await deps.repo.updateCancelAt(A, cancelAt);
+    await reactivateSubscription(deps, A);
+    const ev = deps.repo.events.find(e => e.event_type === "subscription.reactivated");
+    expect(ev?.payload).toMatchObject({ artisanId: A.artisanId });
+  });
+
+  it("subscription.cancel_scheduled payload contient artisanId", async () => {
+    const deps = makeDeps();
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: new Date(Date.now() + 86400_000),
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    await cancelAtPeriodEnd(deps, A);
+    const ev = deps.repo.events.find(e => e.event_type === "subscription.cancel_scheduled");
+    expect(ev?.payload).toMatchObject({ artisanId: A.artisanId });
+  });
+
+  it("subscription.plan_changed payload contient artisanId", async () => {
+    const deps = makeDeps();
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    await changePlan(deps, A, "pro");
+    const ev = deps.repo.events.find(e => e.event_type === "subscription.plan_changed");
+    expect(ev?.payload).toMatchObject({ artisanId: A.artisanId });
+  });
+});

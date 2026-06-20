@@ -40,7 +40,7 @@ async function advanceSubscriptionAfterPayment(
     entityType: "billing_subscription",
     entityId: subscriptionId,
     eventType: "subscription.period_advanced",
-    payload: { artisanId, nextPeriodStart: start.toISOString(), nextPeriodEnd: end.toISOString() },
+    payload: { via: "scheduler", artisanId, nextPeriodStart: start.toISOString(), nextPeriodEnd: end.toISOString() },
     actor: "scheduler",
   });
 }
