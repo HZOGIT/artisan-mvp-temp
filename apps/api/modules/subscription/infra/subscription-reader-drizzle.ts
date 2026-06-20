@@ -13,9 +13,6 @@ function toSubscriptionRow(r: BillingSub): SubscriptionRow {
   return {
     id: r.id,
     artisanId: r.artisan_id,
-    stripeCustomerId: null,
-    stripeSubscriptionId: null,
-    stripePriceId: null,
     plan: r.plan_id,
     status: r.status,
     trialEndsAt: r.trial_ends_at ?? null,

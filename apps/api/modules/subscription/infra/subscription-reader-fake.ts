@@ -5,9 +5,14 @@ import type { SubscriptionRow } from "../domain/subscription";
 /** Repo fake déterministe : abonnement par tenant (null si non semé) + miroir cancel_at_period_end. */
 export class FakeSubscriptionReader implements ISubscriptionRepository {
   private readonly byTenant = new Map<number, SubscriptionRow>();
+  private readonly noms = new Map<number, string>();
 
   seed(artisanId: number, sub: SubscriptionRow): void {
     this.byTenant.set(artisanId, sub);
+  }
+
+  setNomEntreprise(artisanId: number, nom: string): void {
+    this.noms.set(artisanId, nom);
   }
 
   async getSubscription(ctx: TenantContext): Promise<SubscriptionRow | null> {
@@ -19,20 +24,15 @@ export class FakeSubscriptionReader implements ISubscriptionRepository {
     if (cur) this.byTenant.set(ctx.artisanId, { ...cur, cancelAtPeriodEnd: cancel });
   }
 
-  async setStripeCustomerId(ctx: TenantContext, customerId: string): Promise<void> {
-    const cur = this.byTenant.get(ctx.artisanId);
-    this.byTenant.set(ctx.artisanId, { ...(cur ?? blankSub(ctx.artisanId)), stripeCustomerId: customerId });
+  async setStripeCustomerId(_ctx: TenantContext, _customerId: string): Promise<void> {
+    /* no-op */
   }
 
-  setNomEntreprise(artisanId: number, nom: string): void {
-    this.noms.set(artisanId, nom);
-  }
-  private readonly noms = new Map<number, string>();
   async getNomEntreprise(ctx: TenantContext): Promise<string | null> {
     return this.noms.get(ctx.artisanId) ?? null;
   }
 }
 
-function blankSub(artisanId: number): SubscriptionRow {
-  return { id: 0, artisanId, stripeCustomerId: null, stripeSubscriptionId: null, stripePriceId: null, plan: "trial", status: "trialing", trialEndsAt: null, currentPeriodStart: null, currentPeriodEnd: null, cancelAtPeriodEnd: false, maxUsers: 1, maxDevicesPerUser: 3, maxConcurrentSessions: 2 };
+export function blankSub(artisanId: number): SubscriptionRow {
+  return { id: 0, artisanId, plan: "trial", status: "trialing", trialEndsAt: null, currentPeriodStart: null, currentPeriodEnd: null, cancelAtPeriodEnd: false, maxUsers: 1, maxDevicesPerUser: 3, maxConcurrentSessions: 2 };
 }
