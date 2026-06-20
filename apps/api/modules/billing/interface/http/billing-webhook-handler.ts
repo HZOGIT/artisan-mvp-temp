@@ -73,6 +73,11 @@ export async function handleBillingWebhookEvent(
       failureCode: failureCode ?? null,
       failureMessage: failureMessage ?? null,
     });
+
+    /* Fetch sub ici (pas seulement sur isFinalAttempt) pour artisanId uniforme dans cycle.charge_failed (FIX-BB). */
+    const sub = cycle ? await deps.repo.findSubscriptionById(cycle.subscription_id) : null;
+    const artisanId = sub?.artisan_id ?? null;
+
     const attemptCount = cycle?.attempt_count ?? attempt.attempt_no;
     const isFinalAttempt = attemptCount >= MAX_DUNNING_ATTEMPTS;
     const retryAt = isFinalAttempt ? null : nextRetryAt(now, attemptCount);
@@ -81,21 +86,18 @@ export async function handleBillingWebhookEvent(
       entityType: "billing_cycle",
       entityId: attempt.cycle_id,
       eventType: "cycle.charge_failed",
-      payload: { paymentIntentId, via: "webhook", failureCode, failureMessage, nextRetryAt: retryAt?.toISOString() ?? null },
+      payload: { paymentIntentId, via: "webhook", artisanId, attemptNo: attempt.attempt_no, failureCode, failureMessage, nextRetryAt: retryAt?.toISOString() ?? null },
       actor: "stripe_webhook",
     });
-    if (isFinalAttempt && cycle) {
-      const sub = await deps.repo.findSubscriptionById(cycle.subscription_id);
-      if (sub) {
-        await deps.repo.updateSubscriptionStatus({ artisanId: sub.artisan_id, userId: 0 }, "past_due");
-        await deps.repo.appendEvent({
-          entityType: "billing_subscription",
-          entityId: sub.id,
-          eventType: "subscription.suspended",
-          payload: { artisanId: sub.artisan_id, reason: "max_dunning_attempts", via: "webhook" },
-          actor: "stripe_webhook",
-        });
-      }
+    if (isFinalAttempt && cycle && sub) {
+      await deps.repo.updateSubscriptionStatus({ artisanId: sub.artisan_id, userId: 0 }, "past_due");
+      await deps.repo.appendEvent({
+        entityType: "billing_subscription",
+        entityId: sub.id,
+        eventType: "subscription.suspended",
+        payload: { artisanId: sub.artisan_id, reason: "max_dunning_attempts", via: "webhook" },
+        actor: "stripe_webhook",
+      });
     }
   }
 }

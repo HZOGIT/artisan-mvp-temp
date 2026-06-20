@@ -209,6 +209,7 @@ describe("recoverZombies", () => {
     expect(updated.status).toBe("paid");
     const ev = repo.events.find(e => e.event_type === "cycle.zombie_recovered");
     expect(ev).toBeDefined();
+    expect((ev!.payload as Record<string, unknown>)["artisanId"]).toBe(sub.artisan_id);
   });
 
   it("FIX-W — zombie PI succeeded émet cycle.paid avec via:zombie_recovery + artisanId + paidAt", async () => {

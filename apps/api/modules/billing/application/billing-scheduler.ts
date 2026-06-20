@@ -254,15 +254,15 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
     const piId = lastAttempt?.stripe_payment_intent_id ?? null;
 
     if (!piId || !lastAttempt) {
+      const zombieSub = await deps.repo.findSubscriptionById(cycle.subscription_id);
       await deps.repo.appendEvent({
         entityType: "billing_cycle",
         entityId: cycle.id,
         eventType: "cycle.zombie_recovered",
-        payload: { reason: "no_payment_intent_id" },
+        payload: { reason: "no_payment_intent_id", artisanId: zombieSub?.artisan_id ?? null },
         actor: "scheduler",
       });
       if (lastAttempt) {
-        const zombieSub = await deps.repo.findSubscriptionById(cycle.subscription_id);
         if (!zombieSub) {
           await deps.repo.updateCycleStatus(cycle.id, { status: "failed", failedAt: now });
         } else {
@@ -288,15 +288,16 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
 
     const pi = await deps.billing.retrievePaymentIntent(piId);
 
+    /* Fetch sub avant l'event pour inclure artisanId dans le payload (FIX-BB). */
+    const sub = await deps.repo.findSubscriptionById(cycle.subscription_id);
     await deps.repo.appendEvent({
       entityType: "billing_cycle",
       entityId: cycle.id,
       eventType: "cycle.zombie_recovered",
-      payload: { piStatus: pi.status, paymentIntentId: piId },
+      payload: { piStatus: pi.status, paymentIntentId: piId, artisanId: sub?.artisan_id ?? null },
       actor: "scheduler",
     });
 
-    const sub = await deps.repo.findSubscriptionById(cycle.subscription_id);
     if (!sub) {
       await deps.repo.appendEvent({
         entityType: "billing_cycle",

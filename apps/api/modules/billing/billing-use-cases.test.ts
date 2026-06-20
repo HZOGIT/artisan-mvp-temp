@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { FakeBillingRepository } from "./infra/billing-repository-fake";
 import { FakeBillingPort } from "../../shared/ports/billing-adapter";
+import { handleBillingWebhookEvent } from "./interface/http/billing-webhook-handler";
 import type { StripePort } from "../../shared/ports/stripe";
 import type { BillingDeps } from "./application/billing-use-cases";
 import type { BillingInvoice } from "../../../../drizzle/schema.pg";
@@ -1160,5 +1161,67 @@ describe("FIX-Y — FakeBillingRepository fidélité au Drizzle", () => {
     await repo.createChargeAttempt({ cycleId: 1, attemptNo: 1, idempotencyKey: "k1" });
     await expect(repo.createChargeAttempt({ cycleId: 1, attemptNo: 2, idempotencyKey: "k2" }))
       .resolves.toBeDefined();
+  });
+});
+
+describe("FIX-BB — cycle.charge_failed webhook : artisanId + attemptNo dans le payload", () => {
+  async function setupWebhookFailure(repo: FakeBillingRepository, attemptNo = 1) {
+    const sub = await repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: new Date("2026-06-01"), currentPeriodEnd: new Date("2026-07-01"),
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id,
+      periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"),
+      amountCents: 2900, currency: "eur",
+    });
+    await repo.updateCycleStatus(cycle.id, { status: "charging", chargingStartedAt: new Date(), attemptCount: attemptNo });
+    const attempt = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo, idempotencyKey: `k${attemptNo}` });
+    await repo.updateChargeAttempt(attempt.id, { stripePaymentIntentId: "pi_fail", status: "processing" });
+    return { sub, cycle, attempt };
+  }
+
+  it("tentative non-finale → cycle.charge_failed contient artisanId + attemptNo", async () => {
+    const repo = new FakeBillingRepository();
+    const { sub, attempt } = await setupWebhookFailure(repo, 1);
+
+    await handleBillingWebhookEvent(
+      { repo },
+      "payment_intent.payment_failed",
+      "pi_fail",
+      "card_declined",
+      "Your card was declined.",
+      "evt_bb1",
+    );
+
+    const ev = repo.events.find(e => e.event_type === "cycle.charge_failed");
+    expect(ev).toBeDefined();
+    expect(ev!.payload).toMatchObject({
+      via: "webhook",
+      artisanId: sub.artisan_id,
+      attemptNo: attempt.attempt_no,
+      failureCode: "card_declined",
+    });
+  });
+
+  it("tentative finale → suspension + artisanId présent dans cycle.charge_failed", async () => {
+    const repo = new FakeBillingRepository();
+    const { sub } = await setupWebhookFailure(repo, 4);
+
+    await handleBillingWebhookEvent(
+      { repo },
+      "payment_intent.payment_failed",
+      "pi_fail",
+      "insufficient_funds",
+      null,
+      "evt_bb2",
+    );
+
+    const failEv = repo.events.find(e => e.event_type === "cycle.charge_failed");
+    expect(failEv!.payload).toMatchObject({ artisanId: sub.artisan_id, attemptNo: 4 });
+    const suspEv = repo.events.find(e => e.event_type === "subscription.suspended");
+    expect(suspEv).toBeDefined();
+    expect((suspEv!.payload as Record<string, unknown>)["artisanId"]).toBe(sub.artisan_id);
   });
 });
