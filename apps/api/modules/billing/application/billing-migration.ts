@@ -78,7 +78,7 @@ export async function migrateSubscriptionsFromLegacy(
         ? sub.current_period_end
         : null;
 
-      await repo.saveSubscription({
+      const savedSub = await repo.saveSubscription({
         artisanId: sub.artisan_id,
         planId,
         billingMode: "maison",
@@ -98,9 +98,10 @@ export async function migrateSubscriptionsFromLegacy(
 
       await repo.appendEvent({
         entityType: "billing_subscription",
-        entityId: sub.artisan_id,
+        entityId: savedSub.id,
         eventType: "subscription.migrated_from_legacy",
         payload: {
+          artisanId: sub.artisan_id,
           legacySubId: sub.id,
           stripeSubscriptionId: sub.stripe_subscription_id ?? null,
           planId,
