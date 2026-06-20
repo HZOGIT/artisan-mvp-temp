@@ -119,6 +119,21 @@ describe("chargeOffSessionForCycle", () => {
     expect(ev!.payload).toMatchObject({ failureMessage: "card_declined", attemptNo: 1 });
   });
 
+  it("FIX-P — cycle.charge_failed payload inclut failureCode et via:'scheduler'", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+
+    /* requires_action transporte failureCode explicite */
+    billing.chargeOffSession = async () => ({ paymentIntentId: "pi_3ds", status: "requires_action" });
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+
+    const ev = repo.events.find(e => e.event_type === "cycle.charge_failed");
+    expect(ev).toBeDefined();
+    expect(ev!.payload).toMatchObject({ via: "scheduler", failureCode: "requires_action" });
+  });
+
   it("idempotency key format : billing-cycle-{id}-attempt-{n}", async () => {
     const { repo, billing } = makeDeps();
     const sub = await setupActiveSub(repo);

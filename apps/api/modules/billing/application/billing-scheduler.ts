@@ -174,7 +174,7 @@ async function handleDunning(deps: SchedulerDeps, p: DunningParams): Promise<voi
     entityType: "billing_cycle",
     entityId: cycleId,
     eventType: "cycle.charge_failed",
-    payload: { artisanId, attemptNo: newAttemptCount, failureMessage, nextRetryAt: retryAt?.toISOString() ?? null },
+    payload: { via: "scheduler", artisanId, attemptNo: newAttemptCount, failureCode: p.failureCode ?? null, failureMessage, nextRetryAt: retryAt?.toISOString() ?? null },
     actor: "scheduler",
   });
 

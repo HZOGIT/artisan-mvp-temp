@@ -681,6 +681,22 @@ describe("changePlan", () => {
 
     await expect(changePlan(deps, A, "pro")).resolves.toBeUndefined();
   });
+
+  it("FIX-P — sub canceled → changePlan no-op, plan_id non modifié", async () => {
+    const deps = makeDeps();
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "canceled", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+
+    await changePlan(deps, A, "pro");
+
+    const sub = await deps.repo.findSubscription(A);
+    expect(sub?.plan_id).toBe("starter");
+    const evts = deps.repo.events.filter(e => e.event_type === "subscription.plan_changed");
+    expect(evts).toHaveLength(0);
+  });
 });
 
 

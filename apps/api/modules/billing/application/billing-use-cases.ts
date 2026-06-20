@@ -181,6 +181,7 @@ export async function changePlan(deps: Pick<BillingDeps, "repo">, ctx: TenantCon
 
   const sub = await deps.repo.findSubscription(ctx);
   if (!sub) throw new NotFoundError("Aucun abonnement actif");
+  if (sub.status === "canceled") return;
 
   if (sub.plan_id === newPlanId) return;
 
