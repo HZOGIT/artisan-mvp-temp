@@ -827,3 +827,90 @@ describe("changements de plan — nextCycleAmount", () => {
     expect(yearly).toBeLessThanOrEqual(monthly12);
   });
 });
+
+describe("FIX-J — reprise facturation après dunning épuisé (resumeBillingIfAbandoned)", () => {
+  async function setupPastDueWithAbandoned(repo: FakeBillingRepository) {
+    const sub = await repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "past_due", currentPeriodStart: new Date("2026-06-01"), currentPeriodEnd: new Date("2026-07-01"),
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"),
+      amountCents: 2900, currency: "eur",
+    });
+    repo.cycles[0] = { ...cycle, status: "failed", next_retry_at: null, attempt_count: 4, failed_at: new Date() };
+    return { sub, cycle: repo.cycles[0]! };
+  }
+
+  it("confirmPaymentMethod(setAsDefault=true) sur past_due remet le cycle en pending + sub active", async () => {
+    const deps = makeDeps();
+    await setupPastDueWithAbandoned(deps.repo);
+
+    await confirmPaymentMethod(deps, A, {
+      stripePaymentMethodId: "pm_new",
+      stripeCustomerId: "cus_x",
+      setAsDefault: true,
+      consentedAt: new Date(),
+    });
+
+    expect(deps.repo.cycles[0]!.status).toBe("pending");
+    expect(deps.repo.cycles[0]!.next_retry_at).toBeNull();
+    expect(deps.repo.cycles[0]!.attempt_count).toBe(0);
+    expect(deps.repo.subs[0]!.status).toBe("active");
+
+    const ev = deps.repo.events.find(e => e.event_type === "subscription.billing_resumed");
+    expect(ev).toBeDefined();
+    expect(ev!.payload).toMatchObject({ reason: "payment_method_updated" });
+  });
+
+  it("setDefaultPaymentMethod sur past_due remet le cycle en pending + sub active", async () => {
+    const deps = makeDeps();
+    await setupPastDueWithAbandoned(deps.repo);
+
+    const pm = await deps.repo.savePaymentMethod({
+      artisanId: A.artisanId, stripeCustomerId: "cus_x", stripePaymentMethodId: "pm_saved",
+      brand: "visa", last4: "4242", expMonth: 12, expYear: 2028, consentedAt: new Date(),
+    });
+
+    await setDefaultPaymentMethod(deps, A, pm.id);
+
+    expect(deps.repo.cycles[0]!.status).toBe("pending");
+    expect(deps.repo.subs[0]!.status).toBe("active");
+  });
+
+  it("confirmPaymentMethod sur sub active → pas de resumeBilling (pas de changement de statut)", async () => {
+    const deps = makeDeps();
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+
+    await confirmPaymentMethod(deps, A, {
+      stripePaymentMethodId: "pm_ok",
+      stripeCustomerId: "cus_x",
+      setAsDefault: true,
+      consentedAt: new Date(),
+    });
+
+    /* Aucun event de reprise — la sub était déjà active */
+    expect(deps.repo.events.find(e => e.event_type === "subscription.billing_resumed")).toBeUndefined();
+  });
+
+  it("confirmPaymentMethod(setAsDefault=false) sur past_due → pas de reprise (PM non promu)", async () => {
+    const deps = makeDeps();
+    await setupPastDueWithAbandoned(deps.repo);
+
+    await confirmPaymentMethod(deps, A, {
+      stripePaymentMethodId: "pm_notdefault",
+      stripeCustomerId: "cus_x",
+      setAsDefault: false,
+      consentedAt: new Date(),
+    });
+
+    /* Le cycle reste abandonné — setAsDefault=false n'a pas déclenché resumeBilling */
+    expect(deps.repo.cycles[0]!.status).toBe("failed");
+    expect(deps.repo.subs[0]!.status).toBe("past_due");
+  });
+});

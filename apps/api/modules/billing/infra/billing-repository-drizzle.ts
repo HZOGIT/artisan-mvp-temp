@@ -197,6 +197,16 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
     return row ?? null;
   }
 
+  async findAbandonedCycle(subscriptionId: number): Promise<BillingCycle | null> {
+    const [row] = await this.db
+      .select()
+      .from(billingCycles)
+      .where(and(eq(billingCycles.subscription_id, subscriptionId), eq(billingCycles.status, "failed"), isNull(billingCycles.next_retry_at)))
+      .orderBy(desc(billingCycles.period_start))
+      .limit(1);
+    return row ?? null;
+  }
+
   async createCycle(params: CreateCycleParams): Promise<BillingCycle> {
     const [row] = await this.db
       .insert(billingCycles)

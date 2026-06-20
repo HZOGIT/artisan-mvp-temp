@@ -76,6 +76,7 @@ export async function confirmPaymentMethod(
     if (sub) {
       await deps.repo.updateSubscriptionPaymentMethod(ctx, pm.id);
     }
+    await resumeBillingIfAbandoned(deps.repo, ctx);
   }
 
   await deps.repo.appendEvent({
@@ -124,6 +125,29 @@ export async function getBillingInfo(deps: Pick<BillingDeps, "repo">, ctx: Tenan
 }
 
 
+async function resumeBillingIfAbandoned(repo: IBillingRepository, ctx: TenantContext): Promise<void> {
+  const sub = await repo.findSubscription(ctx);
+  if (!sub || sub.status !== "past_due") return;
+
+  const abandoned = await repo.findAbandonedCycle(sub.id);
+  if (!abandoned) return;
+
+  await repo.updateCycleStatus(abandoned.id, {
+    status: "pending",
+    nextRetryAt: null,
+    failedAt: null,
+    attemptCount: 0,
+  });
+  await repo.updateSubscriptionStatus(ctx, "active");
+  await repo.appendEvent({
+    entityType: "billing_subscription",
+    entityId: sub.id,
+    eventType: "subscription.billing_resumed",
+    payload: { cycleId: abandoned.id, reason: "payment_method_updated" },
+    actor: `user:${ctx.userId}`,
+  });
+}
+
 export async function setDefaultPaymentMethod(deps: BillingDeps, ctx: TenantContext, paymentMethodId: number): Promise<void> {
   const pm = await deps.repo.findPaymentMethodById(ctx, paymentMethodId);
   if (!pm) throw new NotFoundError(`Moyen de paiement ${paymentMethodId} introuvable`);
@@ -131,6 +155,8 @@ export async function setDefaultPaymentMethod(deps: BillingDeps, ctx: TenantCont
   await deps.repo.setDefaultPaymentMethod(ctx, paymentMethodId);
   const sub = await deps.repo.findSubscription(ctx);
   if (sub) await deps.repo.updateSubscriptionPaymentMethod(ctx, paymentMethodId);
+
+  await resumeBillingIfAbandoned(deps.repo, ctx);
 
   await deps.repo.appendEvent({
     entityType: "billing_payment_method",

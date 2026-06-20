@@ -91,6 +91,8 @@ export interface IBillingRepository {
   findPendingCycle(subscriptionId: number): Promise<BillingCycle | null>;
   findPendingCycleForPeriod(subscriptionId: number, periodStart: Date): Promise<BillingCycle | null>;
   findCycleById(cycleId: number): Promise<BillingCycle | null>;
+  /** Cycle failed avec nextRetryAt=null (dunning épuisé, abandon définitif). */
+  findAbandonedCycle(subscriptionId: number): Promise<BillingCycle | null>;
   createCycle(params: CreateCycleParams): Promise<BillingCycle>;
   updateCycleStatus(cycleId: number, params: UpdateCycleStatusParams): Promise<void>;
   updateCycleAmount(cycleId: number, amountCents: number): Promise<void>;

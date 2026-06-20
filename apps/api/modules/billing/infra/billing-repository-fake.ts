@@ -164,6 +164,12 @@ export class FakeBillingRepository implements IBillingRepository {
     return this.cycles.find(c => c.id === cycleId) ?? null;
   }
 
+  async findAbandonedCycle(subscriptionId: number): Promise<Cycle | null> {
+    return this.cycles
+      .filter(c => c.subscription_id === subscriptionId && c.status === "failed" && c.next_retry_at === null)
+      .sort((a, b) => b.period_start.getTime() - a.period_start.getTime())[0] ?? null;
+  }
+
   async createCycle(params: CreateCycleParams): Promise<Cycle> {
     const cycle: Cycle = {
       id: nextId(),
