@@ -234,6 +234,50 @@ describe.skipIf(!URL)("billing.router e2e (billing maison protégé)", () => {
     expect(evts[0]!.actor).toBe(`user:${UID}`);
   });
 
+  it("FIX-CDS — cancelAtPeriodEnd + reactivate : cancel_at positionné puis effacé", async () => {
+    const tok = await jwt(UID);
+
+    /* Assure une sub active sans cancel_at */
+    await admin.query(
+      `insert into billing_subscriptions (artisan_id, plan_id, billing_mode, status, current_period_end)
+       values ($1,'starter','maison','active','2026-08-01')
+       on conflict (artisan_id) do update set status='active', cancel_at=null, plan_id='starter'`,
+      [ARTISAN_ID],
+    );
+
+    const cancel = await injectTrpc(app, "POST", "billing.cancelAtPeriodEnd", undefined, tok);
+    expect(cancel.statusCode).toBe(200);
+    const { rows: afterCancel } = await admin.query<{ cancel_at: unknown }>(
+      "select cancel_at from billing_subscriptions where artisan_id=$1", [ARTISAN_ID],
+    );
+    expect(afterCancel[0]!.cancel_at).not.toBeNull();
+
+    const reactivate = await injectTrpc(app, "POST", "billing.reactivate", undefined, tok);
+    expect(reactivate.statusCode).toBe(200);
+    const { rows: afterReact } = await admin.query<{ cancel_at: unknown }>(
+      "select cancel_at from billing_subscriptions where artisan_id=$1", [ARTISAN_ID],
+    );
+    expect(afterReact[0]!.cancel_at).toBeNull();
+  });
+
+  it("FIX-CDS — changePlan → plan_id mis à jour en DB", async () => {
+    const tok = await jwt(UID);
+    await admin.query(
+      `insert into billing_subscriptions (artisan_id, plan_id, billing_mode, status)
+       values ($1,'starter','maison','active')
+       on conflict (artisan_id) do update set status='active', plan_id='starter'`,
+      [ARTISAN_ID],
+    );
+
+    const res = await injectTrpc(app, "POST", "billing.changePlan", { planId: "pro" }, tok);
+    expect(res.statusCode).toBe(200);
+
+    const { rows } = await admin.query<{ plan_id: string }>(
+      "select plan_id from billing_subscriptions where artisan_id=$1", [ARTISAN_ID],
+    );
+    expect(rows[0]!.plan_id).toBe("pro");
+  });
+
   it("setDefaultPaymentMethod : event payment_method.set_default persisté en DB", async () => {
     // Symétrique avec le test revoke : vérifie que setDefaultPaymentMethod écrit aussi en billing_events.
     const { rows } = await admin.query<{ id: number }>(
