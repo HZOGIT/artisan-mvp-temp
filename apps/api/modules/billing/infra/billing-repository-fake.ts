@@ -42,6 +42,8 @@ export class FakeBillingRepository implements IBillingRepository {
   public simulateUpdateSubStatusError: Error | null = null;
   /** Injecte une erreur dans le prochain appel updateSubscriptionPeriod (test ordre cycle-avant-période). */
   public simulateUpdateSubscriptionPeriodError: Error | null = null;
+  /** Injecte une erreur dans le prochain appel appendEvent (test robustesse des catch blocks). */
+  public simulateAppendEventError: Error | null = null;
 
   private now() { return new Date(); }
 
@@ -334,6 +336,11 @@ export class FakeBillingRepository implements IBillingRepository {
   }
 
   async appendEvent(params: AppendEventParams): Promise<BillingEvent> {
+    if (this.simulateAppendEventError) {
+      const err = this.simulateAppendEventError;
+      this.simulateAppendEventError = null;
+      throw err;
+    }
     const ev: BillingEvent = {
       id: nextId(),
       entity_type: params.entityType,

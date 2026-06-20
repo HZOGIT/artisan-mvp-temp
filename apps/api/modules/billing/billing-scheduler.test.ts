@@ -1912,3 +1912,120 @@ describe("FIX-CDF — advanceSubscriptionAfterPayment : cycle créé avant updat
     expect(updatedSub.current_period_end).toEqual(new Date("2026-08-01"));
   });
 });
+
+describe("FIX-CDH — protection catch blocks : appendEvent en échec ne doit pas avorter la boucle", () => {
+  describe("recoverZombies", () => {
+    it("appendEvent dans le catch throw → swallowed, zombie#2 traité normalement", async () => {
+      const { repo, billing } = makeDeps();
+      const sub = await setupActiveSub(repo);
+      const zombieStart = new Date(Date.now() - 20 * 60 * 1000);
+
+      /* zombie1 — retrievePaymentIntent va échouer */
+      const cycle1 = await repo.createCycle({ subscriptionId: sub.id, periodStart: new Date("2026-05-01"), periodEnd: new Date("2026-06-01"), amountCents: 2900, currency: "eur" });
+      await repo.updateCycleStatus(cycle1.id, { status: "charging", chargingStartedAt: zombieStart });
+      const att1 = await repo.createChargeAttempt({ cycleId: cycle1.id, attemptNo: 1, idempotencyKey: "k_cdh1" });
+      await repo.updateChargeAttempt(att1.id, { stripePaymentIntentId: "pi_cdh1", status: "initiated" });
+
+      /* zombie2 — sera récupéré en "paid" (PI succeeded par défaut) */
+      const cycle2 = await repo.createCycle({ subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"), amountCents: 2900, currency: "eur" });
+      await repo.updateCycleStatus(cycle2.id, { status: "charging", chargingStartedAt: zombieStart });
+      const att2 = await repo.createChargeAttempt({ cycleId: cycle2.id, attemptNo: 1, idempotencyKey: "k_cdh2" });
+      await repo.updateChargeAttempt(att2.id, { stripePaymentIntentId: "pi_cdh2", status: "initiated" });
+
+      billing.simulateRetrievePaymentIntentError = new Error("Stripe 404");
+      repo.simulateAppendEventError = new Error("DB down");
+
+      await recoverZombies({ repo, billing });
+
+      /* zombie2 doit être traité malgré la double erreur (retrieve + appendEvent) sur zombie1 */
+      const updated2 = repo.cycles.find(c => c.id === cycle2.id)!;
+      expect(updated2.status).toBe("paid");
+    });
+
+    it("catch path → chargingStartedAt réinitialisé (cooling period, évite re-détection immédiate)", async () => {
+      const { repo, billing } = makeDeps();
+      const sub = await setupActiveSub(repo);
+      const originalStart = new Date(Date.now() - 20 * 60 * 1000);
+
+      const cycle = await repo.createCycle({ subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"), amountCents: 2900, currency: "eur" });
+      await repo.updateCycleStatus(cycle.id, { status: "charging", chargingStartedAt: originalStart });
+      const att = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k_cdh_cool" });
+      await repo.updateChargeAttempt(att.id, { stripePaymentIntentId: "pi_cdh_cool", status: "initiated" });
+
+      billing.simulateRetrievePaymentIntentError = new Error("Stripe unavailable");
+      const before = new Date();
+      await recoverZombies({ repo, billing });
+
+      const updated = repo.cycles.find(c => c.id === cycle.id)!;
+      expect(updated.charging_started_at).not.toBeNull();
+      expect(updated.charging_started_at!.getTime()).toBeGreaterThanOrEqual(before.getTime());
+      expect(updated.charging_started_at!.getTime()).toBeGreaterThan(originalStart.getTime());
+    });
+  });
+
+  describe("activateExpiredTrials", () => {
+    it("appendEvent dans le catch throw → swallowed, trial suivant activé normalement", async () => {
+      const { repo, billing } = makeDeps();
+      const ARTISAN_ID_2 = 2;
+      const trialEnd = new Date(Date.now() - 3600_000);
+
+      /* sub1 — createCycle va échouer → catch → appendEvent va échouer */
+      await repo.saveSubscription({
+        artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+        status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+        trialEndsAt: trialEnd, paymentMethodId: null,
+      });
+
+      /* sub2 — doit être activée malgré la double erreur sur sub1 */
+      await repo.saveSubscription({
+        artisanId: ARTISAN_ID_2, planId: "starter", billingMode: "maison",
+        status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+        trialEndsAt: trialEnd, paymentMethodId: null,
+      });
+
+      repo.simulateCreateCycleError = new Error("pool exhausted");
+      repo.simulateAppendEventError = new Error("DB still down");
+
+      const result = await runSchedulerTick({ repo, billing });
+
+      expect(result.trialsActivated).toBe(1);
+      const sub2 = repo.subs.find(s => s.artisan_id === ARTISAN_ID_2)!;
+      expect(sub2.status).toBe("active");
+    });
+  });
+
+  describe("processDueCancellations", () => {
+    it("appendEvent dans le catch throw → swallowed, sub suivante annulée normalement", async () => {
+      const { repo, billing } = makeDeps();
+      const ARTISAN_ID_2 = 2;
+      const CTX_2 = { artisanId: ARTISAN_ID_2, userId: 0 };
+      const cancelAt = new Date(Date.now() - 5000);
+
+      /* sub1 — updateSubscriptionStatus va échouer → catch → appendEvent va échouer */
+      await repo.saveSubscription({
+        artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+        status: "active", currentPeriodStart: new Date(Date.now() - 31 * 86400_000),
+        currentPeriodEnd: cancelAt, trialEndsAt: null, paymentMethodId: null,
+      });
+      await repo.updateCancelAt(CTX, cancelAt);
+
+      /* sub2 — doit être annulée malgré la double erreur sur sub1 */
+      await repo.saveSubscription({
+        artisanId: ARTISAN_ID_2, planId: "starter", billingMode: "maison",
+        status: "active", currentPeriodStart: new Date(Date.now() - 31 * 86400_000),
+        currentPeriodEnd: cancelAt, trialEndsAt: null, paymentMethodId: null,
+      });
+      await repo.updateCancelAt(CTX_2, cancelAt);
+
+      repo.simulateUpdateSubStatusError = new Error("connection reset");
+      repo.simulateAppendEventError = new Error("DB unreachable");
+
+      await runSchedulerTick({ repo, billing });
+
+      const sub1 = repo.subs.find(s => s.artisan_id === ARTISAN_ID)!;
+      const sub2 = repo.subs.find(s => s.artisan_id === ARTISAN_ID_2)!;
+      expect(sub1.status).toBe("active");
+      expect(sub2.status).toBe("canceled");
+    });
+  });
+});

@@ -414,13 +414,26 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
       });
     }
     } catch (err) {
-      await deps.repo.appendEvent({
-        entityType: "billing_cycle",
-        entityId: cycle.id,
-        eventType: "cycle.zombie_recovery_error",
-        payload: { cycleId: cycle.id, artisanId: cycleArtisanId, error: err instanceof Error ? err.message : String(err) },
-        actor: "scheduler",
-      });
+      /*
+       * appendEvent peut échouer si la DB est down (même contexte que l'erreur dans le try).
+       * Sans protection, un throw ici avorterait la boucle pour tous les zombies restants.
+       * Separately : réinitialise chargingStartedAt pour éviter la relance immédiate à chaque
+       * tick (ex. retrievePaymentIntent 404 persistant → boucle d'erreur toutes les 10 min).
+       * Les deux sont best-effort car la DB peut encore être indisponible.
+       */
+      try {
+        await deps.repo.appendEvent({
+          entityType: "billing_cycle",
+          entityId: cycle.id,
+          eventType: "cycle.zombie_recovery_error",
+          payload: { cycleId: cycle.id, artisanId: cycleArtisanId, error: err instanceof Error ? err.message : String(err) },
+          actor: "scheduler",
+        });
+      } catch { /* best-effort — ne pas avorter la boucle sur échec de logging */ }
+      /* Cooling period : repousse la prochaine détection zombie de ZOMBIE_THRESHOLD */
+      try {
+        await deps.repo.updateCycleStatus(cycle.id, { status: cycle.status, chargingStartedAt: now });
+      } catch { /* best-effort */ }
     }
   }
   return recovered;
@@ -482,13 +495,16 @@ async function activateExpiredTrials(deps: SchedulerDeps, now: Date): Promise<nu
 
       activated++;
     } catch (err) {
-      await deps.repo.appendEvent({
-        entityType: "billing_subscription",
-        entityId: sub.id,
-        eventType: "subscription.trial_activation_error",
-        payload: { artisanId: sub.artisan_id, error: err instanceof Error ? err.message : String(err) },
-        actor: "scheduler",
-      });
+      /* appendEvent peut échouer si la DB est down — protéger pour ne pas avorter la boucle */
+      try {
+        await deps.repo.appendEvent({
+          entityType: "billing_subscription",
+          entityId: sub.id,
+          eventType: "subscription.trial_activation_error",
+          payload: { artisanId: sub.artisan_id, error: err instanceof Error ? err.message : String(err) },
+          actor: "scheduler",
+        });
+      } catch { /* best-effort — ne pas avorter la boucle sur échec de logging */ }
     }
   }
 
@@ -519,13 +535,16 @@ async function processDueCancellations(deps: SchedulerDeps, now: Date): Promise<
       });
       count++;
     } catch (err) {
-      await deps.repo.appendEvent({
-        entityType: "billing_subscription",
-        entityId: sub.id,
-        eventType: "subscription.cancel_error",
-        payload: { artisanId: sub.artisan_id, error: err instanceof Error ? err.message : String(err) },
-        actor: "scheduler",
-      });
+      /* appendEvent peut échouer si la DB est down — protéger pour ne pas avorter la boucle */
+      try {
+        await deps.repo.appendEvent({
+          entityType: "billing_subscription",
+          entityId: sub.id,
+          eventType: "subscription.cancel_error",
+          payload: { artisanId: sub.artisan_id, error: err instanceof Error ? err.message : String(err) },
+          actor: "scheduler",
+        });
+      } catch { /* best-effort — ne pas avorter la boucle sur échec de logging */ }
     }
   }
   return count;

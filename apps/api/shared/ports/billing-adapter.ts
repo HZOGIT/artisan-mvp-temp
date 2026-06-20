@@ -110,6 +110,8 @@ export class FakeBillingPort implements BillingPort {
   public nextChargeError = "card_declined";
   /** Override pour simuler l'état réel d'un PI lors de la récupération zombie. */
   public nextRetrieveResult: PaymentIntentInfo | null = null;
+  /** Injecte une erreur dans le prochain appel retrievePaymentIntent (test catch recoverZombies). */
+  public simulateRetrievePaymentIntentError: Error | null = null;
   private seq = 0;
 
   async createSetupIntent(customerId: string): Promise<SetupIntentResult> {
@@ -129,6 +131,11 @@ export class FakeBillingPort implements BillingPort {
   }
 
   async retrievePaymentIntent(paymentIntentId: string): Promise<PaymentIntentInfo> {
+    if (this.simulateRetrievePaymentIntentError) {
+      const err = this.simulateRetrievePaymentIntentError;
+      this.simulateRetrievePaymentIntentError = null;
+      throw err;
+    }
     return this.nextRetrieveResult ?? { id: paymentIntentId, status: "succeeded", failureCode: null, failureMessage: null };
   }
 
