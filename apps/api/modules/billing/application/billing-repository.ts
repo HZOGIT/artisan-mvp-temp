@@ -60,8 +60,10 @@ export interface SubscriptionWithDueCycle {
   readonly paymentMethod: BillingPaymentMethod;
 }
 
+export type BillingEntityType = "billing_cycle" | "billing_subscription" | "billing_payment_method" | "artisan";
+
 export interface AppendEventParams {
-  readonly entityType: string;
+  readonly entityType: BillingEntityType;
   readonly entityId: number;
   readonly eventType: string;
   readonly payload: Record<string, unknown>;
