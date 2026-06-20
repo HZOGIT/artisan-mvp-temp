@@ -119,18 +119,7 @@ export async function chargeOffSessionForCycle(
       });
       await advanceSubscriptionAfterPayment(deps.repo, subscriptionId, artisanId, cycle);
     } else if (result.status === "requires_action") {
-      /*
-       * Off-session 3DS : l'artisan doit mettre à jour son moyen de paiement (on ne peut pas
-       * compléter l'auth en son absence). On traite comme un échec pour déclencher le dunning.
-       */
-      const retryAt3ds = nextRetryAt(now, newAttemptCount);
-      const isFinal3ds = newAttemptCount >= MAX_DUNNING_ATTEMPTS;
-      await deps.repo.updateCycleStatus(cycleId, {
-        status: "failed",
-        failedAt: now,
-        nextRetryAt: isFinal3ds ? null : retryAt3ds,
-        attemptCount: newAttemptCount,
-      });
+      /* Off-session 3DS impossible sans présence de l'utilisateur — traité comme un échec de paiement. */
       await deps.repo.updateChargeAttempt(attempt.id, { status: "failed", failureCode: "requires_action" });
       await deps.repo.appendEvent({
         entityType: "billing_cycle",
@@ -139,6 +128,7 @@ export async function chargeOffSessionForCycle(
         payload: { paymentIntentId: result.paymentIntentId, artisanId, treatedAsFailed: true },
         actor: "scheduler",
       });
+      await handleDunning(deps, { cycleId, subscriptionId, artisanId, now, newAttemptCount, attempt, failureMessage: "requires_action" });
     } else {
       await deps.repo.updateCycleStatus(cycleId, { status: "processing" });
     }
