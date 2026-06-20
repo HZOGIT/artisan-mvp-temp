@@ -104,8 +104,10 @@ export class FakeBillingPort implements BillingPort {
   public setupIntentsCreated: string[] = [];
   public chargesAttempted: ChargeOffSessionParams[] = [];
   public refundsIssued: { paymentIntentId: string; amountCents?: number }[] = [];
-  /** Override dans les tests pour simuler requires_action ou processing. */
-  public nextChargeResult: ChargeResult = { paymentIntentId: "pi_fake_1", status: "succeeded" };
+  /** Override dans les tests pour simuler requires_action ou processing. null = lève une erreur (dunning). */
+  public nextChargeResult: ChargeResult | null = { paymentIntentId: "pi_fake_1", status: "succeeded" };
+  /** Message d'erreur simulé quand nextChargeResult = null. */
+  public nextChargeError = "card_declined";
   private seq = 0;
 
   async createSetupIntent(customerId: string): Promise<SetupIntentResult> {
@@ -120,6 +122,7 @@ export class FakeBillingPort implements BillingPort {
 
   async chargeOffSession(params: ChargeOffSessionParams): Promise<ChargeResult> {
     this.chargesAttempted.push(params);
+    if (this.nextChargeResult === null) throw new Error(this.nextChargeError);
     return this.nextChargeResult;
   }
 

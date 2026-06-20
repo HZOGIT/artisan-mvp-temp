@@ -951,17 +951,18 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   });
 
   /** Scheduler billing maison — `POST /internal/billing/tick` sécurisé par x-scheduler-secret. */
-  registerBillingSchedulerRoute(app, {
+  const billingNotifier = new SubscriptionEventNotifierDrizzle(getDbHandle().db, emailAdapter);
+  const billingSchedulerDeps = {
     repo: billingRepo,
     billing: new BillingAdapter(),
-    secret: process.env.SCHEDULER_SECRET ?? "",
-  });
+    notifier: billingNotifier,
+    appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+  };
 
-  /** Cron billing maison — tick toutes les heures, lock pg_advisory pour éviter les doublons multi-réplica. */
-  app.register(billingCronPlugin, {
-    schedulerDeps: { repo: billingRepo, billing: new BillingAdapter() },
-    db: getDbHandle().db,
-  });
+  registerBillingSchedulerRoute(app, { ...billingSchedulerDeps, secret: process.env.SCHEDULER_SECRET ?? "" });
+
+  /** Cron billing maison — tick toutes les heures, lock pg_advisory_xact pour éviter les doublons multi-réplica. */
+  app.register(billingCronPlugin, { schedulerDeps: billingSchedulerDeps, db: getDbHandle().db });
 
   /** Upload/suppression du logo artisan `/api/upload-logo` (auth cookie JWT). Stocké en data-URL base64. */
   registerUploadLogoRoute(app, {

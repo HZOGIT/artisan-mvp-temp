@@ -1,10 +1,14 @@
 import type { IBillingRepository } from "./billing-repository";
 import type { BillingPort } from "../../../shared/ports/billing";
+import type { SubscriptionEventNotifier } from "../../subscription/application/subscription-event-notifier";
 import { isDue, isZombie, nextPeriod, nextRetryAt } from "../domain/billing-cycle";
+import { subscriptionEmail } from "../../subscription/domain/webhook";
 
 export interface SchedulerDeps {
   readonly repo: IBillingRepository;
   readonly billing: BillingPort;
+  readonly notifier?: SubscriptionEventNotifier;
+  readonly appUrl?: string;
 }
 
 const MAX_DUNNING_ATTEMPTS = 4;
@@ -53,8 +57,7 @@ export async function chargeOffSessionForCycle(
 ): Promise<void> {
   const now = new Date();
 
-  const allCycles = await deps.repo.findPendingCycle(subscriptionId);
-  const cycle = allCycles?.id === cycleId ? allCycles : null;
+  const cycle = await deps.repo.findCycleById(cycleId);
   if (!cycle) return;
   if (!isDue(cycle, now)) return;
 
@@ -126,6 +129,7 @@ export async function chargeOffSessionForCycle(
         status: "failed",
         failedAt: now,
         nextRetryAt: isFinal3ds ? null : retryAt3ds,
+        attemptCount: newAttemptCount,
       });
       await deps.repo.updateChargeAttempt(attempt.id, { status: "failed", failureCode: "requires_action" });
       await deps.repo.appendEvent({
@@ -140,24 +144,90 @@ export async function chargeOffSessionForCycle(
     }
   } catch (err) {
     const failureMessage = err instanceof Error ? err.message : String(err);
-    const retryAt = nextRetryAt(now, newAttemptCount);
-    const isFinalAttempt = newAttemptCount >= MAX_DUNNING_ATTEMPTS;
-    await deps.repo.updateCycleStatus(cycleId, {
-      status: "failed",
-      failedAt: now,
-      nextRetryAt: isFinalAttempt ? null : retryAt,
-    });
-    await deps.repo.updateChargeAttempt(attempt.id, {
-      status: "failed",
-      failureMessage,
-    });
+    await handleDunning(deps, { cycleId, subscriptionId, artisanId, now, newAttemptCount, attempt, failureMessage });
+  }
+}
+
+interface DunningParams {
+  cycleId: number;
+  subscriptionId: number;
+  artisanId: number;
+  now: Date;
+  newAttemptCount: number;
+  attempt: { id: number };
+  failureMessage: string | null;
+}
+
+async function handleDunning(deps: SchedulerDeps, p: DunningParams): Promise<void> {
+  const { cycleId, subscriptionId, artisanId, now, newAttemptCount, attempt, failureMessage } = p;
+  const retryAt = nextRetryAt(now, newAttemptCount);
+  const isFinalAttempt = newAttemptCount >= MAX_DUNNING_ATTEMPTS;
+
+  await deps.repo.updateCycleStatus(cycleId, {
+    status: "failed",
+    failedAt: now,
+    nextRetryAt: isFinalAttempt ? null : retryAt,
+    attemptCount: newAttemptCount,
+  });
+  await deps.repo.updateChargeAttempt(attempt.id, { status: "failed", failureMessage });
+  await deps.repo.appendEvent({
+    entityType: "billing_cycle",
+    entityId: cycleId,
+    eventType: "cycle.charge_failed",
+    payload: { artisanId, attemptNo: newAttemptCount, failureMessage, nextRetryAt: retryAt?.toISOString() ?? null },
+    actor: "scheduler",
+  });
+
+  if (isFinalAttempt) {
+    await deps.repo.updateSubscriptionStatus({ artisanId, userId: 0 }, "past_due");
     await deps.repo.appendEvent({
-      entityType: "billing_cycle",
-      entityId: cycleId,
-      eventType: "cycle.charge_failed",
-      payload: { artisanId, attemptNo: newAttemptCount, failureMessage, nextRetryAt: retryAt?.toISOString() ?? null },
+      entityType: "billing_subscription",
+      entityId: subscriptionId,
+      eventType: "subscription.suspended",
+      payload: { artisanId, reason: "max_dunning_attempts" },
       actor: "scheduler",
     });
+    if (deps.notifier) {
+      const appUrl = deps.appUrl ?? "https://www.operioz.com";
+      try {
+        await deps.notifier.notifyArtisan(artisanId, {
+          type: "erreur",
+          titre: "Paiement impossible — abonnement suspendu",
+          message: "Votre abonnement est suspendu suite à plusieurs échecs de prélèvement. Mettez à jour votre moyen de paiement.",
+          lien: "/parametres?tab=abonnement",
+        });
+        await deps.notifier.emailArtisanOwner(
+          artisanId,
+          "Abonnement Operioz suspendu — action requise",
+          subscriptionEmail({
+            title: "Abonnement suspendu",
+            body: "Plusieurs tentatives de prélèvement ont échoué. Votre accès à Operioz est suspendu. Mettez à jour votre moyen de paiement pour le rétablir immédiatement.",
+            ctaLabel: "Mettre à jour mon paiement",
+            ctaUrl: `${appUrl}/parametres?tab=abonnement`,
+          }),
+        );
+      } catch { /* best-effort */ }
+    }
+  } else if (deps.notifier) {
+    const appUrl = deps.appUrl ?? "https://www.operioz.com";
+    try {
+      await deps.notifier.notifyArtisan(artisanId, {
+        type: "erreur",
+        titre: "Échec de prélèvement",
+        message: `Votre paiement a échoué (tentative ${newAttemptCount}/${MAX_DUNNING_ATTEMPTS}). Nous réessaierons automatiquement.`,
+        lien: "/parametres?tab=abonnement",
+      });
+      await deps.notifier.emailArtisanOwner(
+        artisanId,
+        "Problème de paiement — Operioz",
+        subscriptionEmail({
+          title: "Echec de prélèvement",
+          body: `Le prélèvement de votre abonnement Operioz a échoué (tentative ${newAttemptCount}/${MAX_DUNNING_ATTEMPTS}). Nous réessaierons automatiquement. Pour éviter toute suspension, vérifiez votre moyen de paiement.`,
+          ctaLabel: "Vérifier mon paiement",
+          ctaUrl: `${appUrl}/parametres?tab=abonnement`,
+        }),
+      );
+    } catch { /* best-effort */ }
   }
 }
 

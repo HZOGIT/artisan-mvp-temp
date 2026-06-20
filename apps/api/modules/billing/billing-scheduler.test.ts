@@ -239,3 +239,60 @@ describe("runSchedulerTick", () => {
     expect(billing.chargesAttempted).toHaveLength(0);
   });
 });
+
+describe("dunning & suspension (IT-3)", () => {
+  const MAX_ATTEMPTS = 4;
+
+  async function driveToFinalAttempt(repo: FakeBillingRepository, billing: FakeBillingPort, notifier?: { notifyCalls: number[]; emailCalls: number[] }) {
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"),
+      amountCents: 2900, currency: "eur",
+    });
+    billing.nextChargeResult = null;
+
+    const fakeNotifier = notifier ? {
+      notifyArtisan: async (_artisanId: number, _n: unknown) => { notifier.notifyCalls.push(_artisanId); },
+      emailArtisanOwner: async (_artisanId: number, _s: string, _h: string) => { notifier.emailCalls.push(_artisanId); },
+    } : undefined;
+
+    const deps = { repo, billing, notifier: fakeNotifier };
+
+    for (let i = 0; i < MAX_ATTEMPTS; i++) {
+      /* Remet le cycle en état "due" (nextRetryAt dans le passé) sans écraser attempt_count */
+      const currentCycle = repo.cycles.find(c => c.id === cycle.id)!;
+      await repo.updateCycleStatus(cycle.id, {
+        status: "failed",
+        failedAt: new Date(0),
+        nextRetryAt: new Date(0),
+        attemptCount: currentCycle.attempt_count,
+      });
+      await chargeOffSessionForCycle(deps, cycle.id, sub.id, ARTISAN_ID);
+    }
+
+    return { sub, cycle };
+  }
+
+  it("après 4 tentatives → subscription.status=past_due + event subscription.suspended", async () => {
+    const { repo, billing } = makeDeps();
+    await driveToFinalAttempt(repo, billing);
+
+    const updatedSub = repo.subs[0]!;
+    expect(updatedSub.status).toBe("past_due");
+
+    const suspendedEv = repo.events.find(e => e.event_type === "subscription.suspended");
+    expect(suspendedEv).toBeDefined();
+    expect(suspendedEv!.payload).toMatchObject({ artisanId: ARTISAN_ID, reason: "max_dunning_attempts" });
+  });
+
+  it("notification in-app envoyée à chaque échec", async () => {
+    const { repo, billing } = makeDeps();
+    const calls = { notifyCalls: [] as number[], emailCalls: [] as number[] };
+    await driveToFinalAttempt(repo, billing, calls);
+
+    expect(calls.notifyCalls.length).toBe(MAX_ATTEMPTS);
+    expect(calls.emailCalls.length).toBe(MAX_ATTEMPTS);
+    calls.notifyCalls.forEach(id => expect(id).toBe(ARTISAN_ID));
+  });
+});
