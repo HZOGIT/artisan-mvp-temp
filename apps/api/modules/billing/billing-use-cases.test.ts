@@ -1273,6 +1273,59 @@ describe("FIX-BB — cycle.charge_failed webhook : artisanId + attemptNo dans le
   });
 });
 
+describe("FIX-CW — handleBillingWebhookEvent payment_failed : idempotence sur cycle déjà failed", () => {
+  async function setupWebhookFailureCW(repo: FakeBillingRepository) {
+    const sub = await repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "past_due", currentPeriodStart: new Date("2026-06-01"), currentPeriodEnd: new Date("2026-07-01"),
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const cycle = await repo.createCycle({ subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"), amountCents: 2900, currency: "eur" });
+    const attempt = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 1, idempotencyKey: "k_cw" });
+    await repo.updateChargeAttempt(attempt.id, { stripePaymentIntentId: "pi_cw", status: "failed" });
+    await repo.updateCycleStatus(cycle.id, { status: "failed", failedAt: new Date(), nextRetryAt: new Date(Date.now() + 86400_000) });
+    return { sub, cycle, attempt };
+  }
+
+  it("cycle déjà 'failed' (scheduler a déjà traité l'échec synchrone) → webhook return early, aucun event dupliqué", async () => {
+    const repo = new FakeBillingRepository();
+    const { cycle } = await setupWebhookFailureCW(repo);
+    const eventsBeforeWebhook = repo.events.length;
+
+    await handleBillingWebhookEvent(
+      { repo },
+      "payment_intent.payment_failed",
+      "pi_cw",
+      "card_declined",
+      null,
+      "evt_cw1",
+    );
+
+    expect(repo.cycles.find(c => c.id === cycle.id)!.status).toBe("failed");
+    expect(repo.events.length).toBe(eventsBeforeWebhook);
+  });
+
+  it("cycle déjà 'failed' + tentative finale → subscription.suspended NON réémis (pas de doublon audit log)", async () => {
+    const repo = new FakeBillingRepository();
+    const sub = await repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "past_due", currentPeriodStart: new Date("2026-06-01"), currentPeriodEnd: new Date("2026-07-01"),
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const cycle = await repo.createCycle({ subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"), amountCents: 2900, currency: "eur" });
+    await repo.updateCycleStatus(cycle.id, { status: "failed", failedAt: new Date(), attemptCount: 4 });
+    const attempt = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 4, idempotencyKey: "k_cw4" });
+    await repo.updateChargeAttempt(attempt.id, { stripePaymentIntentId: "pi_cw4", status: "failed" });
+
+    await handleBillingWebhookEvent({ repo }, "payment_intent.payment_failed", "pi_cw4", null, null, "evt_cw2");
+
+    const suspEvents = repo.events.filter(e => e.event_type === "subscription.suspended");
+    expect(suspEvents).toHaveLength(0);
+    const chargeFailEvents = repo.events.filter(e => e.event_type === "cycle.charge_failed");
+    expect(chargeFailEvents).toHaveLength(0);
+  });
+});
+
 describe("FIX-CE — webhook payment_intent.succeeded : sub canceled → ne pas ressusciter", () => {
   it("PI succeeded reçu après annulation de la sub → cycle paid, aucun period_advanced, sub reste canceled", async () => {
     const repo = new FakeBillingRepository();

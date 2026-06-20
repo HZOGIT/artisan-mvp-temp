@@ -989,15 +989,29 @@ describe("FIX-I — webhook payment_failed respecte MAX_DUNNING_ATTEMPTS", () =>
     expect(cycle.status).toBe("failed");
   });
 
-  it("webhook payment_failed au 4ème attempt → subscription passe en past_due", async () => {
+  it("webhook payment_failed au 4ème attempt (cycle processing — paiement async SEPA) → subscription passe en past_due", async () => {
+    /* État réaliste : cycle en 'processing' (PI en cours côté Stripe, pas encore résolu) + 4 tentatives.
+     * setupFailedCycleAtMaxAttempts utilise status='failed' — état impossible en prod (handleDunning
+     * marque cycle ET sub simultanément). Le vrai chemin webhook 4e tentative = cycle 'processing'. */
     const { repo } = makeDeps();
-    await setupFailedCycleAtMaxAttempts(repo);
+    const sub = await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"),
+      amountCents: 2900, currency: "eur",
+    });
+    repo.cycles[0] = { ...cycle, attempt_count: 4, status: "processing", charging_started_at: new Date() };
+    const attempt = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 4, idempotencyKey: "k4_proc" });
+    await repo.updateChargeAttempt(attempt.id, { stripePaymentIntentId: "pi_final_proc", status: "processing" });
 
     const { handleBillingWebhookEvent } = await import("./interface/http/billing-webhook-handler");
-    await handleBillingWebhookEvent({ repo }, "payment_intent.payment_failed", "pi_final", "card_declined", null, "evt_final2");
+    await handleBillingWebhookEvent({ repo }, "payment_intent.payment_failed", "pi_final_proc", "card_declined", null, "evt_final2_proc");
 
-    const sub = repo.subs[0]!;
-    expect(sub.status).toBe("past_due");
+    const updatedSub = repo.subs.find(s => s.id === sub.id)!;
+    expect(updatedSub.status).toBe("past_due");
   });
 
   it("webhook payment_failed sur cycle déjà paid → no-op (idempotence scheduler↔webhook)", async () => {

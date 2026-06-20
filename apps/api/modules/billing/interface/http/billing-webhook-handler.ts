@@ -73,8 +73,14 @@ export async function handleBillingWebhookEvent(
     });
   } else if (eventType === "payment_intent.payment_failed") {
     const cycle = await deps.repo.findCycleById(attempt.cycle_id);
-    /* Idempotence scheduler↔webhook : ne pas écraser un cycle déjà payé */
-    if (cycle?.status === "paid") return;
+    /*
+     * Idempotence scheduler↔webhook : retour anticipé si le cycle est déjà en état terminal.
+     * — "paid"   : ne pas écraser un paiement réussi avec un échec
+     * — "failed" : le scheduler a déjà traité cet échec synchrone (handleDunning) ;
+     *              le webhook arrivant après créerait des événements cycle.charge_failed
+     *              et subscription.suspended dupliqués dans billing_events.
+     */
+    if (cycle?.status === "paid" || cycle?.status === "failed") return;
 
     await deps.repo.updateChargeAttempt(attempt.id, {
       status: "failed",
