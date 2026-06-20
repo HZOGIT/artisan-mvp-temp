@@ -1576,3 +1576,48 @@ describe("FIX-CY — handleDunning : payload cycle.charge_failed nextRetryAt nul
     expect(ev!.payload.nextRetryAt).toBeNull(); /* cohérent avec DB */
   });
 });
+
+describe("FIX-CZ — updateCycleStatus paid efface failed_at et next_retry_at", () => {
+  it("scheduler : paiement réussi au 2e essai → cycle.failed_at et next_retry_at sont null", async () => {
+    /* Bug : failed → charging → paid ne nettoyait pas failed_at/next_retry_at.
+     * Un cycle paid pouvait garder failed_at=<date échec> et next_retry_at=<old> en DB. */
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+
+    /* Simuler un premier échec (attempt 1) */
+    await repo.updateCycleStatus(cycle.id, { status: "failed", failedAt: new Date("2026-06-01T10:00:00Z"), nextRetryAt: new Date("2026-06-02T10:00:00Z"), attemptCount: 1 });
+
+    /* attempt 2 réussit */
+    repo.cycles[0] = { ...repo.cycles[0]!, attempt_count: 1 };
+    billing.nextChargeResult = { paymentIntentId: "pi_success2", status: "succeeded" };
+
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+
+    const updated = repo.cycles.find(c => c.id === cycle.id)!;
+    expect(updated.status).toBe("paid");
+    expect(updated.failed_at).toBeNull();     /* nettoyé */
+    expect(updated.next_retry_at).toBeNull(); /* nettoyé */
+    expect(updated.paid_at).toBeTruthy();
+  });
+
+  it("recoverZombies : zombie PI succeeded → cycle.failed_at et next_retry_at sont null", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    const zombieStart = new Date(Date.now() - 20 * 60 * 1000);
+    /* Cycle a déjà échoué une fois (d'où failed_at/next_retry_at non nuls) */
+    await repo.updateCycleStatus(cycle.id, { status: "charging", chargingStartedAt: zombieStart, failedAt: new Date("2026-06-01"), nextRetryAt: new Date("2026-06-02"), attemptCount: 2 });
+    const attempt = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 2, idempotencyKey: "kz_succ" });
+    await repo.updateChargeAttempt(attempt.id, { stripePaymentIntentId: "pi_z_succ", status: "processing" });
+    billing.retrievePaymentIntent = async () => ({ id: "pi_z_succ", status: "succeeded", failureCode: null, failureMessage: null });
+
+    await recoverZombies({ repo, billing });
+
+    const updated = repo.cycles.find(c => c.id === cycle.id)!;
+    expect(updated.status).toBe("paid");
+    expect(updated.failed_at).toBeNull();
+    expect(updated.next_retry_at).toBeNull();
+  });
+});

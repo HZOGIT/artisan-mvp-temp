@@ -44,7 +44,7 @@ export async function handleBillingWebhookEvent(
     let artisanId: number | null = null;
 
     if (cycle) {
-      await deps.repo.updateCycleStatus(cycle.id, { status: "paid", paidAt: now });
+      await deps.repo.updateCycleStatus(cycle.id, { status: "paid", paidAt: now, failedAt: null, nextRetryAt: null });
 
       const sub = await deps.repo.findSubscriptionById(cycle.subscription_id);
       if (sub) {

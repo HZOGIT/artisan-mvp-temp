@@ -124,7 +124,7 @@ export async function chargeOffSessionForCycle(
 
     if (result.status === "succeeded") {
       const paidAt = new Date();
-      await deps.repo.updateCycleStatus(cycleId, { status: "paid", paidAt });
+      await deps.repo.updateCycleStatus(cycleId, { status: "paid", paidAt, failedAt: null, nextRetryAt: null });
       await deps.repo.appendEvent({
         entityType: "billing_cycle",
         entityId: cycleId,
@@ -332,7 +332,7 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
       const finalStatus = pi.status === "succeeded" ? "paid" : "failed";
       await deps.repo.updateCycleStatus(cycle.id, {
         status: finalStatus,
-        ...(finalStatus === "paid" ? { paidAt: now } : { failedAt: now }),
+        ...(finalStatus === "paid" ? { paidAt: now, failedAt: null, nextRetryAt: null } : { failedAt: now }),
       });
       if (lastAttempt) await deps.repo.updateChargeAttempt(lastAttempt.id, { status: pi.status === "succeeded" ? "succeeded" : "failed" });
       await deps.repo.appendEvent({
@@ -347,7 +347,7 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
 
     if (pi.status === "succeeded") {
       const paidAt = now;
-      await deps.repo.updateCycleStatus(cycle.id, { status: "paid", paidAt });
+      await deps.repo.updateCycleStatus(cycle.id, { status: "paid", paidAt, failedAt: null, nextRetryAt: null });
       if (lastAttempt) await deps.repo.updateChargeAttempt(lastAttempt.id, { status: "succeeded" });
       await deps.repo.appendEvent({
         entityType: "billing_cycle",

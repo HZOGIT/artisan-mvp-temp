@@ -1406,3 +1406,38 @@ describe("FIX-CX — webhook payment_intent.succeeded : idempotence sur cycle d�
     expect(repo.events.filter(e => e.event_type === "cycle.paid")).toHaveLength(0); /* pas de cycle.paid via webhook */
   });
 });
+
+describe("FIX-CZ — webhook payment_intent.succeeded efface failed_at et next_retry_at (async SEPA après dunning)", () => {
+  it("cycle en 'processing' avec failed_at/next_retry_at hérités de dunning → webhook succeeded les efface", async () => {
+    /* Scénario réel : 1-2 tentatives synchrones ont échoué (failed_at/next_retry_at en DB),
+     * puis la dernière tentative retourne 'processing' (SEPA). Quand le webhook PI.succeeded
+     * arrive, le cycle doit être paid avec failed_at=null et next_retry_at=null. */
+    const repo = new FakeBillingRepository();
+    const sub = await repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: new Date("2026-06-01"), currentPeriodEnd: new Date("2026-07-01"),
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"),
+      amountCents: 2900, currency: "eur",
+    });
+    /* Simule l'état post-dunning partiel : cycle en processing avec failed_at/next_retry_at hérités */
+    await repo.updateCycleStatus(cycle.id, {
+      status: "processing",
+      failedAt: new Date("2026-06-10T08:00:00Z"),
+      nextRetryAt: new Date("2026-06-11T08:00:00Z"),
+      attemptCount: 2,
+    });
+    const attempt = await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: 2, idempotencyKey: "k_cz_w" });
+    await repo.updateChargeAttempt(attempt.id, { stripePaymentIntentId: "pi_cz_sepa", status: "processing" });
+
+    await handleBillingWebhookEvent({ repo }, "payment_intent.succeeded", "pi_cz_sepa", null, null, "evt_cz_sepa");
+
+    const updated = repo.cycles.find(c => c.id === cycle.id)!;
+    expect(updated.status).toBe("paid");
+    expect(updated.failed_at).toBeNull();     /* nettoyé par le fix */
+    expect(updated.next_retry_at).toBeNull(); /* nettoyé par le fix */
+    expect(updated.paid_at).toBeTruthy();
+  });
+});
