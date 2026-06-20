@@ -1389,6 +1389,26 @@ describe("FIX-Q — resumeBillingIfAbandoned : pas de reset attempt_count → pa
   });
 });
 
+describe("FIX-CDO — activateExpiredTrials : billing_interval=yearly → montant et période corrects", () => {
+  it("sub trialing yearly → cycle avec period_end = trialEnd+1an + amount_cents annuel", async () => {
+    const { repo, billing } = makeDeps();
+    const trialEnd = new Date("2026-03-01T00:00:00Z");
+    await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "pro", billingInterval: "yearly", billingMode: "maison",
+      status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: new Date(trialEnd.getTime() - 3600_000), paymentMethodId: null,
+    });
+
+    await runSchedulerTick({ repo, billing });
+
+    const cycle = repo.cycles[0]!;
+    expect(cycle).toBeDefined();
+    expect(cycle.amount_cents).toBe(49000);
+    expect(cycle.period_start).toEqual(new Date(trialEnd.getTime() - 3600_000));
+    expect(cycle.period_end.getFullYear()).toBe(new Date(trialEnd.getTime() - 3600_000).getFullYear() + 1);
+  });
+});
+
 describe("FIX-Z — activateExpiredTrials : plan inconnu → skip, pas de cycle €0", () => {
   it("plan_id inconnu → event trial_activation_error, sub reste trialing, aucun cycle créé", async () => {
     const { repo, billing } = makeDeps();
