@@ -973,3 +973,31 @@ describe("FIX-J — reprise facturation après dunning épuisé (resumeBillingIf
     expect(deps.repo.subs[0]!.status).toBe("past_due");
   });
 });
+
+describe("FIX-V — normalizeStatus : mapping statuts Stripe legacy → state machine maison", () => {
+  it("statuts valides passent tels quels", async () => {
+    const { normalizeStatus } = await import("./application/billing-migration");
+    expect(normalizeStatus("trialing")).toBe("trialing");
+    expect(normalizeStatus("active")).toBe("active");
+    expect(normalizeStatus("past_due")).toBe("past_due");
+    expect(normalizeStatus("canceled")).toBe("canceled");
+  });
+
+  it("unpaid → past_due (factures ouvertes non payées)", async () => {
+    const { normalizeStatus } = await import("./application/billing-migration");
+    expect(normalizeStatus("unpaid")).toBe("past_due");
+  });
+
+  it("incomplete_expired → canceled (premier paiement jamais effectué sous 23h)", async () => {
+    const { normalizeStatus } = await import("./application/billing-migration");
+    expect(normalizeStatus("incomplete_expired")).toBe("canceled");
+  });
+
+  it("incomplete / null / inconnu → active (paiement initial en cours ou statut inconnu)", async () => {
+    const { normalizeStatus } = await import("./application/billing-migration");
+    expect(normalizeStatus("incomplete")).toBe("active");
+    expect(normalizeStatus(null)).toBe("active");
+    expect(normalizeStatus("paused")).toBe("active");
+    expect(normalizeStatus(undefined)).toBe("active");
+  });
+});

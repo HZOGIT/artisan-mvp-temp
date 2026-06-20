@@ -29,6 +29,23 @@ function mapPlan(stripePriceId: string | null | undefined, legacyPlan: string | 
 }
 
 /**
+ * Normalise un statut Stripe legacy vers le set valide de billing_subscriptions.
+ * Stripe expose 7 statuts (trialing/active/past_due/canceled/incomplete/incomplete_expired/unpaid)
+ * mais notre state machine n'en supporte que 4.
+ */
+export function normalizeStatus(legacyStatus: string | null | undefined): "trialing" | "active" | "past_due" | "canceled" {
+  switch (legacyStatus) {
+    case "trialing": return "trialing";
+    case "active": return "active";
+    case "past_due": return "past_due";
+    case "canceled": return "canceled";
+    case "unpaid": return "past_due";
+    case "incomplete_expired": return "canceled";
+    default: return "active";
+  }
+}
+
+/**
  * Migre les artisans de la table `subscriptions` (legacy Stripe) vers `billing_subscriptions` (maison).
  * Idempotent : skip si la ligne existe déjà (ON CONFLICT DO NOTHING via unique artisan_id).
  */
@@ -56,6 +73,7 @@ export async function migrateSubscriptionsFromLegacy(
       }
 
       const planId = mapPlan(sub.stripe_price_id, sub.plan);
+      const status = normalizeStatus(sub.status);
       const cancelAt = sub.cancel_at_period_end && sub.current_period_end
         ? sub.current_period_end
         : null;
@@ -64,7 +82,7 @@ export async function migrateSubscriptionsFromLegacy(
         artisanId: sub.artisan_id,
         planId,
         billingMode: "maison",
-        status: sub.status,
+        status,
         currentPeriodStart: sub.current_period_start ?? null,
         currentPeriodEnd: sub.current_period_end ?? null,
         trialEndsAt: sub.trial_ends_at ?? null,
@@ -86,7 +104,8 @@ export async function migrateSubscriptionsFromLegacy(
           legacySubId: sub.id,
           stripeSubscriptionId: sub.stripe_subscription_id ?? null,
           planId,
-          status: sub.status,
+          status,
+          legacyStatus: sub.status,
         },
         actor: "migration",
       });
