@@ -1,7 +1,7 @@
 import type { IBillingRepository } from "./billing-repository";
 import type { BillingPort } from "../../../shared/ports/billing";
 import type { SubscriptionEventNotifier } from "../../subscription/application/subscription-event-notifier";
-import { isDue, isZombie, isStuckProcessing, nextPeriod, nextRetryAt } from "../domain/billing-cycle";
+import { isDue, isZombie, isStuckProcessing, nextPeriod, nextRetryAt, MAX_DUNNING_ATTEMPTS } from "../domain/billing-cycle";
 import { subscriptionEmail } from "../../subscription/domain/webhook";
 
 export interface SchedulerDeps {
@@ -11,7 +11,6 @@ export interface SchedulerDeps {
   readonly appUrl?: string;
 }
 
-const MAX_DUNNING_ATTEMPTS = 4;
 const TICK_BATCH_SIZE = 200;
 const NO_PM_RETRY_DELAY_MS = 24 * 3600_000;
 

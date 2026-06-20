@@ -1,5 +1,5 @@
 import type { IBillingRepository } from "../../application/billing-repository";
-import { nextPeriod, nextRetryAt } from "../../domain/billing-cycle";
+import { nextPeriod, nextRetryAt, MAX_DUNNING_ATTEMPTS } from "../../domain/billing-cycle";
 
 export interface BillingWebhookDeps {
   readonly repo: IBillingRepository;
@@ -61,14 +61,18 @@ export async function handleBillingWebhookEvent(
       actor: "stripe_webhook",
     });
   } else if (eventType === "payment_intent.payment_failed") {
+    const cycle = await deps.repo.findCycleById(attempt.cycle_id);
+    /* Idempotence scheduler↔webhook : ne pas écraser un cycle déjà payé */
+    if (cycle?.status === "paid") return;
+
     await deps.repo.updateChargeAttempt(attempt.id, {
       status: "failed",
       failureCode: failureCode ?? null,
       failureMessage: failureMessage ?? null,
     });
-    const cycle = await deps.repo.findCycleById(attempt.cycle_id);
     const attemptCount = cycle?.attempt_count ?? attempt.attempt_no;
-    const retryAt = nextRetryAt(now, attemptCount);
+    const isFinalAttempt = attemptCount >= MAX_DUNNING_ATTEMPTS;
+    const retryAt = isFinalAttempt ? null : nextRetryAt(now, attemptCount);
     await deps.repo.updateCycleStatus(attempt.cycle_id, { status: "failed", failedAt: now, nextRetryAt: retryAt });
     await deps.repo.appendEvent({
       entityType: "billing_cycle",
@@ -77,5 +81,18 @@ export async function handleBillingWebhookEvent(
       payload: { paymentIntentId, via: "webhook", failureCode, failureMessage, nextRetryAt: retryAt?.toISOString() ?? null },
       actor: "stripe_webhook",
     });
+    if (isFinalAttempt && cycle) {
+      const sub = await deps.repo.findSubscriptionById(cycle.subscription_id);
+      if (sub) {
+        await deps.repo.updateSubscriptionStatus({ artisanId: sub.artisan_id, userId: 0 }, "past_due");
+        await deps.repo.appendEvent({
+          entityType: "billing_subscription",
+          entityId: sub.id,
+          eventType: "subscription.suspended",
+          payload: { artisanId: sub.artisan_id, reason: "max_dunning_attempts", via: "webhook" },
+          actor: "stripe_webhook",
+        });
+      }
+    }
   }
 }

@@ -1,3 +1,5 @@
+export const MAX_DUNNING_ATTEMPTS = 4;
+
 export type CycleStatus =
   | "pending"
   | "charging"
