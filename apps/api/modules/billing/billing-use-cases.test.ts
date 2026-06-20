@@ -301,6 +301,21 @@ describe("revokePaymentMethod", () => {
 
 
 describe("setDefaultPaymentMethod", () => {
+  it("FIX-CQ — jamais de fenêtre sans carte default (atomicité) : exactement 1 default après chaque changement", async () => {
+    const deps = makeDeps();
+    const { paymentMethod: pm1 } = await confirmPaymentMethod(deps, A, { stripePaymentMethodId: "pm_cq1", stripeCustomerId: "cus_test", setAsDefault: true, consentedAt: new Date() });
+    const { paymentMethod: pm2 } = await confirmPaymentMethod(deps, A, { stripePaymentMethodId: "pm_cq2", stripeCustomerId: "cus_test", setAsDefault: false, consentedAt: new Date() });
+    const { paymentMethod: pm3 } = await confirmPaymentMethod(deps, A, { stripePaymentMethodId: "pm_cq3", stripeCustomerId: "cus_test", setAsDefault: false, consentedAt: new Date() });
+
+    for (const targetId of [pm2.id, pm3.id, pm1.id]) {
+      await setDefaultPaymentMethod(deps, A, targetId);
+      const pms = await deps.repo.listPaymentMethods(A);
+      const defaults = pms.filter(p => p.is_default);
+      expect(defaults).toHaveLength(1);
+      expect(defaults[0]!.id).toBe(targetId);
+    }
+  });
+
   it("change la carte par défaut — une seule carte default à la fois", async () => {
     const deps = makeDeps();
     const { paymentMethod: pm1 } = await confirmPaymentMethod(deps, A, { stripePaymentMethodId: "pm_1", stripeCustomerId: "cus_test", setAsDefault: true, consentedAt: new Date() });

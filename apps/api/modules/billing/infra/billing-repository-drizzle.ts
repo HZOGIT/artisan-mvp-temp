@@ -79,14 +79,15 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
   }
 
   async setDefaultPaymentMethod(ctx: TenantContext, id: number): Promise<void> {
+    /*
+     * Atomique : un seul UPDATE évite la fenêtre où toutes les cartes sont is_default=false
+     * (le scheduler appelant findDefaultPaymentMethod entre les deux anciens UPDATEs
+     * aurait vu null → délai 24h injuste sur le cycle en cours).
+     */
     await this.db
       .update(billingPaymentMethods)
-      .set({ is_default: false })
+      .set({ is_default: sql<boolean>`(${billingPaymentMethods.id} = ${id})` })
       .where(eq(billingPaymentMethods.artisan_id, ctx.artisanId));
-    await this.db
-      .update(billingPaymentMethods)
-      .set({ is_default: true })
-      .where(and(eq(billingPaymentMethods.id, id), eq(billingPaymentMethods.artisan_id, ctx.artisanId)));
   }
 
   async revokePaymentMethod(ctx: TenantContext, id: number): Promise<void> {
