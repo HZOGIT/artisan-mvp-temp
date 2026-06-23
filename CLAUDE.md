@@ -111,8 +111,7 @@ Puis le serveur **refuse de démarrer** si le rôle runtime peut contourner la R
 - `DATABASE_URL` = `artisan_user` (owner) → provision au boot (migrations + grants). Connexion **éphémère**.
 - `APP_DATABASE_URL` = `app_tenant` (non-superuser, RLS) → pool runtime qui sert **toutes** les requêtes.
 
-**Staging = dev** (pas d'env de dev séparé) : la base se (re)provisionne en démarrant le stack
-(`task stack:up` / `stack:restart`). Créer de nouvelles migrations : `task db:generate` (+ `--custom`, cf. ci-dessus).
+**⚠️ Ne JAMAIS appliquer les migrations manuellement.** Après `drizzle-kit generate`, il suffit de déployer : `./scripts/deploy-backend.sh` reconstruit le conteneur et les migrations s'appliquent automatiquement au boot. Pas de `drizzle-kit migrate`, pas de `psql`, pas de `task stack:restart` pour ça.
 
 **Faire évoluer la RLS** (ne JAMAIS éditer une migration appliquée — toujours une nouvelle migration custom append) :
 - **Tenant** (nouvelle table avec `artisanId`/`artisan_id`) : `node scripts/rls/generate-tenant-rls.mjs`

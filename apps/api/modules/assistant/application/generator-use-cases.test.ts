@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { NotFoundError, TooManyRequestsError } from "../../../shared/errors";
-import type { LlmPort, LlmCompleteOptions } from "../../../shared/ports/llm";
+import type { LlmPort, LlmCompleteOptions, LlmResult } from "../../../shared/ports/llm";
 import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { ArtisanReader, ArtisanInfo } from "../../../shared/readers/contact-readers";
 import type { TenantContext } from "../../../shared/tenant";
@@ -10,19 +10,26 @@ import { suggestRelances, generateDevis, analyseRentabilite, predictionTresoreri
 const ctx = (artisanId: number): TenantContext => ({ artisanId, userId: 1 });
 const NOW = new Date("2026-06-15T12:00:00Z");
 
+const STUB_USAGE: LlmResult["usage"] = {
+  model: "stub", durationMs: 0, finishReason: "STOP",
+  promptTokens: 0, responseTokens: 0, thinkingTokens: 0, cachedTokens: 0, toolUseTokens: 0, totalTokens: 0,
+  textInputTokens: 0, audioInputTokens: 0, imageInputTokens: 0, videoInputTokens: 0,
+  textOutputTokens: 0, audioOutputTokens: 0, trafficType: null,
+};
+
 class StubLlm implements LlmPort {
   public calls = 0;
   public lastUser?: string;
   public lastOpts?: LlmCompleteOptions;
   constructor(private readonly out: string) {}
-  async complete(user: string, opts?: LlmCompleteOptions): Promise<string> {
+  async complete(user: string, opts?: LlmCompleteOptions): Promise<LlmResult> {
     this.calls++;
     this.lastUser = user;
     this.lastOpts = opts;
-    return this.out;
+    return { text: this.out, usage: STUB_USAGE };
   }
   // eslint-disable-next-line require-yield
-  async *stream(): AsyncIterable<string> {
+  async *stream(): AsyncIterable<never> {
     throw new Error("unused");
   }
 }

@@ -67,7 +67,7 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte autour) :
   let text: string;
   const t0 = Date.now();
   try {
-    text = await deps.llm.complete(userPrompt, { system: contexteMetier, temperature: 0.4, maxOutputTokens: 1000 });
+    ({ text } = await deps.llm.complete(userPrompt, { system: contexteMetier, temperature: 0.4, maxOutputTokens: 1000 }));
     const llmDuration = Date.now() - t0;
     log?.info({ event: "llm_complete", useCase: "suggererArticlesIA", llmDuration }, `LLM articles terminé en ${llmDuration}ms`);
   } catch (e) {

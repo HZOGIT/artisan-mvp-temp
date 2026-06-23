@@ -1,8 +1,0 @@
-# Fallback SPA : toute route non-asset → index.html (routes wouter / TanStack Router).
-# NB : Cloudflare Pages sert les assets statiques EXISTANTS avant ce fichier ; un `/assets/*.js` hashé
-# MANQUANT (onglet/SW périmé après un deploy) retombe ici → index.html en 200 (text/html). Cloudflare
-# n'honore PAS un statut 404 dans `_redirects` (seulement 200 + 3xx), donc on ne peut pas forcer un vrai
-# 404 ici. La RÉCUPÉRATION est donc côté client : l'import dynamique du chunk périmé échoue (MIME) →
-# `vite:preloadError` → rechargement fenêtré (cf. client/src/main.tsx) qui récupère l'index frais ; et le
-# service worker (sw.js) ne met JAMAIS en cache une réponse text/html servie pour un script (anti-poison).
-/*    /index.html   200

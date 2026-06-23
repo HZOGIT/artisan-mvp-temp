@@ -48,7 +48,7 @@ export async function getConseilsIA(deps: ConseilsIaDeps, ctx: TenantContext, lo
 
   const t0 = Date.now();
   try {
-    const text = await deps.llm.complete(prompt, {
+    const { text } = await deps.llm.complete(prompt, {
       system: getContexteMetier(metier),
       temperature: 0.6,
       maxOutputTokens: 800,

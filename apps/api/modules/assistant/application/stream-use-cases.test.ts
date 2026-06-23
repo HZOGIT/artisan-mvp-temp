@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { TooManyRequestsError, ValidationError } from "../../../shared/errors";
-import type { LlmPort, LlmCompleteOptions } from "../../../shared/ports/llm";
+import type { LlmPort, LlmCompleteOptions, LlmResult, LlmStreamChunk } from "../../../shared/ports/llm";
 import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { ArtisanReader, ArtisanInfo } from "../../../shared/readers/contact-readers";
 import type { TenantContext } from "../../../shared/tenant";
@@ -10,17 +10,25 @@ import { streamAssistantReply, type AssistantStreamEvent } from "./stream-use-ca
 
 const ctx = (artisanId: number): TenantContext => ({ artisanId, userId: 1 });
 
+const STUB_USAGE: LlmResult["usage"] = {
+  model: "stub", durationMs: 0, finishReason: "STOP",
+  promptTokens: 0, responseTokens: 0, thinkingTokens: 0, cachedTokens: 0, toolUseTokens: 0, totalTokens: 0,
+  textInputTokens: 0, audioInputTokens: 0, imageInputTokens: 0, videoInputTokens: 0,
+  textOutputTokens: 0, audioOutputTokens: 0, trafficType: null,
+};
+
 class StreamLlm implements LlmPort {
   public lastPrompt?: string;
   public lastSystem?: string;
   constructor(private readonly chunks: string[]) {}
-  async complete(): Promise<string> {
-    return this.chunks.join("");
+  async complete(): Promise<LlmResult> {
+    return { text: this.chunks.join(""), usage: STUB_USAGE };
   }
-  async *stream(prompt: string, opts?: LlmCompleteOptions): AsyncIterable<string> {
+  async *stream(prompt: string, opts?: LlmCompleteOptions): AsyncIterable<LlmStreamChunk> {
     this.lastPrompt = prompt;
     this.lastSystem = opts?.system;
-    for (const c of this.chunks) yield c;
+    for (const c of this.chunks) yield { kind: "text", text: c };
+    yield { kind: "done", usage: STUB_USAGE };
   }
 }
 const allow: RateLimiterPort = { check: async () => true };

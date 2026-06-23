@@ -51,7 +51,8 @@ describe("ports — découplage use-case / infra", () => {
   it("LlmPort : un use-case dépend du PORT ; le fake renvoie une complétion + capte le prompt", async () => {
     // use-case fictif : dépend uniquement de l'interface LlmPort.
     async function suggererTitre(llm: LlmPort, sujet: string): Promise<string> {
-      return llm.complete(`Donne un titre pour : ${sujet}`, { temperature: 0.2 });
+      const { text } = await llm.complete(`Donne un titre pour : ${sujet}`, { temperature: 0.2 });
+      return text;
     }
     const llm = new FakeLlmPort('{"titre":"Réfection toiture"}');
     const out = await suggererTitre(llm, "devis toiture");
@@ -63,9 +64,8 @@ describe("ports — découplage use-case / infra", () => {
     const llm = new FakeLlmPort("Bonjour, je suis l'assistant Operioz.");
     let acc = "";
     let chunks = 0;
-    for await (const frag of llm.stream("salut")) {
-      acc += frag;
-      chunks++;
+    for await (const chunk of llm.stream("salut")) {
+      if (chunk.kind === "text") { acc += chunk.text; chunks++; }
     }
     expect(acc).toBe("Bonjour, je suis l'assistant Operioz.");
     expect(chunks).toBeGreaterThan(1); // bien un flux (plusieurs fragments)

@@ -6,8 +6,14 @@ import { soumettreDemandeIA, type SoumettreDemandeIADeps } from "./ia-use-cases"
 
 const access = () => new PortalAccessRepositoryFake({ accesses: [{ id: 1, clientId: 5, artisanId: 1, token: "good", email: "x", expiresAt: new Date("2026-12-31"), isActive: true, lastAccessAt: null, createdAt: new Date() }] });
 
+const STUB_USAGE: import("../../../shared/ports/llm").LlmResult["usage"] = {
+  model: "stub", durationMs: 0, finishReason: "STOP",
+  promptTokens: 0, responseTokens: 0, thinkingTokens: 0, cachedTokens: 0, toolUseTokens: 0, totalTokens: 0,
+  textInputTokens: 0, audioInputTokens: 0, imageInputTokens: 0, videoInputTokens: 0,
+  textOutputTokens: 0, audioOutputTokens: 0, trafficType: null,
+};
 const okLlm: LlmPort = {
-  complete: async () => '{"titre":"Fuite salle de bain","description_reformulee":"Fuite sous le lavabo","type_travaux":"Plomberie","urgence":"urgente","estimation_min":150,"estimation_max":300,"questions":["Depuis quand ?","Quel etage ?"]}',
+  complete: async () => ({ text: '{"titre":"Fuite salle de bain","description_reformulee":"Fuite sous le lavabo","type_travaux":"Plomberie","urgence":"urgente","estimation_min":150,"estimation_max":300,"questions":["Depuis quand ?","Quel etage ?"]}', usage: STUB_USAGE }),
   stream: async function* () {},
 };
 const koLlm: LlmPort = { complete: async () => { throw new Error("provider down"); }, stream: async function* () {} };

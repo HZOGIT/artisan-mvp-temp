@@ -34,7 +34,8 @@ async function rateLimitKO(deps: AssistantGeneratorDeps, ctx: TenantContext): Pr
 }
 
 async function complete(deps: AssistantGeneratorDeps, parts: { system: string; user: string; temperature: number; maxOutputTokens: number }): Promise<string> {
-  return deps.llm.complete(parts.user, { system: parts.system, temperature: parts.temperature, maxOutputTokens: parts.maxOutputTokens });
+  const { text } = await deps.llm.complete(parts.user, { system: parts.system, temperature: parts.temperature, maxOutputTokens: parts.maxOutputTokens });
+  return text;
 }
 
 /*

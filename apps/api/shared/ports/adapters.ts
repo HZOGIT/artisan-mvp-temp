@@ -3,37 +3,84 @@
  * résolu via une variable (type `string`, non littéral) → TypeScript ne tire PAS le
  * graphe legacy dans le typecheck de src/** (gate propre), tout en câblant au runtime.
  */
-import type { LlmPort, LlmCompleteOptions } from "./llm";
+import type { LlmPort, LlmCompleteOptions, LlmResult, LlmUsage, LlmStreamChunk } from "./llm";
 import type { VisionPort, VisionRequest, VisionMultiRequest } from "./vision";
 
-/*
- * Adapter LLM sur Google GenAI (Gemini). Import via variable-de-chemin (string non-littéral) → le
- * SDK n'est PAS tiré dans le typecheck de src/** ; on type structurellement ce qu'on utilise. La clé
- * vient de l'env (`GEMINI_API_KEY`), jamais committée. Modèle par défaut `gemini-2.5-flash`.
- */
+/** Forme structurelle du usageMetadata retourné par le SDK @google/genai v1.52. */
+type GeminiUsageMeta = {
+  promptTokenCount?: number;
+  responseTokenCount?: number;
+  thoughtsTokenCount?: number;
+  cachedContentTokenCount?: number;
+  toolUsePromptTokenCount?: number;
+  totalTokenCount?: number;
+  promptTokensDetails?: { modality?: string; tokenCount?: number }[];
+  responseTokensDetails?: { modality?: string; tokenCount?: number }[];
+  trafficType?: string;
+};
+
+type GenAiResponse = { text?: string; candidates?: { finishReason?: string }[]; usageMetadata?: GeminiUsageMeta };
+type GenAiStreamChunk = { text?: string; usageMetadata?: GeminiUsageMeta };
+
 type GenAiClient = {
   models: {
-    generateContent(req: unknown): Promise<{ text?: string }>;
-    generateContentStream(req: unknown): Promise<AsyncIterable<{ text?: string }>>;
+    generateContent(req: unknown): Promise<GenAiResponse>;
+    generateContentStream(req: unknown): Promise<AsyncIterable<GenAiStreamChunk>>;
   };
 };
 type GenAiModule = { GoogleGenAI: new (opts: { apiKey: string }) => GenAiClient };
 
 const GENAI_MODULE: string = "@google/genai";
 
+/** Extrait le tokenCount d'une modalité donnée dans un tableau de détails. */
+function modalityTokens(details: { modality?: string; tokenCount?: number }[] | undefined, modality: string): number {
+  return details?.find((d) => d.modality === modality)?.tokenCount ?? 0;
+}
+
+/** Construit un `LlmUsage` à partir de usageMetadata SDK + contexte de l'appel. */
+function buildUsage(
+  meta: GeminiUsageMeta | undefined,
+  model: string,
+  durationMs: number,
+  finishReason: string,
+): LlmUsage {
+  return {
+    model,
+    durationMs,
+    finishReason,
+    promptTokens:    meta?.promptTokenCount         ?? 0,
+    responseTokens:  meta?.responseTokenCount        ?? 0,
+    thinkingTokens:  meta?.thoughtsTokenCount        ?? 0,
+    cachedTokens:    meta?.cachedContentTokenCount   ?? 0,
+    toolUseTokens:   meta?.toolUsePromptTokenCount   ?? 0,
+    totalTokens:     meta?.totalTokenCount           ?? 0,
+    textInputTokens:  modalityTokens(meta?.promptTokensDetails,   "TEXT"),
+    audioInputTokens: modalityTokens(meta?.promptTokensDetails,   "AUDIO"),
+    imageInputTokens: modalityTokens(meta?.promptTokensDetails,   "IMAGE"),
+    videoInputTokens: modalityTokens(meta?.promptTokensDetails,   "VIDEO"),
+    textOutputTokens:  modalityTokens(meta?.responseTokensDetails, "TEXT"),
+    audioOutputTokens: modalityTokens(meta?.responseTokensDetails, "AUDIO"),
+    trafficType: meta?.trafficType ?? null,
+  };
+}
+
+/*
+ * Adapter LLM sur Google GenAI (Gemini). Import via variable-de-chemin (string non-littéral) → le
+ * SDK n'est PAS tiré dans le typecheck de src/** ; on type structurellement ce qu'on utilise.
+ */
 export class GeminiLlmAdapter implements LlmPort {
   private async client(): Promise<GenAiClient> {
     const mod = (await import(GENAI_MODULE)) as GenAiModule;
     return new mod.GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY ?? "" });
   }
 
+  private resolvedModel(opts?: LlmCompleteOptions): string {
+    return opts?.model ?? process.env.GEMINI_TEXT_MODEL ?? "gemini-3-pro-preview";
+  }
+
   private request(prompt: string, opts?: LlmCompleteOptions) {
     return {
-      /*
-       * Modèle le plus récent/capable par défaut (Gemini 3 Pro) ; surchargé par l'env
-       * `GEMINI_TEXT_MODEL` (staging) ou par `opts.model` au cas par cas.
-       */
-      model: opts?.model ?? process.env.GEMINI_TEXT_MODEL ?? "gemini-3-pro-preview",
+      model: this.resolvedModel(opts),
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       config: {
         ...(opts?.system ? { systemInstruction: opts.system } : {}),
@@ -43,22 +90,37 @@ export class GeminiLlmAdapter implements LlmPort {
     };
   }
 
-  async complete(prompt: string, opts?: LlmCompleteOptions): Promise<string> {
+  async complete(prompt: string, opts?: LlmCompleteOptions): Promise<LlmResult> {
     const ai = await this.client();
     const req = this.request(prompt, opts);
-    // Thinking models (gemini-3.x+) consume thinking tokens from the maxOutputTokens budget,
-    // starving the actual JSON output. Structured completions don't need chain-of-thought.
+    /*
+     * Thinking models (gemini-3.x+) consomment le budget maxOutputTokens avec leurs tokens de
+     * réflexion, ne laissant presque rien pour la sortie JSON. Désactivé pour les completions
+     * structurées (pas besoin de chain-of-thought).
+     */
     (req.config as Record<string, unknown>).thinkingConfig = { thinkingBudget: 0 };
+    const t0 = Date.now();
     const res = await ai.models.generateContent(req);
-    return res.text ?? "";
+    const durationMs = Date.now() - t0;
+    const finishReason = res.candidates?.[0]?.finishReason ?? "STOP";
+    return {
+      text: res.text ?? "",
+      usage: buildUsage(res.usageMetadata, this.resolvedModel(opts), durationMs, finishReason),
+    };
   }
 
-  async *stream(prompt: string, opts?: LlmCompleteOptions): AsyncIterable<string> {
+  async *stream(prompt: string, opts?: LlmCompleteOptions): AsyncIterable<LlmStreamChunk> {
     const ai = await this.client();
+    const model = this.resolvedModel(opts);
+    const t0 = Date.now();
     const s = await ai.models.generateContentStream(this.request(prompt, opts));
+    let lastMeta: GeminiUsageMeta | undefined;
+    let finishReason = "STREAM_END";
     for await (const chunk of s) {
-      if (chunk.text) yield chunk.text;
+      if (chunk.text) yield { kind: "text", text: chunk.text };
+      if (chunk.usageMetadata) lastMeta = chunk.usageMetadata;
     }
+    yield { kind: "done", usage: buildUsage(lastMeta, model, Date.now() - t0, finishReason) };
   }
 }
 

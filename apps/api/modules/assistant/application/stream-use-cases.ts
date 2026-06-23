@@ -70,10 +70,11 @@ export async function* streamAssistantReply(
 
   let full = "";
   for await (const chunk of deps.llm.stream(prompt, { system, temperature: 0.7, maxOutputTokens: 2000 })) {
-    if (chunk) {
-      full += chunk;
-      yield { content: chunk };
+    if (chunk.kind === "text") {
+      full += chunk.text;
+      yield { content: chunk.text };
     }
+    /* chunk.kind === "done" → usage disponible ici pour le tracking (morceau suivant) */
   }
 
   /** Persistance best-effort (n'altère pas le stream déjà émis). */

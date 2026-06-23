@@ -2116,3 +2116,46 @@ export type BillingEvent = typeof billingEvents.$inferSelect;
 export type InsertBillingEvent = typeof billingEvents.$inferInsert;
 
 export type InsertCouleurIntervention = typeof couleursInterventions.$inferInsert;
+
+/* ── LLM USAGE ──────────────────────────────────────────────────────────────
+ * Une ligne par appel LLM (complete ou tour de stream). Insertée en
+ * fire-and-forget après que la réponse est envoyée au client.
+ */
+export const llmUsage = pgTable("llm_usage", {
+  id:                 serial("id").primaryKey(),
+
+  artisanId:          integer("artisan_id").notNull().references(() => artisans.id),
+  userId:             integer("user_id").references(() => users.id),
+  useCase:            varchar("use_case", { length: 80 }).notNull(),
+  model:              varchar("model", { length: 80 }).notNull(),
+
+  /** Tokens INPUT */
+  promptTokens:       integer("prompt_tokens").notNull().default(0),
+  textInputTokens:    integer("text_input_tokens").notNull().default(0),
+  audioInputTokens:   integer("audio_input_tokens").notNull().default(0),
+  imageInputTokens:   integer("image_input_tokens").notNull().default(0),
+  videoInputTokens:   integer("video_input_tokens").notNull().default(0),
+  cachedTokens:       integer("cached_tokens").notNull().default(0),
+  toolUseTokens:      integer("tool_use_tokens").notNull().default(0),
+
+  /** Tokens OUTPUT */
+  responseTokens:     integer("response_tokens").notNull().default(0),
+  textOutputTokens:   integer("text_output_tokens").notNull().default(0),
+  audioOutputTokens:  integer("audio_output_tokens").notNull().default(0),
+  thinkingTokens:     integer("thinking_tokens").notNull().default(0),
+
+  totalTokens:        integer("total_tokens").notNull().default(0),
+
+  trafficType:        varchar("traffic_type", { length: 30 }),
+  durationMs:         integer("duration_ms").notNull(),
+  finishReason:       varchar("finish_reason", { length: 20 }).notNull(),
+
+  inputPayload:       text("input_payload"),
+  outputPayload:      text("output_payload"),
+
+  messageId:          integer("message_id").references(() => aiMessages.id),
+
+  createdAt:          timestamp("created_at").defaultNow().notNull(),
+});
+export type LlmUsageRow = typeof llmUsage.$inferSelect;
+export type InsertLlmUsage = typeof llmUsage.$inferInsert;

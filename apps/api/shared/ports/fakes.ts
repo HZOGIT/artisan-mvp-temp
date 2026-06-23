@@ -4,7 +4,14 @@ import type { SmsPort, SmsMessage } from "./sms";
 import type { StoragePort, PutOptions } from "./storage";
 import type { PdfPort } from "./pdf";
 import type { RateLimiterPort } from "./rate-limiter";
-import type { LlmPort } from "./llm";
+import type { LlmPort, LlmResult, LlmStreamChunk, LlmUsage } from "./llm";
+
+const FAKE_USAGE: LlmUsage = {
+  model: "fake", durationMs: 0, finishReason: "STOP",
+  promptTokens: 0, responseTokens: 0, thinkingTokens: 0, cachedTokens: 0, toolUseTokens: 0, totalTokens: 0,
+  textInputTokens: 0, audioInputTokens: 0, imageInputTokens: 0, videoInputTokens: 0,
+  textOutputTokens: 0, audioOutputTokens: 0, trafficType: null,
+};
 import type { VisionPort, VisionRequest, VisionMultiRequest } from "./vision";
 
 export class FakeEmailPort implements EmailPort {
@@ -83,15 +90,16 @@ export class FakeLlmPort implements LlmPort {
     /** File à plusieurs entrées → consomme ; sinon réponse fixe réutilisée. */
     return this.queue.length > 1 ? this.queue.shift()! : this.queue[0] ?? "";
   }
-  async complete(prompt: string): Promise<string> {
+  async complete(prompt: string): Promise<LlmResult> {
     this.prompts.push(prompt);
-    return this.next();
+    return { text: this.next(), usage: FAKE_USAGE };
   }
-  async *stream(prompt: string): AsyncIterable<string> {
+  async *stream(prompt: string): AsyncIterable<LlmStreamChunk> {
     this.prompts.push(prompt);
     const text = this.next();
     /** Découpe en fragments pour simuler le flux (concaténés = texte complet). */
-    for (const part of text.match(/[\s\S]{1,8}/g) ?? [text]) yield part;
+    for (const part of text.match(/[\s\S]{1,8}/g) ?? [text]) yield { kind: "text", text: part };
+    yield { kind: "done", usage: FAKE_USAGE };
   }
 }
 

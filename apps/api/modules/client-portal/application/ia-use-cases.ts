@@ -73,7 +73,7 @@ Tache : structure cette demande pour l'artisan. Donne un titre court, reformule 
 
 Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte avant/apres) :
 {"titre":"court","description_reformulee":"clair","type_travaux":"libelle","urgence":"normale","estimation_min":0,"estimation_max":0,"questions":["q1","q2"]}`;
-    const text = await deps.llm.complete(prompt, { system: contexteMetier, temperature: 0.4, maxOutputTokens: 1200 });
+    const { text } = await deps.llm.complete(prompt, { system: contexteMetier, temperature: 0.4, maxOutputTokens: 1200 });
     const llmDuration = Date.now() - t0;
     log?.info({ event: "llm_complete", useCase: "soumettreDemandeIA", llmDuration }, `LLM portail terminé en ${llmDuration}ms`);
     const jsonMatch = text.match(/\{[\s\S]*\}/);

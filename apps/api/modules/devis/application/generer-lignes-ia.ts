@@ -75,7 +75,7 @@ Réponds UNIQUEMENT en JSON pur :
 
   let text: string;
   try {
-    text = await deps.llm.complete(userPrompt, { system: SYSTEM, temperature: 0.3, maxOutputTokens: 2500 });
+    ({ text } = await deps.llm.complete(userPrompt, { system: SYSTEM, temperature: 0.3, maxOutputTokens: 2500 }));
   } catch (e) {
     throw new Error(`Génération IA échouée : ${sanitizeIaError(e)}`);
   }
