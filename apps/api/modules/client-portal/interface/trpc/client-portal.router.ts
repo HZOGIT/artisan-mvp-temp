@@ -2,6 +2,7 @@ import { z } from "zod";
 import { router, publicProcedure, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { TenantContext } from "../../../../shared/tenant";
 import type { LlmPort } from "../../../../shared/ports/llm";
+import type { LlmUsageTracker } from "../../../../shared/ports/llm-usage-tracker";
 import type { ArtisanReader } from "../../../../shared/readers/contact-readers";
 import type { IPortalAccessRepository } from "../../application/portal-access-repository";
 import type { IPortalDocsReader } from "../../application/portal-docs-reader";
@@ -32,6 +33,7 @@ export interface ClientPortalRouterDeps {
   readonly email: { send(message: { to: string; subject: string; body: string }): Promise<void> };
   readonly rateLimiter: { check(key: string): Promise<boolean> };
   readonly llm: LlmPort;
+  readonly trackLlm?: LlmUsageTracker;
   readonly genToken?: () => string;
 }
 

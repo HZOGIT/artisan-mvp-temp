@@ -1,6 +1,7 @@
 import { NotFoundError, ValidationError, TooManyRequestsError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { LlmPort } from "../../../shared/ports/llm";
+import type { LlmUsageTracker } from "../../../shared/ports/llm-usage-tracker";
 import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { IDevisRepository } from "../../devis/application/devis-repository";
 import type { IStockRepository } from "../../stocks/application/stock-repository";
@@ -15,6 +16,7 @@ export interface CommandeIaDeps {
   readonly stockRepo: IStockRepository;
   readonly articleRepo: IArticleRepository;
   readonly llm: LlmPort;
+  readonly trackLlm?: LlmUsageTracker;
   readonly rateLimiter: RateLimiterPort;
 }
 
@@ -107,7 +109,9 @@ Réponds UNIQUEMENT en JSON pur :
 
   let text: string;
   try {
-    ({ text } = await deps.llm.complete(userPrompt, { system: SYSTEM, temperature: 0.3, maxOutputTokens: 2500 }));
+    const result = await deps.llm.complete(userPrompt, { system: SYSTEM, temperature: 0.3, maxOutputTokens: 2500 });
+    text = result.text;
+    deps.trackLlm?.({ artisanId: ctx.artisanId, userId: ctx.userId, useCase: "commande_depuis_devis_ia", usage: result.usage });
   } catch (e) {
     throw new Error(`Génération IA échouée : ${sanitizeIaError(e)}`);
   }

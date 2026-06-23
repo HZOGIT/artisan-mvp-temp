@@ -1,5 +1,6 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { LlmPort } from "../../../shared/ports/llm";
+import type { LlmUsageTracker } from "../../../shared/ports/llm-usage-tracker";
 import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { ArtisanReader } from "../../../shared/readers/contact-readers";
 import type { AppLogger } from "../../../shared/ports/logger";
@@ -12,6 +13,7 @@ import { sanitizeIaError } from "../../../shared/ia/sanitize-ia-error";
  */
 export interface ArticlesIaDeps {
   readonly llm: LlmPort;
+  readonly trackLlm?: LlmUsageTracker;
   readonly rateLimiter: RateLimiterPort;
   readonly artisanReader: ArtisanReader;
 }
@@ -67,7 +69,9 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte autour) :
   let text: string;
   const t0 = Date.now();
   try {
-    ({ text } = await deps.llm.complete(userPrompt, { system: contexteMetier, temperature: 0.4, maxOutputTokens: 1000 }));
+    const result = await deps.llm.complete(userPrompt, { system: contexteMetier, temperature: 0.4, maxOutputTokens: 1000 });
+    text = result.text;
+    deps.trackLlm?.({ artisanId: ctx.artisanId, userId: ctx.userId, useCase: "articles_ia", usage: result.usage });
     const llmDuration = Date.now() - t0;
     log?.info({ event: "llm_complete", useCase: "suggererArticlesIA", llmDuration }, `LLM articles terminé en ${llmDuration}ms`);
   } catch (e) {

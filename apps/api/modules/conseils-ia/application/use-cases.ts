@@ -1,5 +1,6 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { LlmPort } from "../../../shared/ports/llm";
+import type { LlmUsageTracker } from "../../../shared/ports/llm-usage-tracker";
 import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { ArtisanReader } from "../../../shared/readers/contact-readers";
 import type { AppLogger } from "../../../shared/ports/logger";
@@ -12,6 +13,7 @@ import type { ConseilsStatsReader } from "./conseils-stats-reader";
 /** Dépendances des conseils IA (lecture seule, non persistée). Parité legacy `conseilsIA`. */
 export interface ConseilsIaDeps {
   readonly llm: LlmPort;
+  readonly trackLlm?: LlmUsageTracker;
   readonly rateLimiter: RateLimiterPort;
   readonly artisanReader: ArtisanReader;
   readonly statsReader: ConseilsStatsReader;
@@ -48,12 +50,13 @@ export async function getConseilsIA(deps: ConseilsIaDeps, ctx: TenantContext, lo
 
   const t0 = Date.now();
   try {
-    const { text } = await deps.llm.complete(prompt, {
+    const { text, usage } = await deps.llm.complete(prompt, {
       system: getContexteMetier(metier),
       temperature: 0.6,
       maxOutputTokens: 800,
     });
     const llmDuration = Date.now() - t0;
+    deps.trackLlm?.({ artisanId: ctx.artisanId, userId: ctx.userId, useCase: "conseils_ia", usage });
     const conseils = parseConseils(text);
     log?.info({ event: "llm_complete", useCase: "conseilsIA", llmDuration, conseils: conseils.length }, `LLM conseilsIA terminé en ${llmDuration}ms`);
     if (conseils.length === 0) return CONSEILS_VIDE;

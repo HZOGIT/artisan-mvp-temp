@@ -1,6 +1,7 @@
 import { NotFoundError, TooManyRequestsError, UnauthorizedError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { LlmPort } from "../../../shared/ports/llm";
+import type { LlmUsageTracker } from "../../../shared/ports/llm-usage-tracker";
 import type { ArtisanReader } from "../../../shared/readers/contact-readers";
 import type { AppLogger } from "../../../shared/ports/logger";
 import { getContexteMetier } from "../../../shared/ia/contexte-metier";
@@ -22,6 +23,7 @@ export interface SoumettreDemandeIADeps {
   readonly clients: { getById(ctx: TenantContext, id: number): Promise<{ nom: string; prenom: string | null; email: string | null; telephone: string | null } | null> };
   readonly artisanInfoReader: ArtisanReader;
   readonly llm: LlmPort;
+  readonly trackLlm?: LlmUsageTracker;
   readonly rateLimiter: { check(key: string): Promise<boolean> };
   readonly notifications: { creer(ctx: TenantContext, input: { type: "info"; titre: string; message: string; lien: string }): Promise<unknown> };
   readonly email: { send(message: { to: string; subject: string; body: string }): Promise<void> };
@@ -73,7 +75,9 @@ Tache : structure cette demande pour l'artisan. Donne un titre court, reformule 
 
 Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte avant/apres) :
 {"titre":"court","description_reformulee":"clair","type_travaux":"libelle","urgence":"normale","estimation_min":0,"estimation_max":0,"questions":["q1","q2"]}`;
-    const { text } = await deps.llm.complete(prompt, { system: contexteMetier, temperature: 0.4, maxOutputTokens: 1200 });
+    const result = await deps.llm.complete(prompt, { system: contexteMetier, temperature: 0.4, maxOutputTokens: 1200 });
+    deps.trackLlm?.({ artisanId: access.artisanId, userId: null, useCase: "portail_demande_ia", usage: result.usage });
+    const { text } = result;
     const llmDuration = Date.now() - t0;
     log?.info({ event: "llm_complete", useCase: "soumettreDemandeIA", llmDuration }, `LLM portail terminé en ${llmDuration}ms`);
     const jsonMatch = text.match(/\{[\s\S]*\}/);

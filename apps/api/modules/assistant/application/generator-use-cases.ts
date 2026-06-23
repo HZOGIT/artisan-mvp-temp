@@ -1,5 +1,6 @@
 import { NotFoundError, TooManyRequestsError } from "../../../shared/errors";
 import type { LlmPort } from "../../../shared/ports/llm";
+import type { LlmUsageTracker } from "../../../shared/ports/llm-usage-tracker";
 import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { ArtisanReader } from "../../../shared/readers/contact-readers";
 import type { TenantContext } from "../../../shared/tenant";
@@ -21,6 +22,7 @@ import type { AssistantDataReader } from "./assistant-data-reader";
  */
 export interface AssistantGeneratorDeps {
   readonly llm: LlmPort;
+  readonly trackLlm?: LlmUsageTracker;
   readonly rateLimiter: RateLimiterPort;
   readonly artisanReader: ArtisanReader;
   readonly dataReader: AssistantDataReader;
@@ -33,8 +35,9 @@ async function rateLimitKO(deps: AssistantGeneratorDeps, ctx: TenantContext): Pr
   return !(await deps.rateLimiter.check(`ia:${ctx.artisanId}`));
 }
 
-async function complete(deps: AssistantGeneratorDeps, parts: { system: string; user: string; temperature: number; maxOutputTokens: number }): Promise<string> {
-  const { text } = await deps.llm.complete(parts.user, { system: parts.system, temperature: parts.temperature, maxOutputTokens: parts.maxOutputTokens });
+async function complete(deps: AssistantGeneratorDeps, parts: { system: string; user: string; temperature: number; maxOutputTokens: number }, ctx: TenantContext, useCase: string): Promise<string> {
+  const { text, usage } = await deps.llm.complete(parts.user, { system: parts.system, temperature: parts.temperature, maxOutputTokens: parts.maxOutputTokens });
+  deps.trackLlm?.({ artisanId: ctx.artisanId, userId: ctx.userId, useCase, usage });
   return text;
 }
 
@@ -54,7 +57,7 @@ export async function suggestRelances(deps: AssistantGeneratorDeps, ctx: TenantC
     .filter((d) => d.jours >= RELANCE_SEUIL_JOURS);
   if (items.length === 0) return [];
 
-  const text = await complete(deps, buildSuggestRelancesPrompt(items));
+  const text = await complete(deps, buildSuggestRelancesPrompt(items), ctx, "assistant_relances");
   return parseRelances(text);
 }
 
@@ -72,7 +75,7 @@ export async function generateDevis(
   if (await rateLimitKO(deps, ctx)) throw new TooManyRequestsError("Limite atteinte");
 
   const catalogue = await deps.dataReader.getCatalogue(ctx);
-  const raw = await complete(deps, buildGenerateDevisPrompt(input.description, catalogue));
+  const raw = await complete(deps, buildGenerateDevisPrompt(input.description, catalogue), ctx, "assistant_devis");
   return { lignes: parseDevisLignes(raw), raw };
 }
 
@@ -92,7 +95,7 @@ export async function analyseRentabilite(
   const data = await deps.dataReader.getDevisAnalyse(ctx, input.devisId);
   if (!data) throw new NotFoundError("Devis non trouvé");
 
-  const analyse = await complete(deps, buildAnalyseRentabilitePrompt(data));
+  const analyse = await complete(deps, buildAnalyseRentabilitePrompt(data), ctx, "assistant_rentabilite");
   return { analyse };
 }
 
@@ -106,6 +109,6 @@ export async function predictionTresorerie(deps: AssistantGeneratorDeps, ctx: Te
   if (await rateLimitKO(deps, ctx)) throw new TooManyRequestsError("Limite atteinte");
 
   const data = await deps.dataReader.getTresorerie(ctx);
-  const prediction = await complete(deps, buildPredictionTresoreriePrompt(data));
+  const prediction = await complete(deps, buildPredictionTresoreriePrompt(data), ctx, "assistant_tresorerie");
   return { prediction };
 }

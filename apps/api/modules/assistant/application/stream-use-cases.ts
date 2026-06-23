@@ -1,5 +1,6 @@
 import { TooManyRequestsError, ValidationError } from "../../../shared/errors";
 import type { LlmPort } from "../../../shared/ports/llm";
+import type { LlmUsageTracker } from "../../../shared/ports/llm-usage-tracker";
 import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { ArtisanReader } from "../../../shared/readers/contact-readers";
 import type { TenantContext } from "../../../shared/tenant";
@@ -13,6 +14,7 @@ import type { AssistantThreadWriter } from "./assistant-thread-writer";
  */
 export interface AssistantStreamDeps {
   readonly llm: LlmPort;
+  readonly trackLlm?: LlmUsageTracker;
   readonly rateLimiter: RateLimiterPort;
   readonly artisanReader: ArtisanReader;
   readonly statsReader: ConseilsStatsReader;
@@ -73,8 +75,9 @@ export async function* streamAssistantReply(
     if (chunk.kind === "text") {
       full += chunk.text;
       yield { content: chunk.text };
+    } else {
+      deps.trackLlm?.({ artisanId: ctx.artisanId, userId: ctx.userId, useCase: "assistant_stream", usage: chunk.usage });
     }
-    /* chunk.kind === "done" → usage disponible ici pour le tracking (morceau suivant) */
   }
 
   /** Persistance best-effort (n'altère pas le stream déjà émis). */
