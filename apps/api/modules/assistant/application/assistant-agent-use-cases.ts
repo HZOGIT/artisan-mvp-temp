@@ -3,6 +3,7 @@ import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { ArtisanReader } from "../../../shared/readers/contact-readers";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ConseilsStatsReader } from "../../conseils-ia/application/conseils-stats-reader";
+import type { LlmUsageTracker } from "../../../shared/ports/llm-usage-tracker";
 import { isWriteTool, TOOL_INVALIDATIONS } from "../domain/assistant-tools-catalog";
 import { buildAssistantSystemPrompt } from "../domain/system-prompt";
 import type {
@@ -29,6 +30,7 @@ const HISTORY_WINDOW = 10;
 
 export interface AssistantAgentDeps {
   readonly llm: LlmAgenticPort;
+  readonly trackLlm?: LlmUsageTracker;
   readonly registry: AssistantToolRegistry;
   readonly rateLimiter: RateLimiterPort;
   readonly artisanReader: ArtisanReader;
@@ -133,6 +135,7 @@ export async function* runAssistantAgent(
         /** turn-complete : message `model` BRUT (à réinjecter tel quel) + outils à exécuter. */
         modelMessage = ev.modelMessage;
         for (const c of ev.functionCalls) calls.push(c);
+        if (ev.usage) deps.trackLlm?.({ artisanId: ctx.artisanId, userId: ctx.userId, useCase: "assistant_agent", usage: ev.usage });
       }
     }
 

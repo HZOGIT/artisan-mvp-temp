@@ -794,6 +794,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const agentLlm = deps.llmAgentic ?? new GeminiAgenticAdapter();
   const agentDeps = {
     llm: agentLlm,
+    trackLlm: makeLlmUsageTracker(getDbHandle().db),
     registry: agentRegistry,
     rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
     artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),

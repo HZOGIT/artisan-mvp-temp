@@ -1,5 +1,6 @@
 import type { AgenticEvent, AgenticFunctionCall, AgenticMessage, AgenticTurnInput, LlmAgenticPort } from "../application/agentic-port";
 import type { ToolParamSchema, ToolSchema } from "../domain/assistant-tools-catalog";
+import type { LlmUsage } from "../../../shared/ports/llm";
 
 /*
  * Adapter Gemini du port AGENTIQUE (function-calling streamé). Comme `GeminiLlmAdapter`, le SDK est
@@ -12,8 +13,16 @@ interface GenAiPart {
   text?: string;
   functionCall?: { name?: string; args?: Record<string, unknown> };
 }
+type GenAiUsageMeta = {
+  promptTokenCount?: number; responseTokenCount?: number; thoughtsTokenCount?: number;
+  cachedContentTokenCount?: number; toolUsePromptTokenCount?: number; totalTokenCount?: number;
+  promptTokensDetails?: { modality?: string; tokenCount?: number }[];
+  responseTokensDetails?: { modality?: string; tokenCount?: number }[];
+  trafficType?: string;
+};
 interface GenAiStreamChunk {
-  candidates?: Array<{ content?: { parts?: GenAiPart[] } }>;
+  candidates?: Array<{ content?: { parts?: GenAiPart[] }; finishReason?: string }>;
+  usageMetadata?: GenAiUsageMeta;
 }
 interface GenAiAgenticClient {
   models: { generateContentStream(req: unknown): Promise<AsyncIterable<GenAiStreamChunk>> };
@@ -98,9 +107,14 @@ export class GeminiAgenticAdapter implements LlmAgenticPort {
     const rawFunctionCallParts: unknown[] = [];
     const functionCalls: AgenticFunctionCall[] = [];
     let textBuffer = "";
+    let lastMeta: GenAiUsageMeta | undefined;
+    let finishReason = "STOP";
+    const t0 = Date.now();
 
     for await (const chunk of stream) {
       const parts = chunk.candidates?.[0]?.content?.parts ?? [];
+      if (chunk.candidates?.[0]?.finishReason) finishReason = chunk.candidates[0].finishReason;
+      if (chunk.usageMetadata) lastMeta = chunk.usageMetadata;
       for (const part of parts) {
         if (typeof part.text === "string" && part.text) {
           textBuffer += part.text;
@@ -118,6 +132,25 @@ export class GeminiAgenticAdapter implements LlmAgenticPort {
     if (textBuffer) modelParts.push({ text: textBuffer });
     for (const p of rawFunctionCallParts) modelParts.push(p);
     const modelMessage: AgenticMessage = { role: "model", content: { kind: "raw", parts: modelParts } };
-    yield { kind: "turn-complete", modelMessage, functionCalls };
+
+    const mt = (arr: { modality?: string; tokenCount?: number }[] | undefined, m: string) =>
+      arr?.find((d) => d.modality === m)?.tokenCount ?? 0;
+    const usage: LlmUsage = {
+      model, durationMs: Date.now() - t0, finishReason,
+      promptTokens:    lastMeta?.promptTokenCount         ?? 0,
+      responseTokens:  lastMeta?.responseTokenCount        ?? 0,
+      thinkingTokens:  lastMeta?.thoughtsTokenCount        ?? 0,
+      cachedTokens:    lastMeta?.cachedContentTokenCount   ?? 0,
+      toolUseTokens:   lastMeta?.toolUsePromptTokenCount   ?? 0,
+      totalTokens:     lastMeta?.totalTokenCount           ?? 0,
+      textInputTokens:  mt(lastMeta?.promptTokensDetails,  "TEXT"),
+      audioInputTokens: mt(lastMeta?.promptTokensDetails,  "AUDIO"),
+      imageInputTokens: mt(lastMeta?.promptTokensDetails,  "IMAGE"),
+      videoInputTokens: mt(lastMeta?.promptTokensDetails,  "VIDEO"),
+      textOutputTokens:  mt(lastMeta?.responseTokensDetails, "TEXT"),
+      audioOutputTokens: mt(lastMeta?.responseTokensDetails, "AUDIO"),
+      trafficType: lastMeta?.trafficType ?? null,
+    };
+    yield { kind: "turn-complete", modelMessage, functionCalls, usage };
   }
 }

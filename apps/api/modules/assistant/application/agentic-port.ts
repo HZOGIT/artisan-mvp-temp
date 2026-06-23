@@ -13,6 +13,7 @@
 
 import type { TenantContext } from "../../../shared/tenant";
 import type { ToolSchema } from "../domain/assistant-tools-catalog";
+import type { LlmUsage } from "../../../shared/ports/llm";
 
 /** Un appel d'outil émis par le modèle. */
 export interface AgenticFunctionCall {
@@ -57,6 +58,7 @@ export type AgenticEvent =
       readonly kind: "turn-complete";
       readonly modelMessage: AgenticMessage;
       readonly functionCalls: readonly AgenticFunctionCall[];
+      readonly usage?: LlmUsage;
     };
 
 /*
