@@ -14,7 +14,10 @@ interface GenAiPart {
   functionCall?: { name?: string; args?: Record<string, unknown> };
 }
 type GenAiUsageMeta = {
-  promptTokenCount?: number; responseTokenCount?: number; thoughtsTokenCount?: number;
+  promptTokenCount?: number;
+  responseTokenCount?: number;
+  candidatesTokenCount?: number;
+  thoughtsTokenCount?: number;
   cachedContentTokenCount?: number; toolUsePromptTokenCount?: number; totalTokenCount?: number;
   promptTokensDetails?: { modality?: string; tokenCount?: number }[];
   responseTokensDetails?: { modality?: string; tokenCount?: number }[];
@@ -138,7 +141,7 @@ export class GeminiAgenticAdapter implements LlmAgenticPort {
     const usage: LlmUsage = {
       model, durationMs: Date.now() - t0, finishReason,
       promptTokens:    lastMeta?.promptTokenCount         ?? 0,
-      responseTokens:  lastMeta?.responseTokenCount        ?? 0,
+      responseTokens:  lastMeta?.responseTokenCount ?? lastMeta?.candidatesTokenCount ?? 0,
       thinkingTokens:  lastMeta?.thoughtsTokenCount        ?? 0,
       cachedTokens:    lastMeta?.cachedContentTokenCount   ?? 0,
       toolUseTokens:   lastMeta?.toolUsePromptTokenCount   ?? 0,

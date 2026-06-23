@@ -9,7 +9,9 @@ import type { VisionPort, VisionRequest, VisionMultiRequest } from "./vision";
 /** Forme structurelle du usageMetadata retourné par le SDK @google/genai v1.52. */
 type GeminiUsageMeta = {
   promptTokenCount?: number;
+  /** responseTokenCount (Gemini API) OU candidatesTokenCount (Vertex / anciens endpoints). */
   responseTokenCount?: number;
+  candidatesTokenCount?: number;
   thoughtsTokenCount?: number;
   cachedContentTokenCount?: number;
   toolUsePromptTokenCount?: number;
@@ -49,7 +51,7 @@ function buildUsage(
     durationMs,
     finishReason,
     promptTokens:    meta?.promptTokenCount         ?? 0,
-    responseTokens:  meta?.responseTokenCount        ?? 0,
+    responseTokens:  meta?.responseTokenCount ?? meta?.candidatesTokenCount ?? 0,
     thinkingTokens:  meta?.thoughtsTokenCount        ?? 0,
     cachedTokens:    meta?.cachedContentTokenCount   ?? 0,
     toolUseTokens:   meta?.toolUsePromptTokenCount   ?? 0,
