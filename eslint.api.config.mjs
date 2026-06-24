@@ -40,5 +40,8 @@ export default tseslint.config({
     "@typescript-eslint/no-non-null-assertion": "warn",
     "@typescript-eslint/consistent-type-imports": ["error", { prefer: "type-imports", fixStyle: "inline-type-imports" }],
     "@typescript-eslint/require-await": "warn",
+    "@typescript-eslint/no-floating-promises": "error",
+    "@typescript-eslint/no-misused-promises": "error",
+    "@typescript-eslint/promise-function-async": "warn",
   },
 });
