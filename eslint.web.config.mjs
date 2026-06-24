@@ -7,11 +7,13 @@ import noTrpcInUi from "./eslint/no-trpc-in-ui.mjs";
 export default tseslint.config(
   {
     files: ["apps/web/src/**/*.{ts,tsx}"],
+    ignores: ["apps/web/src/**/*.test.ts", "apps/web/src/**/*.test.tsx", "apps/web/src/**/*.spec.ts", "apps/web/src/**/*.spec.tsx"],
     languageOptions: {
       parser: tseslint.parser,
-      parserOptions: { ecmaFeatures: { jsx: true } },
+      parserOptions: { ecmaFeatures: { jsx: true }, projectService: true, tsconfigRootDir: import.meta.dirname },
     },
     plugins: {
+      "@typescript-eslint": tseslint.plugin,
       local: { rules: { "kebab-filename": kebabFilename, "no-trpc-in-ui": noTrpcInUi, "comments-jsdoc-only": commentsJsdocOnly } },
       i18next,
     },
@@ -36,6 +38,13 @@ export default tseslint.config(
         },
       ],
       "i18next/no-literal-string": ["error", { mode: "jsx-text-only", words: { exclude: ["^[^A-Za-zÀ-ÿ]+$"] } }],
+      "no-eval": "error",
+      "no-new-func": "error",
+      "no-prototype-builtins": "error",
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-non-null-assertion": "error",
+      "@typescript-eslint/consistent-type-imports": ["error", { prefer: "type-imports", fixStyle: "inline-type-imports" }],
+      "@typescript-eslint/require-await": "error",
     },
   },
   {
@@ -48,6 +57,10 @@ export default tseslint.config(
   },
   {
     files: ["apps/web/src/**/*.test.ts", "apps/web/src/**/*.test.tsx", "apps/web/src/**/*.spec.ts", "apps/web/src/**/*.spec.tsx"],
+    languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: { ecmaFeatures: { jsx: true } },
+    },
     rules: { "local/comments-jsdoc-only": "off", "multiline-comment-style": "off" },
   },
 );

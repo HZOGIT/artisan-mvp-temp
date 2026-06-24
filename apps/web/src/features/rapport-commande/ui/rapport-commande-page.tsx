@@ -119,7 +119,7 @@ export default function RapportCommandePage() {
                     </Button>
                     {commande.fournisseur?.email && (
                       <Button variant="outline" size="sm" onClick={() => {
-                        window.location.href = `mailto:${commande.fournisseur!.email}?subject=${encodeURIComponent(t("mailSubject"))}`;
+                        window.location.href = `mailto:${commande.fournisseur?.email}?subject=${encodeURIComponent(t("mailSubject"))}`;
                         toast.info(t("toastEmail"));
                       }}>
                         <Mail className="mr-2 h-4 w-4" />

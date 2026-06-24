@@ -127,7 +127,6 @@ export function AddCardDialog({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const handleSuccess = () => {

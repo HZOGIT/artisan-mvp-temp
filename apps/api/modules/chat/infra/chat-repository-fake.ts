@@ -42,7 +42,7 @@ export class FakeChatRepository implements IChatRepository {
   async listMessages(_ctx: TenantContext, conversationId: number): Promise<Message[]> {
     return this.msgs.filter((m) => m.conversationId === conversationId).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   }
-  async markMessagesAsRead(ctx: TenantContext, conversationId: number, lecteur: MessageAuteur): Promise<void> {
+  async markMessagesAsRead(_ctx: TenantContext, conversationId: number, lecteur: MessageAuteur): Promise<void> {
     const other: MessageAuteur = lecteur === "artisan" ? "client" : "artisan";
     this.msgs = this.msgs.map((m) => (m.conversationId === conversationId && m.auteur === other ? { ...m, lu: true } : m));
     const conv = this.convs.find((c) => c.id === conversationId);

@@ -87,7 +87,8 @@ export default function SignatureDevisPage() {
   }, []);
 
   const getCanvasPos = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current!;
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
     if ("touches" in e) {
       return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };

@@ -1,5 +1,5 @@
 import { AlertTriangle, Home, RotateCcw } from "lucide-react";
-import { Component, ErrorInfo, ReactNode } from "react";
+import { Component, type ErrorInfo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { BACKEND_URL } from "@/shared/backend-url";
 

@@ -136,7 +136,7 @@ export default function ClientsListPage() {
   }, []);
 
   /** Handler pour soumettre le formulaire d'édition */
-  const handleSubmitEdit = useCallback(async (e: React.FormEvent) => {
+  const handleSubmitEdit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.nom.trim()) {
       toast.error(t("toastNameRequired"));

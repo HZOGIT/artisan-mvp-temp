@@ -2,6 +2,7 @@
  * Vue lecture seule d'une facture en retard de paiement, utilisée pour générer des
  * rappels. Domaine sensible (facturation) : aucune écriture sur les factures.
  */
+import type { NotificationType } from "./notification";
 export interface FactureEnRetard {
   readonly id: number;
   readonly numero: string;
@@ -13,7 +14,7 @@ export interface FactureEnRetard {
 
 /** Données d'une notification à créer (rappel généré). */
 export interface CreerNotificationInput {
-  readonly type: import("./notification").NotificationType;
+  readonly type: NotificationType;
   readonly titre: string;
   readonly message: string;
   readonly lien: string;

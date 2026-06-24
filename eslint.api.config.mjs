@@ -18,7 +18,13 @@ export default tseslint.config({
   },
   files: ["apps/api/**/*.ts"],
   ignores: ["apps/api/**/*.test.ts", "apps/api/**/*.spec.ts"],
-  languageOptions: { parser: tseslint.parser },
+  languageOptions: {
+    parser: tseslint.parser,
+    parserOptions: {
+      project: "./tsconfig.api.json",
+      tsconfigRootDir: import.meta.dirname,
+    },
+  },
   rules: {
     "no-warning-comments": ["error", { terms: ["TODO", "FIXME", "HACK", "XXX"], location: "anywhere" }],
     "local/comments-jsdoc-only": "error",
@@ -27,5 +33,12 @@ export default tseslint.config({
     "local/module-layer-structure": "error",
     "local/module-layer-imports": "error",
     "local/module-completeness": "error",
+    "no-eval": "error",
+    "no-new-func": "error",
+    "no-prototype-builtins": "error",
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/no-non-null-assertion": "warn",
+    "@typescript-eslint/consistent-type-imports": ["error", { prefer: "type-imports", fixStyle: "inline-type-imports" }],
+    "@typescript-eslint/require-await": "warn",
   },
 });

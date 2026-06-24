@@ -112,8 +112,8 @@ export default function AssistantPage({ embedded = false }: { embedded?: boolean
         if (ev.error) toast.error(ev.error);
         if (ev.navigate) { navigate(navigateTarget(ev.navigate, ev.filtre)); try { window.dispatchEvent(new CustomEvent("operioz:open-assistant")); } catch { /* ignore */ } }
         if (ev.invalidate) for (const key of ev.invalidate) queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && q.queryKey.some((k) => typeof k === "string" && k.includes(key)) });
-        if (ev.toolStart) setActiveTools((prev) => [...prev, { name: ev.toolStart!.name }]);
-        if (ev.toolEnd) setActiveTools((prev) => prev.map((t) => t.name === ev.toolEnd!.name && t.ok === undefined ? { ...t, ok: ev.toolEnd!.ok } : t));
+        if (ev.toolStart) { const ts = ev.toolStart; setActiveTools((prev) => [...prev, { name: ts.name }]); }
+        if (ev.toolEnd) { const te = ev.toolEnd; setActiveTools((prev) => prev.map((t) => t.name === te.name && t.ok === undefined ? { ...t, ok: te.ok } : t)); }
       }, controller.signal);
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;

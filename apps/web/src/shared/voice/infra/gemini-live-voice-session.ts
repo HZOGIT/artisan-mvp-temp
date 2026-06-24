@@ -57,11 +57,12 @@ export class GeminiLiveVoiceSession implements VoiceSession {
      * transcription even though the socket connected fine.
      */
     this._ws.binaryType = 'arraybuffer';
+    const ws = this._ws;
 
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => { vlog('❌ WS open timeout'); reject(new Error('WebSocket timeout')); }, 10000);
-      this._ws!.onopen = () => { clearTimeout(timeout); vlog('WS open ✓'); resolve(); };
-      this._ws!.onerror = () => { clearTimeout(timeout); vlog('❌ WS error during open'); reject(new Error('WebSocket error')); };
+      ws.onopen = () => { clearTimeout(timeout); vlog('WS open ✓'); resolve(); };
+      ws.onerror = () => { clearTimeout(timeout); vlog('❌ WS error during open'); reject(new Error('WebSocket error')); };
     });
 
     this._ws.onmessage = (e) => { void this._handleMessage(e); };
@@ -120,7 +121,7 @@ export class GeminiLiveVoiceSession implements VoiceSession {
             const avg = Math.round(energy / (bytes.length / 2));
             vlog(`→ sent chunk #${this._sentChunks}${this._muted ? ' [MUTED→silence]' : ''} avgLevel=${avg}${!this._muted && avg < 30 ? ' ⚠️ silence' : ' 🎤'}`);
           }
-          this._ws!.send(JSON.stringify({
+          this._ws?.send(JSON.stringify({
             realtimeInput: { audio: { mimeType: 'audio/pcm;rate=16000', data } },
           }));
         } else {
@@ -314,7 +315,7 @@ export class GeminiLiveVoiceSession implements VoiceSession {
 
   get isMuted(): boolean { return this._muted; }
 
-  async stop(): Promise<void> {
+  stop(): Promise<void> {
     this._capture.stop();
     this._output.stop();
     this._ws?.close();
@@ -322,5 +323,6 @@ export class GeminiLiveVoiceSession implements VoiceSession {
     /** Now that both capture and playback have released the shared context, close it. */
     closeSharedAudioContext();
     this.setState('idle');
+    return Promise.resolve();
   }
 }

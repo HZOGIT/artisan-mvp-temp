@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IIntegrationsComptablesRepository } from "../../application/integrations-comptables-repository";
+import type { TenantContext } from "../../../../shared/tenant";
 import { getConfig, saveConfig, saveSyncConfig, getSyncStatus, getExports, genererExport, getSyncLogs, getPendingItems, lancerSync, retrySync } from "../../application/use-cases";
 
 const logicielEnum = z.enum(["sage", "quickbooks", "ciel", "ebp", "autre"]);
@@ -26,7 +27,7 @@ const saveSyncConfigSchema = z.object({
  * ⚠️ Lecture seule des données financières (FEC réutilisé, aucune écriture mutée). Repo injecté + un
  * fournisseur de contenu FEC (`fec`) branché sur le générateur du domaine comptabilité.
  */
-export function createIntegrationsComptablesRouter(repo: IIntegrationsComptablesRepository, fec: { getFecContent(ctx: import("../../../../shared/tenant").TenantContext, period: { dateDebut: Date; dateFin: Date }): Promise<string> }) {
+export function createIntegrationsComptablesRouter(repo: IIntegrationsComptablesRepository, fec: { getFecContent(ctx: TenantContext, period: { dateDebut: Date; dateFin: Date }): Promise<string> }) {
   return router({
     getConfig: protectedProcedure.query(({ ctx }) => getConfig(repo, ctx.tenant)),
     saveConfig: protectedProcedure.input(saveConfigSchema).mutation(({ ctx, input }) => saveConfig(repo, ctx.tenant, input)),

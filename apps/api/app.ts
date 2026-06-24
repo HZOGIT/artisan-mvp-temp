@@ -8,7 +8,7 @@ import { createAppRouter } from "./interface/trpc/router";
 import { makeCreateContext, type ContextDeps } from "./interface/trpc/context";
 import { getDbHandle } from "./shared/db";
 import { DrizzleTenantResolver } from "./shared/tenant/drizzle-tenant-resolver";
-import { DrizzleUserRoleReader, type UserRoleReader } from "./shared/tenant/role-reader";
+import { DrizzleUserRoleReader } from "./shared/tenant/role-reader";
 import { DrizzlePermissionsReader } from "./shared/tenant/permissions-reader";
 import { VehiculeRepositoryDrizzle } from "./modules/vehicules/infra/vehicule-repository-drizzle";
 import type { IVehiculeRepository } from "./modules/vehicules/application/vehicule-repository";
@@ -1146,7 +1146,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   app.addHook("onReady", async () => {
     const appUrl = deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com";
     const webhookUrl = `${appUrl}/api/stripe/webhook`;
-    await ensureStripeWebhookEndpoint(process.env.STRIPE_SECRET_KEY ?? "", webhookUrl, app.log as unknown as import("./shared/ports/logger").AppLogger);
+    await ensureStripeWebhookEndpoint(process.env.STRIPE_SECRET_KEY ?? "", webhookUrl, app.log as unknown as AppLogger);
   });
 
   return app;

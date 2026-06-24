@@ -89,7 +89,7 @@ export default function Calendar({ interventions, onDateClick, onInterventionCli
       if (!map.has(key)) {
         map.set(key, []);
       }
-      map.get(key)!.push(intervention);
+      map.get(key)?.push(intervention);
     });
     return map;
   }, [interventions]);
@@ -427,7 +427,7 @@ function WeekView({
         if (!map.has(slotKey)) {
           map.set(slotKey, []);
         }
-        map.get(slotKey)!.push(intervention);
+        map.get(slotKey)?.push(intervention);
       });
     });
     return map;

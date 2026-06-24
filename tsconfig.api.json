@@ -3,7 +3,9 @@
   "compilerOptions": {
     "noEmit": true,
     "incremental": false,
-    "tsBuildInfoFile": null
+    "tsBuildInfoFile": null,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": ["apps/api/**/*", "drizzle/schema.pg.ts"],
   "exclude": ["node_modules", "build", "dist", "**/*.test.ts", "apps/api/shared/legacy"]

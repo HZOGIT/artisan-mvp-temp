@@ -109,7 +109,7 @@ export function AlertsBar({ alerts, onNavigate }: AlertsBarProps) { const { t } 
               {alert.lien && onNavigate && (
                 <button
                   type="button"
-                  onClick={() => onNavigate(alert.lien!)}
+                  onClick={() => onNavigate(alert.lien ?? "")}
                   className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${style.text} hover:bg-white/40 dark:hover:bg-white/5 transition-colors`}
                 >
                   {t("alertVoir")} <ArrowRight className="h-3 w-3" />

@@ -54,17 +54,18 @@ export default function PlanificationPage() {
   /** Marqueurs : destination + techniciens suggérés. */
   useEffect(() => {
     if (!mapRef.current || typeof L === "undefined") return;
+    const map = mapRef.current;
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
 
     if (coords) {
       const destIcon = L.divIcon({ className: "", iconSize: [32, 32], iconAnchor: [16, 32], html: destMarkerHtml() });
-      markersRef.current.push(L.marker([coords.lat, coords.lng], { icon: destIcon }).addTo(mapRef.current).bindPopup(t("destination")));
+      markersRef.current.push(L.marker([coords.lat, coords.lng], { icon: destIcon }).addTo(map).bindPopup(t("destination")));
     }
     suggestions.forEach((s) => {
       if (!s.position) return;
       const icon = L.divIcon({ className: "", iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -16], html: techMarkerHtml(s.technicien.couleur || "#3B82F6", s.disponible) });
-      const marker = L.marker([parseFloat(s.position.latitude), parseFloat(s.position.longitude)], { icon, title: s.technicien.nom }).addTo(mapRef.current!);
+      const marker = L.marker([parseFloat(s.position.latitude), parseFloat(s.position.longitude)], { icon, title: s.technicien.nom }).addTo(map);
       marker.bindPopup(techPopupHtml(s, unites));
       marker.on("click", () => setSelectedTechnicien(s.technicien.id));
       markersRef.current.push(marker);

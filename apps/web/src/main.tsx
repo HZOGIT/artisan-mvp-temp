@@ -97,7 +97,8 @@ const trpcClient = trpc.createClient({
   ],
 })
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+const rootEl = document.getElementById('root') ?? document.body;
+ReactDOM.createRoot(rootEl).render(
   <React.StrictMode>
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>

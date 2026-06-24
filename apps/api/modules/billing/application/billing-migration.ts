@@ -1,7 +1,7 @@
 import type { IBillingRepository } from "./billing-repository";
 import type { DbClient } from "../../../shared/db";
 import { subscriptions, billingSubscriptions } from "../../../../../drizzle/schema.pg";
-import { eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 export interface MigrationResult {
   readonly migrated: number;

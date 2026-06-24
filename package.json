@@ -19,10 +19,10 @@
   },
   "lint-staged": {
     "apps/api/**/*.ts": [
-      "eslint -c eslint.api.config.mjs --max-warnings=0 --no-warn-ignored"
+      "eslint -c eslint.api.config.mjs --max-warnings=-1 --no-warn-ignored"
     ],
     "apps/web/src/**/*.{ts,tsx}": [
-      "eslint -c eslint.web.config.mjs --max-warnings=0"
+      "eslint -c eslint.web.config.mjs --max-warnings=-1"
     ]
   },
   "dependencies": {

@@ -60,7 +60,7 @@ export function ConseillerIAWidget() {
             <div className="flex items-start gap-2 mb-1"><span className="text-lg leading-none">{c.icone || "💡"}</span><span className="text-sm font-semibold text-gray-900 flex-1">{c.titre}</span></div>
             <p className="text-xs text-gray-600 flex-1 mb-2">{c.message}</p>
             {c.actionLien && c.actionLabel && (
-              <Button size="sm" variant="ghost" className="h-7 text-xs justify-start px-2 text-violet-700 hover:text-violet-900 hover:bg-violet-100" onClick={() => setLocation(c.actionLien!)}>{c.actionLabel} <ChevronRight className="h-3 w-3 ml-1" /></Button>
+              <Button size="sm" variant="ghost" className="h-7 text-xs justify-start px-2 text-violet-700 hover:text-violet-900 hover:bg-violet-100" onClick={() => setLocation(c.actionLien ?? "")}>{c.actionLabel} <ChevronRight className="h-3 w-3 ml-1" /></Button>
             )}
           </div>
         ))}

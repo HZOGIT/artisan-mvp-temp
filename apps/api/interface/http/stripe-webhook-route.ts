@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { StripeWebhookDeps } from "../../modules/subscription/application/webhook-use-cases";
 import { processStripeWebhook } from "../../modules/subscription/application/webhook-use-cases";
+import type { AppLogger } from "../../shared/ports/logger";
 
 /*
  * Route HORS-tRPC `POST /api/stripe/webhook`. ⚠️ **RAW BODY obligatoire** : la vérif de signature
@@ -14,7 +15,7 @@ export function registerStripeWebhookRoute(app: FastifyInstance, deps: StripeWeb
     instance.post("/api/stripe/webhook", async (req, reply) => {
       const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(typeof req.body === "string" ? req.body : "");
       const signature = req.headers["stripe-signature"] as string | undefined;
-      const result = await processStripeWebhook({ ...deps, log: req.log as unknown as import("../../shared/ports/logger").AppLogger }, { rawBody, signature });
+      const result = await processStripeWebhook({ ...deps, log: req.log as unknown as AppLogger }, { rawBody, signature });
       if (result.http >= 400) {
         req.log.error({ event: "stripe_webhook_error", status: result.http, body: result.body }, "Stripe webhook failed");
       }
