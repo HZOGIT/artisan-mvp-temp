@@ -18,6 +18,7 @@ import { useLocation, useSearch } from "@/shared/router/navigation";
 import { Plus, Search, FileText, MoreHorizontal, Eye, Pencil, Trash2, Receipt, Download, FileSpreadsheet } from "lucide-react";
 import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
+import { exportToCsv, csvDateSuffix } from "@/shared/lib/csv-export";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/shared/ui/dropdown-menu";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -182,6 +183,34 @@ export default function DevisPage() {
     toast.success(t("toastExcelDownloaded"));
   };
 
+  /** Export CSV */
+  const handleExportCSV = () => {
+    if (!filteredDevis || filteredDevis.length === 0) {
+      toast.error(t("toastNothingToExport"));
+      return;
+    }
+    const headers = [
+      t("csvNumero"), t("csvClient"), t("csvDate"), t("csvDateValidite"),
+      t("csvVuLe"), t("csvObjet"), t("csvReferenceClient"), t("csvStatut"),
+      t("csvMontantHT"), t("csvTVA"), t("csvMontantTTC"),
+    ];
+    const rows = filteredDevis.map((d: Devis) => [
+      d.numero,
+      resolveClientName(d.clientId),
+      d.dateDevis ? format(new Date(d.dateDevis), "dd/MM/yyyy") : "",
+      d.dateValidite ? format(new Date(d.dateValidite), "dd/MM/yyyy") : "",
+      d.dateVue ? format(new Date(d.dateVue), "dd/MM/yyyy") : "",
+      d.objet,
+      d.referenceClient,
+      statutLabelOf(d.statut),
+      parseFloat(d.totalHT || "0"),
+      parseFloat(d.totalTVA || "0"),
+      parseFloat(d.totalTTC || "0"),
+    ]);
+    exportToCsv(`devis_${csvDateSuffix()}.csv`, headers, rows);
+    toast.success(t("toastCsvDownloaded"));
+  };
+
   /** Index client pour la résolution de nom (l'index vit côté UI ; le filtrage est délégué au domaine). */
   const clientsMap = new Map<number, DevisClient>(clients.map((c) => [c.id, c]));
   const resolveClientName = (clientId: number | null) =>
@@ -236,6 +265,10 @@ export default function DevisPage() {
           <Button variant="outline" size="sm" onClick={exportToExcel}>
             <FileSpreadsheet className="h-4 w-4 mr-2" />
             {t("exportExcel")}
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportCSV}>
+            <Download className="h-4 w-4 mr-2" />
+            {t("exportCsv")}
           </Button>
         </div>
       </div>

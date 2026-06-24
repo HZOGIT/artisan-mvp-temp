@@ -41,7 +41,20 @@
   "toastPdfDownloaded": "Export PDF téléchargé",
   "toastExcelDownloaded": "Export Excel téléchargé",
   "toastNothingToExport": "Aucun devis à exporter",
+  "toastCsvDownloaded": "Export CSV téléchargé",
+  "exportCsv": "CSV",
   "excelSheet": "Devis",
   "excelMontantHT": "Montant HT",
-  "excelTVA": "TVA"
+  "excelTVA": "TVA",
+  "csvNumero": "Numéro",
+  "csvClient": "Client",
+  "csvDate": "Date",
+  "csvDateValidite": "Date de validité",
+  "csvVuLe": "Vu le",
+  "csvObjet": "Objet",
+  "csvReferenceClient": "Réf. client",
+  "csvStatut": "Statut",
+  "csvMontantHT": "HT (€)",
+  "csvTVA": "TVA (€)",
+  "csvMontantTTC": "TTC (€)"
 }
