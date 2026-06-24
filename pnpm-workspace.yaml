@@ -6,6 +6,7 @@ allowBuilds:
   core-js: true
   esbuild: true
   protobufjs: true
+  unrs-resolver: true
 minimumReleaseAgeExclude:
   - pnpm@11.8.0
 overrides:

@@ -1,4 +1,5 @@
 import tseslint from "typescript-eslint";
+import importX from "eslint-plugin-import-x";
 import commentsJsdocOnly from "./eslint/comments-jsdoc-only.mjs";
 import moduleLayerStructure from "./eslint/module-layer-structure.mjs";
 import moduleLayerImports from "./eslint/module-layer-imports.mjs";
@@ -7,6 +8,7 @@ import moduleCompleteness from "./eslint/module-completeness.mjs";
 export default tseslint.config({
   plugins: {
     "@typescript-eslint": tseslint.plugin,
+    "import-x": importX,
     local: {
       rules: {
         "comments-jsdoc-only": commentsJsdocOnly,
@@ -43,5 +45,6 @@ export default tseslint.config({
     "@typescript-eslint/no-floating-promises": "error",
     "@typescript-eslint/no-misused-promises": "error",
     "@typescript-eslint/promise-function-async": "warn",
+    "import-x/no-cycle": ["warn", { maxDepth: 5 }],
   },
 });

@@ -1,5 +1,7 @@
 import tseslint from "typescript-eslint";
 import i18next from "eslint-plugin-i18next";
+import reactHooks from "eslint-plugin-react-hooks";
+import importX from "eslint-plugin-import-x";
 import commentsJsdocOnly from "./eslint/comments-jsdoc-only.mjs";
 import kebabFilename from "./eslint/kebab-filename.mjs";
 import noTrpcInUi from "./eslint/no-trpc-in-ui.mjs";
@@ -16,6 +18,8 @@ export default tseslint.config(
       "@typescript-eslint": tseslint.plugin,
       local: { rules: { "kebab-filename": kebabFilename, "no-trpc-in-ui": noTrpcInUi, "comments-jsdoc-only": commentsJsdocOnly } },
       i18next,
+      "react-hooks": reactHooks,
+      "import-x": importX,
     },
     rules: {
       "local/kebab-filename": "error",
@@ -45,6 +49,9 @@ export default tseslint.config(
       "@typescript-eslint/no-non-null-assertion": "error",
       "@typescript-eslint/consistent-type-imports": ["error", { prefer: "type-imports", fixStyle: "inline-type-imports" }],
       "@typescript-eslint/require-await": "error",
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
+      "import-x/no-cycle": ["warn", { maxDepth: 5 }],
     },
   },
   {
