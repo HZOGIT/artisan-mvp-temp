@@ -6,9 +6,9 @@
  * `devis_lignes`).
  * 
  * Invariants (étapes ultérieures) : isolation cross-tenant (modèle + lignes via parent) ; artisanId
- * forcé ; validation (nom non vide ; lignes : designation non vide, quantite/prix ≥ 0, tauxTVA &
- * remise ∈ [0,100]) ; ⚠️ `isDefault` unique par artisan (au plus un modèle par défaut, sans
- * dimension type) ; lignes toujours scopées via l'appartenance du modèle parent au tenant.
+ * forcé ; validation (nom non vide ; lignes : designation non vide, quantite/prix ≥ 0, tauxTVA ∈
+ * [0,100]) ; ⚠️ `isDefault` unique par artisan (au plus un modèle par défaut, sans dimension type) ;
+ * lignes toujours scopées via l'appartenance du modèle parent au tenant.
  */
 
 export interface ModeleDevisLigne {
@@ -22,7 +22,6 @@ export interface ModeleDevisLigne {
   readonly unite: string;
   readonly prixUnitaireHT: string;
   readonly tauxTVA: string;
-  readonly remise: string;
   readonly ordre: number;
 }
 
@@ -40,7 +39,7 @@ export interface ModeleDevis {
 
 /*
  * Entrée de ligne (création/remplacement). Les défauts PG (unite "unité", quantite "1.00",
- * prix "0.00", tauxTVA "20.00", remise "0.00", ordre 1) sont posés par l'infra si absents.
+ * prix "0.00", tauxTVA "20.00", ordre 1) sont posés par l'infra si absents.
  */
 export interface CreateModeleDevisLigneInput {
   readonly articleId?: number | null;
@@ -50,7 +49,6 @@ export interface CreateModeleDevisLigneInput {
   readonly unite?: string;
   readonly prixUnitaireHT?: string;
   readonly tauxTVA?: string;
-  readonly remise?: string;
   readonly ordre?: number;
 }
 

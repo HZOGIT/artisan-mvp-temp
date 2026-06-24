@@ -208,7 +208,7 @@ export function createDevisRouter(
       .input(z.object({ nom: z.string().min(1).max(255), description: z.string().max(2000).optional(), notes: z.string().max(5000).optional() }))
       .mutation(({ ctx, input }) => creerModeleDevis(modeleRepo, ctx.tenant, input)),
 
-    /** Le client envoie des NOMBRES (quantite/prix/TVA/remise) ; le domaine attend des décimaux string. */
+    /** Le client envoie des NOMBRES (quantite/prix/TVA) ; le domaine attend des décimaux string. */
     addLigneToModele: protectedProcedure
       .input(
         z.object({
@@ -220,7 +220,6 @@ export function createDevisRouter(
           unite: z.string().max(20).default("unité"),
           prixUnitaireHT: z.number().default(0),
           tauxTVA: z.number().min(0).max(100).default(20),
-          remise: z.number().min(0).max(100).optional(),
         }),
       )
       .mutation(({ ctx, input }) =>
@@ -232,7 +231,6 @@ export function createDevisRouter(
           unite: input.unite,
           prixUnitaireHT: String(input.prixUnitaireHT),
           tauxTVA: String(input.tauxTVA),
-          remise: input.remise !== undefined ? String(input.remise) : undefined,
         }),
       ),
 

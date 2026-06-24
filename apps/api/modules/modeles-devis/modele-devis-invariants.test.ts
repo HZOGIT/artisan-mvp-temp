@@ -29,14 +29,13 @@ describe("modeles-devis — invariants métier (synthèse)", () => {
     expect(m.artisanId).toBe(1);
   });
 
-  it("INV-3 : validation — nom non vide ; lignes designation/quantite/prix/tauxTVA/remise", async () => {
+  it("INV-3 : validation — nom non vide ; lignes designation/quantite/prix/tauxTVA", async () => {
     const repo = new FakeModeleDevisRepository();
     await expect(creerModeleDevis(repo, A, { nom: " " })).rejects.toBeInstanceOf(ValidationError);
     await expect(creerModeleDevis(repo, A, { nom: "T", lignes: [ligne({ designation: "" })] })).rejects.toBeInstanceOf(ValidationError);
     await expect(creerModeleDevis(repo, A, { nom: "T", lignes: [ligne({ quantite: "-1" })] })).rejects.toBeInstanceOf(ValidationError);
     await expect(creerModeleDevis(repo, A, { nom: "T", lignes: [ligne({ prixUnitaireHT: "-2" })] })).rejects.toBeInstanceOf(ValidationError);
     await expect(creerModeleDevis(repo, A, { nom: "T", lignes: [ligne({ tauxTVA: "120" })] })).rejects.toBeInstanceOf(ValidationError);
-    await expect(creerModeleDevis(repo, A, { nom: "T", lignes: [ligne({ remise: "-5" })] })).rejects.toBeInstanceOf(ValidationError);
   });
 
   it("INV-4 : remplacement des lignes — update avec lignes remplace ; sans lignes conserve", async () => {

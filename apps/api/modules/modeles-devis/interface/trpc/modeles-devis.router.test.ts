@@ -82,12 +82,11 @@ describe.skipIf(!URL)("modelesDevis.router e2e (HTTP → tRPC → use-case → r
     expect(list.every((m) => m.lignes.length === 0)).toBe(true);
   });
 
-  it("validations → 400 : nom vide ; ligne designation vide ; tauxTVA/remise hors [0,100]", async () => {
+  it("validations → 400 : nom vide ; ligne designation vide ; tauxTVA hors [0,100]", async () => {
     const tA = await token(UA);
     expect((await mut(server, "modelesDevis.create", { nom: "" }, tA)).statusCode).toBe(400);
     expect((await mut(server, "modelesDevis.create", { nom: nom(), lignes: [ligne({ designation: "" })] }, tA)).statusCode).toBe(400);
     expect((await mut(server, "modelesDevis.create", { nom: nom(), lignes: [ligne({ tauxTVA: "150.00" })] }, tA)).statusCode).toBe(400);
-    expect((await mut(server, "modelesDevis.create", { nom: nom(), lignes: [ligne({ remise: "150.00" })] }, tA)).statusCode).toBe(400);
   });
 
   it("isolation cross-tenant : B ne voit/modifie/supprime pas le modèle de A", async () => {

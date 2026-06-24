@@ -385,7 +385,6 @@ export const devisOptionsLignes = pgTable("devis_options_lignes", {
   unite: varchar("unite", { length: 20 }).default("unité"),
   prixUnitaireHT: numeric("prixUnitaireHT", { precision: 10, scale: 2 }).default("0.00"),
   tauxTVA: numeric("tauxTVA", { precision: 5, scale: 2 }).default("20.00"),
-  remise: numeric("remise", { precision: 5, scale: 2 }).default("0.00"),
   montantHT: numeric("montantHT", { precision: 10, scale: 2 }).default("0.00"),
   montantTVA: numeric("montantTVA", { precision: 10, scale: 2 }).default("0.00"),
   montantTTC: numeric("montantTTC", { precision: 10, scale: 2 }).default("0.00"),
@@ -419,7 +418,6 @@ export const modelesDevisLignes = pgTable("modeles_devis_lignes", {
   unite: varchar("unite", { length: 20 }).default("unité"),
   prixUnitaireHT: numeric("prixUnitaireHT", { precision: 10, scale: 2 }).default("0.00"),
   tauxTVA: numeric("tauxTVA", { precision: 5, scale: 2 }).default("20.00"),
-  remise: numeric("remise", { precision: 5, scale: 2 }).default("0.00"),
   ordre: integer("ordre").default(1),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });

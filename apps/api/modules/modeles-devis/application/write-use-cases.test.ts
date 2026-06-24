@@ -20,14 +20,13 @@ describe("modeles-devis — write use-cases", () => {
     expect(m.artisanId).toBe(1);
   });
 
-  it("validation des lignes : designation non vide, quantite/prix ≥ 0, tauxTVA & remise ∈ [0,100]", async () => {
+  it("validation des lignes : designation non vide, quantite/prix ≥ 0, tauxTVA ∈ [0,100]", async () => {
     const repo = new FakeModeleDevisRepository();
     await expect(creerModeleDevis(repo, A, { nom: "T", lignes: [ligne({ designation: "" })] })).rejects.toBeInstanceOf(ValidationError);
     await expect(creerModeleDevis(repo, A, { nom: "T", lignes: [ligne({ quantite: "-1" })] })).rejects.toBeInstanceOf(ValidationError);
     await expect(creerModeleDevis(repo, A, { nom: "T", lignes: [ligne({ prixUnitaireHT: "-5" })] })).rejects.toBeInstanceOf(ValidationError);
     await expect(creerModeleDevis(repo, A, { nom: "T", lignes: [ligne({ tauxTVA: "101" })] })).rejects.toBeInstanceOf(ValidationError);
-    await expect(creerModeleDevis(repo, A, { nom: "T", lignes: [ligne({ remise: "150" })] })).rejects.toBeInstanceOf(ValidationError);
-    const ok = await creerModeleDevis(repo, A, { nom: "T", lignes: [ligne({ tauxTVA: "5.5", remise: "10" })] });
+    const ok = await creerModeleDevis(repo, A, { nom: "T", lignes: [ligne({ tauxTVA: "5.5" })] });
     expect(ok.lignes).toHaveLength(1);
   });
 
