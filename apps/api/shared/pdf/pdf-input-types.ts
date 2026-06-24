@@ -15,6 +15,7 @@ export interface DevisLigne {
   prixUnitaireHT?: any;
   prixUnitaire?: any;
   tauxTVA?: any;
+  tvaCategorieId?: any;
   montantHT?: any;
   montantTVA?: any;
   type?: any;

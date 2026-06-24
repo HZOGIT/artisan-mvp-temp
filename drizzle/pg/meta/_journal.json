@@ -120,6 +120,20 @@
       "when": 1782298033924,
       "tag": "0016_drop-remise-orpheline",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1782309949196,
+      "tag": "0017_organic_scorpion",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1782309956058,
+      "tag": "0018_tva-categories-extras",
+      "breakpoints": true
     }
   ]
 }

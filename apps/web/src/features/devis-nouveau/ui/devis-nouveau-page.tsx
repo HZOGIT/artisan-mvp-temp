@@ -6,8 +6,11 @@ import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Textarea } from "@/shared/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { useDevisNouveau, useModeleLoader, searchArticlesRest } from "../application/use-devis-nouveau";
 import { emptyLigne, formatCurrency, totals, moveLine, ligneFromArticle, iaToLignes, iaTotals, buildCreatePayload, buildAddLignePayload, buildModeleLignePayload, type LigneDevis, type ArticleSearchResult, type IAProposition } from "../domain/devis-nouveau";
+import { TVA_CATEGORIES } from "@/shared/tva/taux-tva-fr";
+import type { TvaCategorieId } from "@/shared/tva/taux-tva-fr";
 
 /*
  * Page `/devis/nouveau` — migration clean-archi de `pages/DevisNouveauPage.tsx`. Markup à l'identique.
@@ -72,7 +75,17 @@ export default function DevisNouveauPage() {
     try {
       const data = await loadModele(modeleId);
       if (data?.lignes) {
-        setLignes((ls) => [...ls, ...data.lignes.map((l) => ({ ...emptyLigne(), description: l.designation, quantite: parseFloat(String(l.quantite)), prixUnitaireHT: parseFloat(String(l.prixUnitaireHT)), tauxTVA: parseFloat(String(l.tauxTVA)), unite: l.unite || "unité" }))]);
+        setLignes((ls) => {
+          const tauxToId = (t: string | number | null | undefined): TvaCategorieId => {
+            const n = parseFloat(String(t ?? "0"));
+            if (n >= 20) return "FR_20";
+            if (n >= 10) return "FR_10";
+            if (n >= 5.5) return "FR_5_5";
+            if (n >= 2.1) return "FR_2_1";
+            return "FR_EXONERE";
+          };
+          return [...ls, ...data.lignes.map((l) => ({ ...emptyLigne(), description: l.designation, quantite: parseFloat(String(l.quantite)), prixUnitaireHT: parseFloat(String(l.prixUnitaireHT)), tvaCategorieId: tauxToId(l.tauxTVA), unite: l.unite || "unité" }))];
+        });
         setSelectedModeleId(null); toast.success(t("toastModeleCharge"));
       }
     } catch { toast.error(t("errModeleCharge")); }
@@ -198,7 +211,7 @@ export default function DevisNouveauPage() {
                     <div><Label className="text-xs font-medium mb-1 block">{t("quantite")}</Label><Input type="number" value={ligne.quantite} onChange={(e) => setLigne(ligne.id, "quantite", parseFloat(e.target.value) || 0)} min="0.01" step="0.01" /></div>
                     <div><Label className="text-xs font-medium mb-1 block">{t("unite")}</Label><Input value={ligne.unite} onChange={(e) => setLigne(ligne.id, "unite", e.target.value)} placeholder="unité" /></div>
                     <div><Label className="text-xs font-medium mb-1 block">{t("prixHT")}</Label><Input type="number" value={ligne.prixUnitaireHT} onChange={(e) => setLigne(ligne.id, "prixUnitaireHT", parseFloat(e.target.value) || 0)} min="0" step="0.01" /></div>
-                    <div><Label className="text-xs font-medium mb-1 block">{t("tvaPct")}</Label><Input type="number" value={ligne.tauxTVA} onChange={(e) => setLigne(ligne.id, "tauxTVA", parseFloat(e.target.value) || 20)} min="0" step="0.01" /></div>
+                    <div><Label className="text-xs font-medium mb-1 block">{t("tvaPct")}</Label><Select value={ligne.tvaCategorieId} onValueChange={(v) => setLigne(ligne.id, "tvaCategorieId", v as TvaCategorieId)}><SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger><SelectContent>{TVA_CATEGORIES.map((c) => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}</SelectContent></Select></div>
                     <div><Label className="text-xs font-medium mb-1 block">{t("totalHTcol")}</Label><div className="px-3 py-2 bg-gray-100 rounded-md text-sm font-medium">{formatCurrency(ligne.quantite * ligne.prixUnitaireHT)}</div></div>
                   </div>
                 </div>

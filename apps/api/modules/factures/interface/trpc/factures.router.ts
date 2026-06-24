@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import { TVA_CATEGORIES_MAP } from "../../../../shared/tva/taux-tva-fr";
 import type { IFactureRepository } from "../../application/facture-repository";
 import type { IDevisReader } from "../../application/devis-reader";
 import type { ComptaPort } from "../../application/compta-port";
@@ -24,6 +25,7 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format A
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
 const ligneTypeEnum = z.enum(["produit", "section", "note"]);
 const typeDocumentEnum = z.enum(["facture", "avoir"]);
+const tvaCategorieEnum = z.enum(["FR_20", "FR_10", "FR_5_5", "FR_2_1", "FR_FRANCHISE", "FR_EXONERE", "FR_AUTO"]);
 
 /** `dateEcheance` arrive en string ISO (transport) ; le domaine attend une `Date | null`. */
 function toDate(v: string | null | undefined): Date | null | undefined {
@@ -64,7 +66,7 @@ const ligneCreateSchema = z.object({
   prixUnitaireHT: decimal,
   quantite: decimal.optional(),
   unite: z.string().max(20).optional(),
-  tauxTVA: decimal.optional(),
+  tvaCategorieId: tvaCategorieEnum.optional(),
   reference: z.string().max(50).nullish(),
   description: z.string().max(5000).nullish(),
   ordre: z.number().int().optional(),
@@ -76,7 +78,7 @@ const ligneUpdateSchema = z.object({
   prixUnitaireHT: decimal.optional(),
   quantite: decimal.optional(),
   unite: z.string().max(20).optional(),
-  tauxTVA: decimal.optional(),
+  tvaCategorieId: tvaCategorieEnum.optional(),
   reference: z.string().max(50).nullish(),
   description: z.string().max(5000).nullish(),
   ordre: z.number().int().optional(),
@@ -94,7 +96,7 @@ const avoirInputSchema = z.object({
         designation: z.string().min(1).max(500),
         quantite: decimal,
         prixUnitaireHT: decimal,
-        tauxTVA: decimal.optional(),
+        tvaCategorieId: tvaCategorieEnum.optional(),
         unite: z.string().max(20).nullish(),
         description: z.string().max(5000).nullish(),
       }),
@@ -159,15 +161,18 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
     addLigne: protectedProcedure
       .input(z.object({ factureId: z.number().int() }).and(ligneCreateSchema))
       .mutation(({ ctx, input }) => {
-        const { factureId, ...data } = input;
-        return ajouterLigneFacture(repo, ctx.tenant, factureId, data);
+        const { factureId, tvaCategorieId, ...data } = input;
+        const categorieId = tvaCategorieId ?? "FR_20";
+        const tauxTVA = TVA_CATEGORIES_MAP[categorieId].taux;
+        return ajouterLigneFacture(repo, ctx.tenant, factureId, { ...data, tauxTVA, tvaCategorieId: categorieId });
       }),
 
     updateLigne: protectedProcedure
       .input(z.object({ id: z.number().int(), factureId: z.number().int() }).and(ligneUpdateSchema))
       .mutation(({ ctx, input }) => {
-        const { id, factureId, ...data } = input;
-        return modifierLigneFacture(repo, ctx.tenant, factureId, id, data);
+        const { id, factureId, tvaCategorieId, ...data } = input;
+        const tauxTVA = tvaCategorieId ? TVA_CATEGORIES_MAP[tvaCategorieId].taux : undefined;
+        return modifierLigneFacture(repo, ctx.tenant, factureId, id, { ...data, ...(tauxTVA !== undefined && { tauxTVA }), ...(tvaCategorieId !== undefined && { tvaCategorieId }) });
       }),
 
     deleteLigne: protectedProcedure

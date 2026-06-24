@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { router, protectedProcedure, permissionProcedure } from "../../../../interface/trpc/trpc";
+import { TVA_CATEGORIES_MAP } from "../../../../shared/tva/taux-tva-fr";
 /** Permissions (parité legacy) : actions sur lignes/envoi/duplication = `devis.creer` ; conversion en facture = `factures.creer`. */
 const devisCreer = permissionProcedure("devis.creer");
 const facturesCreer = permissionProcedure("factures.creer");
@@ -29,6 +30,7 @@ import {
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
 const ligneTypeEnum = z.enum(["produit", "section", "note"]);
+const tvaCategorieEnum = z.enum(["FR_20", "FR_10", "FR_5_5", "FR_2_1", "FR_FRANCHISE", "FR_EXONERE", "FR_AUTO"]);
 
 /*
  * `dateValidite` arrive en string ISO (transport) ; le domaine attend une `Date | null`.
@@ -70,7 +72,7 @@ const ligneCreateSchema = z.object({
   prixUnitaireHT: decimal,
   quantite: decimal.optional(),
   unite: z.string().max(20).optional(),
-  tauxTVA: decimal.optional(),
+  tvaCategorieId: tvaCategorieEnum.optional(),
   reference: z.string().max(50).nullish(),
   description: z.string().max(5000).nullish(),
   ordre: z.number().int().optional(),
@@ -82,7 +84,7 @@ const ligneUpdateSchema = z.object({
   prixUnitaireHT: decimal.optional(),
   quantite: decimal.optional(),
   unite: z.string().max(20).optional(),
-  tauxTVA: decimal.optional(),
+  tvaCategorieId: tvaCategorieEnum.optional(),
   reference: z.string().max(50).nullish(),
   description: z.string().max(5000).nullish(),
   ordre: z.number().int().optional(),
@@ -150,15 +152,18 @@ export function createDevisRouter(
     addLigne: devisCreer
       .input(z.object({ devisId: z.number().int() }).and(ligneCreateSchema))
       .mutation(({ ctx, input }) => {
-        const { devisId, ...data } = input;
-        return ajouterLigneDevis(repo, ctx.tenant, devisId, data);
+        const { devisId, tvaCategorieId, ...data } = input;
+        const categorieId = tvaCategorieId ?? "FR_20";
+        const tauxTVA = TVA_CATEGORIES_MAP[categorieId].taux;
+        return ajouterLigneDevis(repo, ctx.tenant, devisId, { ...data, tauxTVA, tvaCategorieId: categorieId });
       }),
 
     updateLigne: devisCreer
       .input(z.object({ id: z.number().int(), devisId: z.number().int() }).and(ligneUpdateSchema))
       .mutation(({ ctx, input }) => {
-        const { id, devisId, ...data } = input;
-        return modifierLigneDevis(repo, ctx.tenant, devisId, id, data);
+        const { id, devisId, tvaCategorieId, ...data } = input;
+        const tauxTVA = tvaCategorieId ? TVA_CATEGORIES_MAP[tvaCategorieId].taux : undefined;
+        return modifierLigneDevis(repo, ctx.tenant, devisId, id, { ...data, ...(tauxTVA !== undefined && { tauxTVA }), ...(tvaCategorieId !== undefined && { tvaCategorieId }) });
       }),
 
     deleteLigne: devisCreer

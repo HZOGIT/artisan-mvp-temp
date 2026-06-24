@@ -94,6 +94,7 @@ export interface AvoirLigneData {
   /** négatif */
   readonly prixUnitaireHT: string;
   readonly tauxTVA: string;
+  readonly tvaCategorieId?: string | null;
   /** négatif */
   readonly montantHT: string;
   /** négatif */
@@ -112,6 +113,7 @@ export interface CopiedLigneData {
   readonly unite: string;
   readonly prixUnitaireHT: string;
   readonly tauxTVA: string;
+  readonly tvaCategorieId?: string | null;
   readonly montantHT: string;
   readonly montantTVA: string;
   readonly montantTTC: string;

@@ -3,6 +3,8 @@ import autoTable from "jspdf-autotable";
 /** Types d entree structurels (./pdf-input-types) - generateur jsPDF internalise dans le new-stack. */
 import type { Devis, DevisLigne, Facture, FactureLigne, Artisan, Client, ContratMaintenance, CommandeFournisseur, LigneCommandeFournisseur, Fournisseur } from "./pdf-input-types";
 import { ROBOTO_REGULAR, ROBOTO_BOLD } from "./fonts";
+import { TVA_CATEGORIES_MAP } from "../tva/taux-tva-fr";
+import type { TvaCategorieId } from "../tva/taux-tva-fr";
 
 /*
  * ============================================================================
@@ -619,11 +621,40 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   doc.text("Conditions de paiement : à réception de la facture.", MARGIN, Math.max(totalsEndY + 12, 280));
   doc.text("Devis valable 30 jours à compter de la date d'émission.", MARGIN, Math.max(totalsEndY + 17, 285));
 
+  /** Pied de page standard */
+  doc.setFont("Roboto", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...TEXT_MUTED);
+  doc.text("Conditions de paiement : à réception de la facture.", MARGIN, Math.max(totalsEndY + 12, 280));
+  doc.text("Devis valable 30 jours à compter de la date d'émission.", MARGIN, Math.max(totalsEndY + 17, 285));
+
+  /** Mentions légales TVA (franchise en base, autoliquidation) si applicable */
+  const tvaDevisMentions = Array.from(
+    new Set(
+      devis.lignes
+        .map((l) => l.tvaCategorieId as string | null | undefined)
+        .filter((id): id is string => !!id)
+        .map((id) => TVA_CATEGORIES_MAP[id as TvaCategorieId]?.mentionLegale)
+        .filter((m): m is string => !!m),
+    ),
+  );
+  let devisMentionY = Math.max(totalsEndY + 23, 291);
+  if (tvaDevisMentions.length > 0) {
+    doc.setFontSize(8);
+    doc.setFont("Roboto", "bold");
+    doc.setTextColor(...TEXT_BODY);
+    for (const m of tvaDevisMentions) {
+      doc.text(m, MARGIN, devisMentionY);
+      devisMentionY += 5;
+    }
+    doc.setFont("Roboto", "normal");
+  }
+
   /** OPE-151 — mentions légales émetteur (société : forme/capital/RCS ; RM si renseigné). */
   const mentions = buildMentionsLegalesEmetteur(artisan);
   if (mentions.length > 0) {
     doc.setFontSize(7);
-    let my = Math.max(totalsEndY + 23, 290);
+    let my = devisMentionY;
     for (const m of mentions) {
       doc.text(m, MARGIN, my);
       my += 4;
@@ -853,12 +884,34 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
     fy = fyPenalty + 8;
   }
 
+  /** Mentions légales TVA (franchise en base, autoliquidation) si applicable */
+  const tvaFactureMentions = Array.from(
+    new Set(
+      facture.lignes
+        .map((l) => (l as any).tvaCategorieId as string | null | undefined)
+        .filter((id): id is string => !!id)
+        .map((id) => TVA_CATEGORIES_MAP[id as TvaCategorieId]?.mentionLegale)
+        .filter((m): m is string => !!m),
+    ),
+  );
+  let factureMentionY = fy + 6;
+  if (tvaFactureMentions.length > 0) {
+    doc.setFontSize(8);
+    doc.setFont("Roboto", "bold");
+    doc.setTextColor(...TEXT_BODY);
+    for (const m of tvaFactureMentions) {
+      doc.text(m, MARGIN, factureMentionY);
+      factureMentionY += 5;
+    }
+    doc.setFont("Roboto", "normal");
+    doc.setFontSize(7);
+  }
+
   /** OPE-151 — mentions légales émetteur (forme juridique / capital / RCS / RM). */
   const mentions = buildMentionsLegalesEmetteur(artisan);
-  let my = fy + 6;
   for (const m of mentions) {
-    doc.text(m, MARGIN, my);
-    my += 4;
+    doc.text(m, MARGIN, factureMentionY);
+    factureMentionY += 4;
   }
 
   /** OPE-127 — CGV sur page dédiée (parité PDF client) ; PAS sur un avoir (document d'annulation). */

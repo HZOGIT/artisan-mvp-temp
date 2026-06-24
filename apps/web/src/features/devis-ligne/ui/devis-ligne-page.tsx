@@ -14,6 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { ScrollArea } from "@/shared/ui/scroll-area";
 import { useDevisLigne } from "../application/use-devis-ligne";
 import { defaultLigneForm, formatCurrency, articleDesignation, articlePrix, articleRef, filterArticles, groupByCategorie, lineTotals, formFromArticle, formFromSuggestion, buildAddLignePayload, type LigneForm, type LigneType } from "../domain/devis-ligne";
+import { TVA_CATEGORIES } from "@/shared/tva/taux-tva-fr";
+import type { TvaCategorieId } from "@/shared/tva/taux-tva-fr";
 
 /*
  * Page `/devis/:id/ligne/nouvelle` — migration clean-archi de `pages/DevisLigneEdit.tsx`. Markup à
@@ -219,14 +221,13 @@ export default function DevisLignePage() {
                 </div>
                 <div className="space-y-2"><Label htmlFor="prixUnitaireHT">{t("prixUnitaireHT")}</Label><Input id="prixUnitaireHT" type="number" step="0.01" min="0" value={form.prixUnitaireHT} onChange={(e) => setForm({ ...form, prixUnitaireHT: e.target.value })} placeholder="0.00" required /></div>
                 <div className="space-y-2">
-                  <Label htmlFor="tauxTVA">{t("tauxTVA")}</Label>
-                  <Select value={form.tauxTVA} onValueChange={(value) => setForm({ ...form, tauxTVA: value })}>
+                  <Label htmlFor="tvaCategorieId">{t("tauxTVA")}</Label>
+                  <Select value={form.tvaCategorieId} onValueChange={(value) => setForm({ ...form, tvaCategorieId: value as TvaCategorieId })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="0">0%</SelectItem>
-                      <SelectItem value="5.5">5.5%</SelectItem>
-                      <SelectItem value="10">10%</SelectItem>
-                      <SelectItem value="20">20%</SelectItem>
+                      {TVA_CATEGORIES.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id}>{cat.label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

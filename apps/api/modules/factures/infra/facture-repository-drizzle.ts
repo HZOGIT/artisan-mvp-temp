@@ -72,6 +72,7 @@ function toLigne(r: LigneRow): FactureLigne {
     unite: r.unite ?? "unité",
     prixUnitaireHT: r.prixUnitaireHT,
     tauxTVA: r.tauxTVA ?? "20.00",
+    tvaCategorieId: r.tvaCategorieId ?? null,
     montantHT: r.montantHT ?? "0.00",
     montantTVA: r.montantTVA ?? "0.00",
     montantTTC: r.montantTTC ?? "0.00",
@@ -327,6 +328,7 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
           unite: l.unite ?? "unité",
           prixUnitaireHT: l.prixUnitaireHT,
           tauxTVA: l.tauxTVA,
+          tvaCategorieId: l.tvaCategorieId ?? null,
           montantHT: l.montantHT,
           montantTVA: l.montantTVA,
           montantTTC: l.montantTTC,
@@ -387,6 +389,7 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
           unite: l.unite,
           prixUnitaireHT: l.prixUnitaireHT,
           tauxTVA: l.tauxTVA,
+          tvaCategorieId: l.tvaCategorieId ?? null,
           montantHT: l.montantHT,
           montantTVA: l.montantTVA,
           montantTTC: l.montantTTC,
@@ -450,6 +453,7 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
           unite: isDisplay ? "unité" : input.unite ?? "unité",
           prixUnitaireHT,
           tauxTVA,
+          tvaCategorieId: isDisplay ? null : (input.tvaCategorieId ?? null),
           montantHT: montants.montantHT,
           montantTVA: montants.montantTVA,
           montantTTC: montants.montantTTC,
@@ -487,6 +491,7 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
       if (input.reference !== undefined) set.reference = isDisplay ? null : input.reference;
       if (input.unite !== undefined) set.unite = isDisplay ? "unité" : input.unite;
       if (input.ordre !== undefined) set.ordre = input.ordre;
+      if (input.tvaCategorieId !== undefined) set.tvaCategorieId = isDisplay ? null : input.tvaCategorieId;
 
       const [row] = await tx.update(facturesLignes).set(set).where(eq(facturesLignes.id, ligneId)).returning();
       await this.recalculerTotaux(tx, ligne.factureId);

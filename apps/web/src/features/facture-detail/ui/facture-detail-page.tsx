@@ -16,6 +16,8 @@ import { Badge } from "@/shared/ui/badge";
 import { Textarea } from "@/shared/ui/textarea";
 import { useFactureDetail, searchArticlesRest } from "../application/use-facture-detail";
 import { formatCurrency, isAvoirDoc, avoirSolde, avoirLignesMontantTTC, buildAvoirTotalLignes, pdfLignes, activitesForFacture, pendingCount, allowedNext, statutAction, STATUS_LABEL_KEY, STATUS_COLORS, RAPPEL_TYPE_KEY, type ArticleSearchResult, type AvoirLigneForm, type RappelType } from "../domain/facture-detail";
+import { TVA_CATEGORIES } from "@/shared/tva/taux-tva-fr";
+import type { TvaCategorieId } from "@/shared/tva/taux-tva-fr";
 
 /*
  * Page `/factures/:id` — migration clean-archi de `pages/FactureDetail.tsx` (le plus gros éditeur). Markup
@@ -38,7 +40,7 @@ export default function FactureDetailPage() {
   const [avoirNotes, setAvoirNotes] = useState("");
   const [avoirLignes, setAvoirLignes] = useState<AvoirLigneForm[]>([]);
   const [paymentData, setPaymentData] = useState({ montantPaye: "", datePaiement: format(new Date(), "yyyy-MM-dd") });
-  const [lineForm, setLineForm] = useState({ reference: "", designation: "", description: "", quantite: "1", unite: "unité", prixUnitaireHT: "", tauxTVA: "20.00" });
+  const [lineForm, setLineForm] = useState({ reference: "", designation: "", description: "", quantite: "1", unite: "unité", prixUnitaireHT: "", tvaCategorieId: "FR_20" as TvaCategorieId });
   const [searchResults, setSearchResults] = useState<ArticleSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -62,7 +64,7 @@ export default function FactureDetailPage() {
   }, []);
 
   const goList = () => { window.location.href = "/factures"; };
-  const resetLineForm = () => setLineForm({ reference: "", designation: "", description: "", quantite: "1", unite: "unité", prixUnitaireHT: "", tauxTVA: "20.00" });
+  const resetLineForm = () => setLineForm({ reference: "", designation: "", description: "", quantite: "1", unite: "unité", prixUnitaireHT: "", tvaCategorieId: "FR_20" as TvaCategorieId });
 
   const handleStatusChange = (newStatus: string) => {
     const onOk = () => { inv(); toast.success(t("toastStatut")); };
@@ -217,7 +219,7 @@ export default function FactureDetailPage() {
                           <Button variant="ghost" size="icon" onClick={() => setAvoirLignes(avoirLignes.filter((_, i) => i !== idx))}><Trash2 className="h-4 w-4 text-red-500" /></Button>
                         </div>
                       ))}
-                      <Button type="button" variant="outline" size="sm" onClick={() => setAvoirLignes([...avoirLignes, { designation: "", quantite: "1", prixUnitaireHT: "", tauxTVA: "20.00", unite: "unité" }])}><Plus className="h-4 w-4 mr-1" />{t("ajouterLigne")}</Button>
+                      <Button type="button" variant="outline" size="sm" onClick={() => setAvoirLignes([...avoirLignes, { designation: "", quantite: "1", prixUnitaireHT: "", tvaCategorieId: "FR_20" as TvaCategorieId, unite: "unité" }])}><Plus className="h-4 w-4 mr-1" />{t("ajouterLigne")}</Button>
                     </div>
                   )}
                   {avoirType === "partiel" && avoirLignes.length > 0 && (
@@ -273,7 +275,7 @@ export default function FactureDetailPage() {
                         {showDropdown && searchResults.length > 0 && (
                           <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
                             {searchResults.map((article) => (
-                              <button key={article.id} type="button" onClick={() => { setLineForm({ ...lineForm, designation: article.nom, description: article.description || "", prixUnitaireHT: article.prix_base, unite: article.unite || "unité", tauxTVA: article.tauxTVA != null && article.tauxTVA !== "" ? String(parseFloat(article.tauxTVA)) : lineForm.tauxTVA }); setShowDropdown(false); toast.success(t("articleSelectionne", { nom: article.nom })); }} className="w-full text-left px-4 py-2.5 hover:bg-blue-50 border-b last:border-b-0 transition-colors">
+                              <button key={article.id} type="button" onClick={() => { const n2 = article.tauxTVA != null && article.tauxTVA !== "" ? parseFloat(article.tauxTVA) : null; const cat: TvaCategorieId = n2 != null ? (n2 >= 20 ? "FR_20" : n2 >= 10 ? "FR_10" : n2 >= 5.5 ? "FR_5_5" : n2 >= 2.1 ? "FR_2_1" : "FR_EXONERE") : lineForm.tvaCategorieId; setLineForm({ ...lineForm, designation: article.nom, description: article.description || "", prixUnitaireHT: article.prix_base, unite: article.unite || "unité", tvaCategorieId: cat }); setShowDropdown(false); toast.success(t("articleSelectionne", { nom: article.nom })); }} className="w-full text-left px-4 py-2.5 hover:bg-blue-50 border-b last:border-b-0 transition-colors">
                                 <div className="font-medium text-sm">{article.nom}</div>
                                 <div className="text-xs text-gray-500">{formatCurrency(article.prix_base)} / {article.unite}<span className="ml-2 text-gray-400">{article.categorie}</span></div>
                               </button>
@@ -286,7 +288,7 @@ export default function FactureDetailPage() {
                         <div className="space-y-2"><Label htmlFor="quantite">{t("quantite")}</Label><Input id="quantite" type="number" step="0.01" value={lineForm.quantite} onChange={(e) => setLineForm({ ...lineForm, quantite: e.target.value })} /></div>
                         <div className="space-y-2"><Label htmlFor="unite">{t("unite")}</Label><Input id="unite" value={lineForm.unite} onChange={(e) => setLineForm({ ...lineForm, unite: e.target.value })} /></div>
                         <div className="space-y-2"><Label htmlFor="prixUnitaireHT">{t("prixHTReq")}</Label><Input id="prixUnitaireHT" type="number" step="0.01" value={lineForm.prixUnitaireHT} onChange={(e) => setLineForm({ ...lineForm, prixUnitaireHT: e.target.value })} required /></div>
-                        <div className="space-y-2"><Label htmlFor="tauxTVA">{t("tvaPct")}</Label><Input id="tauxTVA" type="number" step="0.01" value={lineForm.tauxTVA} onChange={(e) => setLineForm({ ...lineForm, tauxTVA: e.target.value })} /></div>
+                        <div className="space-y-2"><Label htmlFor="tvaCategorieId">{t("tvaPct")}</Label><Select value={lineForm.tvaCategorieId} onValueChange={(v) => setLineForm({ ...lineForm, tvaCategorieId: v as TvaCategorieId })}><SelectTrigger id="tvaCategorieId"><SelectValue /></SelectTrigger><SelectContent>{TVA_CATEGORIES.map((c) => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}</SelectContent></Select></div>
                       </div>
                     </div>
                     <DialogFooter><Button type="button" variant="outline" onClick={() => setIsAddLineDialogOpen(false)}>{t("annuler")}</Button><Button type="submit" disabled={F.addLigne.isPending}>{F.addLigne.isPending ? t("ajout") : t("ajouter")}</Button></DialogFooter>

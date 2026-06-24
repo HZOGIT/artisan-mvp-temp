@@ -1,5 +1,6 @@
 import { ConflictError, NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
+import { TVA_CATEGORIES_MAP } from "../../../shared/tva/taux-tva-fr";
 import type { IFactureRepository, AvoirLigneData, CopiedLigneData } from "./facture-repository";
 import type { IDevisReader } from "./devis-reader";
 import type { ComptaPort } from "./compta-port";
@@ -230,6 +231,7 @@ export type CreerAvoirInput = {
     readonly quantite: string;
     readonly prixUnitaireHT: string;
     readonly tauxTVA?: string;
+    readonly tvaCategorieId?: string;
     readonly unite?: string | null;
     readonly description?: string | null;
   }[];
@@ -261,14 +263,17 @@ export async function creerAvoir(
   /** Lignes d'avoir à montants négatifs. */
   const lignes: AvoirLigneData[] = input.lignes.map((l) => {
     assertLigneValide(l.designation, l.prixUnitaireHT, l.quantite);
-    const m = calculerMontantsAvoirLigne(l.quantite, l.prixUnitaireHT, l.tauxTVA ?? "20.00");
+    const categorieId = l.tvaCategorieId ?? null;
+    const tauxTVA = categorieId ? (TVA_CATEGORIES_MAP[categorieId as keyof typeof TVA_CATEGORIES_MAP]?.taux ?? "20.00") : (l.tauxTVA ?? "20.00");
+    const m = calculerMontantsAvoirLigne(l.quantite, l.prixUnitaireHT, tauxTVA);
     return {
       designation: l.designation,
       description: l.description ?? null,
       quantite: String(Math.abs(Number(l.quantite) || 0)),
       unite: l.unite ?? null,
       prixUnitaireHT: m.prixUnitaireHT,
-      tauxTVA: l.tauxTVA ?? "20.00",
+      tauxTVA,
+      tvaCategorieId: categorieId,
       montantHT: m.montantHT,
       montantTVA: m.montantTVA,
       montantTTC: m.montantTTC,
@@ -346,6 +351,7 @@ export async function convertirDevisEnFacture(
     unite: l.unite,
     prixUnitaireHT: l.prixUnitaireHT,
     tauxTVA: l.tauxTVA,
+    tvaCategorieId: l.tvaCategorieId ?? null,
     montantHT: l.montantHT,
     montantTVA: l.montantTVA,
     montantTTC: l.montantTTC,

@@ -97,6 +97,7 @@ export const artisans = pgTable("artisans", {
   metier: varchar("metier", { length: 100 }),
   plan: varchar("plan", { length: 20 }).default("essentiel"),
   onboardingCompleted: boolean("onboarding_completed").default(false),
+  franchiseTVA: boolean("franchiseTVA").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
 });
@@ -159,6 +160,20 @@ export const factureStatutEnum = pgEnum("facture_statut", ["brouillon", "validee
 export const factureTypeDocumentEnum = pgEnum("facture_type_document", ["facture", "avoir"]);
 export const delaiPaiementTypeEnum = pgEnum("delai_paiement_type", ["net", "fin_de_mois"]);
 export const signatureStatutEnum = pgEnum("signature_statut", ["en_attente", "accepte", "refuse"]);
+
+// ── TVA CATEGORIES ─────────────────────────────────────────────────────────
+export const tvaCategories = pgTable("tva_categories", {
+  id: varchar("id", { length: 30 }).primaryKey(),
+  taux: numeric("taux", { precision: 5, scale: 2 }).notNull(),
+  label: varchar("label", { length: 100 }).notNull(),
+  mentionLegale: text("mention_legale"),
+  codeFacturX: varchar("code_facturx", { length: 5 }),
+  compteCollecte: varchar("compte_collecte", { length: 10 }),
+  ordre: integer("ordre").default(0).notNull(),
+  actif: boolean("actif").default(true).notNull(),
+});
+export type TvaCategorie = typeof tvaCategories.$inferSelect;
+export type InsertTvaCategorie = typeof tvaCategories.$inferInsert;
 
 // ── BIBLIOTHEQUE ARTICLES ────────────────────────────────────────────────────
 export const bibliothequeArticles = pgTable("bibliotheque_articles", {
@@ -249,6 +264,7 @@ export const devisLignes = pgTable("devis_lignes", {
   montantTVA: numeric("montantTVA", { precision: 10, scale: 2 }).default("0.00"),
   montantTTC: numeric("montantTTC", { precision: 10, scale: 2 }).default("0.00"),
   type: ligneTypeEnum("type").default("produit"),
+  tvaCategorieId: varchar("tvaCategorieId", { length: 30 }).references(() => tvaCategories.id),
 });
 export type DevisLigne = typeof devisLignes.$inferSelect;
 export type InsertDevisLigne = typeof devisLignes.$inferInsert;
@@ -298,6 +314,7 @@ export const facturesLignes = pgTable("factures_lignes", {
   montantTVA: numeric("montantTVA", { precision: 10, scale: 2 }).default("0.00"),
   montantTTC: numeric("montantTTC", { precision: 10, scale: 2 }).default("0.00"),
   type: ligneTypeEnum("type").default("produit"),
+  tvaCategorieId: varchar("tvaCategorieId", { length: 30 }).references(() => tvaCategories.id),
 });
 export type FactureLigne = typeof facturesLignes.$inferSelect;
 export type InsertFactureLigne = typeof facturesLignes.$inferInsert;

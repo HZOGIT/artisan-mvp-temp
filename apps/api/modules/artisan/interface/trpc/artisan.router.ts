@@ -30,6 +30,7 @@ const updateSchema = z.object({
   logo: z.string().max(3_000_000).optional(),
   slug: z.string().max(100).optional(),
   metier: z.string().max(50).optional(),
+  franchiseTVA: z.boolean().optional(),
 });
 
 /*

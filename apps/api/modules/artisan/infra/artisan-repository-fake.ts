@@ -15,7 +15,7 @@ export class FakeArtisanRepository implements IArtisanRepository {
       userId: null, siret: null, nomEntreprise: null, adresse: null, codePostal: null, ville: null,
       telephone: null, email: null, specialite: null, tauxTVA: null, numeroTVA: null, iban: null,
       codeAPE: null, formeJuridique: null, capitalSocial: null, villeRCS: null, numeroRM: null,
-      logo: null, slug: null, metier: null, plan: null, onboardingCompleted: null,
+      logo: null, slug: null, metier: null, plan: null, onboardingCompleted: null, franchiseTVA: false,
       createdAt: now, updatedAt: now, ...over,
     };
     this.profiles = this.profiles.filter((x) => x.id !== p.id).concat(p);

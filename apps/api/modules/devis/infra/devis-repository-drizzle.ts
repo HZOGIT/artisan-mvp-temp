@@ -51,6 +51,7 @@ function toLigne(r: LigneRow): DevisLigne {
     unite: r.unite ?? "unité",
     prixUnitaireHT: r.prixUnitaireHT,
     tauxTVA: r.tauxTVA ?? "20.00",
+    tvaCategorieId: r.tvaCategorieId ?? null,
     montantHT: r.montantHT ?? "0.00",
     montantTVA: r.montantTVA ?? "0.00",
     montantTTC: r.montantTTC ?? "0.00",
@@ -241,6 +242,7 @@ export class DevisRepositoryDrizzle implements IDevisRepository {
           unite: isDisplay ? "unité" : input.unite ?? "unité",
           prixUnitaireHT,
           tauxTVA,
+          tvaCategorieId: isDisplay ? null : (input.tvaCategorieId ?? null),
           montantHT: montants.montantHT,
           montantTVA: montants.montantTVA,
           montantTTC: montants.montantTTC,
@@ -279,6 +281,7 @@ export class DevisRepositoryDrizzle implements IDevisRepository {
       if (input.reference !== undefined) set.reference = isDisplay ? null : input.reference;
       if (input.unite !== undefined) set.unite = isDisplay ? "unité" : input.unite;
       if (input.ordre !== undefined) set.ordre = input.ordre;
+      if (input.tvaCategorieId !== undefined) set.tvaCategorieId = isDisplay ? null : input.tvaCategorieId;
 
       const [row] = await tx.update(devisLignes).set(set).where(eq(devisLignes.id, ligneId)).returning();
       await this.recalculerTotaux(tx, ligne.devisId);

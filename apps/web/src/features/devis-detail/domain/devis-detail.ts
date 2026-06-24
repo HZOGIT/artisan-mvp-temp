@@ -43,13 +43,13 @@ export function pendingCount(activites: readonly Activite[]): number {
   return activites.filter((a) => !a.fait).length;
 }
 
-export type PdfLigne = { designation: string; description: string | null; quantite: number; unite: string | null; prixUnitaire: number; tauxTva: number; type: string | null };
+export type PdfLigne = { designation: string; description: string | null; quantite: number; unite: string | null; prixUnitaire: number; tauxTva: number; type: string | null; tvaCategorieId?: string | null };
 
 /** Mappe les lignes du devis pour le générateur PDF. PUR. */
 export function pdfLignes(lignes: readonly Ligne[]): PdfLigne[] {
   return lignes.map((l) => ({
     designation: l.designation, description: l.description, quantite: parseFloat(String(l.quantite)) || 1,
-    unite: l.unite, prixUnitaire: parseFloat(String(l.prixUnitaireHT)) || 0, tauxTva: parseFloat(String(l.tauxTVA)) || 20, type: l.type,
+    unite: l.unite, prixUnitaire: parseFloat(String(l.prixUnitaireHT)) || 0, tauxTva: parseFloat(String(l.tauxTVA)) || 20, type: l.type, tvaCategorieId: (l as { tvaCategorieId?: string | null }).tvaCategorieId ?? null,
   }));
 }
 

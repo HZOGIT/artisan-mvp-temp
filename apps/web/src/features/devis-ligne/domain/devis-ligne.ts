@@ -1,4 +1,5 @@
 import type { RouterInputs, RouterOutputs } from "@/shared/trpc";
+import { TVA_CATEGORIES_MAP, type TvaCategorieId } from "@/shared/tva/taux-tva-fr";
 
 /*
  * Couche DOMAIN de la feature `devis-ligne` (ajout d'une ligne à un devis : produit/section/note, recherche
@@ -11,10 +12,20 @@ export type Suggestion = RouterOutputs["articles"]["suggererArticlesIA"][number]
 export type AddLigneInput = RouterInputs["devis"]["addLigne"];
 export type LigneType = "produit" | "section" | "note";
 
-export type LigneForm = { reference: string; designation: string; description: string; quantite: string; unite: string; prixUnitaireHT: string; tauxTVA: string };
+export type LigneForm = { reference: string; designation: string; description: string; quantite: string; unite: string; prixUnitaireHT: string; tvaCategorieId: TvaCategorieId };
 
 export function defaultLigneForm(): LigneForm {
-  return { reference: "", designation: "", description: "", quantite: "1", unite: "unité", prixUnitaireHT: "", tauxTVA: "20" };
+  return { reference: "", designation: "", description: "", quantite: "1", unite: "unité", prixUnitaireHT: "", tvaCategorieId: "FR_20" };
+}
+
+function tauxStringToCategorie(taux: string): TvaCategorieId {
+  const n = parseFloat(taux);
+  if (n >= 20) return "FR_20";
+  if (n >= 10) return "FR_10";
+  if (n >= 5.5) return "FR_5_5";
+  if (n >= 2.1) return "FR_2_1";
+  if (n > 0) return "FR_5_5";
+  return "FR_EXONERE";
 }
 
 export function formatCurrency(value: number | string | null | undefined): string {
@@ -31,6 +42,7 @@ export const articleDesignation = (a: BiblioArticle): string => a.nom;
 export const articlePrix = (a: BiblioArticle): string => String(a.prixBase ?? "");
 export const articleRef = (a: BiblioArticle): string => a.sousCategorie ?? "";
 export const articleTauxTVA = (a: BiblioArticle): string => (a.tauxTVA != null && a.tauxTVA !== "" ? String(parseFloat(a.tauxTVA)) : "20");
+export const articleCategorieTVA = (a: BiblioArticle): TvaCategorieId => tauxStringToCategorie(articleTauxTVA(a));
 
 /** Filtre les articles (accent-insensible) sur réf/nom/description/catégorie. PUR (matchSearch injecté). */
 export function filterArticles(articles: readonly BiblioArticle[], query: string, matchSearch: (v: string | null | undefined, q: string) => boolean): BiblioArticle[] {
@@ -49,7 +61,7 @@ export function groupByCategorie(articles: readonly BiblioArticle[]): Record<str
 export function lineTotals(form: LigneForm): { totalHT: number; totalTVA: number; totalTTC: number; tauxTVA: number } {
   const q = parseFloat(form.quantite) || 0;
   const pu = parseFloat(form.prixUnitaireHT) || 0;
-  const taux = parseFloat(form.tauxTVA) || 0;
+  const taux = parseFloat(TVA_CATEGORIES_MAP[form.tvaCategorieId]?.taux ?? "20") || 0;
   const totalHT = q * pu;
   const totalTVA = totalHT * (taux / 100);
   return { totalHT, totalTVA, totalTTC: totalHT + totalTVA, tauxTVA: taux };
@@ -57,12 +69,12 @@ export function lineTotals(form: LigneForm): { totalHT: number; totalTVA: number
 
 /** Pré-remplit le formulaire depuis un article bibliothèque. PUR. */
 export function formFromArticle(a: BiblioArticle): LigneForm {
-  return { reference: articleRef(a), designation: articleDesignation(a), description: a.description || "", quantite: "1", unite: a.unite || "unité", prixUnitaireHT: articlePrix(a), tauxTVA: articleTauxTVA(a) };
+  return { reference: articleRef(a), designation: articleDesignation(a), description: a.description || "", quantite: "1", unite: a.unite || "unité", prixUnitaireHT: articlePrix(a), tvaCategorieId: articleCategorieTVA(a) };
 }
 
 /** Pré-remplit le formulaire depuis une suggestion IA. PUR. */
 export function formFromSuggestion(s: Suggestion): LigneForm {
-  return { reference: s.reference || "", designation: s.designation || "", description: s.description || "", quantite: "1", unite: s.unite || "unité", prixUnitaireHT: String(s.prixUnitaire ?? ""), tauxTVA: "20" };
+  return { reference: s.reference || "", designation: s.designation || "", description: s.description || "", quantite: "1", unite: s.unite || "unité", prixUnitaireHT: String(s.prixUnitaire ?? ""), tvaCategorieId: "FR_20" };
 }
 
 /** Construit le payload addLigne. Pour section/note : seule la désignation + prix 0 (hors totaux serveur). PUR. */
@@ -73,6 +85,6 @@ export function buildAddLignePayload(devisId: number, form: LigneForm, type: Lig
   return {
     devisId, reference: form.reference, designation: form.designation, description: form.description,
     quantite: String(parseFloat(form.quantite) || 1), unite: form.unite,
-    prixUnitaireHT: String(parseFloat(form.prixUnitaireHT) || 0), tauxTVA: String(parseFloat(form.tauxTVA) || 20), type: "produit",
+    prixUnitaireHT: String(parseFloat(form.prixUnitaireHT) || 0), tvaCategorieId: form.tvaCategorieId, type: "produit",
   };
 }

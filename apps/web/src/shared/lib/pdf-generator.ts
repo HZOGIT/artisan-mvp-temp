@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { ROBOTO_REGULAR, ROBOTO_BOLD } from "./fonts";
+import { TVA_CATEGORIES_MAP } from "@/shared/tva/taux-tva-fr";
 
 /** Register Roboto font for proper French accent support */
 function registerFonts(doc: jsPDF) {
@@ -258,6 +259,7 @@ interface LigneDocument {
   unite?: string | null;
   prixUnitaire: number;
   tauxTva?: number | null;
+  tvaCategorieId?: string | null;
   /*
    * OPE-168 — `section` (en-tête de lot) / `note` (texte libre) rendues en pleine
    * largeur, sans colonnes de prix, exclues des totaux. Absent/`produit` = ligne normale.
@@ -607,6 +609,15 @@ function addFooter(doc: jsPDF, conditions?: string | null, mentionsLegales?: str
   doc.text("Document généré par Operioz", pageWidth / 2, footerY, { align: "center" });
 }
 
+function tvaMentionsFromLignes(lignes: LigneDocument[]): string | null {
+  const mentions = [...new Set(
+    lignes
+      .map((l) => l.tvaCategorieId ? TVA_CATEGORIES_MAP[l.tvaCategorieId as keyof typeof TVA_CATEGORIES_MAP]?.mentionLegale : null)
+      .filter((m): m is string => !!m),
+  )];
+  return mentions.length > 0 ? mentions.join(" — ") : null;
+}
+
 function addCgvPage(doc: jsPDF, cgv: string): void {
   doc.addPage();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -636,7 +647,9 @@ export function generateDevisPDF(artisan: Artisan, client: Client, devis: DevisD
   yPos = addDocumentInfo(doc, devis, "devis", yPos);
   yPos = addLignesTable(doc, devis.lignes, yPos);
   addTotals(doc, devis.totalHT, devis.totalTVA, devis.totalTTC, yPos);
-  addFooter(doc, devis.conditions, options?.mentionsLegales);
+  const devisTvaMention = tvaMentionsFromLignes(devis.lignes);
+  const devisMentions = [options?.mentionsLegales, devisTvaMention].filter(Boolean).join("\n") || null;
+  addFooter(doc, devis.conditions, devisMentions);
 
   if (options?.cgv) {
     addCgvPage(doc, options.cgv);
@@ -691,7 +704,9 @@ export function generateFacturePDF(artisan: Artisan, client: Client, facture: Fa
       ]
         .filter(Boolean)
         .join("\n");
-  addFooter(doc, factureConditions, options?.mentionsLegales);
+  const factureTvaMention = tvaMentionsFromLignes(facture.lignes);
+  const factureMentions = [options?.mentionsLegales, factureTvaMention].filter(Boolean).join("\n") || null;
+  addFooter(doc, factureConditions, factureMentions);
 
   /*
    * OPE-127 — CGV réutilisables sur une page dédiée (comme le devis). Pas sur un avoir

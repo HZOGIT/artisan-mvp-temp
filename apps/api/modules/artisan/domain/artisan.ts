@@ -27,6 +27,7 @@ export interface ArtisanProfile {
   readonly metier: string | null;
   readonly plan: string | null;
   readonly onboardingCompleted: boolean | null;
+  readonly franchiseTVA: boolean;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
@@ -55,4 +56,5 @@ export interface UpdateArtisanProfileInput {
   readonly logo?: string | null;
   readonly slug?: string | null;
   readonly metier?: string | null;
+  readonly franchiseTVA?: boolean;
 }

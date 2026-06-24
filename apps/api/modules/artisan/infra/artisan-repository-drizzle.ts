@@ -32,6 +32,7 @@ function toProfile(r: Row): ArtisanProfile {
     metier: r.metier ?? null,
     plan: r.plan ?? null,
     onboardingCompleted: r.onboardingCompleted ?? null,
+    franchiseTVA: r.franchiseTVA ?? false,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };
@@ -54,7 +55,7 @@ export class ArtisanRepositoryDrizzle implements IArtisanRepository {
     const cols: (keyof UpdateArtisanProfileInput)[] = [
       "siret", "nomEntreprise", "adresse", "codePostal", "ville", "telephone", "email", "specialite",
       "tauxTVA", "numeroTVA", "iban", "codeAPE", "formeJuridique", "capitalSocial", "villeRCS",
-      "numeroRM", "logo", "slug", "metier",
+      "numeroRM", "logo", "slug", "metier", "franchiseTVA",
     ];
     for (const c of cols) {
       if (input[c] !== undefined) (set as Record<string, unknown>)[c] = input[c];
