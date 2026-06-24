@@ -119,6 +119,10 @@ export async function signDevis(
   }
   const now = (deps.maintenant ?? (() => new Date()))();
   if (now > resolution.signature.expiresAt) throw new ValidationError("Ce lien de signature a expiré");
+  if (resolution.devisDateValidite && now > resolution.devisDateValidite) {
+    const exp = resolution.devisDateValidite.toLocaleDateString("fr-FR");
+    throw new ValidationError(`Ce devis a expiré le ${exp} — demandez un nouveau devis à votre artisan`);
+  }
 
   const ctx = tenantOf(resolution.artisanId);
   const signature = await deps.writer.signDevis(ctx, {

@@ -37,6 +37,7 @@ export class SignaturePublicReaderDrizzle implements SignaturePublicReader {
           devisId: devis.id,
           artisanId: devis.artisanId,
           dateVue: devis.dateVue,
+          devisDateValidite: devis.dateValidite,
         })
         .from(signaturesDevis)
         .innerJoin(devis, eq(devis.id, signaturesDevis.devisId))
@@ -62,6 +63,7 @@ export class SignaturePublicReaderDrizzle implements SignaturePublicReader {
         devisId: r.devisId,
         artisanId: r.artisanId,
         dateVue: r.dateVue ?? null,
+        devisDateValidite: r.devisDateValidite ?? null,
       };
     });
   }

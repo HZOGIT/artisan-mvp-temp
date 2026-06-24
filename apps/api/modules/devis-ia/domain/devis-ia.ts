@@ -1,3 +1,5 @@
+import { round2 } from "../../../shared/money";
+
 /*
  * Devis IA : analyse de photos de chantier (Vision) → résultats détectés → suggestions d'articles →
  * génération d'un devis. Slice A = CRUD/lecture (analyses, photos, suggestions) ; l'IA (analyserPhotos
@@ -121,12 +123,13 @@ export function genererLignesDevis(suggestions: readonly Suggestion[], suggestio
     const quantite = Number(s.quantiteSuggeree || 1);
     const prixUnitaireHT = Number(s.prixEstime || 0);
     const tauxTVA = 20;
-    const montantHT = quantite * prixUnitaireHT;
-    const montantTVA = montantHT * (tauxTVA / 100);
-    lignes.push({ ordre: lignes.length, designation: s.nomArticle || "", quantite, unite: s.unite || "u", prixUnitaireHT, tauxTVA, montantHT, montantTVA, montantTTC: montantHT + montantTVA });
+    const montantHT = round2(quantite * prixUnitaireHT);
+    const montantTVA = round2(montantHT * (tauxTVA / 100));
+    const montantTTC = round2(montantHT + montantTVA);
+    lignes.push({ ordre: lignes.length, designation: s.nomArticle || "", quantite, unite: s.unite || "u", prixUnitaireHT, tauxTVA, montantHT, montantTVA, montantTTC });
     totalHT += montantHT;
     totalTVA += montantTVA;
   }
   if (lignes.length === 0) return null;
-  return { lignes, totalHT, totalTVA, totalTTC: totalHT + totalTVA };
+  return { lignes, totalHT: round2(totalHT), totalTVA: round2(totalTVA), totalTTC: round2(totalHT + totalTVA) };
 }

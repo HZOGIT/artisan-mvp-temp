@@ -15,13 +15,12 @@ export interface DevisLigne {
   prixUnitaireHT?: any;
   prixUnitaire?: any;
   tauxTVA?: any;
-}
-
-export interface FactureLigne extends DevisLigne {
   montantHT?: any;
   montantTVA?: any;
   type?: any;
 }
+
+export type FactureLigne = DevisLigne;
 export type LigneCommandeFournisseur = DevisLigne;
 
 export interface Devis {

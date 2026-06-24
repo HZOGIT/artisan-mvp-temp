@@ -547,7 +547,7 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
      * Section (en-tête de lot, gras) / note (texte libre, italique) en
      * pleine largeur, sans colonnes chiffrées ; exclues des totaux (montants 0).
      */
-    const type = (ligne as any).type ?? "produit";
+    const type = ligne.type ?? "produit";
     if (type === "section") {
       return [{ content: ligne.designation, colSpan: 4, styles: { fontStyle: "bold" as const, fillColor: [226, 232, 240] as [number, number, number], textColor: [30, 41, 59] as [number, number, number] } }];
     }
@@ -555,13 +555,13 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
       return [{ content: ligne.designation, colSpan: 4, styles: { fontStyle: "italic" as const, textColor: [100, 100, 100] as [number, number, number] } }];
     }
     const quantite = Number(ligne.quantite) || 0;
-    const prixUnitaire =
-      typeof ligne.prixUnitaireHT === "string" ? parseFloat(ligne.prixUnitaireHT) : Number(ligne.prixUnitaireHT);
+    const prixUnitaire = Number(ligne.prixUnitaireHT) || 0;
+    const montantHT = ligne.montantHT != null ? Number(ligne.montantHT) : prixUnitaire * quantite;
     return [
       ligne.designation,
       quantite.toString(),
       `${prixUnitaire.toFixed(2)} €`,
-      `${(prixUnitaire * quantite).toFixed(2)} €`,
+      `${montantHT.toFixed(2)} €`,
     ];
   });
 
@@ -582,21 +582,32 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   /*
    * Totaux — lus depuis les champs DB (pré-calculés) pour garantir la cohérence
    * avec ce qui est stocké et éviter tout recalcul divergent côté PDF.
+   * TVA ventilée par taux (OPE-58/OPE-487) : si plusieurs taux coexistent (ex. 10% + 20%),
+   * on affiche une ligne par taux pour respecter l'obligation légale de ventilation.
    */
   const sousTotal = parseFloat(String(devis.totalHT ?? "0")) || 0;
   const tva = parseFloat(String(devis.totalTVA ?? "0")) || 0;
   const totalTTC = parseFloat(String(devis.totalTTC ?? "0")) || 0;
-  const tauxTVALabel = sousTotal > 0 ? Math.round((tva / sousTotal) * 100) : (Number(artisan.tauxTVA) || 20);
+
+  const tvaParTaux = new Map<number, number>();
+  for (const l of devis.lignes) {
+    const taux = Number(l.tauxTVA) || 0;
+    const montantTVA = l.montantTVA != null ? Number(l.montantTVA) : (Number(l.montantHT) || 0) * (taux / 100);
+    if (taux > 0) tvaParTaux.set(taux, (tvaParTaux.get(taux) ?? 0) + montantTVA);
+  }
+  const tvaRows: { label: string; value: string }[] =
+    tvaParTaux.size > 1
+      ? Array.from(tvaParTaux.entries())
+          .sort(([a], [b]) => a - b)
+          .map(([taux, montant]) => ({ label: `TVA (${taux}%)`, value: `${montant.toFixed(2)} €` }))
+      : [{ label: `TVA (${tvaParTaux.size === 1 ? Array.from(tvaParTaux.keys())[0] : (Number(artisan.tauxTVA) || 20)}%)`, value: `${tva.toFixed(2)} €` }];
 
   const totalsStartY = (doc as any).lastAutoTable.finalY + 8;
   const totalsEndY = renderTotalsBox(
     doc,
     primary,
     totalsStartY,
-    [
-      { label: "Sous-total HT", value: `${sousTotal.toFixed(2)} €` },
-      { label: `TVA (${tauxTVALabel}%)`, value: `${tva.toFixed(2)} €` },
-    ],
+    [{ label: "Sous-total HT", value: `${sousTotal.toFixed(2)} €` }, ...tvaRows],
     "TOTAL TTC",
     `${totalTTC.toFixed(2)} €`,
   );
@@ -691,18 +702,21 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
      * OPE-168 (volet 2) — section (en-tête de lot, gras) / note (texte libre, italique)
      * en pleine largeur, sans colonnes chiffrées ; exclues des totaux (montants 0).
      */
-    const type = (ligne as any).type ?? "produit";
+    const type = ligne.type ?? "produit";
     if (type === "section") {
       return [{ content: ligne.designation, colSpan: 4, styles: { fontStyle: "bold" as const, fillColor: [226, 232, 240] as [number, number, number], textColor: [30, 41, 59] as [number, number, number] } }];
     }
     if (type === "note") {
       return [{ content: ligne.designation, colSpan: 4, styles: { fontStyle: "italic" as const, textColor: [100, 100, 100] as [number, number, number] } }];
     }
+    const quantite = Number(ligne.quantite) || 0;
+    const prixUnitaire = Number(ligne.prixUnitaireHT) || 0;
+    const montantHT = ligne.montantHT != null ? Number(ligne.montantHT) : prixUnitaire * quantite;
     return [
       ligne.designation,
-      (Number(ligne.quantite) || 0).toString(),
-      `${Number(ligne.prixUnitaireHT).toFixed(2)} €`,
-      `${(Number(ligne.prixUnitaireHT) * (Number(ligne.quantite) || 0)).toFixed(2)} €`,
+      quantite.toString(),
+      `${prixUnitaire.toFixed(2)} €`,
+      `${montantHT.toFixed(2)} €`,
     ];
   });
 
@@ -723,21 +737,32 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   /*
    * Totaux — lus depuis les champs DB (pré-calculés) pour garantir la cohérence
    * avec ce qui est stocké et éviter tout recalcul divergent côté PDF.
+   * TVA ventilée par taux (OPE-58/OPE-487) : si plusieurs taux coexistent (ex. 10% + 20%),
+   * on affiche une ligne par taux pour respecter l'obligation légale de ventilation.
    */
   const sousTotal = parseFloat(String(facture.totalHT ?? "0")) || 0;
   const tva = parseFloat(String(facture.totalTVA ?? "0")) || 0;
   const totalTTC = parseFloat(String(facture.totalTTC ?? "0")) || 0;
-  const tauxTVALabel = sousTotal > 0 ? Math.round((tva / sousTotal) * 100) : (Number(artisan.tauxTVA) || 20);
+
+  const tvaParTauxF = new Map<number, number>();
+  for (const l of facture.lignes) {
+    const taux = Number(l.tauxTVA) || 0;
+    const montantTVA = l.montantTVA != null ? Number(l.montantTVA) : (Number(l.montantHT) || 0) * (taux / 100);
+    if (taux > 0) tvaParTauxF.set(taux, (tvaParTauxF.get(taux) ?? 0) + montantTVA);
+  }
+  const tvaRowsF: { label: string; value: string }[] =
+    tvaParTauxF.size > 1
+      ? Array.from(tvaParTauxF.entries())
+          .sort(([a], [b]) => a - b)
+          .map(([taux, montant]) => ({ label: `TVA (${taux}%)`, value: `${montant.toFixed(2)} €` }))
+      : [{ label: `TVA (${tvaParTauxF.size === 1 ? Array.from(tvaParTauxF.keys())[0] : (Number(artisan.tauxTVA) || 20)}%)`, value: `${tva.toFixed(2)} €` }];
 
   const totalsStartY = (doc as any).lastAutoTable.finalY + 8;
   const totalsEndY = renderTotalsBox(
     doc,
     primary,
     totalsStartY,
-    [
-      { label: "Sous-total HT", value: `${sousTotal.toFixed(2)} €` },
-      { label: `TVA (${tauxTVALabel}%)`, value: `${tva.toFixed(2)} €` },
-    ],
+    [{ label: "Sous-total HT", value: `${sousTotal.toFixed(2)} €` }, ...tvaRowsF],
     "TOTAL TTC",
     `${totalTTC.toFixed(2)} €`,
   );

@@ -29,4 +29,11 @@ describe("genererLignesDevis", () => {
     expect(r!.lignes[0].quantite).toBe(1);
     expect(r!.lignes[0].prixUnitaireHT).toBe(0);
   });
+  it("arrondi par ligne — totalTTC == sum(ligne.montantTTC) même avec prix non multiple de 0.01 (OPE-471)", () => {
+    const s = (id: number): Suggestion => sugg(id, { quantiteSuggeree: "3", prixEstime: "33.333" });
+    const r = genererLignesDevis([s(1), s(2), s(3)])!;
+    const sumLignes = r.lignes.reduce((acc, l) => acc + l.montantTTC, 0);
+    expect(r.totalTTC).toBeCloseTo(sumLignes, 10);
+    expect(r.totalHT + r.totalTVA).toBeCloseTo(r.totalTTC, 10);
+  });
 });

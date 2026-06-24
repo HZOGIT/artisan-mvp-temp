@@ -49,6 +49,7 @@ const resolution = (overrides: Partial<SignatureTokenResolution> = {}): Signatur
   devisId: 10,
   artisanId: 1,
   dateVue: null,
+  devisDateValidite: null,
   ...overrides,
 });
 
@@ -213,6 +214,19 @@ describe("signDevis (public)", () => {
   it("lien expiré → ValidationError", async () => {
     const { deps } = build({ res: resolution({ signature: signature({ expiresAt: new Date("2026-06-01") }) }), view });
     await expect(signDevis(deps, signPayload)).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("devis expiré (dateValidite dépassée) → ValidationError même si le token est encore valide (OPE-61)", async () => {
+    const res = resolution({ devisDateValidite: new Date("2026-06-10T00:00:00Z") }); // expiré avant NOW (15 juin)
+    const { deps } = build({ res, view });
+    await expect(signDevis(deps, signPayload)).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("devis avec dateValidite future → signable normalement", async () => {
+    const res = resolution({ devisDateValidite: new Date("2026-07-01T00:00:00Z") }); // futur
+    const { deps } = build({ res, view });
+    const out = await signDevis(deps, signPayload);
+    expect(out.signature.statut).toBe("accepte");
   });
 
   it("succès : signe (accepte + IP/UA), notifie et email l'artisan", async () => {
