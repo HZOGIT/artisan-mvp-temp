@@ -45,7 +45,16 @@ export default {
     return {
       ImportDeclaration(node) {
         const src = node.source.value;
-        if (!src.startsWith(".")) return; // import externe → hors périmètre
+        if (!src.startsWith(".")) {
+          const absMatch = src.match(/@\/modules\/[^/]+\/([^/]+)/);
+          if (absMatch) {
+            const targetLayer = absMatch[1];
+            if (forbidden?.has(targetLayer)) {
+              context.report({ node, message: `Clean-archi (import absolu) : la couche "${currentLayer}" ne peut pas importer depuis "${targetLayer}".` });
+            }
+          }
+          return;
+        }
 
         const targetLayer = resolveLayer(src, currentLayer);
         if (!targetLayer || !forbidden.has(targetLayer)) return;

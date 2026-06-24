@@ -5,6 +5,7 @@ import importX from "eslint-plugin-import-x";
 import commentsJsdocOnly from "./eslint/comments-jsdoc-only.mjs";
 import kebabFilename from "./eslint/kebab-filename.mjs";
 import noTrpcInUi from "./eslint/no-trpc-in-ui.mjs";
+import noDirectEnvAccess from "./eslint/no-direct-env-access.mjs";
 
 export default tseslint.config(
   {
@@ -16,7 +17,7 @@ export default tseslint.config(
     },
     plugins: {
       "@typescript-eslint": tseslint.plugin,
-      local: { rules: { "kebab-filename": kebabFilename, "no-trpc-in-ui": noTrpcInUi, "comments-jsdoc-only": commentsJsdocOnly } },
+      local: { rules: { "kebab-filename": kebabFilename, "no-trpc-in-ui": noTrpcInUi, "comments-jsdoc-only": commentsJsdocOnly, "no-direct-env-access": noDirectEnvAccess } },
       i18next,
       "react-hooks": reactHooks,
       "import-x": importX,
@@ -52,6 +53,7 @@ export default tseslint.config(
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
       "import-x/no-cycle": ["warn", { maxDepth: 5 }],
+      "local/no-direct-env-access": "warn",
     },
   },
   {

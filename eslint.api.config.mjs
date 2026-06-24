@@ -4,6 +4,8 @@ import commentsJsdocOnly from "./eslint/comments-jsdoc-only.mjs";
 import moduleLayerStructure from "./eslint/module-layer-structure.mjs";
 import moduleLayerImports from "./eslint/module-layer-imports.mjs";
 import moduleCompleteness from "./eslint/module-completeness.mjs";
+import noDirectEnvAccess from "./eslint/no-direct-env-access.mjs";
+import requireZodInput from "./eslint/require-zod-input.mjs";
 
 export default tseslint.config({
   plugins: {
@@ -15,6 +17,8 @@ export default tseslint.config({
         "module-layer-structure": moduleLayerStructure,
         "module-layer-imports": moduleLayerImports,
         "module-completeness": moduleCompleteness,
+        "no-direct-env-access": noDirectEnvAccess,
+        "require-zod-input": requireZodInput,
       },
     },
   },
@@ -46,5 +50,7 @@ export default tseslint.config({
     "@typescript-eslint/no-misused-promises": "error",
     "@typescript-eslint/promise-function-async": "warn",
     "import-x/no-cycle": ["warn", { maxDepth: 5 }],
+    "local/no-direct-env-access": "warn",
+    "local/require-zod-input": "warn",
   },
 });
