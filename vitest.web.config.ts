@@ -20,5 +20,8 @@ export default defineConfig({
       threads: { minThreads: 1, maxThreads: "75%" },
     },
     reporter: ["dot"],
+    experimental: {
+      fsModuleCache: true,
+    },
   },
 });

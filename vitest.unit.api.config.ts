@@ -21,5 +21,8 @@ export default defineConfig({
     ],
     setupFiles: ["./vitest.setup.api.ts"],
     reporter: ["dot"],
+    experimental: {
+      fsModuleCache: true,
+    },
   },
 });
