@@ -99,6 +99,9 @@ export const artisans = pgTable("artisans", {
   plan: varchar("plan", { length: 20 }).default("essentiel"),
   onboardingCompleted: boolean("onboarding_completed").default(false),
   franchiseTVA: boolean("franchiseTVA").default(false).notNull(),
+  assuranceDecennaleNom: varchar("assuranceDecennaleNom", { length: 255 }),
+  assuranceDecennalePolice: varchar("assuranceDecennalePolice", { length: 100 }),
+  assuranceDecennaleGarantie: varchar("assuranceDecennaleGarantie", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
 });

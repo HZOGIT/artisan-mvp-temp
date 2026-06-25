@@ -159,15 +159,8 @@
     {
       "idx": 22,
       "version": "7",
-      "when": 1782376071034,
-      "tag": "0022_signature-document-hash",
-      "breakpoints": true
-    },
-    {
-      "idx": 23,
-      "version": "7",
-      "when": 1782377993952,
-      "tag": "0023_tricky_shard",
+      "when": 1782376693019,
+      "tag": "0022_fixed_krista_starr",
       "breakpoints": true
     }
   ]

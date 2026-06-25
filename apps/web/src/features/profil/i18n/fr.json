@@ -85,5 +85,13 @@
   "metierPlombier": "Plombier", "metierElectricien": "Electricien", "metierChauffagiste": "Chauffagiste",
   "metierPaysagiste": "Paysagiste", "metierCuisiniste": "Cuisiniste", "metierCarreleur": "Carreleur",
   "metierMenuisier": "Menuisier", "metierMacon": "Macon", "metierPeintre": "Peintre",
-  "metierTerrassier": "Terrassier", "metierDomotique": "Domotique", "metierAutre": "Autre"
+  "metierTerrassier": "Terrassier", "metierDomotique": "Domotique", "metierAutre": "Autre",
+  "assuranceDecennale": "Assurance décennale",
+  "assuranceDecennaleDesc": "Obligatoire pour les artisans du bâtiment (Art. L243-2 C. assurances — Loi Spinetta). La mention apparaîtra sur vos devis et factures si renseignée.",
+  "assureurDecennale": "Nom de l'assureur",
+  "assureurDecennalePlaceholder": "Ex. : Allianz, AXA, MAF…",
+  "policeDecennale": "Numéro de police",
+  "policeDecennalePlaceholder": "Ex. : 1234567890",
+  "zoneGarantieDecennale": "Zone de garantie",
+  "zoneGarantieDecennalePlaceholder": "Ex. : France métropolitaine"
 }

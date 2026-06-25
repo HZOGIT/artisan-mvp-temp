@@ -1,5 +1,5 @@
 {
-  "id": "c2549206-a4bc-4308-b99e-0356b62fda66",
+  "id": "201c6a31-e20e-445a-a11f-88952a474f2e",
   "prevId": "77aaa299-12c2-4490-a819-4360ba30c619",
   "version": "7",
   "dialect": "postgresql",
@@ -718,6 +718,24 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "assuranceDecennaleNom": {
+          "name": "assuranceDecennaleNom",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "assuranceDecennalePolice": {
+          "name": "assuranceDecennalePolice",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "assuranceDecennaleGarantie": {
+          "name": "assuranceDecennaleGarantie",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
         },
         "createdAt": {
           "name": "createdAt",
@@ -9378,18 +9396,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "documentHash": {
-          "name": "documentHash",
-          "type": "varchar(64)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "documentHashedAt": {
-          "name": "documentHashedAt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {},

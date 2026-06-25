@@ -16,6 +16,7 @@ export class FakeArtisanRepository implements IArtisanRepository {
       telephone: null, email: null, specialite: null, tauxTVA: null, numeroTVA: null, iban: null,
       codeAPE: null, formeJuridique: null, capitalSocial: null, villeRCS: null, numeroRM: null,
       logo: null, slug: null, metier: null, plan: null, onboardingCompleted: null, franchiseTVA: false,
+      assuranceDecennaleNom: null, assuranceDecennalePolice: null, assuranceDecennaleGarantie: null,
       createdAt: now, updatedAt: now, ...over,
     };
     this.profiles = this.profiles.filter((x) => x.id !== p.id).concat(p);
