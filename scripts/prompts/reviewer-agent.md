@@ -207,20 +207,37 @@ WORKTREE="/tmp/wt-${SESSION_NAME}"
 [ -d "$WORKTREE" ] && git -C /home/developer/artisan-mvp-temp worktree remove "$WORKTREE" --force
 git branch -D "feat/${SESSION_NAME}" 2>/dev/null
 
-# Synchroniser staging local avec le merge avant de déployer :
-git fetch origin staging -q && git merge --ff-only origin/staging
+# (la mise à jour du working tree avant deploy est gérée à l'étape 4 — garde-fou anti-périmé)
 ```
 
-**4. Déployer si le backend est touché :**
+**4. Déployer si le backend est touché — TOUJOURS builder EXACTEMENT `origin/staging` :**
+
+> 🚨 **ERREUR GRAVE déjà commise (à ne JAMAIS reproduire)** : lancer `cd /home/developer/artisan-mvp-temp && ./scripts/deploy-backend.sh` build l'image Docker depuis le **working tree partagé**. Ce tree peut être **détaché / périmé / sale** (plusieurs agents le manipulent, `git checkout <fichier>`, resets concurrents…). Conséquence vécue : le backend a tourné pendant des heures sur du **vieux code** alors que les PRs étaient mergées sur `origin/staging`, le `smoke` générique passant quand même (il ne teste pas les features récentes). **Le déploiement DOIT builder l'état exact de `origin/staging`.**
 
 ```bash
 CHANGED=$(gh pr view <numero> --json files -q '.files[].path' | grep '^apps/api/')
 if [[ -n "$CHANGED" ]]; then
-  cd /home/developer/artisan-mvp-temp && ./scripts/deploy-backend.sh
+  cd /home/developer/artisan-mvp-temp
+  git fetch origin staging -q
+  # Réaligne le repo principal sur origin/staging (corrige un HEAD détaché ; préserve les
+  # fichiers NON suivis des autres agents ; les modifs de fichiers SUIVIS = résidus de merge
+  # déjà sur origin/staging, donc safe à écraser — les agents travaillent dans /tmp/wt-<session>) :
+  git checkout -B staging origin/staging
+  git reset --hard origin/staging
+  # GARDE-FOU OBLIGATOIRE : la source de build DOIT == origin/staging, sinon NE PAS déployer.
+  if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/staging)" ]; then
+    echo "ABORT deploy : working tree != origin/staging (périmé). Investiguer, NE PAS déployer."
+  else
+    ./scripts/deploy-backend.sh
+    # Vérif anti-périmé : un marqueur du code mergé doit être présent dans le tree buildé.
+    # (ex. grep d'une chaîne ajoutée par la PR dans apps/api/** ; le smoke générique ne suffit PAS.)
+  fi
 fi
 ```
 
 Le frontend (CF Pages) se redéploie automatiquement sur push `staging`.
+
+> **Règle générale deploy** : ne jamais conclure « deploy OK » sur la seule foi du `smoke` (il répond 200 même sur du vieux code). Toujours (a) garde-fou `HEAD == origin/staging` AVANT le build, et (b) idéalement vérifier un marqueur de la PR dans le code buildé / le comportement live.
 
 **5. Mettre à jour les issues Linear liées :**
 
@@ -258,5 +275,23 @@ Pour trouver l'`id` de l'issue depuis son identifiant OPE-XXX : utiliser `get_is
 
 - Ne merge **jamais** une PR si `pnpm check` échoue ou si lint retourne des `error`.
 - Si la même PR a déjà reçu 3 rounds de corrections sans avancer → notifie l'humain avec `BLOCKED`.
-- Pas de `git reset --hard`, `rebase`, `push --force` sur `staging`.
+- **Jamais** `push --force`, `rebase` ou `commit --amend` sur la **branche `staging` distante** (réécriture d'historique partagé). En revanche, **réaligner le working tree LOCAL** sur `origin/staging` via `git reset --hard origin/staging` est **autorisé et requis avant chaque deploy** (étape 4) : ça ne touche pas l'historique distant, ça pointe vers le merge de tout le monde, et ça préserve les fichiers non suivis.
 - Commit chirurgical si tu dois toucher un fichier en direct (rare).
+
+### 🔴 Déploiement — invariant non négociable
+
+- Un `deploy-backend.sh` build l'image depuis le **working tree** du repo principal. Ce tree est partagé et peut être **périmé/détaché/sale**. **TOUJOURS** réaligner sur `origin/staging` + **garde-fou `HEAD == origin/staging`** AVANT de builder (étape 4). Un `smoke` vert ne prouve PAS que le bon code est déployé.
+- Après tout merge backend : vérifier que `git -C /home/developer/artisan-mvp-temp rev-parse HEAD == origin/staging` et que le marqueur de la PR est dans le tree buildé.
+
+### 🧹 Hygiène worktrees + screens — à chaque cycle
+
+- **Après CHAQUE merge** : tuer le screen worker, supprimer le worktree `/tmp/wt-<session>`, supprimer la branche distante+locale (étape 3). Non négociable.
+- **Au début de chaque cycle cron**, balayer les orphelins (les nettoyages ratés s'accumulent) :
+```bash
+# Worktrees orphelins (branche feat mergée/supprimée mais worktree resté) :
+git -C /home/developer/artisan-mvp-temp worktree prune
+git -C /home/developer/artisan-mvp-temp worktree list   # inspecter /tmp/wt-* restants → remove --force ceux des PRs déjà mergées
+# Screens de workers dont la PR est mergée/fermée → screen -S <nom> -X quit
+screen -ls
+```
+- Ne JAMAIS supprimer un worktree/screen qui n'est pas à toi (PR encore ouverte, autre rôle infra : `project-manager`, `deployment-manager`). En cas de doute, laisse.
