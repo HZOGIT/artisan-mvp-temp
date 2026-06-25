@@ -25,6 +25,7 @@ RUN pnpm build:newstack
 FROM node:alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production \
+    TZ=Europe/Paris \
     NEW_STACK_PORT=3001 \
     HOST=0.0.0.0
 RUN npm install -g pnpm@11.5.1
