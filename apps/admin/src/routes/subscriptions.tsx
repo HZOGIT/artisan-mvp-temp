@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { createRoute, useNavigate } from "@tanstack/react-router";
 import { rootRoute } from "./__root";
 import { trpc } from "../shared/trpc";
@@ -6,10 +7,13 @@ function SubscriptionsPage() {
   const navigate = useNavigate();
   const { data, isLoading, error } = trpc.platformAdmin.subscriptions.list.useQuery({ page: 1 });
 
-  if (error?.data?.code === "UNAUTHORIZED") {
-    void navigate({ to: "/login" });
-    return null;
-  }
+  useEffect(() => {
+    if (error?.data?.code === "UNAUTHORIZED") {
+      void navigate({ to: "/login" });
+    }
+  }, [error, navigate]);
+
+  if (error?.data?.code === "UNAUTHORIZED") return null;
   if (error?.data?.code === "FORBIDDEN") {
     return <p style={{ color: "red", padding: "24px" }}>Accès refusé — compte staff Operioz requis.</p>;
   }
