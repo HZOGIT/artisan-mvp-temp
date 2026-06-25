@@ -46,7 +46,7 @@ export default tseslint.config(
       "no-eval": "error",
       "no-new-func": "error",
       "no-prototype-builtins": "error",
-      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-non-null-assertion": "error",
       "@typescript-eslint/consistent-type-imports": ["error", { prefer: "type-imports", fixStyle: "inline-type-imports" }],
       "@typescript-eslint/require-await": "error",

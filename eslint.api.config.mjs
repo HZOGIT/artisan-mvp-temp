@@ -8,7 +8,8 @@ import noDirectEnvAccess from "./eslint/no-direct-env-access.mjs";
 import requireZodInput from "./eslint/require-zod-input.mjs";
 import requireLlmTracking from "./eslint/require-llm-tracking.mjs";
 
-export default tseslint.config({
+export default tseslint.config(
+  {
   plugins: {
     "@typescript-eslint": tseslint.plugin,
     "import-x": importX,
@@ -44,10 +45,10 @@ export default tseslint.config({
     "no-eval": "error",
     "no-new-func": "error",
     "no-prototype-builtins": "error",
-    "@typescript-eslint/no-explicit-any": "warn",
-    "@typescript-eslint/no-non-null-assertion": "warn",
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/no-non-null-assertion": "error",
     "@typescript-eslint/consistent-type-imports": ["error", { prefer: "type-imports", fixStyle: "inline-type-imports" }],
-    "@typescript-eslint/require-await": "warn",
+    "@typescript-eslint/require-await": "error",
     "@typescript-eslint/no-floating-promises": "error",
     "@typescript-eslint/no-misused-promises": "error",
     "@typescript-eslint/promise-function-async": "warn",
@@ -56,4 +57,15 @@ export default tseslint.config({
     "local/require-zod-input": "warn",
     "local/require-llm-tracking": "error",
   },
-});
+  },
+  {
+    files: [
+      "apps/api/**/*-fake.ts",
+      "apps/api/**/fakes.ts",
+      "apps/api/shared/ports/stripe-adapter.ts",
+      "apps/api/shared/ports/billing-adapter.ts",
+      "apps/api/shared/ports/password-hasher-bcrypt.ts",
+    ],
+    rules: { "@typescript-eslint/require-await": "off" },
+  },
+);

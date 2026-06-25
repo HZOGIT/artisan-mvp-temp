@@ -1,8 +1,7 @@
 #!/bin/sh
 
-# 1. ESLint sur les fichiers stagés uniquement
+# 1. ESLint (fichiers stagés) + vitest related (tests touchés par les fichiers stagés)
 pnpm lint-staged
 
-# 2. TypeScript + tests — tout en parallèle
+# 2. TypeScript — les deux tsconfigs en parallèle
 pnpm check:parallel
-pnpm test:parallel

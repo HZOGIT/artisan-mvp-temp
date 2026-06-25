@@ -15,7 +15,7 @@ export interface BillingCronOptions {
 }
 
 export const billingCronPlugin = fp(
-  async (app: FastifyInstance, opts: BillingCronOptions) => {
+  (app: FastifyInstance, opts: BillingCronOptions) => {
     const intervalMinutes = opts.intervalMinutes ?? 60;
 
     const task = new AsyncTask(

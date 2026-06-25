@@ -20,16 +20,16 @@ export class SlidingWindowRateLimiter implements RateLimiterPort {
     private readonly maintenant: () => number = () => Date.now(),
   ) {}
 
-  async check(key: string): Promise<boolean> {
+  check(key: string): Promise<boolean> {
     const now = this.maintenant();
     const debut = now - this.fenetreMs;
     const recents = (this.hits.get(key) ?? []).filter((t) => t > debut);
     if (recents.length >= this.limite) {
       this.hits.set(key, recents);
-      return false;
+      return Promise.resolve(false);
     }
     recents.push(now);
     this.hits.set(key, recents);
-    return true;
+    return Promise.resolve(true);
   }
 }

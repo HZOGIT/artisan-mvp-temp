@@ -14,7 +14,7 @@ export interface UploadLogoDeps extends CookieAuthDeps {
  * pas le parser JSON tRPC. Le logo est stocké en data-URL base64 dans `artisans.logo` (parité legacy).
  */
 export function registerUploadLogoRoute(app: FastifyInstance, deps: UploadLogoDeps): void {
-  app.register(async (instance) => {
+  app.register((instance) => {
     instance.register(multipart, { limits: { fileSize: MAX_LOGO_BYTES, files: 1 } });
 
     instance.post("/api/upload-logo", async (req, reply) => {

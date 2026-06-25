@@ -14,20 +14,20 @@ import {
  * satisfont structurellement les types d'entrée (cf. `pdf-input-types.ts`).
  */
 export class JsPdfAdapter implements PdfPort {
-  async render(template: string, data: Record<string, unknown>): Promise<Buffer> {
+  render(template: string, data: Record<string, unknown>): Promise<Buffer> {
     switch (template) {
       case "devis":
-        return generateDevisPDF(data as never);
+        return Promise.resolve(generateDevisPDF(data as never));
       case "facture":
-        return generateFacturePDF(data as never);
+        return Promise.resolve(generateFacturePDF(data as never));
       case "bon-commande":
-        return generateBonCommandePDF(data as never);
+        return Promise.resolve(generateBonCommandePDF(data as never));
       case "contrat":
-        return generateContratPDF(data as never);
+        return Promise.resolve(generateContratPDF(data as never));
       case "intervention":
-        return generateInterventionPDF(data as never);
+        return Promise.resolve(generateInterventionPDF(data as never));
       default:
-        throw new Error(`Template PDF inconnu : ${template}`);
+        return Promise.reject(new Error(`Template PDF inconnu : ${template}`));
     }
   }
 }

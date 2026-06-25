@@ -26,9 +26,9 @@ export class AssistantReadToolRegistry implements AssistantToolRegistry {
     this.handlers = new Map(Object.entries(handlers));
     /** `naviguer_vers` : pur, toujours disponible (sauf override explicite). */
     if (!this.handlers.has("naviguer_vers")) {
-      this.handlers.set("naviguer_vers", async (args) => {
+      this.handlers.set("naviguer_vers", (args) => {
         const r = resolveNavigation(args);
-        return r.ok ? { ok: true, data: { navigate: r.navigate, confirmation: r.confirmation } } : { ok: false, error: r.error };
+        return Promise.resolve(r.ok ? { ok: true, data: { navigate: r.navigate, confirmation: r.confirmation } } : { ok: false, error: r.error });
       });
     }
     this.writeHandlers = new Map(Object.entries(writeHandlers));

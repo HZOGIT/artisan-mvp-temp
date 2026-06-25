@@ -397,7 +397,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     void reply.code(status).send({ error: error.message ?? "Erreur serveur" });
   });
 
-  app.get("/health", async () => ({ status: "ok" }));
+  app.get("/health", () => ({ status: "ok" }));
 
   const vehiculeRepo = deps.vehiculeRepo ?? new VehiculeRepositoryDrizzle(getDbHandle().db);
   const avis = createAvisModule({

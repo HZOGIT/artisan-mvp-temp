@@ -10,7 +10,7 @@ import type { AppLogger } from "../../shared/ports/logger";
  * JSON global (tRPC) n'est PAS impacté (les content-type parsers Fastify sont encapsulés par plugin).
  */
 export function registerStripeWebhookRoute(app: FastifyInstance, deps: StripeWebhookDeps): void {
-  app.register(async (instance) => {
+  app.register((instance) => {
     instance.addContentTypeParser("application/json", { parseAs: "buffer" }, (_req, body, done) => done(null, body));
     instance.post("/api/stripe/webhook", async (req, reply) => {
       const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(typeof req.body === "string" ? req.body : "");
