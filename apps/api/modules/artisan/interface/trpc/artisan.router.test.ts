@@ -3,11 +3,14 @@ import { SignJWT } from "jose";
 import { Pool } from "pg";
 import { buildApp } from "../../../../app";
 import { injectTrpc } from "../../../../shared/testing/trpc-inject";
+import { BcryptPasswordHasher } from "../../../../shared/ports/password-hasher-bcrypt";
 
 const URL = process.env.DATABASE_URL;
 const SECRET = "test-secret-at-least-32-characters-long-xxxx";
 const UID = 9941121;
 const EMAIL = `u${UID}@t.fr`;
+const PASSWORD = "IbanTest123!";
+const VALID_IBAN = "FR7630006000011234567890189";
 
 const jwt = (userId: number) =>
   new SignJWT({ userId, email: EMAIL }).setProtectedHeader({ alg: "HS256" }).setExpirationTime("1h").sign(new TextEncoder().encode(SECRET));
@@ -24,7 +27,8 @@ describe.skipIf(!URL)("artisan.router e2e (profil protégé)", () => {
 
   beforeAll(async () => {
     await cleanup();
-    await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [UID, EMAIL]);
+    const hash = await new BcryptPasswordHasher().hash(PASSWORD);
+    await admin.query("insert into users (id, email, password, role) values ($1,$2,$3,'artisan')", [UID, EMAIL, hash]);
     await admin.query('insert into artisans ("userId","nomEntreprise") values ($1,$2)', [UID, "Avant"]);
     app = buildApp({ jwtSecret: SECRET });
   });
@@ -73,5 +77,36 @@ describe.skipIf(!URL)("artisan.router e2e (profil protégé)", () => {
     expect((await injectTrpc(app, "POST", "artisan.updateProfile", { siret: "" }, tok)).statusCode).toBe(200);
     // SIRET valide (Luhn OK) → accepté
     expect((await injectTrpc(app, "POST", "artisan.updateProfile", { siret: "73282932000074" }, tok)).statusCode).toBe(200);
+  });
+
+  it("IBAN sans currentPassword → 400", async () => {
+    const tok = await jwt(UID);
+    const res = await injectTrpc(app, "POST", "artisan.updateProfile", { iban: VALID_IBAN }, tok);
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("IBAN avec mauvais mot de passe → 401", async () => {
+    const tok = await jwt(UID);
+    const res = await injectTrpc(app, "POST", "artisan.updateProfile", { iban: VALID_IBAN, currentPassword: "mauvais" }, tok);
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("IBAN avec mot de passe correct → 200 et IBAN mis à jour", async () => {
+    const tok = await jwt(UID);
+    const res = await injectTrpc(app, "POST", "artisan.updateProfile", { iban: VALID_IBAN, currentPassword: PASSWORD }, tok);
+    expect(res.statusCode).toBe(200);
+    const profile = await injectTrpc(app, "GET", "artisan.getProfile", undefined, tok);
+    expect(profile.json().result.data?.iban).toBe(VALID_IBAN);
+  });
+
+  it("IBAN compte actif=false (soft-deleted) + bon password → 401", async () => {
+    await admin.query("update users set actif=false where id=$1", [UID]);
+    try {
+      const tok = await jwt(UID);
+      const res = await injectTrpc(app, "POST", "artisan.updateProfile", { iban: VALID_IBAN, currentPassword: PASSWORD }, tok);
+      expect(res.statusCode).toBe(401);
+    } finally {
+      await admin.query("update users set actif=true where id=$1", [UID]);
+    }
   });
 });
