@@ -81,6 +81,47 @@ describe("chargeOffSessionForCycle", () => {
     expect(periodEv!.payload).toMatchObject({ via: "scheduler", artisanId: ARTISAN_ID });
   });
 
+  it("succeeded : facture + ligne créées pour le cycle (anti-régression OPE-535)", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    billing.nextChargeResult = { paymentIntentId: "pi_ok", status: "succeeded" };
+
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+
+    expect(repo.invoices).toHaveLength(1);
+    const inv = repo.invoices[0]!;
+    expect(inv.billing_cycle_id).toBe(cycle.id);
+    expect(inv.total_cents).toBe(cycle.amount_cents);
+    expect(inv.tax_cents).toBe(Math.round(cycle.amount_cents / 6));
+    expect(inv.status).toBe("paid");
+    expect(inv.number).toMatch(/^FAC-\d{4}-\d{4}$/);
+
+    expect(repo.invoiceLines).toHaveLength(1);
+    const line = repo.invoiceLines[0]!;
+    expect(line.invoice_id).toBe(inv.id);
+    expect(line.quantity).toBe(1);
+    expect(line.tax_rate_bps).toBe(2000);
+    expect(line.amount_cents + line.tax_amount_cents).toBe(cycle.amount_cents);
+  });
+
+  it("idempotence : createInvoiceForCycle appelé 2× → 1 seule facture", async () => {
+    const { repo, billing } = makeDeps();
+    const sub = await setupActiveSub(repo);
+    await setupPm(repo);
+    const cycle = await setupPendingCycle(repo, sub.id);
+    billing.nextChargeResult = { paymentIntentId: "pi_ok", status: "succeeded" };
+
+    await chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID);
+    await repo.createInvoiceForCycle({
+      artisanId: ARTISAN_ID, cycleId: cycle.id, amountCents: cycle.amount_cents,
+      taxCents: Math.round(cycle.amount_cents / 6), currency: "eur", planDescription: "Abonnement Starter",
+    });
+
+    expect(repo.invoices).toHaveLength(1);
+  });
+
   it("requires_action : traité comme failed (3DS off-session = dunning) + event cycle.requires_action", async () => {
     const { repo, billing } = makeDeps();
     const sub = await setupActiveSub(repo);

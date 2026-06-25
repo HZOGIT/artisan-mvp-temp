@@ -164,6 +164,15 @@ export async function chargeOffSessionForCycle(
       });
       const sub = await deps.repo.findSubscriptionById(subscriptionId);
       const interval = resolveInterval(sub?.billing_interval);
+      const plan = sub ? planById(sub.plan_id) : undefined;
+      await deps.repo.createInvoiceForCycle({
+        artisanId,
+        cycleId,
+        amountCents: cycle.amount_cents,
+        taxCents: Math.round(cycle.amount_cents / 6),
+        currency: cycle.currency,
+        planDescription: `Abonnement ${plan?.name ?? (sub?.plan_id ?? "Operioz")}`,
+      });
       /*
        * Guard symétrique de FIX-CE (webhook) et FIX-CC (zombie recovery) :
        * ne pas avancer la période si la sub a été annulée entre le claimCycleForCharging
@@ -412,6 +421,15 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
         eventType: "cycle.paid",
         payload: { via: "zombie_recovery", paymentIntentId: piId, artisanId, paidAt: paidAt.toISOString() },
         actor: "scheduler",
+      });
+      const zombiePlan = planById(sub.plan_id);
+      await deps.repo.createInvoiceForCycle({
+        artisanId,
+        cycleId: cycle.id,
+        amountCents: cycle.amount_cents,
+        taxCents: Math.round(cycle.amount_cents / 6),
+        currency: cycle.currency,
+        planDescription: `Abonnement ${zombiePlan?.name ?? sub.plan_id}`,
       });
       await advanceSubscriptionAfterPayment(deps.repo, cycle.subscription_id, artisanId, cycle, resolveInterval(sub.billing_interval));
     } else if (pi.status === "processing") {

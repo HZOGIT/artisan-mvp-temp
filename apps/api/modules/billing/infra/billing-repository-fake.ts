@@ -8,12 +8,14 @@ import type {
   UpdateChargeAttemptParams,
   SubscriptionWithDueCycle,
   AppendEventParams,
+  CreateInvoiceForCycleParams,
 } from "../application/billing-repository";
 import type {
   BillingPaymentMethod,
   BillingSubscription,
   BillingCycle,
   BillingInvoice,
+  BillingInvoiceLine,
   BillingEvent,
   BillingChargeAttempt,
 } from "../../../../../drizzle/schema.pg";
@@ -33,7 +35,9 @@ export class FakeBillingRepository implements IBillingRepository {
   public cycles: Cycle[] = [];
   public chargeAttempts: BillingChargeAttempt[] = [];
   public invoices: BillingInvoice[] = [];
+  public invoiceLines: BillingInvoiceLine[] = [];
   public events: BillingEvent[] = [];
+  private seqCounters: Map<string, number> = new Map();
   public processedWebhookIds: Set<string> = new Set();
   public customerIds: Map<number, string> = new Map();
   /** Injecte une erreur dans le prochain appel createCycle (test catch dans activateExpiredTrials). */
@@ -333,6 +337,68 @@ export class FakeBillingRepository implements IBillingRepository {
 
   async findInvoicesByArtisan(ctx: TenantContext, limit = 12): Promise<BillingInvoice[]> {
     return this.invoices.filter(i => i.artisan_id === ctx.artisanId).slice(0, limit);
+  }
+
+  async createInvoiceForCycle(params: CreateInvoiceForCycleParams): Promise<BillingInvoice> {
+    const existing = this.invoices.find(i => i.billing_cycle_id === params.cycleId);
+    if (existing) return existing;
+
+    const year = new Date().getFullYear();
+    const key = `FAC-${year}`;
+    const seq = (this.seqCounters.get(key) ?? 0) + 1;
+    this.seqCounters.set(key, seq);
+    const number = `FAC-${year}-${String(seq).padStart(4, "0")}`;
+    const subtotalCents = params.amountCents - params.taxCents;
+    const now = this.now();
+
+    const invoice: BillingInvoice = {
+      id: nextId(),
+      artisan_id: params.artisanId,
+      number,
+      stripe_invoice_id: null,
+      stripe_invoice_number: null,
+      type: "subscription",
+      status: "paid",
+      subtotal_cents: subtotalCents,
+      tax_cents: params.taxCents,
+      total_cents: params.amountCents,
+      credit_amount_cents: 0,
+      refund_amount_cents: 0,
+      currency: params.currency,
+      billing_cycle_id: params.cycleId,
+      original_invoice_id: null,
+      stripe_payment_intent_id: null,
+      pdf_url: null,
+      buyer_siren: null,
+      buyer_routing_id: null,
+      einvoice_format: null,
+      einvoice_status: null,
+      einvoice_pa_message_id: null,
+      einvoice_hash: null,
+      due_at: null,
+      paid_at: now,
+      voided_at: null,
+      created_at: now,
+      updated_at: now,
+    };
+    this.invoices.push(invoice);
+
+    this.invoiceLines.push({
+      id: nextId(),
+      invoice_id: invoice.id,
+      description: params.planDescription,
+      quantity: 1,
+      unit_amount_cents: subtotalCents,
+      amount_cents: subtotalCents,
+      tax_rate_bps: 2000,
+      tax_amount_cents: params.taxCents,
+      type: "subscription",
+      metadata: null,
+      sort_order: 0,
+      created_at: now,
+    });
+
+    return invoice;
   }
 
   async markWebhookProcessed(stripeEventId: string, _eventType: string, _payload: Record<string, unknown>): Promise<boolean> {

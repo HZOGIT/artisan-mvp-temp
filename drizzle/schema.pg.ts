@@ -2084,7 +2084,7 @@ export const billingInvoices = pgTable("billing_invoices", {
   credit_amount_cents: bigint("credit_amount_cents", { mode: "number" }).notNull().default(0),
   refund_amount_cents: bigint("refund_amount_cents", { mode: "number" }).notNull().default(0),
   currency: varchar("currency", { length: 3 }).notNull().default("eur"),
-  billing_cycle_id: integer("billing_cycle_id").references(() => billingCycles.id, { onDelete: "restrict" }),
+  billing_cycle_id: integer("billing_cycle_id").unique().references(() => billingCycles.id, { onDelete: "restrict" }),
   original_invoice_id: integer("original_invoice_id"),
   stripe_payment_intent_id: varchar("stripe_payment_intent_id", { length: 255 }),
   pdf_url: text("pdf_url"),
