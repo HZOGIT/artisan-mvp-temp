@@ -102,7 +102,8 @@ export async function chargeOffSessionForCycle(
   const ctx = { artisanId, userId: 0 } as const;
   const pm = await deps.repo.findDefaultPaymentMethod(ctx);
   const customerId = pm?.stripe_customer_id;
-  if (!pm || !customerId) {
+  const stripePaymentMethodId = pm?.stripe_payment_method_id;
+  if (!pm || !customerId || !stripePaymentMethodId) {
     const pmRetryAt = new Date(now.getTime() + NO_PM_RETRY_DELAY_MS);
     await deps.repo.updateCycleStatus(cycleId, { status: "failed", failedAt: now, nextRetryAt: pmRetryAt });
     await deps.repo.appendEvent({
@@ -136,7 +137,7 @@ export async function chargeOffSessionForCycle(
   try {
     const result = await deps.billing.chargeOffSession({
       customerId,
-      paymentMethodId: pm.stripe_payment_method_id!,
+      paymentMethodId: stripePaymentMethodId,
       amountCents: cycle.amount_cents,
       currency: "eur",
       description: `Abonnement Operioz — période ${cycle.period_start.toISOString().slice(0, 10)}`,
@@ -473,7 +474,8 @@ async function activateExpiredTrials(deps: SchedulerDeps, now: Date): Promise<nu
   for (const sub of expired) {
     try {
       const interval = resolveInterval(sub.billing_interval);
-      const trialEnd = sub.trial_ends_at!;
+      if (!sub.trial_ends_at) continue;
+      const trialEnd = sub.trial_ends_at;
       const { end: periodEnd } = nextPeriod(trialEnd, interval);
       const plan = planById(sub.plan_id);
       if (!plan) {
@@ -557,7 +559,7 @@ async function processDueCancellations(deps: SchedulerDeps, now: Date): Promise<
         entityType: "billing_subscription",
         entityId: sub.id,
         eventType: "subscription.canceled",
-        payload: { artisanId: sub.artisan_id, cancelAt: sub.cancel_at!.toISOString(), via: "scheduler" },
+        payload: { artisanId: sub.artisan_id, cancelAt: (sub.cancel_at ?? now).toISOString(), via: "scheduler" },
         actor: "scheduler",
       });
       count++;

@@ -91,6 +91,7 @@ export interface AssistantAgentMailing {
  */
 export function buildAssistantWriteDeps(repos: AssistantAgentWriteRepos, mailing: AssistantAgentMailing = {}): AssistantWriteDeps {
   const { clientRepo, interventionRepo, devisRepo, factureRepo, devisReader, commandeRepo } = repos;
+  const { devis: devisMail, facture: factureMail, relance: relanceMail, commande: commandeMail } = mailing;
   return {
     clients: { create: (ctx, input) => creerClient(clientRepo, ctx, input) },
     clientsById: clientRepo,
@@ -135,17 +136,17 @@ export function buildAssistantWriteDeps(repos: AssistantAgentWriteRepos, mailing
         }
       : {}),
     /** ── Envois (PDF via PdfPort, email via EmailPort, statut, rate-limit ; portés par les use-cases). ── */
-    ...(mailing.devis
-      ? { devisSender: { envoyer: (ctx, id, m) => envoyerDevisParEmail(devisRepo, mailing.devis!, ctx, { devisId: id, customMessage: m, attachPdf: true }) } }
+    ...(devisMail
+      ? { devisSender: { envoyer: (ctx, id, m) => envoyerDevisParEmail(devisRepo, devisMail, ctx, { devisId: id, customMessage: m, attachPdf: true }) } }
       : {}),
-    ...(factureRepo && mailing.facture
-      ? { factureSender: { envoyer: (ctx, id, m) => envoyerFactureParEmail(factureRepo, mailing.facture!, ctx, { factureId: id, customMessage: m, attachPdf: true }) } }
+    ...(factureRepo && factureMail
+      ? { factureSender: { envoyer: (ctx, id, m) => envoyerFactureParEmail(factureRepo, factureMail, ctx, { factureId: id, customMessage: m, attachPdf: true }) } }
       : {}),
-    ...(factureRepo && mailing.relance
-      ? { relanceSender: { envoyer: (ctx, id, m) => envoyerRelanceFacture(factureRepo, mailing.relance!, ctx, { factureId: id, customMessage: m }) } }
+    ...(factureRepo && relanceMail
+      ? { relanceSender: { envoyer: (ctx, id, m) => envoyerRelanceFacture(factureRepo, relanceMail, ctx, { factureId: id, customMessage: m }) } }
       : {}),
     /** `envoyerCommandeParEmail` n'accepte pas de message personnalisé (le use-case migré l'a dropé) → ignoré. */
-    ...(mailing.commande ? { commandeSender: { envoyer: (ctx, id) => envoyerCommandeParEmail(mailing.commande!, ctx, id) } } : {}),
+    ...(commandeMail ? { commandeSender: { envoyer: (ctx, id) => envoyerCommandeParEmail(commandeMail, ctx, id) } } : {}),
   };
 }
 

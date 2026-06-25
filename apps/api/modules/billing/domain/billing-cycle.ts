@@ -48,7 +48,7 @@ export function isStuckProcessing(cycle: BillingCycle, now: Date): boolean {
 export function isDue(cycle: BillingCycle, now: Date): boolean {
   if (cycle.status === "pending") return now >= cycle.period_start;
   if (cycle.status === "failed" && cycle.next_retry_at !== null) {
-    return now >= cycle.next_retry_at!;
+    return now >= cycle.next_retry_at;
   }
   return false;
 }

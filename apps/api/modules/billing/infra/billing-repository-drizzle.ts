@@ -75,7 +75,8 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
         consented_at: params.consentedAt,
       })
       .returning();
-    return row!;
+    if (!row) throw new Error("DB insert returned no row");
+    return row;
   }
 
   async setDefaultPaymentMethod(ctx: TenantContext, id: number): Promise<void> {
@@ -136,7 +137,8 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
         },
       })
       .returning();
-    return row!;
+    if (!row) throw new Error("DB insert returned no row");
+    return row;
   }
 
   async findExpiredTrials(now: Date, limit = 200): Promise<BillingSubscription[]> {
@@ -244,7 +246,8 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
         status: "pending",
       })
       .returning();
-    return row!;
+    if (!row) throw new Error("DB insert returned no row");
+    return row;
   }
 
 
@@ -354,7 +357,8 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
         status: "initiated",
       })
       .returning();
-    return row!;
+    if (!row) throw new Error("DB insert returned no row");
+    return row;
   }
 
   async updateChargeAttempt(id: number, params: UpdateChargeAttemptParams): Promise<void> {
@@ -414,7 +418,8 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
         actor: params.actor,
       })
       .returning();
-    return row!;
+    if (!row) throw new Error("DB insert returned no row");
+    return row;
   }
 
 
