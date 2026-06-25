@@ -24,7 +24,18 @@ export interface ImportDevisData {
   readonly notes?: string;
 }
 
-/** Facture « légère » importée : montant TTC brut, sans lignes. Numéro généré serveur. */
+/** Ligne de facture importée (synthétique pour reprise HT/TVA depuis TTC). */
+export interface ImportFactureLigneData {
+  readonly designation: string;
+  readonly quantite: string;
+  readonly prixUnitaireHT: string;
+  readonly tauxTVA: string;
+  readonly tvaCategorieId?: string;
+  readonly montantHT: string;
+  readonly montantTVA: string;
+}
+
+/** Facture « légère » importée : montant TTC brut, avec lignes synthétiques HT/TVA. Numéro généré serveur. */
 export interface ImportFactureData {
   readonly clientId: number;
   /** Numéro LÉGAL d'origine (autre logiciel) à PRÉSERVER ; si absent/vide → numéro serveur généré. */
@@ -36,6 +47,7 @@ export interface ImportFactureData {
   readonly datePaiement?: Date;
   readonly modePaiement?: string;
   readonly totalTTC: string;
+  readonly lignes?: readonly ImportFactureLigneData[];
 }
 
 /*

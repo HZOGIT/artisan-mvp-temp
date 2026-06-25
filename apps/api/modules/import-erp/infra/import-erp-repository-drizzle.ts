@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { clients as clientsTable, devis as devisTable, factures as facturesTable } from "../../../../../drizzle/schema.pg";
+import { clients as clientsTable, devis as devisTable, factures as facturesTable, facturesLignes as facturesLignesTable } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
@@ -75,7 +75,7 @@ export class ImportErpRepositoryDrizzle implements IImportErpRepository {
      */
     const numero = data.numero && data.numero.trim() ? data.numero.trim() : await this.factureRepo.nextNumero(ctx);
     await withTenant(this.db, ctx, async (tx) => {
-      await tx.insert(facturesTable).values({
+      const [facture] = await tx.insert(facturesTable).values({
         artisanId: ctx.artisanId,
         clientId: data.clientId,
         numero,
@@ -86,7 +86,27 @@ export class ImportErpRepositoryDrizzle implements IImportErpRepository {
         datePaiement: data.datePaiement ?? null,
         modePaiement: data.modePaiement ?? null,
         totalTTC: data.totalTTC,
-      });
+      }).returning();
+      if (data.lignes && data.lignes.length > 0) {
+        for (const ligne of data.lignes) {
+          const montantTTC = (parseFloat(ligne.montantHT) + parseFloat(ligne.montantTVA)).toFixed(2);
+          await tx.insert(facturesLignesTable).values({
+            factureId: facture.id,
+            ordre: 0,
+            designation: ligne.designation,
+            description: null,
+            quantite: ligne.quantite,
+            unite: "unité",
+            prixUnitaireHT: ligne.prixUnitaireHT,
+            tauxTVA: ligne.tauxTVA,
+            tvaCategorieId: ligne.tvaCategorieId ?? null,
+            montantHT: ligne.montantHT,
+            montantTVA: ligne.montantTVA,
+            montantTTC,
+            type: "produit",
+          });
+        }
+      }
     });
   }
 

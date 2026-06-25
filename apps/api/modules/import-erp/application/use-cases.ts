@@ -1,4 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
+import { tauxStringToCategorie } from "../../../shared/tva/taux-tva-fr";
 import type { IImportErpRepository } from "./import-erp-repository";
 import { pickField, findClientByName, emptyResult, type ImportRow, type ImportMapping, type ImportResult } from "../domain/import";
 
@@ -99,7 +100,7 @@ export async function importDevis(repo: IImportErpRepository, ctx: TenantContext
 
 /*
  * Importe des factures « légères » (parité legacy `importFactures`). Client résolu par nom ; échéance =
- * dateFacture + 30 jours. Montant TTC brut (pas de lignes ni d'écritures — reprise de données).
+ * dateFacture + 30 jours. Crée une ligne synthétique HT/TVA à partir du TTC + tauxTVA optionnel.
  */
 export async function importFactures(repo: IImportErpRepository, ctx: TenantContext, input: ImportInput): Promise<ImportResult> {
   const clients = await repo.listClients(ctx);
@@ -136,6 +137,30 @@ export async function importFactures(repo: IImportErpRepository, ctx: TenantCont
       const dateFactStr = pickField(row, input.mapping, "dateFacture");
       const datePaiementStr = pickField(row, input.mapping, "datePaiement");
       const dateFacture = dateFactStr ? new Date(dateFactStr) : new Date();
+      const totalTTCStr = pickField(row, input.mapping, "totalTTC") || "0";
+      const totalTTC = parseFloat(totalTTCStr);
+      const totalHTStr = pickField(row, input.mapping, "totalHT");
+      const tauxTVAStr = pickField(row, input.mapping, "tauxTVA");
+      const tauxTVA = tauxTVAStr ? parseFloat(tauxTVAStr) : 20.00;
+      let totalHT: number;
+      if (totalHTStr) {
+        totalHT = parseFloat(totalHTStr);
+      } else {
+        totalHT = parseFloat((totalTTC / (1 + tauxTVA / 100)).toFixed(2));
+      }
+      const montantTVA = parseFloat((totalTTC - totalHT).toFixed(2));
+      const tvaCategorieId = tauxStringToCategorie(tauxTVA);
+      const lignes = [
+        {
+          designation: "Reprise historique",
+          quantite: "1",
+          prixUnitaireHT: totalHT.toFixed(2),
+          tauxTVA: tauxTVA.toFixed(2),
+          tvaCategorieId,
+          montantHT: totalHT.toFixed(2),
+          montantTVA: montantTVA.toFixed(2),
+        },
+      ];
       await repo.createFactureLight(ctx, {
         clientId: client.id,
         numero: numeroOrigine,
@@ -145,7 +170,8 @@ export async function importFactures(repo: IImportErpRepository, ctx: TenantCont
         dateEcheance: new Date(dateFacture.getTime() + 30 * JOUR_MS),
         datePaiement: datePaiementStr ? new Date(datePaiementStr) : undefined,
         modePaiement: pickField(row, input.mapping, "modePaiement"),
-        totalTTC: pickField(row, input.mapping, "totalTTC") || "0",
+        totalTTC: totalTTCStr,
+        lignes,
       });
       /** anti-doublon intra-lot */
       if (numeroOrigine) numerosVus.add(numeroOrigine);

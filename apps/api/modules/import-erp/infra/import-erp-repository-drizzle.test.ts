@@ -72,7 +72,7 @@ describe.skipIf(!URL)("ImportErpRepositoryDrizzle (RLS import ERP)", () => {
     expect(rows[0].numero).toBeTruthy(); // numéro généré serveur
   });
 
-  it("createFactureLight : PRÉSERVE le numéro légal fourni ; en génère un si absent", async () => {
+  it("createFactureLight : PRÉSERVE le numéro légal fourni ; en génère un si absent + crée ligne HT/TVA", async () => {
     await repo.createFactureLight(ctx(artisanA), {
       clientId: clientA, numero: "LEGACY-2024-007", objet: "Hist", statut: "payee",
       dateFacture: new Date("2024-03-01"), dateEcheance: new Date("2024-03-31"), totalTTC: "300.00",
@@ -80,10 +80,86 @@ describe.skipIf(!URL)("ImportErpRepositoryDrizzle (RLS import ERP)", () => {
     await repo.createFactureLight(ctx(artisanA), {
       clientId: clientA, objet: "Sans numero", statut: "envoyee",
       dateFacture: new Date("2026-03-01"), dateEcheance: new Date("2026-03-31"), totalTTC: "150.00",
+      lignes: [
+        {
+          designation: "Reprise historique",
+          quantite: "1",
+          prixUnitaireHT: "125.00",
+          tauxTVA: "20.00",
+          tvaCategorieId: "FR_20",
+          montantHT: "125.00",
+          montantTVA: "25.00",
+        },
+      ],
     });
     const numeros = await repo.listFactureNumeros(ctx(artisanA));
-    expect(numeros).toContain("LEGACY-2024-007"); // numéro d'origine préservé
-    expect(numeros.filter((n) => n !== "LEGACY-2024-007")).toHaveLength(1); // l'autre a un numéro généré
-    expect(await repo.listFactureNumeros(ctx(artisanB))).toEqual([]); // anti-IDOR
+    expect(numeros).toContain("LEGACY-2024-007");
+    expect(numeros.filter((n) => n !== "LEGACY-2024-007")).toHaveLength(1);
+    expect(await repo.listFactureNumeros(ctx(artisanB))).toEqual([]);
+    const generated = numeros.filter((n) => n !== "LEGACY-2024-007")[0];
+    const { rows: lignes } = await admin.query(
+      'select f.numero, f."totalTTC", l."montantHT", l."montantTVA", l."montantTTC" from factures f left join factures_lignes l on f.id = l."factureId" where f.numero = $1',
+      [generated],
+    );
+    expect(lignes).toHaveLength(1);
+    expect(lignes[0].totalTTC).toBe("150.00");
+    expect(lignes[0].montantHT).toBe("125.00");
+    expect(lignes[0].montantTVA).toBe("25.00");
+    expect(lignes[0].montantTTC).toBe("150.00");
+  });
+
+  it("createFactureLight : dérive HT à partir de TTC (TTC=120 → HT=100, TVA=20)", async () => {
+    await repo.createFactureLight(ctx(artisanA), {
+      clientId: clientA, numero: "IMPORT-DERIVE-001", objet: "Import dérivé", statut: "brouillon",
+      dateFacture: new Date("2026-01-15"), dateEcheance: new Date("2026-02-15"), totalTTC: "120.00",
+      lignes: [
+        {
+          designation: "Reprise historique",
+          quantite: "1",
+          prixUnitaireHT: "100.00",
+          tauxTVA: "20.00",
+          tvaCategorieId: "FR_20",
+          montantHT: "100.00",
+          montantTVA: "20.00",
+        },
+      ],
+    });
+    const { rows } = await admin.query(
+      'select f.numero, f."totalTTC", l."montantHT", l."montantTVA", l."montantTTC" from factures f left join factures_lignes l on f.id = l."factureId" where f.numero = $1',
+      ["IMPORT-DERIVE-001"],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].totalTTC).toBe("120.00");
+    expect(rows[0].montantHT).toBe("100.00");
+    expect(rows[0].montantTVA).toBe("20.00");
+    expect(rows[0].montantTTC).toBe("120.00");
+  });
+
+  it("createFactureLight : TVA 10% (TTC=110 → HT=100, TVA=10)", async () => {
+    await repo.createFactureLight(ctx(artisanA), {
+      clientId: clientA, numero: "IMPORT-DERIVE-002", objet: "Import 10% TVA", statut: "brouillon",
+      dateFacture: new Date("2026-01-20"), dateEcheance: new Date("2026-02-20"), totalTTC: "110.00",
+      lignes: [
+        {
+          designation: "Reprise historique",
+          quantite: "1",
+          prixUnitaireHT: "100.00",
+          tauxTVA: "10.00",
+          tvaCategorieId: "FR_10",
+          montantHT: "100.00",
+          montantTVA: "10.00",
+        },
+      ],
+    });
+    const { rows } = await admin.query(
+      'select f.numero, f."totalTTC", l."montantHT", l."montantTVA", l."montantTTC", l."tvaCategorieId" from factures f left join factures_lignes l on f.id = l."factureId" where f.numero = $1',
+      ["IMPORT-DERIVE-002"],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].totalTTC).toBe("110.00");
+    expect(rows[0].montantHT).toBe("100.00");
+    expect(rows[0].montantTVA).toBe("10.00");
+    expect(rows[0].montantTTC).toBe("110.00");
+    expect(rows[0].tvaCategorieId).toBe("FR_10");
   });
 });
