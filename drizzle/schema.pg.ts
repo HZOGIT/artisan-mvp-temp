@@ -29,6 +29,7 @@ import {
   jsonb,
   unique,
   primaryKey,
+  index,
 } from "drizzle-orm/pg-core";
 
 // ── Enums ──────────────────────────────────────────────────────────────────
@@ -507,6 +508,8 @@ export const techniciens = pgTable("techniciens", {
   coutHoraire: numeric("coutHoraire", { precision: 8, scale: 2 }),
   userId: integer("userId"),
   notes: text("notes"),
+  /** CNIL géoloc — le technicien peut désactiver son suivi GPS hors temps de travail. */
+  suiviActif: boolean("suiviActif").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
@@ -527,20 +530,26 @@ export type DisponibiliteTechnicien = typeof disponibilitesTechniciens.$inferSel
 export type InsertDisponibiliteTechnicien = typeof disponibilitesTechniciens.$inferInsert;
 
 // ── POSITIONS GPS TECHNICIENS ────────────────────────────────────────────────
-export const positionsTechniciens = pgTable("positions_techniciens", {
-  id: serial("id").primaryKey(),
-  technicienId: integer("technicienId").notNull(),
-  latitude: numeric("latitude", { precision: 10, scale: 8 }).notNull(),
-  longitude: numeric("longitude", { precision: 11, scale: 8 }).notNull(),
-  precision: integer("precision"),
-  vitesse: numeric("vitesse", { precision: 5, scale: 2 }),
-  cap: integer("cap"),
-  batterie: integer("batterie"),
-  enDeplacement: boolean("enDeplacement").default(false),
-  interventionEnCoursId: integer("interventionEnCoursId"),
-  timestamp: timestamp("timestamp").defaultNow().notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+export const positionsTechniciens = pgTable(
+  "positions_techniciens",
+  {
+    id: serial("id").primaryKey(),
+    technicienId: integer("technicienId").notNull(),
+    latitude: numeric("latitude", { precision: 10, scale: 8 }).notNull(),
+    longitude: numeric("longitude", { precision: 11, scale: 8 }).notNull(),
+    precision: integer("precision"),
+    vitesse: numeric("vitesse", { precision: 5, scale: 2 }),
+    cap: integer("cap"),
+    batterie: integer("batterie"),
+    enDeplacement: boolean("enDeplacement").default(false),
+    interventionEnCoursId: integer("interventionEnCoursId"),
+    timestamp: timestamp("timestamp").defaultNow().notNull(),
+    /** CNIL — date d'expiration de la position (8 h après l'enregistrement, purgée par le cron). */
+    expiresAt: timestamp("expiresAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (t) => [index("idx_positions_techniciens_expires_at").on(t.expiresAt)],
+);
 export type PositionTechnicien = typeof positionsTechniciens.$inferSelect;
 export type InsertPositionTechnicien = typeof positionsTechniciens.$inferInsert;
 

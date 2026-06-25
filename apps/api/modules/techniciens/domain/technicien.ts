@@ -18,6 +18,8 @@ export interface Technicien {
   readonly coutHoraire: string | null;
   readonly userId: number | null;
   readonly notes: string | null;
+  /** CNIL — le technicien peut désactiver son suivi GPS hors temps de travail. */
+  readonly suiviActif: boolean;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }

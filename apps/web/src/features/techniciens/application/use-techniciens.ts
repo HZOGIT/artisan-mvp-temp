@@ -16,11 +16,12 @@ export function useTechniciens() {
   const create = trpc.techniciens.create.useMutation({ onSuccess: invalidate });
   const update = trpc.techniciens.update.useMutation({ onSuccess: invalidate });
   const remove = trpc.techniciens.delete.useMutation({ onSuccess: invalidate });
+  const setSuiviActif = trpc.techniciens.setSuiviActif.useMutation({ onSuccess: invalidate });
 
   const techniciens: Technicien[] = techniciensQ.data ?? [];
   const linkableUsers: LinkableUser[] = linkableUsersQ.data ?? [];
 
-  return { techniciens, linkableUsers, create, update, remove };
+  return { techniciens, linkableUsers, create, update, remove, setSuiviActif };
 }
 
 /** Détail du technicien sélectionné (stats + habilitations) — queries dépendantes de l'état UI. */

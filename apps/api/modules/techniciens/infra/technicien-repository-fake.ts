@@ -8,6 +8,9 @@ import type { HabilitationTechnicien, AjouterHabilitationInput } from "../domain
 import type { TechnicienStats } from "../domain/stats";
 
 type InterventionStatut = "planifiee" | "en_cours" | "terminee" | "annulee";
+type StoredPosition = Position & { expiresAt: Date };
+
+const GPS_RETENTION_MS = 8 * 60 * 60 * 1000;
 
 /*
  * Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le
@@ -16,7 +19,7 @@ type InterventionStatut = "planifiee" | "en_cours" | "terminee" | "annulee";
 export class FakeTechnicienRepository implements ITechnicienRepository {
   private store: Technicien[] = [];
   private dispos: Disponibilite[] = [];
-  private positions: Position[] = [];
+  private positions: StoredPosition[] = [];
   private habilitations: Array<HabilitationTechnicien & { artisanId: number }> = [];
   /** Interventions simulées pour les stats : {artisanId, technicienId, statut}. */
   private interventions: Array<{ artisanId: number; technicienId: number; statut: InterventionStatut }> = [];
@@ -63,6 +66,7 @@ export class FakeTechnicienRepository implements ITechnicienRepository {
       coutHoraire: input.coutHoraire ?? null,
       userId: input.userId ?? null,
       notes: input.notes ?? null,
+      suiviActif: true,
       createdAt: now,
       updatedAt: now,
     };
@@ -115,7 +119,10 @@ export class FakeTechnicienRepository implements ITechnicienRepository {
     const list = this.positions
       .filter((p) => p.technicienId === technicienId)
       .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime() || b.id - a.id);
-    return list[0] ?? null;
+    const found = list[0];
+    if (!found) return null;
+    const { expiresAt: _e, ...pos } = found;
+    return pos;
   }
 
   async enregistrerPosition(
@@ -124,7 +131,8 @@ export class FakeTechnicienRepository implements ITechnicienRepository {
     input: EnregistrerPositionInput,
   ): Promise<Position | null> {
     if (!(await this.owns(ctx, technicienId))) return null;
-    const p: Position = {
+    const now = new Date();
+    const stored: StoredPosition = {
       id: ++this.posSeq,
       technicienId,
       latitude: input.latitude,
@@ -135,10 +143,27 @@ export class FakeTechnicienRepository implements ITechnicienRepository {
       batterie: input.batterie ?? null,
       enDeplacement: input.enDeplacement ?? false,
       interventionEnCoursId: input.interventionEnCoursId ?? null,
-      timestamp: new Date(),
+      timestamp: now,
+      expiresAt: new Date(now.getTime() + GPS_RETENTION_MS),
     };
-    this.positions.push(p);
-    return p;
+    this.positions.push(stored);
+    const { expiresAt: _e, ...pos } = stored;
+    return pos;
+  }
+
+  async setSuiviActif(ctx: TenantContext, technicienId: number, actif: boolean): Promise<Technicien | null> {
+    const t = await this.getById(ctx, technicienId);
+    if (!t) return null;
+    const updated: Technicien = { ...t, suiviActif: actif, updatedAt: new Date() };
+    this.store = this.store.map((x) => (x.id === technicienId ? updated : x));
+    return updated;
+  }
+
+  async purgerPositionsExpirees(): Promise<number> {
+    const now = new Date();
+    const before = this.positions.length;
+    this.positions = this.positions.filter((p) => p.expiresAt >= now);
+    return before - this.positions.length;
   }
 
   async getUsersLiables(ctx: TenantContext): Promise<UtilisateurLiable[]> {
