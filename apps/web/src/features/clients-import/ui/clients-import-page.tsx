@@ -1,8 +1,8 @@
 import { useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
 import { Upload, AlertCircle, CheckCircle, Loader2, Download } from "lucide-react";
+import { exportToCsv } from "@/shared/lib/csv-export";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
@@ -31,9 +31,13 @@ export default function ClientsImportPage() {
     setFile(selected);
     setIsLoading(true);
     try {
-      const workbook = XLSX.read(await selected.arrayBuffer(), { type: "array" });
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[workbook.SheetNames[0]]);
-      const clients = parseRows(rows);
+      const { default: readXlsxFile } = await import("read-excel-file");
+      const sheets = (await readXlsxFile(selected)) as Array<{ data: unknown[][] }>;
+      const sheetData = sheets[0].data as unknown[][];
+      const [headers, ...dataRows] = sheetData;
+      const headerArray = (headers ?? []) as unknown[];
+      const rows = dataRows.map(row => Object.fromEntries(headerArray.map((h, i) => [String(h), (row as unknown[])[i]])));
+      const clients = parseRows(rows as Record<string, unknown>[]);
       setPreview(clients);
       if (clients.length === 0) { toast.error(t("errAucunValide")); setFile(null); }
       else toast.success(t("comptesToast", { valides: validCount(clients), erreurs: errorCount(clients) }));
@@ -59,10 +63,9 @@ export default function ClientsImportPage() {
   };
 
   const downloadTemplate = () => {
-    const ws = XLSX.utils.json_to_sheet([TEMPLATE_ROW]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Clients");
-    XLSX.writeFile(wb, "modele_clients.xlsx");
+    const headers = Object.keys(TEMPLATE_ROW);
+    const rows = [Object.values(TEMPLATE_ROW).map(String)];
+    exportToCsv("modele_clients.csv", headers, rows);
     toast.success(t("modeleTelecharge"));
   };
 
