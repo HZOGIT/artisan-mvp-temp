@@ -286,12 +286,16 @@ Pour trouver l'`id` de l'issue depuis son identifiant OPE-XXX : utiliser `get_is
 ### 🧹 Hygiène worktrees + screens — à chaque cycle
 
 - **Après CHAQUE merge** : tuer le screen worker, supprimer le worktree `/tmp/wt-<session>`, supprimer la branche distante+locale (étape 3). Non négociable.
-- **Au début de chaque cycle cron**, balayer les orphelins (les nettoyages ratés s'accumulent) :
+- **Au début de chaque cycle cron**, balayer les orphelins (les nettoyages ratés s'accumulent) — mais avec des critères STRICTS :
 ```bash
-# Worktrees orphelins (branche feat mergée/supprimée mais worktree resté) :
 git -C /home/developer/artisan-mvp-temp worktree prune
-git -C /home/developer/artisan-mvp-temp worktree list   # inspecter /tmp/wt-* restants → remove --force ceux des PRs déjà mergées
-# Screens de workers dont la PR est mergée/fermée → screen -S <nom> -X quit
+git -C /home/developer/artisan-mvp-temp worktree list
 screen -ls
 ```
-- Ne JAMAIS supprimer un worktree/screen qui n'est pas à toi (PR encore ouverte, autre rôle infra : `project-manager`, `deployment-manager`). En cas de doute, laisse.
+
+> 🚨 **ERREUR GRAVE déjà commise — ne PAS supprimer un worktree « parce que sa branche est ancêtre de `origin/staging` »**. Une branche **fraîchement créée** (0 commit propre) est trivialement un ancêtre de staging → faux positif « mergé ». J'ai ainsi détruit 4 worktrees que le `project-manager` venait de lancer. Un worktree n'est un orphelin supprimable que si **TOUS** ces critères sont réunis :
+> 1. **Aucun screen** du même nom ne tourne (`screen -ls` ne le liste pas) — un screen vivant = session active, **on ne touche pas** ;
+> 2. La branche a eu une **PR réellement mergée/fermée** : `gh pr list --head feat/<nom> --state all --json number,state` renvoie `MERGED`/`CLOSED` (PAS la simple ascendance git) ;
+> 3. Le worktree est **vieux** (pas créé dans les dernières minutes — recoupe avec l'horodatage `screen -ls`).
+>
+> Au moindre doute (pas de PR du tout, worktree récent, screen présent) → **laisser**. Ne JAMAIS toucher : `/tmp/wt-build-admin`, les worktrees d'autres rôles infra, ou tout ce qui n'est pas clairement un worker de PR mergée.
