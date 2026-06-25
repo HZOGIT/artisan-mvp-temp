@@ -4,6 +4,7 @@ import { FakeEmailPort } from "../../../shared/ports/fakes";
 import { FakePasswordHasher } from "../../../shared/ports/password-hasher-bcrypt";
 import type { TenantContext } from "../../../shared/tenant";
 import { FakeUtilisateurRepository } from "../infra/utilisateur-repository-fake";
+import { FakeSubscriptionReader, blankSub } from "../../subscription/infra/subscription-reader-fake";
 import type { UtilisateurDeps } from "./use-cases";
 import {
   basculerActif,
@@ -19,11 +20,12 @@ const ctx = (artisanId: number): TenantContext => ({ artisanId, userId: 1 });
 const A = 10;
 const B = 20;
 
-function makeDeps(over: Partial<UtilisateurDeps> = {}): { deps: UtilisateurDeps; repo: FakeUtilisateurRepository; email: FakeEmailPort } {
+function makeDeps(over: Partial<UtilisateurDeps> = {}): { deps: UtilisateurDeps; repo: FakeUtilisateurRepository; email: FakeEmailPort; subscriptionReader: FakeSubscriptionReader } {
   const repo = new FakeUtilisateurRepository();
   const email = new FakeEmailPort();
-  const deps: UtilisateurDeps = { repo, hasher: new FakePasswordHasher(), email, genTempPassword: () => "TEMP123456", ...over };
-  return { deps, repo, email };
+  const subscriptionReader = new FakeSubscriptionReader();
+  const deps: UtilisateurDeps = { repo, hasher: new FakePasswordHasher(), email, subscriptionReader, genTempPassword: () => "TEMP123456", ...over };
+  return { deps, repo, email, subscriptionReader };
 }
 
 describe("utilisateurs use-cases", () => {
@@ -125,5 +127,58 @@ describe("utilisateurs use-cases", () => {
     const res = await reinitialiserPermissions(deps, ctx(A), 101);
     expect(res.permissions).toContain("interventions.voir");
     expect(await repo.getPermissions(101)).toContain("calendrier.voir");
+  });
+
+  it("invite : maxUsers 1 (trial) → 1 user existant + nouvelle invitation → ConflictError", async () => {
+    const { deps, repo, subscriptionReader } = makeDeps();
+    subscriptionReader.seed(A, blankSub(A)); /* maxUsers: 1 (trial) */
+    repo.seedUser({ id: 100, role: "artisan", artisanId: null }); /* owner */
+    repo.setOwner(A, 100);
+    await expect(inviterUtilisateur(deps, ctx(A), { email: "new@t.fr", nom: "X", role: "artisan" })).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("invite : maxUsers 5 (pro) → 5 users existants + nouvelle invitation → ConflictError", async () => {
+    const { deps, repo, subscriptionReader } = makeDeps();
+    subscriptionReader.seed(A, { ...blankSub(A), plan: "pro", maxUsers: 5 });
+    repo.seedUser({ id: 100, role: "artisan", artisanId: null }); /* owner */
+    repo.setOwner(A, 100);
+    for (let i = 1; i < 5; i++) {
+      repo.seedUser({ id: 100 + i, role: "technicien", artisanId: A });
+    }
+    await expect(inviterUtilisateur(deps, ctx(A), { email: "new@t.fr", nom: "X", role: "artisan" })).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("invite : maxUsers 5 (pro) → 4 users existants + nouvelle invitation → OK", async () => {
+    const { deps, repo, subscriptionReader } = makeDeps();
+    repo.setNomEntreprise(A, "Test");
+    subscriptionReader.seed(A, { ...blankSub(A), plan: "pro", maxUsers: 5 });
+    repo.seedUser({ id: 100, role: "artisan", artisanId: null }); /* owner */
+    repo.setOwner(A, 100);
+    for (let i = 1; i < 4; i++) {
+      repo.seedUser({ id: 100 + i, role: "technicien", artisanId: A });
+    }
+    const res = await inviterUtilisateur(deps, ctx(A), { email: "new@t.fr", nom: "X", role: "artisan" });
+    expect(res.email).toBe("new@t.fr");
+  });
+
+  it("invite : pas de subscription (défaut 1) → maxUsers 1 par défaut", async () => {
+    const { deps, repo } = makeDeps();
+    repo.seedUser({ id: 100, role: "artisan", artisanId: null }); /* owner */
+    repo.setOwner(A, 100);
+    await expect(inviterUtilisateur(deps, ctx(A), { email: "new@t.fr", nom: "X", role: "artisan" })).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("invite : maxUsers 5 (pro) → 5 users total mais 1 inactif → 4 actifs → invitation OK", async () => {
+    const { deps, repo, subscriptionReader } = makeDeps();
+    repo.setNomEntreprise(A, "Test");
+    subscriptionReader.seed(A, { ...blankSub(A), plan: "pro", maxUsers: 5 });
+    repo.seedUser({ id: 100, role: "artisan", artisanId: null }); /* owner */
+    repo.setOwner(A, 100);
+    for (let i = 1; i < 4; i++) {
+      repo.seedUser({ id: 100 + i, role: "technicien", artisanId: A, actif: true });
+    }
+    repo.seedUser({ id: 104, role: "technicien", artisanId: A, actif: false }); /* inactif → ne compte pas */
+    const res = await inviterUtilisateur(deps, ctx(A), { email: "new@t.fr", nom: "X", role: "artisan" });
+    expect(res.email).toBe("new@t.fr");
   });
 });

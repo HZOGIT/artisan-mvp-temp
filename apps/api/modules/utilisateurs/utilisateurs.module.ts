@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { EmailPort } from "../../shared/ports/email";
 import type { PasswordHasher } from "../../shared/ports/password-hasher";
+import type { ISubscriptionReader } from "../subscription/application/subscription-reader";
 import type { IUtilisateurRepository } from "./application/utilisateur-repository";
 import type { UtilisateurDeps } from "./application/use-cases";
 import { createUtilisateursRouter } from "./interface/trpc/utilisateurs.router";
@@ -13,6 +14,7 @@ export interface UtilisateursModuleDeps {
   readonly repository: IUtilisateurRepository;
   readonly hasher: PasswordHasher;
   readonly email: EmailPort;
+  readonly subscriptionReader: ISubscriptionReader;
   readonly genTempPassword?: () => string;
 }
 
@@ -26,6 +28,7 @@ export function createUtilisateursModule(deps: UtilisateursModuleDeps): Utilisat
     repo: deps.repository,
     hasher: deps.hasher,
     email: deps.email,
+    subscriptionReader: deps.subscriptionReader,
     genTempPassword: deps.genTempPassword ?? defaultTempPassword,
   };
   return { deps: ucDeps, router: createUtilisateursRouter(ucDeps) };

@@ -3,9 +3,15 @@ import { createUtilisateursModule, defaultTempPassword } from "./utilisateurs.mo
 import { FakeUtilisateurRepository } from "./infra/utilisateur-repository-fake";
 import { FakeEmailPort } from "../../shared/ports/fakes";
 import { FakePasswordHasher } from "../../shared/ports/password-hasher-bcrypt";
+import { FakeSubscriptionReader } from "../subscription/infra/subscription-reader-fake";
 
 const make = () =>
-  createUtilisateursModule({ repository: new FakeUtilisateurRepository(), hasher: new FakePasswordHasher(), email: new FakeEmailPort() });
+  createUtilisateursModule({
+    repository: new FakeUtilisateurRepository(),
+    hasher: new FakePasswordHasher(),
+    email: new FakeEmailPort(),
+    subscriptionReader: new FakeSubscriptionReader(),
+  });
 
 describe("utilisateurs.module", () => {
   it("expose les 7 procédures tRPC", () => {
