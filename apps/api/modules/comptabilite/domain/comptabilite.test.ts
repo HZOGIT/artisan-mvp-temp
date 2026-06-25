@@ -74,6 +74,27 @@ describe("comptabilite domain (pur)", () => {
     expect(r).toEqual({ tvaCollectee: 15, tvaDeductible: 5, tvaNette: 10 });
   });
 
+  it("computeGrandLivre : invariant solde = totalDebit − totalCredit après round2 (anti-régression drift)", () => {
+    const gl = computeGrandLivre([
+      ec({ numeroCompte: "411000", debit: "0.1", credit: "0.00" }),
+      ec({ numeroCompte: "411000", debit: "0.2", credit: "0.00" }),
+    ]);
+    const c = gl[0];
+    expect(c.totalDebit).toBe(0.3);
+    expect(c.solde).toBe(c.totalDebit - c.totalCredit);
+  });
+
+  it("computeBalance : invariant soldeDebiteur dérivé de débit−crédit arrondis (anti-régression drift)", () => {
+    const bal = computeBalance([
+      ec({ numeroCompte: "411000", debit: "0.1" }),
+      ec({ numeroCompte: "411000", debit: "0.2" }),
+    ]);
+    const b = bal[0];
+    expect(b.debit).toBe(0.3);
+    expect(b.soldeDebiteur).toBe(b.debit - b.credit);
+    expect(b.soldeCrediteur).toBe(0);
+  });
+
   it("assembleDeclarationTVA : arrondi 2 déc., total collectée + nette", () => {
     const d = assembleDeclarationTVA(
       [

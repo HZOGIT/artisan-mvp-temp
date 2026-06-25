@@ -23,4 +23,12 @@ describe("computeDevisStats (pur)", () => {
     expect(stats.montantTotal).toBe(0);
     expect(stats.parStatut).toEqual({ envoye: 1 });
   });
+
+  it("montantTotal arrondi à 2 décimales — anti-régression drift float", () => {
+    const stats = computeDevisStats([
+      { statut: "accepte", totalTTC: "0.1" },
+      { statut: "accepte", totalTTC: "0.2" },
+    ]);
+    expect(stats.montantTotal).toBe(0.3);
+  });
 });
