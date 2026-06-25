@@ -61,16 +61,27 @@ describe("auth use-cases", () => {
     expect(repo.bootstrapped).toEqual([user.id]);
   });
 
-  it("updateEmail : OK si libre ou inchangé ; ConflictError si pris par un autre", async () => {
+  it("updateEmail : bon mot de passe → OK ; email pris par un autre → ConflictError", async () => {
     const repo = new FakeAuthRepository();
-    repo.seed({ id: 1, email: "moi@t.fr" });
-    repo.seed({ id: 2, email: "autre@t.fr" });
+    repo.seed({ id: 1, email: "moi@t.fr", password: "hashed:secret" });
+    repo.seed({ id: 2, email: "autre@t.fr", password: "hashed:x" });
     const deps = makeDeps(repo);
-    expect(await updateEmail(deps, 1, "nouveau@t.fr")).toEqual({ success: true });
+    expect(await updateEmail(deps, 1, "nouveau@t.fr", "secret")).toEqual({ success: true });
     expect((await repo.getById(1))?.email).toBe("nouveau@t.fr");
-    await expect(updateEmail(deps, 1, "autre@t.fr")).rejects.toBeInstanceOf(ConflictError);
-    // Inchangé (toujours mon propre email) → OK.
-    expect(await updateEmail(deps, 1, "nouveau@t.fr")).toEqual({ success: true });
+    await expect(updateEmail(deps, 1, "autre@t.fr", "secret")).rejects.toBeInstanceOf(ConflictError);
+    expect(await updateEmail(deps, 1, "nouveau@t.fr", "secret")).toEqual({ success: true });
+  });
+
+  it("updateEmail : mauvais mot de passe → UnauthorizedError", async () => {
+    const repo = new FakeAuthRepository();
+    repo.seed({ id: 1, email: "moi@t.fr", password: "hashed:secret" });
+    await expect(updateEmail(makeDeps(repo), 1, "nouveau@t.fr", "mauvais")).rejects.toBeInstanceOf(UnauthorizedError);
+  });
+
+  it("updateEmail : compte sans mot de passe (OAuth) → ValidationError", async () => {
+    const repo = new FakeAuthRepository();
+    repo.seed({ id: 1, email: "oauth@t.fr", password: null });
+    await expect(updateEmail(makeDeps(repo), 1, "nouveau@t.fr", "x")).rejects.toBeInstanceOf(ValidationError);
   });
 
   it("updatePassword : vérifie l'ancien (bcrypt) puis hashe le nouveau ; mauvais ancien → 401", async () => {

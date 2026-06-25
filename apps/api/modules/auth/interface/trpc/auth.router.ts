@@ -44,9 +44,9 @@ export function createAuthRouter(deps: AuthDeps) {
 
     /** ── Self-service (utilisateur authentifié) ─────────────────────────────────────────────────── */
     updateEmail: protectedProcedure
-      .input(z.object({ newEmail: z.string().email() }))
+      .input(z.object({ newEmail: z.string().email(), currentPassword: z.string().min(1) }))
       .mutation(async ({ ctx, input }) => {
-        const r = await updateEmail(deps, ctx.tenant.userId, input.newEmail);
+        const r = await updateEmail(deps, ctx.tenant.userId, input.newEmail, input.currentPassword);
         ctx.log.info({ event: "auth_update_email" }, "Email mis à jour");
         return r;
       }),

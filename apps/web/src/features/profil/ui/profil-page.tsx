@@ -175,6 +175,7 @@ function AccountSettings() {
   const { currentEmail, updateEmail, updatePassword, deleteAccount } = useAccountSettings();
   const [newEmail, setNewEmail] = useState("");
   const [confirmEmail, setConfirmEmail] = useState("");
+  const [currentPasswordForEmail, setCurrentPasswordForEmail] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -185,7 +186,7 @@ function AccountSettings() {
     e.preventDefault();
     const err = validateEmailChange(newEmail, confirmEmail, currentEmail);
     if (err) { toast[err === "errEmailSame" ? "info" : "error"](t(err)); return; }
-    updateEmail.mutate({ newEmail: newEmail.trim() }, { onSuccess: () => { toast.success(t("toastEmailOk")); setNewEmail(""); setConfirmEmail(""); }, onError: (e2) => toast.error(e2.message || t("errEmail")) });
+    updateEmail.mutate({ newEmail: newEmail.trim(), currentPassword: currentPasswordForEmail }, { onSuccess: () => { toast.success(t("toastEmailOk")); setNewEmail(""); setConfirmEmail(""); setCurrentPasswordForEmail(""); }, onError: (e2) => toast.error(e2.message || t("errEmail")) });
   };
 
   const strength = passwordStrength(newPassword);
@@ -215,7 +216,8 @@ function AccountSettings() {
               <div><Label htmlFor="newEmail">{t("nouvelEmail")}</Label><Input id="newEmail" type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="nouveau@exemple.com" className="mt-1" /></div>
               <div><Label htmlFor="confirmEmail">{t("confirmerNouvelEmail")}</Label><Input id="confirmEmail" type="email" value={confirmEmail} onChange={(e) => setConfirmEmail(e.target.value)} placeholder="nouveau@exemple.com" className="mt-1" /></div>
             </div>
-            <div className="flex justify-end"><Button type="submit" disabled={!newEmail || !confirmEmail || updateEmail.isPending}>{updateEmail.isPending ? t("majEnCours") : t("majEmail")}</Button></div>
+            <div><Label htmlFor="currentPasswordForEmail">{t("mdpActuel")}</Label><Input id="currentPasswordForEmail" type="password" value={currentPasswordForEmail} onChange={(e) => setCurrentPasswordForEmail(e.target.value)} autoComplete="current-password" className="mt-1" /></div>
+            <div className="flex justify-end"><Button type="submit" disabled={!newEmail || !confirmEmail || !currentPasswordForEmail || updateEmail.isPending}>{updateEmail.isPending ? t("majEnCours") : t("majEmail")}</Button></div>
           </form>
         </CardContent>
       </Card>

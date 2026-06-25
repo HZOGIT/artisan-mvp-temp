@@ -82,8 +82,15 @@ export async function signup(deps: AuthDeps, input: { email: string; password: s
   return { user, token };
 }
 
-/** Modifie l'email de l'utilisateur courant. Conflit si l'email est déjà pris par un AUTRE utilisateur (409). */
-export async function updateEmail(deps: AuthDeps, userId: number, newEmail: string): Promise<{ success: true }> {
+/** Modifie l'email de l'utilisateur courant. Exige le mot de passe actuel (401 si KO). Conflit si l'email est déjà pris par un AUTRE utilisateur (409). */
+export async function updateEmail(deps: AuthDeps, userId: number, newEmail: string, currentPassword: string): Promise<{ success: true }> {
+  const cred = await deps.repo.findCredentialsById(userId);
+  if (!cred || !cred.password) {
+    throw new ValidationError("Aucun mot de passe configuré sur ce compte");
+  }
+  if (!(await deps.hasher.verify(currentPassword, cred.password))) {
+    throw new UnauthorizedError("Mot de passe actuel incorrect");
+  }
   const existing = await deps.repo.findIdByEmail(newEmail);
   if (existing !== null && existing !== userId) {
     throw new ConflictError("Email déjà utilisé");
