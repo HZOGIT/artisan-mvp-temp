@@ -20,12 +20,12 @@ export class FacturesCAReaderDrizzle implements FacturesCAReader {
         .select({
           mois: sql<number>`extract(month from coalesce(${factures.dateFacture}, ${factures.createdAt}))::int`,
           annee: sql<number>`extract(year from coalesce(${factures.dateFacture}, ${factures.createdAt}))::int`,
-          caTotal: sql<string>`coalesce(sum(${factures.totalTTC}), 0)::text`,
+          caTotal: sql<string>`coalesce(sum(${factures.totalHT}), 0)::text`,
           nombreFactures: sql<number>`count(*)::int`,
           nombreClients: sql<number>`count(distinct ${factures.clientId})::int`,
         })
         .from(factures)
-        .where(sql`${factures.artisanId} = ${ctx.artisanId} and ${factures.statut} = 'payee'`)
+        .where(sql`${factures.artisanId} = ${ctx.artisanId} and (${factures.statut} = 'payee' or (${factures.typeDocument} = 'avoir' and ${factures.statut} = 'validee'))`)
         .groupBy(
           sql`extract(month from coalesce(${factures.dateFacture}, ${factures.createdAt}))`,
           sql`extract(year from coalesce(${factures.dateFacture}, ${factures.createdAt}))`,

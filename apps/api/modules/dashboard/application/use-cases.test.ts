@@ -10,7 +10,7 @@ describe("dashboard use-cases (wiring reader → pur, scopé tenant)", () => {
   it("getStats : agrège les lots du tenant ; un autre tenant a ses propres chiffres", async () => {
     const reader = new FakeDashboardReader();
     reader.seed(1, {
-      factures: [{ id: 1, numero: "F", clientId: 1, statut: "payee", totalTTC: "200", dateFacture: NOW, datePaiement: NOW, createdAt: NOW }],
+      factures: [{ id: 1, numero: "F", clientId: 1, statut: "payee", totalHT: "167.00", totalTTC: "200.00", typeDocument: "facture", dateFacture: NOW, datePaiement: NOW, createdAt: NOW }],
       devis: [{ id: 1, numero: "D", statut: "envoye", createdAt: NOW }],
       clients: [{ id: 1, nom: "C", prenom: null, createdAt: NOW }],
       interventions: [],
@@ -33,7 +33,7 @@ describe("dashboard use-cases (wiring reader → pur, scopé tenant)", () => {
     const reader = new FakeDashboardReader();
     reader.seed(1, {
       clients: [{ id: 1, nom: "A", prenom: null, createdAt: NOW }, { id: 2, nom: "B", prenom: null, createdAt: NOW }],
-      factures: [{ id: 1, numero: "F", clientId: 2, statut: "payee", totalTTC: "500", dateFacture: NOW, datePaiement: NOW, createdAt: NOW }],
+      factures: [{ id: 1, numero: "F", clientId: 2, statut: "payee", totalHT: "417.00", totalTTC: "500.00", typeDocument: "facture", dateFacture: NOW, datePaiement: NOW, createdAt: NOW }],
     });
     const top = await getTopClients(reader, ctx(1), 1);
     expect(top).toHaveLength(1);

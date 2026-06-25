@@ -108,8 +108,8 @@ export class RapportRepositoryDrizzle implements IRapportRepository {
         case "fournisseurs":
           return tx.select().from(fournisseurs).where(eq(fournisseurs.artisanId, aid));
         case "financier": {
-          const facturesList = await tx.select({ statut: factures.statut, totalTTC: factures.totalTTC }).from(factures).where(eq(factures.artisanId, aid));
-          return computeFinancier(facturesList.map((f) => ({ statut: f.statut ?? null, totalTTC: f.totalTTC ?? null })));
+          const facturesList = await tx.select({ statut: factures.statut, totalHT: factures.totalHT, typeDocument: factures.typeDocument }).from(factures).where(eq(factures.artisanId, aid));
+          return computeFinancier(facturesList.map((f) => ({ statut: f.statut ?? null, totalHT: f.totalHT ?? null, typeDocument: f.typeDocument ?? null })));
         }
         default:
           return [];
