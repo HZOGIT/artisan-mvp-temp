@@ -349,6 +349,7 @@ export interface AppDeps extends ContextDeps {
   readonly facturesCAReader?: FacturesCAReader;
   readonly tresorerieReader?: TresorerieReader;
   readonly eventBus?: EventBusPort;
+  readonly checkSubscriptionActive?: (artisanId: number) => Promise<boolean>;
 }
 
 /** Construit l'instance Fastify : /health + tRPC monté sur /api/trpc. */
@@ -1120,15 +1121,17 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   });
 
   /** Outil unitaire de la session vocale Live `POST /api/voice/tool` — réutilise le registry agentique. */
+  const checkSubscriptionActive = deps.checkSubscriptionActive ?? (async (artisanId: number) => {
+    const sub = await billingRepo.findSubscription({ artisanId, userId: 0 });
+    return sub?.status === "active" || sub?.status === "trialing";
+  });
+
   registerVoiceToolRoute(app, {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
     registry: agentRegistry,
     rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
-    checkSubscriptionActive: async (artisanId: number) => {
-      const sub = await billingRepo.findSubscription({ artisanId, userId: 0 });
-      return sub?.status === "active" || sub?.status === "trialing";
-    },
+    checkSubscriptionActive,
   });
 
   /** Token éphémère Gemini Live `POST /api/voice/token` — auth cookie, déclare les mêmes outils que le registry agentique. */
@@ -1142,10 +1145,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     threadsRepo: new AssistantThreadsRepositoryDrizzle(getDbHandle().db),
     tools: agentRegistry.tools,
     rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
-    checkSubscriptionActive: async (artisanId: number) => {
-      const sub = await billingRepo.findSubscription({ artisanId, userId: 0 });
-      return sub?.status === "active" || sub?.status === "trialing";
-    },
+    checkSubscriptionActive,
   });
 
   /** PDF bon de commande fournisseur `/api/commandes-fournisseurs/:id/pdf` (auth cookie, jsPDF). */
@@ -1251,10 +1251,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
     threadsRepo: new AssistantThreadsRepositoryDrizzle(getDbHandle().db),
     threadWriter: new AssistantThreadWriterDrizzle(getDbHandle().db),
-    checkSubscriptionActive: async (artisanId: number) => {
-      const sub = await billingRepo.findSubscription({ artisanId, userId: 0 });
-      return sub?.status === "active" || sub?.status === "trialing";
-    },
+    checkSubscriptionActive,
   });
 
   /** Expose le routeur racine assemblé (introspection : garde-fou de cohérence des domaines montés). */
