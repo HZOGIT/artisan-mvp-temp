@@ -402,56 +402,58 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
   }
 
   async createInvoiceForCycle(params: CreateInvoiceForCycleParams): Promise<BillingInvoice> {
-    const existing = await this.db
-      .select()
-      .from(billingInvoices)
-      .where(eq(billingInvoices.billing_cycle_id, params.cycleId))
-      .limit(1);
-    if (existing[0]) return existing[0];
+    return this.db.transaction(async (tx) => {
+      const existing = await tx
+        .select()
+        .from(billingInvoices)
+        .where(eq(billingInvoices.billing_cycle_id, params.cycleId))
+        .limit(1);
+      if (existing[0]) return existing[0];
 
-    const year = new Date().getFullYear();
-    const [seqRow] = await this.db
-      .insert(billingInvoiceSequences)
-      .values({ series: "FAC", year, next_val: 1 })
-      .onConflictDoUpdate({
-        target: [billingInvoiceSequences.series, billingInvoiceSequences.year],
-        set: { next_val: sql`${billingInvoiceSequences.next_val} + 1` },
-      })
-      .returning();
-    if (!seqRow) throw new Error("sequence upsert returned no row");
-    const invoiceNumber = `FAC-${year}-${String(seqRow.next_val).padStart(4, "0")}`;
+      const year = new Date().getFullYear();
+      const [seqRow] = await tx
+        .insert(billingInvoiceSequences)
+        .values({ series: "FAC", year, next_val: 1 })
+        .onConflictDoUpdate({
+          target: [billingInvoiceSequences.series, billingInvoiceSequences.year],
+          set: { next_val: sql`${billingInvoiceSequences.next_val} + 1` },
+        })
+        .returning();
+      if (!seqRow) throw new Error("sequence upsert returned no row");
+      const invoiceNumber = `FAC-${year}-${String(seqRow.next_val).padStart(4, "0")}`;
 
-    const subtotalCents = params.amountCents - params.taxCents;
-    const [invoice] = await this.db
-      .insert(billingInvoices)
-      .values({
-        artisan_id: params.artisanId,
-        number: invoiceNumber,
+      const subtotalCents = params.amountCents - params.taxCents;
+      const [invoice] = await tx
+        .insert(billingInvoices)
+        .values({
+          artisan_id: params.artisanId,
+          number: invoiceNumber,
+          type: "subscription",
+          status: "paid",
+          subtotal_cents: subtotalCents,
+          tax_cents: params.taxCents,
+          total_cents: params.amountCents,
+          currency: params.currency,
+          billing_cycle_id: params.cycleId,
+          paid_at: new Date(),
+        })
+        .returning();
+      if (!invoice) throw new Error("billing_invoices insert returned no row");
+
+      await tx.insert(billingInvoiceLines).values({
+        invoice_id: invoice.id,
+        description: params.planDescription,
+        quantity: 1,
+        unit_amount_cents: subtotalCents,
+        amount_cents: subtotalCents,
+        tax_rate_bps: 2000,
+        tax_amount_cents: params.taxCents,
         type: "subscription",
-        status: "paid",
-        subtotal_cents: subtotalCents,
-        tax_cents: params.taxCents,
-        total_cents: params.amountCents,
-        currency: params.currency,
-        billing_cycle_id: params.cycleId,
-        paid_at: new Date(),
-      })
-      .returning();
-    if (!invoice) throw new Error("billing_invoices insert returned no row");
+        sort_order: 0,
+      });
 
-    await this.db.insert(billingInvoiceLines).values({
-      invoice_id: invoice.id,
-      description: params.planDescription,
-      quantity: 1,
-      unit_amount_cents: subtotalCents,
-      amount_cents: subtotalCents,
-      tax_rate_bps: 2000,
-      tax_amount_cents: params.taxCents,
-      type: "subscription",
-      sort_order: 0,
+      return invoice;
     });
-
-    return invoice;
   }
 
 
