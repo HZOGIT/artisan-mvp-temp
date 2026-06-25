@@ -189,6 +189,7 @@ export async function dupliquerDevis(
       unite: l.unite,
       prixUnitaireHT: l.prixUnitaireHT,
       tauxTVA: l.tauxTVA,
+      tvaCategorieId: l.tvaCategorieId ?? null,
       ordre: l.ordre,
       type: l.type,
     });
