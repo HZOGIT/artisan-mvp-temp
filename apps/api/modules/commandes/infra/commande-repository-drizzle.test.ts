@@ -87,4 +87,22 @@ describe.skipIf(!URL)("CommandeRepositoryDrizzle (PG, RLS + scope tenant)", () =
     const n = await admin.query('select count(*)::int as n from lignes_commandes_fournisseurs where "commandeId"=$1', [cmd!.id]);
     expect(n.rows[0].n).toBe(0);
   });
+
+  it("TVA arrondie correctement (round2 IEEE-754) : 5.5% sur 100€ HT → 5.50 exactement", async () => {
+    const cmd = await repo.create(ctx(A), {
+      fournisseurId: fournA,
+      lignes: [
+        { designation: "Article", quantite: "100", prixUnitaire: "1.00", tauxTVA: "5.5" }, /* HT 100, TVA = 5.50 */
+      ],
+    });
+    expect(cmd).not.toBeNull();
+    expect(cmd!.totalHT).toBe("100.00");
+    expect(cmd!.totalTVA).toBe("5.50");
+    expect(cmd!.totalTTC).toBe("105.50");
+    /* Invariant : Σ(lignesTV A arrondies) === totalTVA (pas d'accumulation flottante) */
+    const lignes = await repo.listLignes(ctx(A), cmd!.id);
+    const sommeTVA = lignes.reduce((s, l) => s + (Number(l.montantTotal) * (Number(l.tauxTVA) / 100)), 0);
+    /* La somme des TVA par ligne arrondies doit égaler totalTVA au 2e décimal */
+    expect(Math.abs(sommeTVA - Number(cmd!.totalTVA))).toBeLessThan(0.001);
+  });
 });
