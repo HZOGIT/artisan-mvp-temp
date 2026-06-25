@@ -1,6 +1,6 @@
 {
-  "id": "c2549206-a4bc-4308-b99e-0356b62fda66",
-  "prevId": "77aaa299-12c2-4490-a819-4360ba30c619",
+  "id": "c13d2175-e429-4cfb-bae9-312db20e8b3e",
+  "prevId": "4b1fa5af-6e44-4ad6-a9f9-e0da277a59da",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -718,6 +718,24 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "assuranceDecennaleNom": {
+          "name": "assuranceDecennaleNom",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "assuranceDecennalePolice": {
+          "name": "assuranceDecennalePolice",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "assuranceDecennaleGarantie": {
+          "name": "assuranceDecennaleGarantie",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
         },
         "createdAt": {
           "name": "createdAt",
@@ -10314,6 +10332,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "passwordChangedAt": {
+          "name": "passwordChangedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},

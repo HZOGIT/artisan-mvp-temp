@@ -286,7 +286,7 @@ function buildMentionsLegalesEmetteur(artisan: Artisan): string[] {
   }
   if (artisan.numeroRM) lines.push(`Inscrit au Répertoire des Métiers — RM ${artisan.numeroRM}`);
   if (artisan.assuranceDecennaleNom && artisan.assuranceDecennalePolice) {
-    const zone = artisan.assuranceDecennaleGarantie ? `, garantissant les travaux ${artisan.assuranceDecennaleGarantie}` : "";
+    const zone = artisan.assuranceDecennaleGarantie ? `, garantissant les travaux en ${artisan.assuranceDecennaleGarantie}` : "";
     lines.push(`Assurance décennale : ${artisan.assuranceDecennaleNom} — Police n° ${artisan.assuranceDecennalePolice}${zone}`);
   }
   return lines;
