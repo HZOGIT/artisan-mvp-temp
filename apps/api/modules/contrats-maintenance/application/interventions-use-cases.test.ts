@@ -87,6 +87,19 @@ describe("contrats — interventions & à-facturer use-cases", () => {
     expect(await listContratsAFacturer(repo, B)).toEqual([]);
   });
 
+  it("listContratsAFacturer : arrondi TVA correct sur montant à centimes (HT=100.10, TVA=20%)", async () => {
+    const repo = new FakeContratRepository();
+    repo.seedClient(A.artisanId, 200, "Precision");
+    await repo.create(
+      A,
+      base({ clientId: 200, montantHT: "100.10", tauxTVA: "20.00", prochainFacturation: new Date("2026-06-13T00:00:00Z") }),
+      "CTR-PREC",
+    );
+    const out = await listContratsAFacturer(repo, A, () => new Date("2026-06-14T12:00:00Z"));
+    expect(out[0].montantTVA).toBe("20.02");
+    expect(out[0].montantTTC).toBe("120.12");
+  });
+
   it("addMonthsClamped : clamp de fin de mois (31 jan + 1 mois → 28 fév)", () => {
     expect(addMonthsClamped(new Date("2026-01-31T00:00:00Z"), 1).getDate()).toBe(28);
     expect(addMonthsClamped(new Date("2026-03-15T00:00:00Z"), 3).getMonth()).toBe(5); // juin

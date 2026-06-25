@@ -32,11 +32,12 @@ export async function listContratsAFacturer(
   return rows.map((c) => {
     const montantHT = parseFloat(c.montantHT || "0") || 0;
     const tauxTVA = parseFloat(c.tauxTVA || "0") || 0;
-    const montantTTC = montantHT * (1 + tauxTVA / 100);
+    const montantTVA = Math.round((montantHT * tauxTVA / 100) * 100) / 100;
+    const montantTTC = Math.round((montantHT + montantTVA) * 100) / 100;
     const joursRetard = c.prochainFacturation
       ? Math.max(0, Math.floor((now - c.prochainFacturation.getTime()) / 86_400_000))
       : 0;
-    return { ...c, montantTTC: montantTTC.toFixed(2), joursRetard };
+    return { ...c, montantTVA: montantTVA.toFixed(2), montantTTC: montantTTC.toFixed(2), joursRetard };
   });
 }
 

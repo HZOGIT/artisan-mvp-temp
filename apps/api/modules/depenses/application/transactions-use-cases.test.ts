@@ -128,6 +128,16 @@ describe("depenses — convertirTransaction", () => {
     await expect(convertirTransaction({ transactionRepo: trxRepo, depenseRepo: depRepo }, B, { transactionId: t.id, categorie: "x" })).rejects.toBeInstanceOf(NotFoundError);
   });
 
+  it("tauxTva optionnel : tauxTva:10 appliqué (pas le défaut 20%)", async () => {
+    const trxRepo = new FakeTransactionBancaireRepository();
+    const depRepo = new FakeDepenseRepository();
+    const t = seed(trxRepo, { montant: "-110.00", typeTransaction: "debit" });
+    const dep = await convertirTransaction({ transactionRepo: trxRepo, depenseRepo: depRepo }, A, { transactionId: t.id, categorie: "materiaux", tauxTva: 10 });
+    expect(dep.montantTtc).toBe("110.00");
+    expect(dep.montantHt).toBe("100.00");
+    expect(dep.montantTva).toBe("10.00");
+  });
+
   it("une transaction au CRÉDIT (encaissement) → ValidationError (pas une dépense)", async () => {
     const trxRepo = new FakeTransactionBancaireRepository();
     const depRepo = new FakeDepenseRepository();

@@ -63,6 +63,7 @@ export interface ConvertirTransactionInput {
   readonly categorie: string;
   readonly fournisseur?: string;
   readonly description?: string;
+  readonly tauxTva?: number;
 }
 
 /*
@@ -87,7 +88,7 @@ export async function convertirTransaction(
   }
 
   const montantTtc = Math.abs(Number(t.montant) || 0);
-  const tauxTva = 20;
+  const tauxTva = input.tauxTva ?? 20;
   const montantHt = Math.round((montantTtc / (1 + tauxTva / 100)) * 100) / 100;
   const montantTva = Math.round((montantTtc - montantHt) * 100) / 100;
   const libelle = String(t.libelle || "").slice(0, 200);

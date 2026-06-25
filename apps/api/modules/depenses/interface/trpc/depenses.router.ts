@@ -422,6 +422,7 @@ export function createDepensesRouter(
           categorie: z.string().min(1).max(100),
           fournisseur: z.string().max(255).optional(),
           description: z.string().max(5000).optional(),
+          tauxTva: z.number().min(0).max(100).optional(),
         }),
       )
       .mutation(({ ctx, input }) => convertirTransaction({ transactionRepo, depenseRepo: repo }, ctx.tenant, input)),
