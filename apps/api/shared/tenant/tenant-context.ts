@@ -10,6 +10,8 @@ export interface TenantContext {
   readonly role?: string;
   /** Vrai si l'utilisateur est le propriétaire du compte artisan (bypass des gates de permission). */
   readonly isOwner?: boolean;
+  /** true si l'artisan est en franchise en base de TVA (art. 293 B CGI). */
+  readonly franchiseTVA?: boolean;
 }
 
 /*

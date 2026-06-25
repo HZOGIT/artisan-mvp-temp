@@ -7,7 +7,7 @@ import type { TenantContext, TokenClaims, TenantResolver } from "./tenant-contex
  * Adapter (infra) du port TenantResolver : résout le TenantContext depuis les claims du
  * token (userId) en lisant `artisans`/`users`. Ces tables sont HORS RLS tenant (auth/
  * identité) → lisibles sans contexte tenant.
- * 
+ *
  * Appartenance d'un utilisateur à un tenant (parité du domaine `utilisateurs`) :
  *   tenant = OWNER (`artisans.userId = userId`) ∪ COLLABORATEUR (`users.artisanId = userId`).
  * L'OWNER prime ; à défaut, un collaborateur/secrétaire/technicien invité est résolu via
@@ -19,7 +19,7 @@ export class DrizzleTenantResolver implements TenantResolver {
 
   async resolve(claims: TokenClaims): Promise<TenantContext | null> {
     const [artisan] = await this.db
-      .select({ id: artisans.id })
+      .select({ id: artisans.id, franchiseTVA: artisans.franchiseTVA })
       .from(artisans)
       .where(eq(artisans.userId, claims.userId))
       .limit(1);
@@ -39,6 +39,7 @@ export class DrizzleTenantResolver implements TenantResolver {
       userId: claims.userId,
       role: user?.role ?? undefined,
       isOwner: artisan !== undefined,
+      franchiseTVA: artisan?.franchiseTVA ?? false,
     };
   }
 }

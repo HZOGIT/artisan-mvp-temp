@@ -604,7 +604,7 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
       ? Array.from(tvaParTaux.entries())
           .sort(([a], [b]) => a - b)
           .map(([taux, montant]) => ({ label: `TVA (${taux}%)`, value: `${montant.toFixed(2)} €` }))
-      : [{ label: `TVA (${tvaParTaux.size === 1 ? Array.from(tvaParTaux.keys())[0] : (Number(artisan.tauxTVA) || 20)}%)`, value: `${tva.toFixed(2)} €` }];
+      : [{ label: tvaParTaux.size === 1 ? `TVA (${Array.from(tvaParTaux.keys())[0]}%)` : "TVA", value: `${tva.toFixed(2)} €` }];
 
   const totalsStartY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
   const totalsEndY = renderTotalsBox(
@@ -788,7 +788,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
       ? Array.from(tvaParTauxF.entries())
           .sort(([a], [b]) => a - b)
           .map(([taux, montant]) => ({ label: `TVA (${taux}%)`, value: `${montant.toFixed(2)} €` }))
-      : [{ label: `TVA (${tvaParTauxF.size === 1 ? Array.from(tvaParTauxF.keys())[0] : (Number(artisan.tauxTVA) || 20)}%)`, value: `${tva.toFixed(2)} €` }];
+      : [{ label: tvaParTauxF.size === 1 ? `TVA (${Array.from(tvaParTauxF.keys())[0]}%)` : "TVA", value: `${tva.toFixed(2)} €` }];
 
   const totalsStartY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
   const totalsEndY = renderTotalsBox(
