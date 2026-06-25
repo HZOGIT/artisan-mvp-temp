@@ -7,17 +7,21 @@ import type { TenantContext } from "../../../shared/tenant";
 const A: TenantContext = { artisanId: 1, userId: 10 };
 const TECH = 500;
 
-describe("calculerJoursConge (parité legacy)", () => {
-  it("jours pleins = ceil(|fin−début|)+1 (bornes incluses)", () => {
-    // 01→05 juillet = 5 jours
-    expect(calculerJoursConge({ dateDebut: "2026-07-01", dateFin: "2026-07-05", demiJourneeDebut: false, demiJourneeFin: false }).jours).toBe(5);
-    // même jour = 1 jour
-    expect(calculerJoursConge({ dateDebut: "2026-07-01", dateFin: "2026-07-01", demiJourneeDebut: false, demiJourneeFin: false }).jours).toBe(1);
+describe("calculerJoursConge (jours ouvrés, sam/dim exclus)", () => {
+  it("jours ouvrés pleins — lun→ven = 5 jours, même jour ouvré = 1", () => {
+    /* 2026-07-06 (lun) → 2026-07-10 (ven) = 5 jours ouvrés */
+    expect(calculerJoursConge({ dateDebut: "2026-07-06", dateFin: "2026-07-10", demiJourneeDebut: false, demiJourneeFin: false }).jours).toBe(5);
+    expect(calculerJoursConge({ dateDebut: "2026-07-06", dateFin: "2026-07-06", demiJourneeDebut: false, demiJourneeFin: false }).jours).toBe(1);
+  });
+
+  it("weekends exclus — mer→dim = 3 jours ouvrés (mer/jeu/ven)", () => {
+    /* 2026-07-01 (mer) → 2026-07-05 (dim) : sam+dim exclus → 3 jours */
+    expect(calculerJoursConge({ dateDebut: "2026-07-01", dateFin: "2026-07-05", demiJourneeDebut: false, demiJourneeFin: false }).jours).toBe(3);
   });
 
   it("demi-journées retranchent 0,5 chacune", () => {
-    expect(calculerJoursConge({ dateDebut: "2026-07-01", dateFin: "2026-07-05", demiJourneeDebut: true, demiJourneeFin: true }).jours).toBe(4);
-    expect(calculerJoursConge({ dateDebut: "2026-07-01", dateFin: "2026-07-01", demiJourneeDebut: true, demiJourneeFin: false }).jours).toBe(0.5);
+    expect(calculerJoursConge({ dateDebut: "2026-07-06", dateFin: "2026-07-10", demiJourneeDebut: true, demiJourneeFin: true }).jours).toBe(4);
+    expect(calculerJoursConge({ dateDebut: "2026-07-06", dateFin: "2026-07-06", demiJourneeDebut: true, demiJourneeFin: false }).jours).toBe(0.5);
   });
 
   it("année d'imputation = année de dateDebut (anti-corruption inter-exercices)", () => {
@@ -37,7 +41,7 @@ describe("conges — intégration solde (décompte idempotent + recrédit)", () 
     repo.registerTechnicien(1, TECH);
     return repo;
   }
-  const conge = (over = {}) => ({ technicienId: TECH, type: "conge_paye" as const, dateDebut: "2026-07-01", dateFin: "2026-07-05", ...over });
+  const conge = (over = {}) => ({ technicienId: TECH, type: "conge_paye" as const, dateDebut: "2026-07-06", dateFin: "2026-07-10", ...over });
 
   it("approuver décompte le solde (5 jours) ; ré-approuver ne re-décompte pas (idempotent)", async () => {
     const repo = seed();
