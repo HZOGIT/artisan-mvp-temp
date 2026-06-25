@@ -30,6 +30,7 @@ export function registerVoiceToolRoute(app: FastifyInstance, deps: VoiceToolRout
 
     try {
       const result = await deps.registry.execute(body.name, args, { artisanId: auth.artisanId, userId: auth.userId });
+      req.log.info({ artisanId: auth.artisanId, tool: body.name }, 'voice_tool_called');
       return reply.send({ result });
     } catch {
       return reply.send({ result: { ok: false, error: "Erreur exécution outil" } });

@@ -361,6 +361,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
    * « expiré »). On relève la limite pour couvrir les gros batchs (≈150 procédures).
    */
   const app = Fastify({
+    bodyLimit: 5 * 1024 * 1024,
     maxParamLength: 5000,
     logger: buildFastifyLoggerConfig(),
     genReqId: (req) => (req.headers["x-request-id"] as string | undefined) ?? randomUUID().slice(0, 8),
