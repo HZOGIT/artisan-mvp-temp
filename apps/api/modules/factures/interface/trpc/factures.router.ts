@@ -16,7 +16,6 @@ import {
   supprimerLigneFacture,
   changerStatutFacture,
   enregistrerPaiementFacture,
-  marquerFacturePayee,
   creerAvoir,
   convertirDevisEnFacture,
 } from "../../application/write-use-cases";
@@ -244,14 +243,14 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
       }),
 
     /*
-     * Marquer payée (parité client `trpc.factures.markAsPaid`) : écrase montantPaye + force `payee` +
-     * génère les écritures FEC (vente + encaissement) via le ComptaPort. ⚠️ sémantique legacy (non cumulatif).
+     * Paiement partiel ou soldant (parité client `trpc.factures.markAsPaid`) : cumule montantPaye,
+     * marque `payee` uniquement si totalTTC soldé, génère les écritures FEC. Date invalide → 400.
      */
     markAsPaid: protectedProcedure
-      .input(z.object({ id: z.number().int(), montantPaye: decimal, datePaiement: z.string() }))
+      .input(z.object({ id: z.number().int(), montantPaye: decimal, datePaiement: isoDate }))
       .mutation(async ({ ctx, input }) => {
-        const result = await marquerFacturePayee(repo, ctx.tenant, input.id, { montantPaye: input.montantPaye, datePaiement: input.datePaiement }, compta);
-        ctx.log.info({ event: "facture_payee", factureId: input.id, montantPaye: Number(input.montantPaye) }, "Facture marquée payée");
+        const result = await enregistrerPaiementFacture(repo, ctx.tenant, input.id, { montant: input.montantPaye, date: toDate(input.datePaiement) }, compta);
+        ctx.log.info({ event: "facture_paiement_enregistre", factureId: input.id, montant: Number(input.montantPaye) }, "Paiement facture enregistré");
         return result;
       }),
 
