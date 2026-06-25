@@ -63,12 +63,14 @@ jspm_packages/
 
 # TypeScript cache
 *.tsbuildinfo
+.tsbuildinfo/
 
 # Optional npm cache directory
 .npm
 
 # Optional eslint cache
 .eslintcache
+node_modules/.cache/eslint/
 
 # Microbundle cache
 .rpt2_cache/

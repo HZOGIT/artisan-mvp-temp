@@ -15,7 +15,7 @@ describe("commande-form — domain pur", () => {
     expect(r[0]).toMatchObject({ type: "artisan", nom: "Robinet", prixAchat: undefined, prixVente: 50 });
   });
   it("mapBiblioResults : id préfixé biblio-", () => {
-    const data = [{ id: 7, nom: "Tube", unite: "ml", prix_base: "12" }] as BiblioArticle[];
+    const data = [{ id: 7, nom: "Tube", unite: "ml", prixBase: "12" }] as BiblioArticle[];
     expect(mapBiblioResults(data)[0]).toMatchObject({ id: "biblio-7", type: "bibliotheque", nom: "Tube", prixVente: 12 });
   });
   it("ligneFromSearchResult : articleId si artisan, prix d'achat seulement", () => {
