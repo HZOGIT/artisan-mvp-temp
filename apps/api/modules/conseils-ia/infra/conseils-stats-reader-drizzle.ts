@@ -15,21 +15,17 @@ export class ConseilsStatsReaderDrizzle implements ConseilsStatsReader {
 
   getStats(ctx: TenantContext): Promise<ConseilsStats> {
     return withTenant(this.db, ctx, async (tx) => {
-      const [devisRow] = await tx
-        .select({ n: sql<number>`count(*)::int` })
-        .from(devis)
-        .where(and(eq(devis.artisanId, ctx.artisanId), inArray(devis.statut, ["brouillon", "envoye"])));
-
-      const [factRow] = await tx
-        .select({ n: sql<number>`count(*)::int`, total: sql<string>`coalesce(sum(${factures.totalTTC}), 0)` })
-        .from(factures)
-        .where(and(eq(factures.artisanId, ctx.artisanId), notInArray(factures.statut, ["payee", "annulee", "brouillon"])));
-
-      const [stockRow] = await tx
-        .select({ n: sql<number>`count(*)::int` })
-        .from(stocks)
-        .where(and(eq(stocks.artisanId, ctx.artisanId), lte(stocks.quantiteEnStock, stocks.seuilAlerte)));
-
+      const [[devisRow], [factRow], [stockRow]] = await Promise.all([
+        tx.select({ n: sql<number>`count(*)::int` })
+          .from(devis)
+          .where(and(eq(devis.artisanId, ctx.artisanId), inArray(devis.statut, ["brouillon", "envoye"]))),
+        tx.select({ n: sql<number>`count(*)::int`, total: sql<string>`coalesce(sum(${factures.totalTTC}), 0)` })
+          .from(factures)
+          .where(and(eq(factures.artisanId, ctx.artisanId), notInArray(factures.statut, ["payee", "annulee", "brouillon"]))),
+        tx.select({ n: sql<number>`count(*)::int` })
+          .from(stocks)
+          .where(and(eq(stocks.artisanId, ctx.artisanId), lte(stocks.quantiteEnStock, stocks.seuilAlerte))),
+      ]);
       return {
         nbDevisEnAttente: devisRow?.n ?? 0,
         nbFacturesImpayees: factRow?.n ?? 0,

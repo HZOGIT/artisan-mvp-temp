@@ -1,6 +1,7 @@
 import type { AgenticEvent, AgenticFunctionCall, AgenticMessage, AgenticTurnInput, LlmAgenticPort } from "../application/agentic-port";
 import type { ToolParamSchema, ToolSchema } from "../domain/assistant-tools-catalog";
 import type { LlmUsage } from "../../../shared/ports/llm";
+import { type AppLogger, ConsoleLogger } from "../../../shared/ports/logger";
 
 /*
  * Adapter Gemini du port AGENTIQUE (function-calling streamé). Comme `GeminiLlmAdapter`, le SDK est
@@ -89,10 +90,25 @@ export function toGeminiContents(messages: readonly AgenticMessage[]): unknown[]
 
 /** ── Adapter ────────────────────────────────────────────────────────────────────────────────── */
 export class GeminiAgenticAdapter implements LlmAgenticPort {
+  private readonly log: AppLogger;
+  private ai: GenAiAgenticClient | null = null;
+
+  constructor(log?: AppLogger) {
+    this.log = log ?? new ConsoleLogger();
+  }
+
+  private async getAi(): Promise<GenAiAgenticClient> {
+    if (!this.ai) {
+      const mod = (await import(GENAI_MODULE)) as GenAiModule;
+      this.ai = new mod.GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY ?? "" });
+    }
+    return this.ai;
+  }
+
   async *streamTurn(input: AgenticTurnInput): AsyncIterable<AgenticEvent> {
-    const mod = (await import(GENAI_MODULE)) as GenAiModule;
-    const ai = new mod.GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY ?? "" });
-    const model = input.model ?? process.env.GEMINI_TEXT_MODEL ?? "gemini-3-pro-preview";
+    const ai = await this.getAi();
+    const model = input.model ?? process.env.GEMINI_TEXT_MODEL ?? "gemini-2.5-flash";
+    this.log.info({ event: "gemini_model_resolved", model }, "Modèle Gemini résolu");
     const tools = toGeminiTools(input.tools);
 
     const stream = await ai.models.generateContentStream({
