@@ -186,7 +186,7 @@ export default function CommandeFormPage() {
                     <Input placeholder={t("unite")} value={ligne.unite} disabled={isEdit} onChange={(e) => setLigne(ligne.id, { unite: e.target.value })} className="text-center" />
                     <Input type="number" min="0" step="0.01" placeholder={t("prixHT")} value={ligne.prixUnitaire ?? ""} disabled={isEdit} onChange={(e) => setLigne(ligne.id, { prixUnitaire: e.target.value ? parseFloat(e.target.value) : undefined })} className="text-right" />
                     <Select value={String(ligne.tauxTVA)} onValueChange={(v) => setLigne(ligne.id, { tauxTVA: parseFloat(v) || 20 })} disabled={isEdit}>
-                      <SelectTrigger className="text-center" />
+                      <SelectTrigger className="text-center"><SelectValue /></SelectTrigger>
                       <SelectContent>{TVA_CATEGORIES.map((c) => (<SelectItem key={c.id} value={c.taux}>{c.label}</SelectItem>))}</SelectContent>
                     </Select>
                     <div className="flex items-center justify-end text-sm font-medium h-9 px-2">{formatCurrency(ligne.quantite * (ligne.prixUnitaire || 0))}</div>
