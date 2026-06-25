@@ -38,6 +38,7 @@ export class DrizzleTenantResolver implements TenantResolver {
       artisanId,
       userId: claims.userId,
       role: user?.role ?? undefined,
+      isOwner: artisan !== undefined,
     };
   }
 }
