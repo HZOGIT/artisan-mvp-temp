@@ -109,6 +109,16 @@ describe("migrateSubscriptionsFromLegacy — création de cycles", () => {
     expect(repo.cycles).toHaveLength(0);
   });
 
+  it("current_period_start null — migrer 2x → 1 seul cycle (periodStart déterministe)", async () => {
+    const sub = makeLegacySub({ current_period_start: null });
+    const db = makeDb([sub]);
+
+    await migrateSubscriptionsFromLegacy(db, repo);
+    await migrateSubscriptionsFromLegacy(db, repo);
+
+    expect(repo.cycles).toHaveLength(1);
+  });
+
   it("sub active déjà migrée → skippée, aucun cycle créé (idempotent)", async () => {
     const db = makeDb([makeLegacySub()], true);
 

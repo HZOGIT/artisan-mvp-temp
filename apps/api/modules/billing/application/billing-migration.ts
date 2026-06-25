@@ -98,13 +98,13 @@ export async function migrateSubscriptionsFromLegacy(
       }
 
       if ((status === "active" || status === "past_due") && sub.current_period_end && sub.current_period_end > new Date()) {
-        const periodStart = sub.current_period_start ?? new Date();
-        const existing = await repo.findPendingCycleForPeriod(savedSub.id, periodStart);
-        if (!existing) {
-          const intervalDays = sub.current_period_start
-            ? Math.round((sub.current_period_end.getTime() - sub.current_period_start.getTime()) / 86_400_000)
-            : 30;
-          const interval = intervalDays >= 300 ? "yearly" : "monthly";
+        const intervalDays = sub.current_period_start
+          ? Math.round((sub.current_period_end.getTime() - sub.current_period_start.getTime()) / 86_400_000)
+          : 30;
+        const interval = intervalDays >= 300 ? "yearly" : "monthly";
+        const periodStart = sub.current_period_start ?? new Date(sub.current_period_end.getTime() - intervalDays * 86_400_000);
+        const existingCycle = await repo.findPendingCycleForPeriod(savedSub.id, periodStart);
+        if (!existingCycle) {
           const plan = planById(planId);
           const amountCents = plan?.amountCentsByInterval[interval] ?? 2900;
           await repo.createCycle({
