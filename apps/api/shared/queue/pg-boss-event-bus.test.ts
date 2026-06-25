@@ -1,10 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
-import { FakeEventBus, FakeWorkerPort } from "../ports/fakes";
+import { FakeEventBus, FakeWorkerPort, FakeEmailPort } from "../ports/fakes";
 import { PgBossEventBus } from "./pg-boss-event-bus";
 import { PgBossWorkerAdapter } from "./pg-boss-worker-adapter";
 import { registerWorkers } from "./workers";
 import type { PgBoss } from "pg-boss";
 import type { DomainEvent } from "../ports/event-bus";
+import type { DbClient } from "../db/client";
 
 const makeEvent = <T>(type: string, payload: T): DomainEvent<T> => ({
   type,
@@ -120,7 +121,7 @@ describe("FakeWorkerPort", () => {
 
   it("registeredTypes liste les types enregistrés", () => {
     const workers = new FakeWorkerPort();
-    registerWorkers(workers);
+    registerWorkers(workers, { email: new FakeEmailPort(), db: {} as DbClient });
     expect(workers.registeredTypes()).toEqual(expect.arrayContaining([
       "FACTURE_PAYEE",
       "DEVIS_ACCEPTE",
