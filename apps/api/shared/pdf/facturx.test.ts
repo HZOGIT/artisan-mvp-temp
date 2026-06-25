@@ -66,4 +66,71 @@ describe("generateFacturXML (Factur-X CII, profil MINIMUM)", () => {
     const xml = generateFacturXML(facture({ dateEcheance: null }), artisan(), client());
     expect(xml).not.toContain("DueDateDateTime");
   });
+
+  it("ligne FR_FRANCHISE (0%, franchise en base) → CategoryCode E", () => {
+    const f = facture({
+      lignes: [
+        {
+          designation: "Service",
+          tvaCategorieId: "FR_FRANCHISE",
+          tauxTVA: 0,
+          montantHT: "100",
+          montantTVA: "0",
+        },
+      ],
+    });
+    const xml = generateFacturXML(f, artisan(), client());
+    expect(xml).toContain("<ram:CategoryCode>E</ram:CategoryCode>");
+    expect(xml).not.toContain("<ram:CategoryCode>AE</ram:CategoryCode>");
+  });
+
+  it("ligne FR_AUTO (0%, autoliquidation) → CategoryCode AE", () => {
+    const f = facture({
+      lignes: [
+        {
+          designation: "Matériel",
+          tvaCategorieId: "FR_AUTO",
+          tauxTVA: 0,
+          montantHT: "200",
+          montantTVA: "0",
+        },
+      ],
+    });
+    const xml = generateFacturXML(f, artisan(), client());
+    expect(xml).toContain("<ram:CategoryCode>AE</ram:CategoryCode>");
+    expect(xml).not.toContain("<ram:CategoryCode>E</ram:CategoryCode>");
+  });
+
+  it("lignes mixtes (FR_20 + FR_FRANCHISE + FR_AUTO) → codes respectifs S, E, AE", () => {
+    const f = facture({
+      lignes: [
+        {
+          designation: "Normal 20%",
+          tvaCategorieId: "FR_20",
+          tauxTVA: 20,
+          montantHT: "100",
+          montantTVA: "20",
+        },
+        {
+          designation: "Franchise",
+          tvaCategorieId: "FR_FRANCHISE",
+          tauxTVA: 0,
+          montantHT: "100",
+          montantTVA: "0",
+        },
+        {
+          designation: "Auto",
+          tvaCategorieId: "FR_AUTO",
+          tauxTVA: 0,
+          montantHT: "100",
+          montantTVA: "0",
+        },
+      ],
+    });
+    const xml = generateFacturXML(f, artisan(), client());
+    const matches = xml.match(/<ram:CategoryCode>[^<]+<\/ram:CategoryCode>/g) || [];
+    expect(matches).toContain("<ram:CategoryCode>S</ram:CategoryCode>");
+    expect(matches).toContain("<ram:CategoryCode>E</ram:CategoryCode>");
+    expect(matches).toContain("<ram:CategoryCode>AE</ram:CategoryCode>");
+  });
 });

@@ -1,9 +1,10 @@
 import type { Facture, FactureLigne, Artisan, Client } from "./pdf-input-types";
+import { TVA_CATEGORIES_MAP, type TvaCategorieId, tauxStringToCategorie } from "../tva/taux-tva-fr";
 
 /**
  * Generates Factur-X XML (CII / ZUGFeRD MINIMUM profile)
  * Compliant with EN 16931 for French electronic invoicing 2026.
- * Emits one ApplicableTradeTax block per distinct TVA rate (multi-rate support).
+ * Emits one ApplicableTradeTax block per distinct TVA category (multi-category support).
  */
 export function generateFacturXML(
   facture: Facture & { lignes: FactureLigne[] },
@@ -18,31 +19,38 @@ export function generateFacturXML(
   const totalTTC = parseFloat(facture.totalTTC?.toString() || "0");
 
   /*
-   * Aggregate TVA per distinct rate from lines (EN 16931 : one block per rate).
+   * Aggregate TVA per distinct tvaCategorieId from lines (EN 16931 : one block per category).
    * Lines of type section/note carry no price and are excluded.
    */
-  const tvaByRate = new Map<number, { baseHT: number; montantTVA: number }>();
+  const tvaByCategorie = new Map<TvaCategorieId, { baseHT: number; montantTVA: number; taux: number }>();
   for (const l of facture.lignes) {
     const type = String(l.type ?? "produit");
     if (type === "section" || type === "note") continue;
-    const taux = parseFloat(String(l.tauxTVA ?? "0")) || 0;
+    const tvaCategorieId = (l.tvaCategorieId ?? "FR_20") as TvaCategorieId;
+    const categorieDef = TVA_CATEGORIES_MAP[tvaCategorieId];
+    const taux = parseFloat(categorieDef?.taux ?? String(l.tauxTVA ?? "0")) || 0;
     const ht = parseFloat(String(l.montantHT ?? "0")) || 0;
     const tva = parseFloat(String(l.montantTVA ?? "0")) || 0;
-    const entry = tvaByRate.get(taux) ?? { baseHT: 0, montantTVA: 0 };
+    const entry = tvaByCategorie.get(tvaCategorieId) ?? { baseHT: 0, montantTVA: 0, taux };
     entry.baseHT += ht;
     entry.montantTVA += tva;
-    tvaByRate.set(taux, entry);
+    tvaByCategorie.set(tvaCategorieId, entry);
   }
 
   /** Fallback when lines have no montantHT/TVA (edge case): single block from totals. */
-  const taxBlocks: { taux: number; baseHT: number; montantTVA: number }[] =
-    tvaByRate.size > 0
-      ? Array.from(tvaByRate.entries()).map(([taux, v]) => ({
-          taux,
+  const taxBlocks: { tvaCategorieId: TvaCategorieId; taux: number; baseHT: number; montantTVA: number }[] =
+    tvaByCategorie.size > 0
+      ? Array.from(tvaByCategorie.entries()).map(([tvaCategorieId, v]) => ({
+          tvaCategorieId,
+          taux: v.taux,
           baseHT: round2(v.baseHT),
           montantTVA: round2(v.montantTVA),
         }))
-      : [{ taux: parseFloat(String(artisan.tauxTVA ?? "20")), baseHT: totalHT, montantTVA: totalTVA }];
+      : (() => {
+          const categId = tauxStringToCategorie(artisan.tauxTVA ?? "20");
+          const def = TVA_CATEGORIES_MAP[categId];
+          return [{ tvaCategorieId: categId, taux: parseFloat(def.taux), baseHT: totalHT, montantTVA: totalTVA }];
+        })();
 
   const sellerName = escXml(artisan.nomEntreprise || "Artisan");
   const sellerAddr = escXml(artisan.adresse || "");
@@ -57,15 +65,16 @@ export function generateFacturXML(
   const buyerVille = escXml(client.ville || "");
 
   const taxBlocksXml = taxBlocks
-    .map(
-      (b) => `      <ram:ApplicableTradeTax>
+    .map((b) => {
+      const codeFacturX = TVA_CATEGORIES_MAP[b.tvaCategorieId]?.codeFacturX ?? "S";
+      return `      <ram:ApplicableTradeTax>
         <ram:CalculatedAmount>${b.montantTVA.toFixed(2)}</ram:CalculatedAmount>
         <ram:TypeCode>VAT</ram:TypeCode>
         <ram:BasisAmount>${b.baseHT.toFixed(2)}</ram:BasisAmount>
-        <ram:CategoryCode>S</ram:CategoryCode>
+        <ram:CategoryCode>${codeFacturX}</ram:CategoryCode>
         <ram:RateApplicablePercent>${b.taux.toFixed(2)}</ram:RateApplicablePercent>
-      </ram:ApplicableTradeTax>`,
-    )
+      </ram:ApplicableTradeTax>`;
+    })
     .join("\n");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
