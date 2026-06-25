@@ -1,6 +1,6 @@
 import { NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
-import type { ICongeRepository } from "./conge-repository";
+import type { ICongeRepository, SoldeResult } from "./conge-repository";
 import type { Conge } from "../domain/conge";
 
 /*
@@ -22,4 +22,8 @@ export async function getConge(repo: ICongeRepository, ctx: TenantContext, id: n
   const conge = await repo.getById(ctx, id);
   if (!conge) throw new NotFoundError("Demande de congé introuvable");
   return conge;
+}
+
+export function getSoldeConge(repo: ICongeRepository, ctx: TenantContext, technicienId: number, annee: number): Promise<SoldeResult[]> {
+  return repo.getSolde(ctx, technicienId, annee);
 }

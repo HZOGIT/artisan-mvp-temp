@@ -2,6 +2,15 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { Conge, CongeStatut, CreateCongeInput, UpdateCongeInput } from "../domain/conge";
 import type { SoldeCongeType } from "./solde";
 
+export interface SoldeResult {
+  readonly type: SoldeCongeType;
+  readonly annee: number;
+  readonly soldeInitial: number;
+  readonly soldeRestant: number;
+  readonly joursAcquis: number;
+  readonly joursPris: number;
+}
+
 /*
  * Ajustement additif du solde de congés d'un technicien (décompte si deltaJours > 0,
  * recrédit si < 0), pour une année et un type donnés.
@@ -62,4 +71,5 @@ export interface ICongeRepository {
    * la transition en_attente→approuve, recrédit uniquement en quittant approuve).
    */
   ajusterSolde(ctx: TenantContext, ajustement: AjustementSolde): Promise<void>;
+  getSolde(ctx: TenantContext, technicienId: number, annee: number): Promise<SoldeResult[]>;
 }

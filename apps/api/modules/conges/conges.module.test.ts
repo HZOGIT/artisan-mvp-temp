@@ -41,6 +41,6 @@ describe("conges.module", () => {
   it("expose un routeur tRPC assemblé (procédures parité)", () => {
     const module = createCongesModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["annuler", "approuver", "create", "delete", "enAttente", "getById", "list", "refuser", "update"]);
+    expect(procedures).toEqual(["annuler", "approuver", "create", "delete", "enAttente", "getById", "getSolde", "list", "refuser", "update"]);
   });
 });

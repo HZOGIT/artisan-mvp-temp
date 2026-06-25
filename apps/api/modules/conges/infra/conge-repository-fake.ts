@@ -1,5 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { ICongeRepository, AjustementSolde } from "../application/conge-repository";
+import type { ICongeRepository, AjustementSolde, SoldeResult } from "../application/conge-repository";
 import type { Conge, CongeStatut, CreateCongeInput, UpdateCongeInput } from "../domain/conge";
 
 /*
@@ -123,5 +123,17 @@ export class FakeCongeRepository implements ICongeRepository {
       this.joursPris.set(key, deltaJours);
     }
     /** absente + recrédit (≤0) → no-op */
+  }
+
+  async getSolde(ctx: TenantContext, technicienId: number, annee: number): Promise<SoldeResult[]> {
+    const results: SoldeResult[] = [];
+    for (const key of Array.from(this.joursPris.keys())) {
+      const [artId, techId, type, yr] = key.split(":");
+      if (Number(artId) === ctx.artisanId && Number(techId) === technicienId && Number(yr) === annee) {
+        const joursPris = this.joursPris.get(key) ?? 0;
+        results.push({ type: type as SoldeResult["type"], annee, soldeInitial: 0, soldeRestant: 0, joursAcquis: 0, joursPris });
+      }
+    }
+    return results;
   }
 }
