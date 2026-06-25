@@ -160,11 +160,13 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
 
     addLigne: protectedProcedure
       .input(z.object({ factureId: z.number().int() }).and(ligneCreateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { factureId, tvaCategorieId, ...data } = input;
-        const categorieId = tvaCategorieId ?? "FR_20";
-        const tauxTVA = TVA_CATEGORIES_MAP[categorieId].taux;
-        return ajouterLigneFacture(repo, ctx.tenant, factureId, { ...data, tauxTVA, tvaCategorieId: categorieId });
+        const artisanInfo = await mailing.artisanReader.getArtisan(ctx.tenant);
+        const isFranchise = (artisanInfo?.["franchiseTVA"] as boolean | null) ?? false;
+        const effectiveCategorieId = isFranchise && (!tvaCategorieId || tvaCategorieId === "FR_20") ? "FR_FRANCHISE" : (tvaCategorieId ?? "FR_20");
+        const tauxTVA = TVA_CATEGORIES_MAP[effectiveCategorieId].taux;
+        return ajouterLigneFacture(repo, ctx.tenant, factureId, { ...data, tauxTVA, tvaCategorieId: effectiveCategorieId });
       }),
 
     updateLigne: protectedProcedure

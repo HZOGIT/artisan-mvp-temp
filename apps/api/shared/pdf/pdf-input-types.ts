@@ -71,6 +71,7 @@ export interface Artisan {
   assuranceDecennaleNom?: string | null;
   assuranceDecennalePolice?: string | null;
   assuranceDecennaleGarantie?: string | null;
+  franchiseTVA?: boolean | null;
 }
 
 export interface Client {
