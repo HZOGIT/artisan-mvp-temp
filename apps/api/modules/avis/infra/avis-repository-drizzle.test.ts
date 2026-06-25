@@ -74,19 +74,19 @@ describe.skipIf(!URL)("AvisRepositoryDrizzle (PG, RLS + scope tenant)", () => {
     expect(maj?.statut).toBe("publie");
   });
 
-  it("getStats : agrégats moyenne/total/distribution scopés (avis publiés)", async () => {
+  it("getStats : agrégats moyenne/total/distribution scopés (publie + masque comptés)", async () => {
     await cleanup();
     await seed(A, 5);
     await seed(A, 5);
     await seed(A, 3);
-    await seed(A, 1, "masque"); // exclu (non publié)
+    await seed(A, 1, "masque"); // compté — masquer ne doit pas retirer de la note
     await seed(B, 2); // autre tenant → ne compte pas pour A
 
     const stats = await repo.getStats(ctx(A));
-    expect(stats.total).toBe(3);
+    expect(stats.total).toBe(4);
     expect(stats.distribution[5]).toBe(2);
     expect(stats.distribution[3]).toBe(1);
-    expect(stats.distribution[1]).toBe(0);
-    expect(stats.moyenne).toBe(Math.round(((5 + 5 + 3) / 3) * 10) / 10);
+    expect(stats.distribution[1]).toBe(1);
+    expect(stats.moyenne).toBe(Math.round(((5 + 5 + 3 + 1) / 4) * 10) / 10);
   });
 });
