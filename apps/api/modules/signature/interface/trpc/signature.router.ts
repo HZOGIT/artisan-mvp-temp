@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, publicProcedure } from "../../../../interface/trpc/trpc";
 import type { SignatureDeps } from "../../application/use-cases";
 import { getSignatureByDevis, createSignatureLink } from "../../application/use-cases";
@@ -38,13 +39,17 @@ export function createSignatureRouter(deps: SignatureDeps, publicDeps: Signature
      */
     getSignatureByDevis: protectedProcedure
       .input(devisIdInput)
-      .query(({ ctx, input }) => getSignatureByDevis(deps, ctx.tenant!, input.devisId)),
+      .query(({ ctx, input }) => {
+        if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
+        return getSignatureByDevis(deps, ctx.tenant, input.devisId);
+      }),
 
     /** Génère (idempotent) le lien de signature d'un devis du tenant + email client + notification. */
     createSignatureLink: protectedProcedure
       .input(devisIdInput)
       .mutation(async ({ ctx, input }) => {
-        const result = await createSignatureLink(deps, ctx.tenant!, input.devisId);
+        if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
+        const result = await createSignatureLink(deps, ctx.tenant, input.devisId);
         ctx.log.info({ event: "signature_link_created", devisId: input.devisId }, "Lien de signature généré");
         return result;
       }),

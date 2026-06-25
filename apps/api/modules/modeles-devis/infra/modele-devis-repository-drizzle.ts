@@ -95,7 +95,8 @@ export class ModeleDevisRepositoryDrizzle implements IModeleDevisRepository {
       }
       const aggregate = await this.loadAggregate(tx, ctx, parent.id);
       /** on vient de créer l'agrégat scopé au tenant */
-      return aggregate!;
+      if (!aggregate) throw new Error("Aggregate introuvable après insertion");
+      return aggregate;
     });
   }
 

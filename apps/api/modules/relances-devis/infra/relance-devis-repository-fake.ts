@@ -15,7 +15,8 @@ export class FakeRelanceDevisRepository implements IRelanceDevisRepository {
   /** Déclare qu'un devis appartient à un artisan (pour les tests d'anti-IDOR-FK). */
   seedDevis(artisanId: number, devisId: number): void {
     if (!this.devisByArtisan.has(artisanId)) this.devisByArtisan.set(artisanId, new Set());
-    this.devisByArtisan.get(artisanId)!.add(devisId);
+    const artisanDevis = this.devisByArtisan.get(artisanId);
+    if (artisanDevis) artisanDevis.add(devisId);
   }
 
   private scoped(ctx: TenantContext): RelanceDevis[] {

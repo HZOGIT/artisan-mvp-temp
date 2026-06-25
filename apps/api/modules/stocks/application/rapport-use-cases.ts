@@ -64,7 +64,9 @@ export async function genererRapportCommande(
     const quantiteACommander = Math.max(seuil * 2 - qteEnStock, 1);
     const prixUnitaire = Number.parseFloat(af?.prixAchat || stock.prixAchat || "0");
 
-    grouped.get(fournisseurId)!.lignes.push({
+    const groupEntry = grouped.get(fournisseurId);
+    if (!groupEntry) continue;
+    groupEntry.lignes.push({
       stock: {
         id: stock.id,
         reference: stock.reference,
