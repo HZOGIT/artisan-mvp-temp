@@ -152,11 +152,13 @@ export function createDevisRouter(
 
     addLigne: devisCreer
       .input(z.object({ devisId: z.number().int() }).and(ligneCreateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { devisId, tvaCategorieId, ...data } = input;
-        const categorieId = tvaCategorieId ?? "FR_20";
-        const tauxTVA = TVA_CATEGORIES_MAP[categorieId].taux;
-        return ajouterLigneDevis(repo, ctx.tenant, devisId, { ...data, tauxTVA, tvaCategorieId: categorieId });
+        const artisanInfo = await mailing.artisanReader.getArtisan(ctx.tenant);
+        const isFranchise = (artisanInfo?.["franchiseTVA"] as boolean | null) ?? false;
+        const effectiveCategorieId = isFranchise && (!tvaCategorieId || tvaCategorieId === "FR_20") ? "FR_FRANCHISE" : (tvaCategorieId ?? "FR_20");
+        const tauxTVA = TVA_CATEGORIES_MAP[effectiveCategorieId].taux;
+        return ajouterLigneDevis(repo, ctx.tenant, devisId, { ...data, tauxTVA, tvaCategorieId: effectiveCategorieId });
       }),
 
     updateLigne: devisCreer

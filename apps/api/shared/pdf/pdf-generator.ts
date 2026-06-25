@@ -300,7 +300,7 @@ function buildArtisanBlock(artisan: Artisan): InfoBlock {
   if (artisan.telephone) lines.push(`Tél: ${artisan.telephone}`);
   if (artisan.email) lines.push(`Email: ${artisan.email}`);
   if (artisan.siret) lines.push(`SIRET: ${artisan.siret}`);
-  if (artisan.numeroTVA) lines.push(`TVA: ${artisan.numeroTVA}`);
+  if (artisan.numeroTVA && !artisan.franchiseTVA) lines.push(`TVA: ${artisan.numeroTVA}`);
   if (artisan.codeAPE) lines.push(`APE: ${artisan.codeAPE}`);
   return { label: "ÉMETTEUR", name: artisan.nomEntreprise || "Artisan", lines };
 }

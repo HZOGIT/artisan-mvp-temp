@@ -299,8 +299,23 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
       [artisanA, UA, id],
     );
     const log = (await callQuery(server, "factures.getAuditLog", { factureId: id }, tA)).json().result.data as Array<{ action: string }>;
-    expect(log.map((e) => e.action)).toEqual(["sent", "created"]); // tri récent → ancien
-    // hors tenant → [] (pas 404)
+    expect(log.map((e) => e.action)).toEqual(["sent", "created"]); /** tri récent → ancien */
+    /** hors tenant → [] (pas 404) */
     expect((await callQuery(server, "factures.getAuditLog", { factureId: id }, tB)).json().result.data).toEqual([]);
+  });
+
+  it("franchise TVA : addLigne sans tvaCategorieId → FR_FRANCHISE ; tvaCategorieId explicite non-FR_20 préservé", async () => {
+    const tA = await token(UA);
+    await admin.query('update artisans set "franchiseTVA"=true where id=$1', [artisanA]);
+    try {
+      const id = (await callMutation(server, "factures.create", { clientId: clientA }, tA)).json().result.data.id as number;
+      const l = await callMutation(server, "factures.addLigne", { factureId: id, designation: "Pose franchise", quantite: "1", prixUnitaireHT: "100.00" }, tA);
+      expect(l.json().result.data.tvaCategorieId).toBe("FR_FRANCHISE");
+      expect(l.json().result.data.tauxTVA).toBe("0.00");
+      const l2 = await callMutation(server, "factures.addLigne", { factureId: id, designation: "Fourniture taux réduit", quantite: "1", prixUnitaireHT: "50.00", tvaCategorieId: "FR_10" }, tA);
+      expect(l2.json().result.data.tvaCategorieId).toBe("FR_10");
+    } finally {
+      await admin.query('update artisans set "franchiseTVA"=false where id=$1', [artisanA]);
+    }
   });
 });

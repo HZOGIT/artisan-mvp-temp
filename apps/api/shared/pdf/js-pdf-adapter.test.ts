@@ -31,4 +31,12 @@ describe("JsPdfAdapter (générateur jsPDF internalisé)", () => {
   it("template inconnu → throw", async () => {
     await expect(adapter.render("inconnu", {})).rejects.toThrow("Template PDF inconnu");
   });
+
+  it("render('devis') artisan franchiseTVA + ligne FR_FRANCHISE → PDF valide sans n° TVA intracommunautaire", async () => {
+    const artisanFranchise = { ...artisan, franchiseTVA: true, numeroTVA: "FR12345678900" };
+    const ligneFranchise = { designation: "Main d'œuvre", quantite: 1, unite: "h", prixUnitaireHT: 50, tauxTVA: 0, tvaCategorieId: "FR_FRANCHISE" };
+    const buf = await adapter.render("devis", { devis: { numero: "DEV-FRANCH", dateDevis: new Date(), dateValidite: new Date(), referenceClient: null, lignes: [ligneFranchise] }, artisan: artisanFranchise, client });
+    expectPdf(buf);
+    expect(buf.toString("latin1")).not.toContain("FR12345678900");
+  });
 });
