@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
+import { PDFDocument } from "pdf-lib";
 import { NotFoundError } from "../../../shared/errors";
 import { FakePdfPort } from "../../../shared/ports";
+import type { PdfPort } from "../../../shared/ports/pdf";
 import type { TenantContext } from "../../../shared/tenant";
 import { getFacturxXml, getFacturxPdf, type FacturxPdfDeps } from "./facturx-use-cases";
 
@@ -40,10 +42,14 @@ describe("getFacturxXml", () => {
 });
 
 describe("getFacturxPdf", () => {
-  it("succès → {buffer, filename Factur-X} via render('facture')", async () => {
-    const pdf = new FakePdfPort();
+  it("succès → filename correct + render('facture') appelé + XML factur-x.xml embarqué dans le PDF", async () => {
+    const minPdf = Buffer.from(await (await PDFDocument.create()).save());
+    const captured: Array<{ template: string; data: Record<string, unknown> }> = [];
+    const pdf: PdfPort = { render: async (t, d) => { captured.push({ template: t, data: d }); return minPdf; } };
     const res = await getFacturxPdf(build({ pdf }), ctx, 7);
     expect(res.filename).toBe("Facture_FAC-2026-0001_FacturX.pdf");
-    expect(pdf.rendered[0].template).toBe("facture");
+    expect(captured[0]?.template).toBe("facture");
+    expect(res.buffer.toString("binary")).toContain("factur-x.xml");
+    expect(res.buffer.toString("binary")).toContain("FAC-2026-0001");
   });
 });
