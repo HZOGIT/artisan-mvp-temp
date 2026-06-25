@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react";
 import { AlertTriangle, Home, RotateCcw } from "lucide-react";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -75,6 +76,7 @@ class ErrorBoundary extends Component<Props, State> {
 
   override componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("[App ErrorBoundary]", error, info);
+    Sentry.captureException(error);
     try {
       const payload = JSON.stringify({
         events: [

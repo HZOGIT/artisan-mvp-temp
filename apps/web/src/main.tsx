@@ -1,11 +1,20 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import * as Sentry from '@sentry/react'
 import App from './app.tsx'
 import './index.css'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { trpc } from './shared/trpc'
 import { httpBatchLink, httpLink, httpSubscriptionLink, splitLink } from '@trpc/client'
 import superjson from 'superjson'
+
+if (import.meta.env.VITE_SENTRY_DSN) {
+  Sentry.init({
+    dsn: import.meta.env.VITE_SENTRY_DSN,
+    environment: import.meta.env.MODE,
+    tracesSampleRate: 0.1,
+  })
+}
 
 /*
  * Auto-reparation des chunks perimes apres deploiement.
