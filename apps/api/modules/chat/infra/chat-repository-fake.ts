@@ -70,7 +70,9 @@ export class FakeChatRepository implements IChatRepository {
     return conv;
   }
   async updateStatut(ctx: TenantContext, conversationId: number, statut: ConversationStatut): Promise<Conversation> {
-    const conv = this.owned(ctx, conversationId)!;
+    const conv = this.owned(ctx, conversationId);
+    if (!conv) throw new Error("Conversation not found");
+
     const idx = this.convs.indexOf(conv);
     this.convs[idx] = { ...conv, statut, updatedAt: new Date() };
     return this.convs[idx];

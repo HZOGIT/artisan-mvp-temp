@@ -267,7 +267,8 @@ export class CommandeRepositoryDrizzle implements ICommandeRepository {
       }
 
       for (const [ligneId, quantiteRecue] of Array.from(recueParLigne.entries())) {
-        const ligne = ligneById.get(ligneId)!;
+        const ligne = ligneById.get(ligneId);
+        if (!ligne) continue;;
         /** Invariant garanti côté infra : qté reçue ∈ [0, quantité commandée] (clamp défensif). */
         const max = Number(ligne.quantite);
         const valeur = Math.max(0, Math.min(quantiteRecue, max));
