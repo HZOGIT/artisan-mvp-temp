@@ -6,6 +6,7 @@ import { provisionDatabase, assertAppRoleExistsAndRestricted } from "./shared/db
 import { PgBossEventBus } from "./shared/queue/pg-boss-event-bus";
 import { PgBossWorkerAdapter } from "./shared/queue/pg-boss-worker-adapter";
 import { registerWorkers } from "./shared/queue/workers";
+import { ResendEmailAdapter } from "./shared/email/resend-email-adapter";
 
 async function main(): Promise<void> {
   /* Provision automatique au boot (sous verrou) : migrations schéma + RLS, rôle applicatif + droits. */
@@ -25,7 +26,7 @@ async function main(): Promise<void> {
   });
 
   const eventBus = new PgBossEventBus(boss);
-  registerWorkers(new PgBossWorkerAdapter(boss));
+  registerWorkers(new PgBossWorkerAdapter(boss), { email: new ResendEmailAdapter(), db: getDbHandle().db });
 
   const app = buildApp({ eventBus });
   app.addHook("onClose", async () => { await boss.stop(); });
