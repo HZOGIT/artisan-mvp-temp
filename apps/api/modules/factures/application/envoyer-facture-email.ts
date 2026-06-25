@@ -3,6 +3,7 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { EmailPort } from "../../../shared/ports/email";
 import type { PdfPort } from "../../../shared/ports/pdf";
 import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
+import { round2 } from "../../../shared/money";
 import type { IFactureRepository } from "./facture-repository";
 import type { ArtisanReader, ClientReader } from "./contact-readers";
 import type { IModeleEmailRepository } from "../../modeles-email/application/modele-email-repository";
@@ -133,7 +134,7 @@ export async function envoyerFactureParEmail(
 
   const artisanName = artisan.nomEntreprise || "Votre artisan";
   const clientName = client.prenom ? `${client.prenom} ${client.nom}` : client.nom;
-  const totalTTC = `${(parseFloat(facture.totalTTC || "0") || 0).toFixed(2)} €`;
+  const totalTTC = `${round2(Number(facture.totalTTC) || 0).toFixed(2)} €`;
   const dateEcheance = facture.dateEcheance ? new Date(facture.dateEcheance).toLocaleDateString("fr-FR") : null;
 
   const modele = deps.modeleEmailRepo ? await deps.modeleEmailRepo.getDefaultByType(ctx, "envoi_facture") : null;
