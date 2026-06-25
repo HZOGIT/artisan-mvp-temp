@@ -248,7 +248,7 @@ export default function ParametresPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="mediateurConsommation">{t("mediateurConsommation")}</Label>
-                  <Input id="mediateurConsommation" value={formData.mediateurConsommation} onChange={(e) => setFormData({ ...formData, mediateurConsommation: e.target.value })} placeholder={t("mediateurConsommationPlaceholder")} />
+                  <Input id="mediateurConsommation" value={formData.mediateurConsommation} onChange={(e) => setFormData({ ...formData, mediateurConsommation: e.target.value })} placeholder={t("mediateurConsommationPlaceholder")} maxLength={1000} />
                   <p className="text-xs text-muted-foreground">{t("mediateurConsommationHint")}</p>
                 </div>
               </CardContent>
