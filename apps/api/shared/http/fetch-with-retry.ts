@@ -21,12 +21,9 @@ export async function fetchWithRetry(
     try {
       const res = await fetch(url, { ...init, signal });
       clearTimeout(timeoutId);
-      if (!canRetry || attempt >= maxRetries || (res.status < 429 && res.status !== 429 && res.status < 500)) return res;
-      if (res.status === 429 || res.status >= 500) {
-        lastError = new Error();
-      } else {
-        return res;
-      }
+      const retryable = res.status === 429 || res.status >= 500;
+      if (!canRetry || attempt >= maxRetries || !retryable) return res;
+      lastError = new Error();
     } catch (err) {
       clearTimeout(timeoutId);
       if (!canRetry) throw err;
