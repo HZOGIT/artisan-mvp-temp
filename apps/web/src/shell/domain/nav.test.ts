@@ -128,13 +128,16 @@ describe("shell/subscription (pur)", () => {
     expect(trialBannerSeverity(sub({ status: "trialing", trialDaysLeft: 1 }))).toBe("critical");
     expect(trialBannerSeverity(sub({ status: "trialing", trialDaysLeft: 0 }))).toBe("critical");
   });
-  it("accountBlockState : expiré/essai fini bloque ; /parametres et /profil tolérés", () => {
+  it("accountBlockState : suspendu/annulé/essai fini bloque ; /parametres et /profil tolérés", () => {
     expect(accountBlockState(sub({ status: "active" }), "/clients").isBlocked).toBe(false);
     expect(accountBlockState(sub({ status: "expired" }), "/clients").isBlocked).toBe(true);
+    expect(accountBlockState(sub({ status: "past_due" }), "/clients").isBlocked).toBe(true);
+    expect(accountBlockState(sub({ status: "canceled" }), "/clients").isBlocked).toBe(true);
+    expect(accountBlockState(sub({ status: "canceled", currentPeriodEnd: null }), "/clients").isBlocked).toBe(true);
     expect(accountBlockState(sub({ status: "trialing", trialDaysLeft: 0 }), "/clients").isBlocked).toBe(true);
-    expect(accountBlockState(sub({ status: "expired" }), "/parametres").blockerAllowed).toBe(true);
-    expect(accountBlockState(sub({ status: "expired" }), "/profil").blockerAllowed).toBe(true);
-    expect(accountBlockState(sub({ status: "expired" }), "/clients").blockerAllowed).toBe(false);
+    expect(accountBlockState(sub({ status: "past_due" }), "/parametres").blockerAllowed).toBe(true);
+    expect(accountBlockState(sub({ status: "past_due" }), "/profil").blockerAllowed).toBe(true);
+    expect(accountBlockState(sub({ status: "past_due" }), "/clients").blockerAllowed).toBe(false);
   });
 });
 
