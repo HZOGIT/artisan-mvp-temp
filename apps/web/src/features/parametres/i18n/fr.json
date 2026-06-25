@@ -80,5 +80,9 @@
   "vitrineExperience": "Années d'expérience",
   "vitrineServices": "Services proposés (un par ligne)",
   "vitrineServicesPlaceholder": "Installation plomberie\nDépannage urgent\nRénovation salle de bain",
-  "toastVitrineEnregistree": "Page vitrine enregistrée"
+  "toastVitrineEnregistree": "Page vitrine enregistrée",
+  "rgpdTitre": "Mes données personnelles (RGPD)",
+  "rgpdDesc": "Conformément à l'Art. 20 du RGPD, vous pouvez télécharger l'intégralité de vos données (profil, clients, devis, factures, interventions…) dans un fichier JSON structuré.",
+  "rgpdExporter": "Exporter mes données",
+  "rgpdExporterHint": "Un fichier ZIP est généré et téléchargé. Il contient toutes vos données au format JSON machine-readable."
 }

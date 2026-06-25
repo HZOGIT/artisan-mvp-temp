@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { Settings, FileText, Bell, Save, Palette, Upload, Trash2, Image, CreditCard, Globe, ExternalLink } from "lucide-react";
+import { Settings, FileText, Bell, Save, Palette, Upload, Trash2, Image, CreditCard, Globe, ExternalLink, Download, Shield } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -338,6 +338,19 @@ export default function ParametresPage() {
               <Button type="button" variant="ghost" size="sm" disabled={regenerateIcal.isPending} onClick={() => regenerateIcal.mutate(undefined, { onSuccess: () => toast.success(t("icalRegenere")), onError: () => toast.error(t("icalErreurRegen")) })}>
                 {t("icalRegenerer")}
               </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5" />{t("rgpdTitre")}</CardTitle>
+              <CardDescription>{t("rgpdDesc")}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button type="button" variant="outline" onClick={() => { window.location.href = "/api/rgpd/export"; }}>
+                <Download className="h-4 w-4 mr-2" />{t("rgpdExporter")}
+              </Button>
+              <p className="text-xs text-muted-foreground">{t("rgpdExporterHint")}</p>
             </CardContent>
           </Card>
 
