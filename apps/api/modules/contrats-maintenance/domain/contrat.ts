@@ -108,6 +108,7 @@ export interface UpdateContratInterventionInput {
  */
 export interface ContratAFacturer extends Contrat {
   readonly clientNom: string;
+  readonly montantTVA: string;
   readonly montantTTC: string;
   readonly joursRetard: number;
 }
