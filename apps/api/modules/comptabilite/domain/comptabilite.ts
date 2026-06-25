@@ -5,6 +5,8 @@
  * TVA reconnus par préfixe (44571x collectée / 44566x déductible).
  */
 
+import { round2 } from "../../../shared/money";
+
 export interface Ecriture {
   readonly id: number;
   readonly dateEcriture: Date;
@@ -52,7 +54,6 @@ export interface DeclarationTVADetail {
 }
 
 const num = (v: unknown): number => parseFloat(String(v ?? "0")) || 0;
-const round2 = (v: number): number => Math.round(v * 100) / 100;
 
 /*
  * Grand livre : groupé par compte (ordre d'apparition = tri numeroCompte/date en amont), avec totaux
