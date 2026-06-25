@@ -1,4 +1,5 @@
 import type { INotificationRepository } from "./application/notification-repository";
+import type { PushPort } from "../../shared/push/web-push-adapter";
 import { createNotificationsRouter } from "./interface/trpc/notifications.router";
 
 /*
@@ -7,6 +8,7 @@ import { createNotificationsRouter } from "./interface/trpc/notifications.router
  */
 export interface NotificationsModuleDeps {
   readonly repository: INotificationRepository;
+  readonly push?: PushPort;
 }
 
 export interface NotificationsModule {
@@ -15,5 +17,5 @@ export interface NotificationsModule {
 }
 
 export function createNotificationsModule(deps: NotificationsModuleDeps): NotificationsModule {
-  return { deps, router: createNotificationsRouter(deps.repository) };
+  return { deps, router: createNotificationsRouter(deps.repository, deps.push) };
 }

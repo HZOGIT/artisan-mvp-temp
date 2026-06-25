@@ -42,9 +42,12 @@ describe("notifications.module", () => {
       "delete",
       "generateOverdueReminders",
       "getUnreadCount",
+      "getVapidPublicKey",
       "list",
       "markAllAsRead",
       "markAsRead",
+      "subscribe",
+      "unsubscribe",
     ]);
   });
 });

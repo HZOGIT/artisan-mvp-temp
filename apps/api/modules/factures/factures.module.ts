@@ -3,6 +3,7 @@ import type { IDevisReader } from "./application/devis-reader";
 import type { ComptaPort } from "./application/compta-port";
 import { NOOP_COMPTA } from "./application/compta-port";
 import type { FactureMailingDeps } from "./application/envoyer-facture-email";
+import type { PushPort } from "../../shared/push/web-push-adapter";
 import { createFacturesRouter } from "./interface/trpc/factures.router";
 
 /*
@@ -17,6 +18,7 @@ export interface FacturesModuleDeps {
   readonly compta?: ComptaPort;
   /** Composition de l'envoi par email (lecture artisan/client + PdfPort + EmailPort + rate-limiter). */
   readonly mailing: FactureMailingDeps;
+  readonly push?: PushPort;
 }
 
 export interface FacturesModule {
@@ -25,5 +27,5 @@ export interface FacturesModule {
 }
 
 export function createFacturesModule(deps: FacturesModuleDeps): FacturesModule {
-  return { deps, router: createFacturesRouter(deps.repository, deps.devisReader, deps.compta ?? NOOP_COMPTA, deps.mailing) };
+  return { deps, router: createFacturesRouter(deps.repository, deps.devisReader, deps.compta ?? NOOP_COMPTA, deps.mailing, deps.push) };
 }

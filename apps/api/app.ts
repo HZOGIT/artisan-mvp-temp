@@ -271,6 +271,8 @@ import { ResendEmailAdapter, SlidingWindowRateLimiter, GeminiLlmAdapter, GeminiV
 import { makeLlmUsageTracker } from "./shared/ports/llm-usage-tracker";
 import type { AppLogger } from "./shared/ports/logger";
 import { JsPdfAdapter } from "./shared/pdf/js-pdf-adapter";
+import { WebPushAdapter } from "./shared/push/web-push-adapter";
+import type { PushPort } from "./shared/push/web-push-adapter";
 
 export interface AppDeps extends ContextDeps {
   /*
@@ -282,6 +284,7 @@ export interface AppDeps extends ContextDeps {
   /** Dépendances du workflow demande d'avis (injectables en test : email/rate-limiter fakes). */
   readonly demandeAvisRepo?: IDemandeAvisRepository;
   readonly emailPort?: EmailPort;
+  readonly pushPort?: PushPort;
   readonly rateLimiter?: RateLimiterPort;
   /** Port LLM (Gemini) + rate-limiter IA dédié — injectables en test (FakeLlmPort déterministe). */
   readonly llm?: LlmPort;
@@ -393,6 +396,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   /** Adapter email partagé — reçoit app.log pour que succès/erreurs d'envoi arrivent dans BetterStack. */
   const emailAdapter = deps.emailPort ?? new ResendEmailAdapter(app.log as unknown as AppLogger);
 
+  /** Adapter push web (VAPID). No-op silencieux si VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY absents. */
+  const pushAdapter = deps.pushPort ?? new WebPushAdapter(getDbHandle().db);
+
   app.register(cookie);
   app.register(fastifySchedule);
   /*
@@ -456,6 +462,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const notificationRepo = deps.notificationRepo ?? new NotificationRepositoryDrizzle(getDbHandle().db);
   const notifications = createNotificationsModule({
     repository: notificationRepo,
+    push: pushAdapter,
   });
   /*
    * Repos partagés hoistés (évite les TDZ entre modules qui se composent mutuellement) :
@@ -599,6 +606,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db),
     /** genererLignesIA : LlmPort (Gemini) + rate-limiter IA dédié (budget horaire par artisan). */
     ia: { llm: deps.llm ?? new GeminiLlmAdapter(), trackLlm: makeLlmUsageTracker(getDbHandle().db), rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000) },
+    push: pushAdapter,
   });
   /*
    * Génération FEC réelle : l'adapter ecritures implémente le seam `ComptaPort` des factures
@@ -623,6 +631,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
       modeleEmailRepo,
     },
+    push: pushAdapter,
   });
   /*
    * Domaine compta/écritures — lecture seule (balance/grand-livre/FEC). La génération est

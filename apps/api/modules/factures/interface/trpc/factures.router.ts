@@ -5,6 +5,7 @@ import type { IFactureRepository } from "../../application/facture-repository";
 import type { IDevisReader } from "../../application/devis-reader";
 import type { ComptaPort } from "../../application/compta-port";
 import type { FactureMailingDeps } from "../../application/envoyer-facture-email";
+import type { PushPort } from "../../../../shared/push/web-push-adapter";
 import { envoyerFactureParEmail } from "../../application/envoyer-facture-email";
 import { listFactures, getFactureDetail, listLignesFacture, getAvoirsFacture, getAuditLogFacture } from "../../application/read-use-cases";
 import {
@@ -111,7 +112,7 @@ const avoirInputSchema = z.object({
  * use-cases (scoping tenant + numérotation serveur + anti-IDOR-FK + immutabilité post-émission),
  * laisse remonter les Domain errors (NotFound→404, Validation→400, Conflict→409).
  */
-export function createFacturesRouter(repo: IFactureRepository, devisReader: IDevisReader, compta: ComptaPort, mailing: FactureMailingDeps) {
+export function createFacturesRouter(repo: IFactureRepository, devisReader: IDevisReader, compta: ComptaPort, mailing: FactureMailingDeps, push?: PushPort) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listFactures(repo, ctx.tenant)),
 
@@ -147,6 +148,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
         });
         const result = await creerFacture(repo, ctx.tenant, { ...rest, dateEcheance: toDate(rest.dateEcheance), lignes });
         ctx.log.info({ event: "facture_created", factureId: result.id, clientId: rest.clientId }, "Facture créée");
+        push?.sendToUser(ctx.tenant.artisanId, { title: "Operioz", body: `Nouvelle facture ${result.numero} créée` }).catch(() => undefined);
         return result;
       }),
 
