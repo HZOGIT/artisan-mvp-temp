@@ -1,5 +1,5 @@
-import { and, eq, gte } from "drizzle-orm";
-import { artisans, billingEvents, billingSubscriptions, permissionsUtilisateur, users } from "../../../../../drizzle/schema.pg";
+import { and, eq, gte, inArray, notInArray, sql } from "drizzle-orm";
+import { artisans, billingEvents, billingSubscriptions, clients, conversations, factures, messages, permissionsUtilisateur, rdvEnLigne, users } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import type { IAuthRepository } from "../application/auth-repository";
 import type { AuthCredentials, AuthUser } from "../domain/auth";
@@ -127,5 +127,47 @@ export class AuthRepositoryDrizzle implements IAuthRepository {
     } catch {
       /* best-effort */
     }
+  }
+
+  async purgePersonalData(userId: number): Promise<void> {
+    const [u] = await this.db.select({ artisanId: users.artisanId }).from(users).where(eq(users.id, userId)).limit(1);
+    if (!u?.artisanId) return;
+    const artisanId = u.artisanId;
+
+    /** 1. Clients liés à au moins une facture → pseudonymiser (obligation légale 10 ans). */
+    const withInvoice = await this.db
+      .selectDistinct({ clientId: factures.clientId })
+      .from(factures)
+      .where(eq(factures.artisanId, artisanId));
+    const clientIdsWithInvoice = withInvoice.map((r) => r.clientId);
+
+    if (clientIdsWithInvoice.length > 0) {
+      await this.db
+        .update(clients)
+        .set({ nom: "Client anonymisé", prenom: null, email: null, telephone: null, adresse: null, codePostal: null, ville: null, adresseFacturation: null, codePostalFacturation: null, villeFacturation: null, raisonSociale: null, siret: null, numeroTVA: null, notes: null })
+        .where(and(eq(clients.artisanId, artisanId), inArray(clients.id, clientIdsWithInvoice)));
+    }
+
+    /** 2. Clients sans facture → supprimer. */
+    const deleteClientsWhere = clientIdsWithInvoice.length > 0
+      ? and(eq(clients.artisanId, artisanId), notInArray(clients.id, clientIdsWithInvoice))
+      : eq(clients.artisanId, artisanId);
+    await this.db.delete(clients).where(deleteClientsWhere);
+
+    /** 3. Messages et conversations (PII dans le contenu). */
+    const convIds = await this.db.select({ id: conversations.id }).from(conversations).where(eq(conversations.artisanId, artisanId));
+    if (convIds.length > 0) {
+      await this.db.delete(messages).where(inArray(messages.conversationId, convIds.map((c) => c.id)));
+    }
+    await this.db.delete(conversations).where(eq(conversations.artisanId, artisanId));
+
+    /** 4. RDV en ligne. */
+    await this.db.delete(rdvEnLigne).where(eq(rdvEnLigne.artisanId, artisanId));
+
+    /** 5. PII artisan + marqueur de suppression différée 30j. */
+    await this.db
+      .update(artisans)
+      .set({ email: null, telephone: null, iban: null, adresse: null, codePostal: null, ville: null, logo: null, pendingDeletionAt: sql`now()` })
+      .where(eq(artisans.id, artisanId));
   }
 }

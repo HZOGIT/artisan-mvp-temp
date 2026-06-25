@@ -164,11 +164,12 @@ export async function logoutEverywhere(deps: AuthDeps, userId: number): Promise<
   return { success: true };
 }
 
-/** Suppression de compte (SOFT-delete : actif=false + email neutralisé réutilisable). Confirmation requise. */
+/** Suppression de compte RGPD Art. 17 : soft-delete + effacement immédiat des données personnelles. Confirmation requise. */
 export async function deleteAccount(deps: AuthDeps, userId: number, confirmation: string): Promise<{ success: true }> {
   if (confirmation !== "SUPPRIMER") {
     throw new ValidationError("Confirmation incorrecte");
   }
   await deps.repo.softDelete(userId, `deleted_${userId}_${Date.now()}@operioz.com`);
+  await deps.repo.purgePersonalData(userId);
   return { success: true };
 }

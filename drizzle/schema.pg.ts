@@ -103,6 +103,7 @@ export const artisans = pgTable("artisans", {
   assuranceDecennaleNom: varchar("assuranceDecennaleNom", { length: 255 }),
   assuranceDecennalePolice: varchar("assuranceDecennalePolice", { length: 100 }),
   assuranceDecennaleGarantie: varchar("assuranceDecennaleGarantie", { length: 255 }),
+  pendingDeletionAt: timestamp("pendingDeletionAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
 });
