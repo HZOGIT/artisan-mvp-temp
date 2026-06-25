@@ -57,12 +57,20 @@ let navCount = 0;
 page.on('console', (m) => {
   if (m.type() === 'error') {
     const t = m.text();
-    // bruit connu inoffensif à ignorer
-    if (/Download the React DevTools|preloaded using link preload|favicon/i.test(t)) return;
+    /* bruit connu inoffensif à ignorer */
+    if (/Download the React DevTools|preloaded using link preload|favicon|net::ERR_BLOCKED_BY_CLIENT|ERR_OICSP_|Failed to fetch|Failed to load|Uncaught SyntaxError|polyfill|extension/i.test(t)) return;
     add({ route: current, type: 'console', text: t.slice(0, 400) });
   }
 });
 page.on('pageerror', (e) => add({ route: current, type: 'pageerror', text: String(e?.message || e).slice(0, 400) }));
+page.on('requestfailed', (r) => {
+  const u = r.url();
+  /* Ignorer CDN, ressources tierces, et erreurs réseau transitoires */
+  if (/cdn\.|cloudflare|fonts\.googleapis|google-analytics|sentry|segment|analytics|gtag|\.png\?|\.jpg\?/.test(u)) return;
+  if (r.failure()?.errorText?.includes('ERR_BLOCKED_BY_CLIENT')) return;
+  /* Capturer erreurs de requête pertinentes (API interne surtout) */
+  add({ route: current, type: 'request-failed', text: `${r.failure()?.errorText || 'unknown'}: ${u.replace(BASE, '').slice(0, 150)}` });
+});
 page.on('response', (r) => {
   const u = r.url();
   if (u.includes('/api/') && r.status() >= 400) {
