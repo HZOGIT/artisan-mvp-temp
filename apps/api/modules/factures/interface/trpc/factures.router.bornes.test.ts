@@ -138,11 +138,12 @@ describe.skipIf(!URL)("factures.router e2e — bornes & invariants transport", (
     const tA = await token(UA);
     const id = await createFacture(tA);
     expect((await callMutation(server, "factures.envoyer", { id }, tA)).statusCode).toBe(400);
-    // mise à jour du SIRET → l'émission doit passer
     await admin.query('update artisans set siret=$1 where id=$2', ["73282932000074", artisanA]);
-    expect((await callMutation(server, "factures.envoyer", { id }, tA)).statusCode).toBe(200);
-    // nettoyage
-    await admin.query('update artisans set siret=null where id=$1', [artisanA]);
+    try {
+      expect((await callMutation(server, "factures.envoyer", { id }, tA)).statusCode).toBe(200);
+    } finally {
+      await admin.query('update artisans set siret=null where id=$1', [artisanA]);
+    }
   });
 
   it("updateLigne/deleteLigne — recalculs ; ligne d'une AUTRE facture du tenant → 404 ; ligne inexistante → 404", async () => {

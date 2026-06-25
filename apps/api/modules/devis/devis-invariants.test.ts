@@ -13,6 +13,7 @@ import type { TenantContext } from "../../shared/tenant";
 
 // Revue de synthèse des invariants métier du domaine devis (commercial/financier — sensible).
 const A: TenantContext = { artisanId: 1, userId: 50 };
+const fakeArtisanReader = { getArtisan: async () => ({ id: 1, nomEntreprise: null, email: null, siret: "73282932000074" }) };
 const B: TenantContext = { artisanId: 2, userId: 20 };
 
 function repoWithClient(ctx: TenantContext, cid: number): FakeDevisRepository {
@@ -64,7 +65,7 @@ describe("devis — invariants métier (synthèse)", () => {
   it("INV-5 : immutabilité post-acceptation — devis accepté figé (modif/suppr/lignes → Conflict)", async () => {
     const repo = repoWithClient(A, 100);
     const d = await creerDevis(repo, A, { clientId: 100 });
-    await changerStatutDevis(repo, A, d.id, "envoye");
+    await changerStatutDevis(repo, A, d.id, "envoye", fakeArtisanReader);
     await changerStatutDevis(repo, A, d.id, "accepte");
     await expect(modifierDevis(repo, A, d.id, { objet: "x" })).rejects.toBeInstanceOf(ConflictError);
     await expect(supprimerDevis(repo, A, d.id)).rejects.toBeInstanceOf(ConflictError);
@@ -75,7 +76,7 @@ describe("devis — invariants métier (synthèse)", () => {
     const repo = repoWithClient(A, 100);
     const d = await creerDevis(repo, A, { clientId: 100 });
     await expect(changerStatutDevis(repo, A, d.id, "accepte")).rejects.toBeInstanceOf(ConflictError); // saute envoye
-    expect((await changerStatutDevis(repo, A, d.id, "envoye")).statut).toBe("envoye");
+    expect((await changerStatutDevis(repo, A, d.id, "envoye", fakeArtisanReader)).statut).toBe("envoye");
     expect((await changerStatutDevis(repo, A, d.id, "envoye")).statut).toBe("envoye"); // idempotent
     await changerStatutDevis(repo, A, d.id, "expire");
     await expect(changerStatutDevis(repo, A, d.id, "accepte")).rejects.toBeInstanceOf(ConflictError); // terminal figé
