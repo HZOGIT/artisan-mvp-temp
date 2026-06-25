@@ -127,6 +127,53 @@ describe("processStripeWebhook (fail-closed)", () => {
     expect(logged.some(m => m.includes("billing maison webhook handler failed"))).toBe(true);
   });
 
+  it("OPE-29 — re-livraison même event.id → duplicate:true, 0 effet de bord", async () => {
+    const { deps, paymentWriter, notifier } = build();
+    paymentWriter.seed("tok_idem", { paiementId: 20, factureId: 99, artisanId: 5 });
+    const seen = new Set<string>();
+    const markWebhookProcessed = async (id: string) => { if (seen.has(id)) return false; seen.add(id); return true; };
+
+    const event = { id: "evt_idem1", type: "checkout.session.completed", data: { object: { payment_intent: "pi_x", metadata: { token_paiement: "tok_idem", facture_id: "99" } } } };
+    const r1 = await processStripeWebhook({ ...deps, markWebhookProcessed }, { rawBody: raw(event), signature: SIG });
+    const r2 = await processStripeWebhook({ ...deps, markWebhookProcessed }, { rawBody: raw(event), signature: SIG });
+
+    expect(r1.http).toBe(200);
+    expect(r1.body).toEqual({ received: true });
+    expect(r2.http).toBe(200);
+    expect(r2.body).toEqual({ received: true, duplicate: true });
+    expect(paymentWriter.completed).toHaveLength(1);
+  });
+
+  it("OPE-29 — re-livraison trial_will_end → duplicate:true, 0 notif/email supplémentaire", async () => {
+    const { deps, notifier } = build();
+    const seen = new Set<string>();
+    const markWebhookProcessed = async (id: string) => { if (seen.has(id)) return false; seen.add(id); return true; };
+
+    const event = { id: "evt_trial_idem", type: "customer.subscription.trial_will_end", data: { object: { metadata: { artisanId: "42" } } } };
+    await processStripeWebhook({ ...deps, markWebhookProcessed }, { rawBody: raw(event), signature: SIG });
+    const r2 = await processStripeWebhook({ ...deps, markWebhookProcessed }, { rawBody: raw(event), signature: SIG });
+
+    expect(r2.body).toEqual({ received: true, duplicate: true });
+    expect(notifier.notifs).toHaveLength(1);
+    expect(notifier.emails).toHaveLength(1);
+  });
+
+  it("OPE-29 P0 — payment_intent.* non consommé par garde top-level, slot laissé au billing handler", async () => {
+    const { deps } = build();
+    const topLevelConsumed: string[] = [];
+    const markWebhookProcessed = async (id: string, type: string) => { topLevelConsumed.push(`${type}:${id}`); return true; };
+    const billingCalled: string[] = [];
+    const event = { id: "evt_pi_p0", type: "payment_intent.succeeded", data: { object: { id: "pi_p0" } } };
+
+    await processStripeWebhook(
+      { ...deps, markWebhookProcessed, onBillingWebhookEvent: async (t) => { billingCalled.push(t); } },
+      { rawBody: raw(event), signature: SIG },
+    );
+
+    expect(topLevelConsumed).toHaveLength(0);
+    expect(billingCalled).toEqual(["payment_intent.succeeded"]);
+  });
+
   it("FIX-CT — onBillingWebhookEvent erreur payment_failed logguée, retourne 200", async () => {
     const { deps } = build();
     const logged: string[] = [];

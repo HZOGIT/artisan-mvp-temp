@@ -955,6 +955,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
     onBillingWebhookEvent: (eventType, piId, fc, fm, stripeEventId) =>
       handleBillingWebhookEvent({ repo: billingRepo }, eventType, piId, fc, fm, stripeEventId),
+    markWebhookProcessed: (eventId, eventType) => billingRepo.markWebhookProcessed(eventId, eventType, {}),
   });
 
   /** Scheduler billing maison — `POST /internal/billing/tick` sécurisé par x-scheduler-secret. */

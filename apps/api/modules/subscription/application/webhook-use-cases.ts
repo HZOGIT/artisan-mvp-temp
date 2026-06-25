@@ -12,6 +12,11 @@ export interface StripeWebhookDeps {
   readonly appUrl: string;
   readonly log?: AppLogger;
   readonly onBillingWebhookEvent?: (eventType: string, paymentIntentId: string, failureCode?: string | null, failureMessage?: string | null, stripeEventId?: string) => Promise<void>;
+  /**
+   * Garde idempotence Stripe (at-least-once). INSERT ON CONFLICT DO NOTHING → false si déjà vu.
+   * Non fourni = pas de dédup (mode test, hors-billing).
+   */
+  readonly markWebhookProcessed?: (eventId: string, eventType: string) => Promise<boolean>;
 }
 
 export interface WebhookResult {
@@ -34,6 +39,18 @@ export async function processStripeWebhook(
   }
 
   if (event.id.startsWith("evt_test_")) return { http: 200, body: { verified: true } };
+
+  /*
+   * Garde idempotence top-level — UNIQUEMENT pour les events sans dédup interne.
+   * payment_intent.* délèguent à handleBillingWebhookEvent qui a son propre markWebhookProcessed.
+   * Leur appliquer ce garde consommerait le slot PK → le handler billing verrait CONFLICT dès la
+   * 1ère livraison → return early → cycle jamais avancé, dunning silencieusement cassé.
+   */
+  const EVENTS_WITH_OWN_DEDUP = ["payment_intent.succeeded", "payment_intent.payment_failed"];
+  if (deps.markWebhookProcessed && !EVENTS_WITH_OWN_DEDUP.includes(event.type)) {
+    const isNew = await deps.markWebhookProcessed(event.id, event.type);
+    if (!isNew) return { http: 200, body: { received: true, duplicate: true } };
+  }
 
   deps.log?.info({ event: "stripe_webhook_received", stripeEvent: event.type, eventId: event.id }, `Stripe webhook: ${event.type}`);
 
