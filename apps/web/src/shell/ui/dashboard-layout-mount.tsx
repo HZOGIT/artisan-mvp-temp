@@ -94,7 +94,7 @@ export function DashboardLayoutMount() {
           </>
         }
       >
-        {isBlocked && !blockerAllowed ? <ExpiredBlocker /> : <Outlet />}
+        {isBlocked && !blockerAllowed ? <ExpiredBlocker onExportData={() => { window.location.href = "/api/rgpd/export"; }} /> : <Outlet />}
       </DashboardLayout>
       <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
     </>

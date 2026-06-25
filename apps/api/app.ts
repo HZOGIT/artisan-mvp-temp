@@ -158,6 +158,7 @@ import { registerUploadLogoRoute } from "./interface/http/upload-logo-route";
 import { ArtisanLogoWriterDrizzle } from "./modules/artisan/infra/artisan-logo-writer-drizzle";
 import { registerComptabiliteExportRoute } from "./interface/http/comptabilite-export-route";
 import { FacturesCsvReaderDrizzle } from "./modules/comptabilite/infra/factures-csv-reader-drizzle";
+import { registerRgpdExportRoute } from "./interface/http/rgpd-export-route";
 import { registerPaiementRoute } from "./interface/http/paiement-route";
 import { PortalPaymentReaderDrizzle } from "./modules/paiement/infra/portal-payment-reader-drizzle";
 import { PortalPaymentWriterDrizzle } from "./modules/paiement/infra/portal-payment-writer-drizzle";
@@ -990,6 +991,13 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
     reader: deps.comptabiliteReader ?? new ComptabiliteReaderDrizzle(getDbHandle().db),
     csvReader: new FacturesCsvReaderDrizzle(getDbHandle().db),
+  });
+
+  /** Portabilité RGPD Art. 20 — `GET /api/rgpd/export` (auth cookie JWT) → ZIP JSON toutes données du compte. */
+  registerRgpdExportRoute(app, {
+    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
+    db: getDbHandle().db,
   });
 
   /** Statut de paiement + Checkout Stripe — portail client, public par token. */
