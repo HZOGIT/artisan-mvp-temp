@@ -21,6 +21,7 @@ import { usePortailRdv } from "../application/use-portail-rdv";
 import { usePortailChat } from "../application/use-portail-chat";
 import { usePortailInfos } from "../application/use-portail-infos";
 import { usePortailDemande } from "../application/use-portail-demande";
+import { BACKEND_URL } from "@/shared/backend-url";
 import { PORTAIL_TABS, formatCurrency, devisStatutClass, factureStatutClass, isFacturePayable, interventionStatutClass, chantierStatutClass, prochaineIntervention, groupSlotsByDay, rdvStatutClass, totalUnread, formatChatDate, EXEMPLES_DEMANDE, demandeValide, type RdvUrgence, type DemandeStructured } from "../domain/portail";
 
 /*
@@ -134,7 +135,7 @@ export default function PortailClientPage() {
     if (!token) return;
     setPayingFactureId(factureId);
     try {
-      const resp = await fetch("/api/paiement/create-checkout-session", {
+      const resp = await fetch(`${BACKEND_URL}/api/paiement/create-checkout-session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ factureId, token }),

@@ -10,6 +10,7 @@ import { Textarea } from "@/shared/ui/textarea";
 import { Switch } from "@/shared/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 import { AbonnementSection } from "@/features/abonnement/ui/abonnement-section";
+import { BACKEND_URL } from "@/shared/backend-url";
 import { useParametres } from "../application/use-parametres";
 import {
   parametresToForm, formToUpdateInput, buildIcalUrl, demandeStatutClass, FORM_DEFAULTS,
@@ -82,7 +83,7 @@ export default function ParametresPage() {
     try {
       const fd = new FormData();
       fd.append("logo", file);
-      const resp = await fetch("/api/upload-logo", { method: "POST", body: fd });
+      const resp = await fetch(`${BACKEND_URL}/api/upload-logo`, { method: "POST", body: fd });
       const data = await resp.json();
       if (!resp.ok) {
         throw new Error(data.detail ? `${data.error}: ${data.detail}` : (data.error || t("logoErreurUpload")));
@@ -99,7 +100,7 @@ export default function ParametresPage() {
 
   const handleDeleteLogo = async () => {
     try {
-      const resp = await fetch("/api/upload-logo", { method: "DELETE" });
+      const resp = await fetch(`${BACKEND_URL}/api/upload-logo`, { method: "DELETE" });
       if (!resp.ok) throw new Error(t("logoErreurSuppression"));
       setLogoPreview(null);
       refetchArtisan();
