@@ -136,7 +136,7 @@ describe("write-tool-handlers — creer_devis", () => {
     );
     expect(res).toMatchObject({ ok: true, data: { devisId: 55, numero: "DEV-2026-0001", statut: "brouillon" } });
     if (res.ok) expect((res.data as { message: string }).message).toBe("Devis DEV-2026-0001 créé en brouillon (240.00 € TTC)");
-    expect(writer.lignes[0]).toEqual({ designation: "Main d'œuvre", quantite: "2", unite: "u", prixUnitaireHT: "50", tauxTVA: "20" });
+    expect(writer.lignes[0]).toEqual({ designation: "Main d'œuvre", quantite: "2", unite: "u", prixUnitaireHT: "50", tauxTVA: "20", tvaCategorieId: "FR_20" });
   });
 
   it("client d'un autre tenant → ok:false (le use-case migré lève, capté)", async () => {
@@ -181,7 +181,7 @@ describe("write-tool-handlers — creer_facture", () => {
     const h = buildAssistantWriteHandlers({ factures: writer });
     const res = await h.creer_facture({ clientId: 3, objet: "Travaux", lignes: [{ designation: "Pose", quantite: 3, prixUnitaireHT: 100 }] }, ctx);
     expect(res).toMatchObject({ ok: true, data: { factureId: 88, numero: "FAC-2026-0001", statut: "brouillon" } });
-    expect(writer.lignes[0]).toEqual({ designation: "Pose", quantite: "3", unite: "u", prixUnitaireHT: "100", tauxTVA: "20" });
+    expect(writer.lignes[0]).toEqual({ designation: "Pose", quantite: "3", unite: "u", prixUnitaireHT: "100", tauxTVA: "20", tvaCategorieId: "FR_20" });
     if (res.ok) expect((res.data as { message: string }).message).toBe("Facture FAC-2026-0001 créée (360.00 € TTC)");
   });
 
@@ -308,7 +308,7 @@ describe("write-tool-handlers — commandes fournisseurs", () => {
     );
     expect(res).toMatchObject({ ok: true, data: { commandeId: 31, numero: "BC-2026-0001" } });
     expect(writer.input?.notes).toBe("Urgent — Délai : 2 semaines");
-    expect(writer.input?.lignes[0]).toEqual({ designation: "Tube", quantite: "6", unite: "u", prixUnitaire: "50", tauxTVA: "20" });
+    expect(writer.input?.lignes[0]).toEqual({ designation: "Tube", quantite: "6", unite: "u", prixUnitaire: "50", tauxTVA: "20", tvaCategorieId: "FR_20" });
   });
 
   it("envoyer_commande_fournisseur : sans id → ok:false ; succès → message", async () => {

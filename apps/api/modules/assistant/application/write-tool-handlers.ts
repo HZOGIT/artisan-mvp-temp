@@ -1,5 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
-import { tauxStringToCategorie, TVA_CATEGORIES_MAP } from "../../../shared/tva/taux-tva-fr";
+import { tauxStringToCategorie, TVA_CATEGORIES_MAP, type TvaCategorieId } from "../../../shared/tva/taux-tva-fr";
 import type { ToolHandler } from "./assistant-tool-registry";
 
 /*
@@ -247,7 +247,9 @@ async function creerDevisOrchestration(
   const created = await devis.creer(ctx, { clientId, objet, notes: optStr(args.notes), dateValidite });
   for (const raw of lignes) {
     const l = (raw ?? {}) as Record<string, unknown>;
-    const catDevis = l.tvaCategorieId ? String(l.tvaCategorieId) : tauxStringToCategorie(String(l.tauxTVA ?? 20));
+    const catDevis: TvaCategorieId = l.tvaCategorieId && String(l.tvaCategorieId) in TVA_CATEGORIES_MAP
+      ? (String(l.tvaCategorieId) as TvaCategorieId)
+      : tauxStringToCategorie(String(l.tauxTVA ?? 20));
     await devis.ajouterLigne(ctx, created.id, {
       designation: String(l.designation ?? ""),
       quantite: String(Number(l.quantite) || 0),
@@ -330,7 +332,9 @@ function makeCreerFacture(facture: FactureWriterForAgent): ToolHandler {
         factureId = created.id;
         for (const raw of lignes) {
           const l = (raw ?? {}) as Record<string, unknown>;
-          const catFact = l.tvaCategorieId ? String(l.tvaCategorieId) : tauxStringToCategorie(String(l.tauxTVA ?? 20));
+          const catFact: TvaCategorieId = l.tvaCategorieId && String(l.tvaCategorieId) in TVA_CATEGORIES_MAP
+            ? (String(l.tvaCategorieId) as TvaCategorieId)
+            : tauxStringToCategorie(String(l.tauxTVA ?? 20));
           await facture.ajouterLigne(ctx, factureId, {
             designation: String(l.designation ?? ""),
             quantite: String(Number(l.quantite) || 0),
@@ -418,7 +422,9 @@ function makeCreerCommande(commandes: CommandeWriterForAgent): ToolHandler {
         notes,
         lignes: lignes.map((raw) => {
           const l = (raw ?? {}) as Record<string, unknown>;
-          const catCmd = l.tvaCategorieId ? String(l.tvaCategorieId) : tauxStringToCategorie(String(l.tauxTVA ?? 20));
+          const catCmd: TvaCategorieId = l.tvaCategorieId && String(l.tvaCategorieId) in TVA_CATEGORIES_MAP
+            ? (String(l.tvaCategorieId) as TvaCategorieId)
+            : tauxStringToCategorie(String(l.tauxTVA ?? 20));
           return {
             designation: String(l.designation ?? ""),
             quantite: String(Number(l.quantite) || 0),
