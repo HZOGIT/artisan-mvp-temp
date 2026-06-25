@@ -5,6 +5,8 @@ import type { PdfPort } from "../../../shared/ports/pdf";
 import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { IFactureRepository } from "./facture-repository";
 import type { ArtisanReader, ClientReader } from "./contact-readers";
+import type { IModeleEmailRepository } from "../../modeles-email/application/modele-email-repository";
+import { buildModeleEmail } from "../../modeles-email/domain/render";
 
 /*
  * Dépendances de l'envoi d'une facture par email (composition cross-domaine : artisan + client +
@@ -16,6 +18,8 @@ export interface FactureMailingDeps {
   readonly pdf: PdfPort;
   readonly email: EmailPort;
   readonly rateLimiter: RateLimiterPort;
+  /** Optionnel : si présent, le modèle `isDefault` du type `envoi_facture` remplace le gabarit codé en dur. */
+  readonly modeleEmailRepo?: IModeleEmailRepository;
 }
 
 export interface EnvoyerFactureEmailInput {
@@ -132,15 +136,29 @@ export async function envoyerFactureParEmail(
   const totalTTC = `${(parseFloat(facture.totalTTC || "0") || 0).toFixed(2)} €`;
   const dateEcheance = facture.dateEcheance ? new Date(facture.dateEcheance).toLocaleDateString("fr-FR") : null;
 
-  const { subject, body } = buildFactureEmail({
-    artisanName,
-    clientName,
-    numero: facture.numero,
-    objet: facture.objet,
-    totalTTC,
-    dateEcheance,
-    customMessage: input.customMessage ?? null,
-  });
+  const modele = deps.modeleEmailRepo ? await deps.modeleEmailRepo.getDefaultByType(ctx, "envoi_facture") : null;
+  const { subject, body } = modele
+    ? buildModeleEmail(
+        modele,
+        {
+          client_nom: clientName,
+          client_prenom: client.prenom ?? "",
+          numero: facture.numero,
+          montant_ttc: totalTTC,
+          date_echeance: dateEcheance ?? "",
+          nom_entreprise: artisanName,
+        },
+        input.customMessage ?? null,
+      )
+    : buildFactureEmail({
+        artisanName,
+        clientName,
+        numero: facture.numero,
+        objet: facture.objet,
+        totalTTC,
+        dateEcheance,
+        customMessage: input.customMessage ?? null,
+      });
 
   const attachments = input.attachPdf
     ? await (async () => {

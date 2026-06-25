@@ -5,6 +5,8 @@ import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { ArtisanReader, ClientReader, ArtisanInfo, ClientInfo } from "../../../shared/readers/contact-readers";
 import type { IDevisRepository } from "./devis-repository";
 import type { IRelanceDevisRepository } from "../../relances-devis/application/relance-devis-repository";
+import type { IModeleEmailRepository } from "../../modeles-email/application/modele-email-repository";
+import { buildModeleEmail } from "../../modeles-email/domain/render";
 
 /*
  * Dépendances des relances de devis (composition : devis + relances + client/artisan + email +
@@ -18,6 +20,8 @@ export interface DevisRelanceDeps {
   readonly email: EmailPort;
   readonly rateLimiter: RateLimiterPort;
   readonly maintenant?: () => Date;
+  /** Optionnel : si présent, le modèle `isDefault` du type `relance_devis` remplace le gabarit codé en dur. */
+  readonly modeleEmailRepo?: IModeleEmailRepository;
 }
 
 function escapeHtml(s: string): string {
@@ -57,20 +61,14 @@ async function envoyerEtEnregistrer(
   deps: DevisRelanceDeps,
   ctx: TenantContext,
   devisId: number,
-  numero: string,
   client: ClientInfo & { email: string },
-  artisan: ArtisanInfo | null,
+  emailContent: { subject: string; body: string },
   message: string,
 ): Promise<boolean> {
   let ok = true;
   try {
-    await deps.email.send({
-      to: client.email,
-      subject: `Relance - Devis n°${numero}`,
-      body: buildRelanceBody(numero, message, artisan),
-    });
+    await deps.email.send({ to: client.email, subject: emailContent.subject, body: emailContent.body });
   } catch {
-    /** l'échec d'envoi n'interrompt pas : on journalise le statut (parité legacy) */
     ok = false;
   }
   await deps.relanceRepo.create(ctx, {
@@ -107,7 +105,15 @@ export async function envoyerRelanceDevis(
   const artisan = await deps.artisanReader.getArtisan(ctx);
   const artisanName = artisan?.nomEntreprise || "Votre artisan";
   const message = input.message || messageParDefaut(devis.numero, artisanName);
-  await envoyerEtEnregistrer(deps, ctx, devis.id, devis.numero, { ...client, email: client.email }, artisan, message);
+  const modele = deps.modeleEmailRepo ? await deps.modeleEmailRepo.getDefaultByType(ctx, "relance_devis") : null;
+  const emailContent = modele
+    ? buildModeleEmail(
+        modele,
+        { client_nom: clientNom(client), client_prenom: client.prenom ?? "", numero: devis.numero, nom_entreprise: artisanName },
+        input.message ?? null,
+      )
+    : { subject: `Relance - Devis n°${devis.numero}`, body: buildRelanceBody(devis.numero, message, artisan) };
+  await envoyerEtEnregistrer(deps, ctx, devis.id, { ...client, email: client.email }, emailContent, message);
   return { success: true, message: "Relance envoyée avec succès" };
 }
 
@@ -131,6 +137,7 @@ export async function envoyerRelancesAutomatiques(
 
   const artisan = await deps.artisanReader.getArtisan(ctx);
   const artisanName = artisan?.nomEntreprise || "Votre artisan";
+  const modele = deps.modeleEmailRepo ? await deps.modeleEmailRepo.getDefaultByType(ctx, "relance_devis") : null;
   const nonSignes = await deps.devisRepo.listNonSignes(ctx);
   let relancesEnvoyees = 0;
 
@@ -142,7 +149,14 @@ export async function envoyerRelancesAutomatiques(
     const client = await deps.clientReader.getClient(ctx, d.clientId);
     if (!client || !client.email) continue;
     const message = messageParDefaut(d.numero, artisanName, clientNom(client));
-    const ok = await envoyerEtEnregistrer(deps, ctx, d.id, d.numero, { ...client, email: client.email }, artisan, message);
+    const emailContent = modele
+      ? buildModeleEmail(
+          modele,
+          { client_nom: clientNom(client), client_prenom: client.prenom ?? "", numero: d.numero, nom_entreprise: artisanName },
+          null,
+        )
+      : { subject: `Relance - Devis n°${d.numero}`, body: buildRelanceBody(d.numero, message, artisan) };
+    const ok = await envoyerEtEnregistrer(deps, ctx, d.id, { ...client, email: client.email }, emailContent, message);
     if (ok) relancesEnvoyees++;
   }
   return { success: true, relancesEnvoyees };

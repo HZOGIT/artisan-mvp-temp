@@ -107,6 +107,17 @@ export class ModeleEmailRepositoryDrizzle implements IModeleEmailRepository {
     });
   }
 
+  getDefaultByType(ctx: TenantContext, type: TypeModeleEmail): Promise<ModeleEmail | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .select()
+        .from(modelesEmail)
+        .where(and(eq(modelesEmail.artisanId, ctx.artisanId), eq(modelesEmail.type, type), eq(modelesEmail.isDefault, true)))
+        .limit(1);
+      return row ? toModeleEmail(row) : null;
+    });
+  }
+
   delete(ctx: TenantContext, id: number): Promise<boolean> {
     return withTenant(this.db, ctx, async (tx) => {
       const deleted = await tx

@@ -61,6 +61,10 @@ export class FakeModeleEmailRepository implements IModeleEmailRepository {
     return next;
   }
 
+  async getDefaultByType(ctx: TenantContext, type: TypeModeleEmail): Promise<ModeleEmail | null> {
+    return this.scoped(ctx).find((m) => m.type === type && m.isDefault) ?? null;
+  }
+
   async delete(ctx: TenantContext, id: number): Promise<boolean> {
     const idx = this.store.findIndex((m) => m.id === id && m.artisanId === ctx.artisanId);
     if (idx === -1) return false;
