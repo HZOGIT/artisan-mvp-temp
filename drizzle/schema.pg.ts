@@ -406,6 +406,7 @@ export const devisOptionsLignes = pgTable("devis_options_lignes", {
   montantTVA: numeric("montantTVA", { precision: 10, scale: 2 }).default("0.00"),
   montantTTC: numeric("montantTTC", { precision: 10, scale: 2 }).default("0.00"),
   ordre: integer("ordre").default(1),
+  tvaCategorieId: varchar("tvaCategorieId", { length: 30 }).references(() => tvaCategories.id),
 });
 export type DevisOptionLigne = typeof devisOptionsLignes.$inferSelect;
 export type InsertDevisOptionLigne = typeof devisOptionsLignes.$inferInsert;
