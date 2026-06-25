@@ -38,3 +38,13 @@ export const TVA_CATEGORIES: readonly TvaCategorieDef[] = [
 export const TVA_CATEGORIES_MAP = Object.fromEntries(
   TVA_CATEGORIES.map((c) => [c.id, c]),
 ) as Record<TvaCategorieId, TvaCategorieDef>;
+
+export function tauxStringToCategorie(taux: string | number | null | undefined): TvaCategorieId {
+  const n = parseFloat(String(taux ?? 0));
+  if (n >= 20) return "FR_20";
+  if (n >= 10) return "FR_10";
+  if (n >= 5.5) return "FR_5_5";
+  if (n >= 2.1) return "FR_2_1";
+  if (n > 0) return "FR_5_5";
+  return "FR_EXONERE";
+}

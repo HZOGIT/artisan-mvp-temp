@@ -1,4 +1,5 @@
 import { NotFoundError, ConflictError } from "../../../shared/errors";
+import { tauxStringToCategorie } from "../../../shared/tva/taux-tva-fr";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IContratRepository } from "./contrat-repository";
 import type { ContratFactureGenerator, FactureGenereeRef } from "./contrat-facture-generator";
@@ -112,6 +113,7 @@ export async function genererFactureContrat(
     description: contrat.description,
     montantHT: contrat.montantHT,
     tauxTVA: contrat.tauxTVA,
+    tvaCategorieId: tauxStringToCategorie(contrat.tauxTVA || "20"),
   });
 
   const periodeFin = addMonthsClamped(now, MOIS_PAR_PERIODICITE[contrat.periodicite] ?? 1);

@@ -20,6 +20,7 @@ import {
   clientNom, computeStats, filterContrats, statutVariant, TYPES_CONTRAT, PERIODICITES, STATUTS,
   type Contrat, type ContratType, type Periodicite,
 } from "../domain/contrat";
+import { TVA_CATEGORIES } from "@/shared/tva/taux-tva-fr";
 
 interface ContratFormData {
   clientId: number;
@@ -43,7 +44,7 @@ const initialFormData: ContratFormData = {
   description: "",
   type: "entretien",
   montantHT: "",
-  tauxTVA: "20.00",
+  tauxTVA: "20",
   periodicite: "annuel",
   dateDebut: new Date().toISOString().split("T")[0],
   dateFin: "",
@@ -122,7 +123,7 @@ export default function ContratsPage() {
       description: contrat.description || "",
       type: contrat.type,
       montantHT: contrat.montantHT || "",
-      tauxTVA: contrat.tauxTVA || "20.00",
+      tauxTVA: String(parseFloat(contrat.tauxTVA || "20")) || "20",
       periodicite: contrat.periodicite,
       dateDebut: contrat.dateDebut ? new Date(contrat.dateDebut).toISOString().split("T")[0] : "",
       dateFin: contrat.dateFin ? new Date(contrat.dateFin).toISOString().split("T")[0] : "",
@@ -205,7 +206,14 @@ export default function ContratsPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>{t("tauxTVA")}</Label>
-                  <Input type="number" step="0.01" value={formData.tauxTVA} onChange={(e) => setFormData({ ...formData, tauxTVA: e.target.value })} />
+                  <Select value={formData.tauxTVA} onValueChange={(v) => setFormData({ ...formData, tauxTVA: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {TVA_CATEGORIES.map((c) => (
+                        <SelectItem key={c.id} value={c.taux}>{c.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>{t("periodicite")}</Label>
