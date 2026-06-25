@@ -17,6 +17,7 @@ import type { TenantContext } from "../../../shared/tenant";
 
 const A: TenantContext = { artisanId: 1, userId: 10 };
 const B: TenantContext = { artisanId: 2, userId: 20 };
+const fakeArtisanReader = { getArtisan: async () => ({ id: 1, nomEntreprise: null, email: null, siret: "73282932000074" }) };
 
 function repoWithClient(ctx: TenantContext, cid: number): FakeFactureRepository {
   const repo = new FakeFactureRepository();
@@ -113,7 +114,7 @@ describe("factures — use-cases d'écriture", () => {
   it("changerStatutFacture — machine à états : brouillon→envoyee→en_retard→payee ; idempotence", async () => {
     const repo = repoWithClient(A, 100);
     const f = await creerFacture(repo, A, { clientId: 100 });
-    expect((await changerStatutFacture(repo, A, f.id, "envoyee")).statut).toBe("envoyee");
+    expect((await changerStatutFacture(repo, A, f.id, "envoyee", undefined, fakeArtisanReader)).statut).toBe("envoyee");
     expect((await changerStatutFacture(repo, A, f.id, "envoyee")).statut).toBe("envoyee"); // idempotent
     expect((await changerStatutFacture(repo, A, f.id, "en_retard")).statut).toBe("en_retard");
     expect((await changerStatutFacture(repo, A, f.id, "payee")).statut).toBe("payee");
@@ -124,7 +125,7 @@ describe("factures — use-cases d'écriture", () => {
     const f = await creerFacture(repo, A, { clientId: 100 });
     // brouillon → payee (saute envoyee) interdit
     await expect(changerStatutFacture(repo, A, f.id, "payee")).rejects.toBeInstanceOf(ConflictError);
-    await changerStatutFacture(repo, A, f.id, "envoyee");
+    await changerStatutFacture(repo, A, f.id, "envoyee", undefined, fakeArtisanReader);
     await changerStatutFacture(repo, A, f.id, "payee");
     // payee terminal → toute autre transition → Conflict
     await expect(changerStatutFacture(repo, A, f.id, "envoyee")).rejects.toBeInstanceOf(ConflictError);
@@ -142,7 +143,7 @@ describe("factures — use-cases d'écriture", () => {
   async function factureEmise(repo: FakeFactureRepository): Promise<number> {
     const f = await creerFacture(repo, A, { clientId: 100 });
     await ajouterLigneFacture(repo, A, f.id, { designation: "Pose", quantite: "1", prixUnitaireHT: "100.00", tauxTVA: "20" });
-    await changerStatutFacture(repo, A, f.id, "envoyee");
+    await changerStatutFacture(repo, A, f.id, "envoyee", undefined, fakeArtisanReader);
     return f.id;
   }
 
