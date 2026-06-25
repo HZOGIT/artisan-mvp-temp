@@ -187,4 +187,65 @@ describe("processStripeWebhook (fail-closed)", () => {
     expect(r.http).toBe(200);
     expect(logged.some(m => m.includes("billing maison webhook handler failed"))).toBe(true);
   });
+
+  it("OPE-28 — subscription.updated → onSubscriptionWebhookEvent(artisanId, priceId, status)", async () => {
+    const { deps } = build();
+    const calls: Array<{ artisanId: number; priceId: string | null; stripeStatus: string }> = [];
+    const event = {
+      id: "evt_sub_upd",
+      type: "customer.subscription.updated",
+      data: { object: { status: "active", metadata: { artisanId: "7" }, items: { data: [{ price: { id: "price_pro_monthly" } }] } } },
+    };
+    const r = await processStripeWebhook(
+      { ...deps, onSubscriptionWebhookEvent: async (a, p, s) => { calls.push({ artisanId: a, priceId: p, stripeStatus: s }); } },
+      { rawBody: raw(event), signature: SIG },
+    );
+    expect(r.http).toBe(200);
+    expect(calls).toEqual([{ artisanId: 7, priceId: "price_pro_monthly", stripeStatus: "active" }]);
+  });
+
+  it("OPE-28 — subscription.created → onSubscriptionWebhookEvent avec priceId", async () => {
+    const { deps } = build();
+    const calls: Array<{ artisanId: number; priceId: string | null; stripeStatus: string }> = [];
+    const event = {
+      id: "evt_sub_cre",
+      type: "customer.subscription.created",
+      data: { object: { status: "trialing", metadata: { artisanId: "3" }, items: { data: [{ price: { id: "price_enterprise_yearly" } }] } } },
+    };
+    await processStripeWebhook(
+      { ...deps, onSubscriptionWebhookEvent: async (a, p, s) => { calls.push({ artisanId: a, priceId: p, stripeStatus: s }); } },
+      { rawBody: raw(event), signature: SIG },
+    );
+    expect(calls).toEqual([{ artisanId: 3, priceId: "price_enterprise_yearly", stripeStatus: "trialing" }]);
+  });
+
+  it("OPE-28 — subscription.deleted → priceId null + stripeStatus 'canceled'", async () => {
+    const { deps } = build();
+    const calls: Array<{ artisanId: number; priceId: string | null; stripeStatus: string }> = [];
+    const event = {
+      id: "evt_sub_del",
+      type: "customer.subscription.deleted",
+      data: { object: { status: "canceled", metadata: { artisanId: "12" }, items: { data: [] } } },
+    };
+    await processStripeWebhook(
+      { ...deps, onSubscriptionWebhookEvent: async (a, p, s) => { calls.push({ artisanId: a, priceId: p, stripeStatus: s }); } },
+      { rawBody: raw(event), signature: SIG },
+    );
+    expect(calls).toEqual([{ artisanId: 12, priceId: null, stripeStatus: "canceled" }]);
+  });
+
+  it("OPE-28 — subscription.updated sans artisanId dans metadata → skip", async () => {
+    const { deps } = build();
+    const calls: unknown[] = [];
+    const event = {
+      id: "evt_sub_noid",
+      type: "customer.subscription.updated",
+      data: { object: { status: "active", metadata: {}, items: { data: [] } } },
+    };
+    await processStripeWebhook(
+      { ...deps, onSubscriptionWebhookEvent: async (...args) => { calls.push(args); } },
+      { rawBody: raw(event), signature: SIG },
+    );
+    expect(calls).toHaveLength(0);
+  });
 });

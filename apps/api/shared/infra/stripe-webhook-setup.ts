@@ -4,6 +4,9 @@ const STRIPE_MODULE = "stripe";
 
 const WEBHOOK_EVENTS = [
   "checkout.session.completed",
+  "customer.subscription.created",
+  "customer.subscription.updated",
+  "customer.subscription.deleted",
   "customer.subscription.trial_will_end",
   "payment_intent.succeeded",
   "payment_intent.payment_failed",
