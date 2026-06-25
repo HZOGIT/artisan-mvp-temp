@@ -124,6 +124,10 @@ export async function signDevis(
     throw new ValidationError(`Ce devis a expiré le ${exp} — demandez un nouveau devis à votre artisan`);
   }
 
+  if (!(await deps.rateLimiter.check(`sign:${resolution.signature.id}`))) {
+    throw new TooManyRequestsError("Trop de tentatives. Réessayez dans quelques minutes.");
+  }
+
   const ctx = tenantOf(resolution.artisanId);
   const signature = await deps.writer.signDevis(ctx, {
     token: input.token,
@@ -164,6 +168,10 @@ export async function refuseDevis(
   if (!resolution) throw new NotFoundError("Lien de signature invalide");
   if (resolution.signature.statut !== "en_attente") {
     throw new ValidationError("Ce devis a déjà été traité");
+  }
+
+  if (!(await deps.rateLimiter.check(`refuse:${resolution.signature.id}`))) {
+    throw new TooManyRequestsError("Trop de tentatives. Réessayez dans quelques minutes.");
   }
 
   const ctx = tenantOf(resolution.artisanId);

@@ -247,12 +247,22 @@ describe("signDevis (public)", () => {
     expect(out.signature.statut).toBe("accepte");
     expect(email.sent).toHaveLength(0);
   });
+
+  it("rate-limit atteint → TooManyRequestsError (anti brute-force token)", async () => {
+    const { deps } = build({ res: resolution(), view, rateLimiter: new DenyRateLimiter() });
+    await expect(signDevis(deps, signPayload)).rejects.toBeInstanceOf(TooManyRequestsError);
+  });
 });
 
 describe("refuseDevis (public)", () => {
   it("statut ≠ en_attente → ValidationError", async () => {
     const { deps } = build({ res: resolution({ signature: signature({ statut: "refuse" }) }), view });
     await expect(refuseDevis(deps, { token: "tok", motifRefus: null, ipAddress: "1.2.3.4", userAgent: "UA" })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("rate-limit atteint → TooManyRequestsError (anti flood refus)", async () => {
+    const { deps } = build({ res: resolution(), view, rateLimiter: new DenyRateLimiter() });
+    await expect(refuseDevis(deps, { token: "tok", motifRefus: null, ipAddress: "1.2.3.4", userAgent: "UA" })).rejects.toBeInstanceOf(TooManyRequestsError);
   });
 
   it("succès : refuse (+ motif), notifie alerte et email l'artisan", async () => {
