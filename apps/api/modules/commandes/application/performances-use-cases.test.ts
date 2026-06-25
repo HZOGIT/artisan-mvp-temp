@@ -51,4 +51,12 @@ describe("calculerPerformancesFournisseurs (pur)", () => {
     const [perf] = calculerPerformancesFournisseurs([], [f(20, "F20")]);
     expect(perf).toMatchObject({ totalCommandes: 0, commandesLivrees: 0, commandesEnRetard: 0, delaiMoyenLivraison: null, tauxFiabilite: 100, montantTotal: 0 });
   });
+
+  it("montantTotal arrondi à 2 décimales — anti-régression drift float", () => {
+    const [perf] = calculerPerformancesFournisseurs(
+      [cmd({ id: 1, fournisseurId: 10, statut: "livree", totalTTC: "0.1" }), cmd({ id: 2, fournisseurId: 10, statut: "livree", totalTTC: "0.2" })],
+      [f(10, "F10")],
+    );
+    expect(perf.montantTotal).toBe(0.3);
+  });
 });

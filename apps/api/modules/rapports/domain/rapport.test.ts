@@ -16,4 +16,12 @@ describe("computeFinancier (pur)", () => {
   it("aucune facture → zéros", () => {
     expect(computeFinancier([])).toEqual([{ totalCA: 0, nombreFactures: 0, facturesPayees: 0 }]);
   });
+
+  it("totalCA arrondi à 2 décimales — anti-régression drift float", () => {
+    const out = computeFinancier([
+      { statut: "payee", totalHT: "0.1", typeDocument: "facture" },
+      { statut: "payee", totalHT: "0.2", typeDocument: "facture" },
+    ]);
+    expect(out[0].totalCA).toBe(0.3);
+  });
 });

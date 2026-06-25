@@ -1,3 +1,5 @@
+import { round2 } from "../../../shared/money";
+
 /** Statistiques agrégées des devis du tenant (parité legacy `statistiques.getDevisStats`). */
 export interface DevisStats {
   readonly total: number;
@@ -23,5 +25,5 @@ export function computeDevisStats(devis: readonly DevisStatRow[]): DevisStats {
     parStatut[statut] = (parStatut[statut] || 0) + 1;
     montantTotal += parseFloat(d.totalTTC ?? "0") || 0;
   }
-  return { total: devis.length, parStatut, montantTotal };
+  return { total: devis.length, parStatut, montantTotal: round2(montantTotal) };
 }
