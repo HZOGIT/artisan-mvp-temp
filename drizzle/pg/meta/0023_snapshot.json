@@ -1,5 +1,5 @@
 {
-  "id": "4b1fa5af-6e44-4ad6-a9f9-e0da277a59da",
+  "id": "3094e8a5-8f57-40a7-94b4-09d7abd0dfe2",
   "prevId": "c2549206-a4bc-4308-b99e-0356b62fda66",
   "version": "7",
   "dialect": "postgresql",
@@ -8482,6 +8482,12 @@
           "notNull": true,
           "default": "now()"
         },
+        "expiresAt": {
+          "name": "expiresAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
         "createdAt": {
           "name": "createdAt",
           "type": "timestamp",
@@ -10047,6 +10053,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "suiviActif": {
+          "name": "suiviActif",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
         "createdAt": {
           "name": "createdAt",
           "type": "timestamp",
@@ -10314,12 +10327,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "passwordChangedAt": {
-          "name": "passwordChangedAt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {},
