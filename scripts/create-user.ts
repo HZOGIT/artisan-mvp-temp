@@ -29,8 +29,10 @@ async function main() {
 
     const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, EMAIL)).limit(1);
     if (existing.length) {
-      await db.update(users).set({ password, name: NAME }).where(eq(users.email, EMAIL));
-      console.log(`🔁 Utilisateur existant mis à jour (id=${existing[0].id}).`);
+      const patch: Partial<typeof users.$inferInsert> = { password, name: NAME };
+      if (process.env.USER_ROLE) patch.role = process.env.USER_ROLE as typeof patch.role;
+      await db.update(users).set(patch).where(eq(users.email, EMAIL));
+      console.log(`🔁 Utilisateur existant mis à jour (id=${existing[0].id})${process.env.USER_ROLE ? ` — rôle=${process.env.USER_ROLE}` : ""}.`);
     } else {
       const values: typeof users.$inferInsert = { email: EMAIL, password, name: NAME };
       if (process.env.USER_ROLE) values.role = process.env.USER_ROLE as typeof values.role;

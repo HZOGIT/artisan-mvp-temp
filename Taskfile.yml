@@ -72,6 +72,13 @@ tasks:
     cmds:
       - 'DATABASE_URL={{.LOCAL_DATABASE_URL}} DB_DIALECT=postgresql USER_EMAIL=dev@operioz.com USER_PASSWORD=Operioz USER_NAME="Dev Operioz" pnpm exec tsx scripts/create-user.ts'
 
+  db:seed:admin:
+    desc: "Crée/promeut un user STAFF PLATEFORME (role=admin, SANS artisan → accès platformAdmin.*). Vars : EMAIL (requis), PASSWORD (défaut Azerqsdf1234!), DB_URL (défaut local 5432 ; passer l'URL du PG staging 5433 pour le backend déployé). Ex : task db:seed:admin EMAIL=dev+admin@operioz.com"
+    requires:
+      vars: [EMAIL]
+    cmds:
+      - 'DATABASE_URL="{{.DB_URL | default .LOCAL_DATABASE_URL}}" DB_DIALECT=postgresql USER_ROLE=admin USER_EMAIL="{{.EMAIL}}" USER_PASSWORD="{{.PASSWORD | default "Azerqsdf1234!"}}" USER_NAME="{{.NAME | default "Staff Operioz"}}" pnpm exec tsx scripts/create-user.ts'
+
   db:seed:show:
     desc: Show seeded users
     cmds:
