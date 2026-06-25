@@ -32,7 +32,7 @@ describe.skipIf(!URL)("POST /api/voice/persist (auth cookie)", () => {
     await admin.query("insert into users (id, email) values ($1,$2),($3,$4)", [UID, `u${UID}@test.fr`, UID_OTHER, `u${UID_OTHER}@test.fr`]);
     const artisanId = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UID])).rows[0].id;
     await admin.query('insert into artisans ("userId") values ($1)', [UID_OTHER]);
-    await admin.query("insert into billing_subscriptions (artisan_id, plan_id, billing_mode, status) values ($1,'pro','maison','active')", [artisanId]);
+    await admin.query("insert into billing_subscriptions (artisan_id, plan_id, billing_mode, status) values ($1,'pro','maison','trialing')", [artisanId]);
     threadId = (await admin.query('insert into ai_threads ("artisanId",title,"lastMessageAt") values ($1,$2,now()) returning id', [artisanId, "Voix"])).rows[0].id;
     app = buildApp({ jwtSecret: SECRET });
   });
