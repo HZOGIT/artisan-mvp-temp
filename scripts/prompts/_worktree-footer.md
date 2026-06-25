@@ -9,6 +9,16 @@ Tu travailles dans un **worktree Git isolé** :
 
 Les scripts utilitaires sont dans `__MAIN_REPO__/scripts/` — utilise leurs **chemins absolus** depuis ce worktree.
 
+### 0. Préchauffer le cache TypeScript (dès le début)
+
+Lance immédiatement en background pour que le cache `.tsbuildinfo` soit chaud au moment du premier commit :
+
+```bash
+cd __MAIN_REPO__ && pnpm check:parallel &
+```
+
+Le pre-commit hook utilise `check:parallel` (incremental). Sans ce warm-up, le premier commit est lent (~2 min) car il compile tout from scratch.
+
 ### 1. Commits chirurgicaux (dans ce worktree)
 
 ```bash
