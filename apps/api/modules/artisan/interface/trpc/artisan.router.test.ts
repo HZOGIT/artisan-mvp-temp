@@ -98,4 +98,15 @@ describe.skipIf(!URL)("artisan.router e2e (profil protégé)", () => {
     const profile = await injectTrpc(app, "GET", "artisan.getProfile", undefined, tok);
     expect(profile.json().result.data?.iban).toBe(VALID_IBAN);
   });
+
+  it("IBAN compte actif=false (soft-deleted) + bon password → 401", async () => {
+    await admin.query("update users set actif=false where id=$1", [UID]);
+    try {
+      const tok = await jwt(UID);
+      const res = await injectTrpc(app, "POST", "artisan.updateProfile", { iban: VALID_IBAN, currentPassword: PASSWORD }, tok);
+      expect(res.statusCode).toBe(401);
+    } finally {
+      await admin.query("update users set actif=true where id=$1", [UID]);
+    }
+  });
 });

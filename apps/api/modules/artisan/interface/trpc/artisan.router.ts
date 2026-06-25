@@ -63,25 +63,24 @@ export function createArtisanRouter(repo: IArtisanRepository, security: ArtisanS
       .mutation(async ({ ctx, input }) => {
         const { currentPassword, ...profileInput } = input;
 
+        let credEmail: string | null = null;
         if (profileInput.iban !== undefined) {
           if (!currentPassword) {
             throw new ValidationError("Mot de passe requis pour modifier l'IBAN");
           }
           const cred = await security.authRepo.findCredentialsById(ctx.tenant.userId);
-          if (!cred?.password || !(await security.hasher.verify(currentPassword, cred.password))) {
+          if (!cred || !cred.actif || !cred.password || !(await security.hasher.verify(currentPassword, cred.password))) {
             throw new UnauthorizedError("Mot de passe incorrect");
           }
+          credEmail = cred.email;
         }
 
         const result = await updateProfile(repo, ctx.tenant, profileInput);
 
-        if (profileInput.iban !== undefined && security.email) {
-          const user = await security.authRepo.getById(ctx.tenant.userId);
-          if (user?.email) {
-            try {
-              await security.email.send({ to: user.email, subject: "Votre IBAN de facturation a été modifié", body: ibanChangedEmail() });
-            } catch { /* best-effort */ }
-          }
+        if (profileInput.iban !== undefined && security.email && credEmail) {
+          try {
+            await security.email.send({ to: credEmail, subject: "Votre IBAN de facturation a été modifié", body: ibanChangedEmail() });
+          } catch { /* best-effort */ }
         }
 
         const changedFields = Object.keys(profileInput).filter((k) => profileInput[k as keyof typeof profileInput] !== undefined);
