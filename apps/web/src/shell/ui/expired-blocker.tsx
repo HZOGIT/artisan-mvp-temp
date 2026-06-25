@@ -10,6 +10,7 @@ export function ExpiredBlocker({ onExportData }: { onExportData?: () => void }) 
   const { t } = useTranslation("shell");
   const [, setLocation] = useLocation();
   const { data: sub } = trpc.subscription.getCurrent.useQuery();
+  const isPastDue = sub?.status === "past_due";
 
   useEffect(() => {
     if (sub && (sub.status === "active" || sub.status === "trialing")) window.location.reload();
@@ -22,15 +23,16 @@ export function ExpiredBlocker({ onExportData }: { onExportData?: () => void }) 
           <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-red-100 dark:bg-red-950/40 mb-4">
             <XCircle className="h-8 w-8 text-red-600" />
           </div>
-          <h1 className="text-2xl font-bold mb-2">{t("aboExpire")}</h1>
+          <h1 className="text-2xl font-bold mb-2">{isPastDue ? t("aboSuspendu") : t("aboExpire")}</h1>
           <p className="text-muted-foreground mb-6">
-            {t("renouvelezAcces")}<br /><span className="text-sm">{t("donneesConservees")}</span>
+            {isPastDue ? t("regularisezPaiement") : t("renouvelezAcces")}
+            {!isPastDue && <><br /><span className="text-sm">{t("donneesConservees")}</span></>}
           </p>
           <div className="space-y-2">
             <Button className="w-full" onClick={() => setLocation("/parametres?tab=abonnement")}>
-              <RefreshCw className="h-4 w-4 mr-2" />{t("renouvelerAbo")}
+              <RefreshCw className="h-4 w-4 mr-2" />{isPastDue ? t("mettreAjourPaiement") : t("renouvelerAbo")}
             </Button>
-            {onExportData && (
+            {onExportData && !isPastDue && (
               <Button variant="ghost" className="w-full" onClick={onExportData}>
                 <Download className="h-4 w-4 mr-2" />{t("exporterDonnees")}
               </Button>

@@ -16,14 +16,17 @@ export function trialBannerSeverity(sub: Subscription | null | undefined): Trial
 }
 
 /*
- * Compte bloqué (essai fini / expiré / annulé échu) + routes tolérées (renouvellement/profil). PUR.
+ * Compte bloqué (essai fini / suspendu paiement / annulé / expiré) + routes tolérées (renouvellement/profil). PUR.
+ * `past_due` = suspendu après épuisement du dunning (scheduler émet "Votre accès est suspendu").
+ * `canceled` = toujours bloqué (le check `currentPeriodEnd < now` était cassé quand currentPeriodEnd est null).
  * `location` = chemin courant (ex. `/parametres`).
  */
 export function accountBlockState(sub: Subscription | null | undefined, location: string): { isBlocked: boolean; blockerAllowed: boolean } {
   const trialEnded = sub?.status === "trialing" && sub.trialDaysLeft <= 0;
   const isBlocked = !!(
     sub?.status === "expired" ||
-    (sub?.status === "canceled" && sub.currentPeriodEnd && new Date(sub.currentPeriodEnd) < new Date()) ||
+    sub?.status === "past_due" ||
+    sub?.status === "canceled" ||
     trialEnded
   );
   const p = location;
