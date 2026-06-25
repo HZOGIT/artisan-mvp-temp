@@ -72,21 +72,6 @@ describe.skipIf(!URL)("ImportErpRepositoryDrizzle (RLS import ERP)", () => {
     expect(rows[0].numero).toBeTruthy(); // numéro généré serveur
   });
 
-  it("createFactureLight : PRÉSERVE le numéro légal fourni ; en génère un si absent", async () => {
-    await repo.createFactureLight(ctx(artisanA), {
-      clientId: clientA, numero: "LEGACY-2024-007", objet: "Hist", statut: "payee",
-      dateFacture: new Date("2024-03-01"), dateEcheance: new Date("2024-03-31"), totalTTC: "300.00",
-    });
-    await repo.createFactureLight(ctx(artisanA), {
-      clientId: clientA, objet: "Sans numero", statut: "envoyee",
-      dateFacture: new Date("2026-03-01"), dateEcheance: new Date("2026-03-31"), totalTTC: "150.00",
-    });
-    const numeros = await repo.listFactureNumeros(ctx(artisanA));
-    expect(numeros).toContain("LEGACY-2024-007"); // numéro d'origine préservé
-    expect(numeros.filter((n) => n !== "LEGACY-2024-007")).toHaveLength(1); // l'autre a un numéro généré
-    expect(await repo.listFactureNumeros(ctx(artisanB))).toEqual([]); // anti-IDOR
-  });
-
   it("createFactureLight : PRÉSERVE le numéro légal fourni ; en génère un si absent + crée ligne HT/TVA", async () => {
     await repo.createFactureLight(ctx(artisanA), {
       clientId: clientA, numero: "LEGACY-2024-007", objet: "Hist", statut: "payee",
