@@ -120,6 +120,8 @@ function requirePermission(...requiredPerms: string[]) {
     }
     /** admin bypasse toutes les permissions */
     if (ctx.role === "admin") return next();
+    /** propriétaire du compte artisan bypasse les gates de permission */
+    if (ctx.tenant?.isOwner) return next();
     const has = requiredPerms.every((p) => ctx.permissions.includes(p));
     if (!has) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Vous n'avez pas la permission requise" });

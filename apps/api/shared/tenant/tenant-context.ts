@@ -8,6 +8,8 @@ export interface TenantContext {
   readonly artisanId: number;
   readonly userId: number;
   readonly role?: string;
+  /** Vrai si l'utilisateur est le propriétaire du compte artisan (bypass des gates de permission). */
+  readonly isOwner?: boolean;
 }
 
 /*

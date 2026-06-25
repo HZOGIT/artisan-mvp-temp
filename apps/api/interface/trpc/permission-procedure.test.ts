@@ -44,6 +44,16 @@ describe("permissionProcedure (seam d'autorisation par permission)", () => {
     const caller = testRouter.createCaller(baseCtx({ tenant: null, permissions: ["utilisateurs.gerer"] }));
     await expect(caller.gerer()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
+
+  it("owner (isOwner: true) sans permission DB → autorisé (bypass propriétaire)", async () => {
+    const caller = testRouter.createCaller(baseCtx({ tenant: { artisanId: 10, userId: 1, isOwner: true }, permissions: [] }));
+    expect(await caller.gerer()).toBe("ok");
+  });
+
+  it("collaborateur (isOwner: false) sans permission → FORBIDDEN", async () => {
+    const caller = testRouter.createCaller(baseCtx({ tenant: { artisanId: 10, userId: 2, isOwner: false }, permissions: [] }));
+    await expect(caller.gerer()).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
 });
 
 describe("makeCreateContext : révocation par passwordChangedAt", () => {
