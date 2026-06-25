@@ -16,9 +16,8 @@ export default defineConfig({
     environment: "node",
     include: ["apps/web/src/**/*.test.ts", "apps/web/src/**/*.test.tsx"],
     pool: "threads",
-    poolOptions: {
-      threads: { minThreads: 1, maxThreads: "75%" },
-    },
+    minWorkers: 1,
+    maxWorkers: "75%",
     reporter: ["dot"],
     experimental: {
       fsModuleCache: true,
