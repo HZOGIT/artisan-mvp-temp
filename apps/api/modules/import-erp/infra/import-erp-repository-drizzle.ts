@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { clients as clientsTable, devis as devisTable, factures as facturesTable, factures_lignes as facturesLignesTable } from "../../../../../drizzle/schema.pg";
+import { clients as clientsTable, devis as devisTable, factures as facturesTable, facturesLignes as facturesLignesTable } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
@@ -89,6 +89,7 @@ export class ImportErpRepositoryDrizzle implements IImportErpRepository {
       }).returning();
       if (data.lignes && data.lignes.length > 0) {
         for (const ligne of data.lignes) {
+          const montantTTC = (parseFloat(ligne.montantHT) + parseFloat(ligne.montantTVA)).toFixed(2);
           await tx.insert(facturesLignesTable).values({
             factureId: facture.id,
             ordre: 0,
@@ -101,7 +102,7 @@ export class ImportErpRepositoryDrizzle implements IImportErpRepository {
             tvaCategorieId: ligne.tvaCategorieId ?? null,
             montantHT: ligne.montantHT,
             montantTVA: ligne.montantTVA,
-            montantTTC: ligne.montantHT + ligne.montantTVA,
+            montantTTC,
             type: "produit",
           });
         }
