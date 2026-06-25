@@ -96,8 +96,10 @@ describe.skipIf(!URL)("ImportErpRepositoryDrizzle (RLS import ERP)", () => {
     expect(numeros).toContain("LEGACY-2024-007");
     expect(numeros.filter((n) => n !== "LEGACY-2024-007")).toHaveLength(1);
     expect(await repo.listFactureNumeros(ctx(artisanB))).toEqual([]);
+    const generated = numeros.filter((n) => n !== "LEGACY-2024-007")[0];
     const { rows: lignes } = await admin.query(
-      'select f.numero, f."totalTTC", l."montantHT", l."montantTVA", l."montantTTC" from factures f left join factures_lignes l on f.id = l."factureId" where l.id is not null order by f.numero',
+      'select f.numero, f."totalTTC", l."montantHT", l."montantTVA", l."montantTTC" from factures f left join factures_lignes l on f.id = l."factureId" where f.numero = $1',
+      [generated],
     );
     expect(lignes).toHaveLength(1);
     expect(lignes[0].totalTTC).toBe("150.00");
