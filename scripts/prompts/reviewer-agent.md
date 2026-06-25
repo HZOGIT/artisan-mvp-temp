@@ -42,31 +42,77 @@ gh pr diff <numero>
 gh pr view <numero> --json files,commits,body
 ```
 
-#### b. Vérifier la qualité
+#### b. Vérifier la qualité — DANS le worktree de la PR
 
-Depuis le repo principal :
+⚠️ **N'utilise PAS `gh pr checkout` dans le repo principal** : la branche est déjà montée par le worktree
+`/tmp/wt-<session>` (git refuse un second checkout), et basculer `staging` casserait le travail des autres
+agents. Vérifie **dans le worktree**.
+
+⚠️ **N'invoque PAS `pnpm check`/`pnpm lint:*` dans le worktree** : le wrapper pnpm détecte les `node_modules`
+(symlink) « désynchronisés » et tente une purge interactive qui **échoue sans TTY**. Appelle les binaires
+**directement** depuis le `node_modules` du repo principal.
 
 ```bash
-cd /home/developer/artisan-mvp-temp
+SESSION_NAME="<nom après feat/>"   # ex. feat/fix-bug → fix-bug
+WT=/tmp/wt-$SESSION_NAME
+BIN=/home/developer/artisan-mvp-temp/node_modules/.bin
 
-# Checkout local de la branche pour vérifier
-gh pr checkout <numero>
+# Le worktree doit être propre et synchro avec le HEAD de la PR :
+git -C "$WT" rev-parse HEAD ; gh pr view <numero> --json headRefOid -q .headRefOid
+git -C "$WT" status --short          # doit être vide
 
-pnpm check       # tsc doit passer
-pnpm lint:api    # si fichiers api/ modifiés
-pnpm lint:web    # si fichiers web/ modifiés
+# Si node_modules manque dans le worktree (certains setups l'oublient) → le lier :
+[ -e "$WT/node_modules" ] || ln -s /home/developer/artisan-mvp-temp/node_modules "$WT/node_modules"
+
+cd "$WT"
+$BIN/tsc -p tsconfig.api.json --noEmit          # gate tsc backend
+$BIN/tsc -p tsconfig.web.json --noEmit          # gate tsc frontend (strict)
+$BIN/eslint -c eslint.api.config.mjs --concurrency=auto apps/api      # si apps/api touché
+$BIN/eslint -c eslint.web.config.mjs --concurrency=auto apps/web/src  # si apps/web touché
+# Lint : seuls les ERRORS bloquent. Le repo a ~1000+ warnings pré-existants (normal, non bloquant).
+
+# Tests (gate L1/L2/L3). Le PG de test est sur 5432 :
+DATABASE_URL=postgres://artisan_user:artisan_password@localhost:5432/artisan_mvp \
+  $BIN/vitest run -c vitest.api.config.ts <chemins des fichiers/modules touchés>
 ```
 
-Revenir sur staging après :
+⚠️ **PG de test périmé** : si un test L3 échoue en `500 / column "X" does not exist`, la base 5432 est en
+retard de migrations. Reprovisionne-la (mécanisme documenté, idempotent) puis relance les tests :
 ```bash
-git checkout staging
+cd /home/developer/artisan-mvp-temp && task db:provision
+```
+Si la PR ajoute elle-même une migration pas encore sur staging, applique-la en lançant `provision-cli.ts`
+depuis le worktree (`DATABASE_URL=… APP_DATABASE_URL=… pnpm exec tsx apps/api/shared/db/provision-cli.ts`).
+
+⚠️ **Conflit de migration** (`gh pr view <numero> --json mergeable` = `CONFLICTING`) : si `staging` a gagné
+une migration au même numéro depuis la création de la PR, demande au worker de **rebaser sur `origin/staging`
+puis RÉGÉNÉRER** sa migration via `drizzle-kit generate` (jamais éditer `_journal.json` à la main).
+
+#### b-bis. Traiter les findings Greptile (revue automatique)
+
+Greptile analyse chaque PR et classe ses findings par sévérité (P0/P1/P2/P3). **Tu dois les lire et
+t'assurer qu'ils sont traités** avant tout merge. Deux sources, complémentaires :
+
+**(A) CLI `greptile` — RECOMMANDÉ, plus rapide sur le HEAD courant.** Le CLI est installé et connecté
+(`greptile whoami` → `dev@operioz.com`, org Operioz). Il review la branche **courante** contre sa base,
+donc lance-le **depuis le worktree** de la PR (sur la branche `feat/<session>`) :
+
+```bash
+cd /tmp/wt-<session>
+greptile review -b staging --agent          # sortie texte parsable (alias de --text, pour agents)
+# ou, pour parser programmatiquement :
+greptile review -b staging --agent --json
 ```
 
-#### b-bis. Traiter les commentaires Greptile (revue automatique)
+- `--agent` = sortie plate sans couleurs/animations (idéale pour toi). `--json` = findings structurés.
+- Avantage vs le bot GitHub : tu obtiens les findings sur le **dernier commit** sans attendre que le bot
+  re-poste (utile aux rounds 2+ juste après un push worker).
+- ⚠️ Une review CLI peut prendre **1 à 4 min** (indexation/analyse). Lance-la **une seule fois par round**,
+  en parallèle de tes gates (tsc/lint/tests) pendant qu'elle tourne — ne la relance pas en boucle.
+- `greptile review --resume` reprend une review interrompue ; `greptile review show <id>` rouvre une review passée.
 
-Greptile (`greptile-apps[bot]`) poste une revue automatique sur chaque PR : un résumé + parfois des
-commentaires **inline** classés par sévérité (P0/P1/P2/P3). **Tu dois les lire et t'assurer qu'ils sont
-traités** avant tout merge.
+**(B) Commentaires du bot GitHub `greptile-apps[bot]`** — fallback / recoupement (le bot tourne
+automatiquement à chaque push, ses commentaires sont déjà sur la PR) :
 
 ```bash
 # Corps de la review Greptile (résumé + score de confiance)
@@ -77,6 +123,9 @@ gh api repos/HZOGIT/artisan-mvp-temp/pulls/<numero>/reviews \
 gh api repos/HZOGIT/artisan-mvp-temp/pulls/<numero>/comments \
   --jq '.[] | select(.user.login=="greptile-apps[bot]") | {path, line, body}'
 ```
+
+Utilise (A) en premier pour la rapidité ; recoupe avec (B) si le bot a déjà commenté. Dans les deux cas,
+**évalue chaque finding toi-même** (cf. ci-dessous) — ne l'applique jamais aveuglément.
 
 Pour chaque finding Greptile :
 - **Évalue-le toi-même** (Greptile peut se tromper ou flagger du pré-existant hors périmètre — ne l'applique pas aveuglément).
@@ -128,31 +177,38 @@ Puis passe à la PR suivante — tu reviendras sur celle-ci à la prochaine ité
 
 #### d. Décision : PR approuvée
 
-Si `pnpm check` passe, lint OK, **les commentaires Greptile valides sont traités (corrigés ou justifiés)**, et le code est correct :
+Si tsc passe, lint sans `error`, **les findings Greptile valides sont traités (corrigés ou justifiés)**, et le code est correct :
 
-**1. Approuver sur GitHub :**
+**1. Merger (squash) — depuis le repo principal.**
 ```bash
-gh pr review <numero> --approve --body "Code review OK — merge automatique."
+cd /home/developer/artisan-mvp-temp
+```
+⚠️ **Ne tente PAS `gh pr review --approve`** : le reviewer partage le compte GitHub de l'auteur des PRs
+(`HZOGIT`) → GitHub refuse (« Can not approve your own pull request »). Le merge direct fait foi.
+
+⚠️ **Ne passe PAS `--delete-branch`** au merge : tant que le worktree existe, git refuse de supprimer la
+branche locale et la commande sort en erreur **après** avoir mergé (confusion). On supprime worktree +
+branche à l'étape 3.
+
+```bash
+gh pr merge <numero> --squash --subject "$(gh pr view <numero> --json title -q .title)"
+gh pr view <numero> --json state -q .state    # doit afficher MERGED
 ```
 
-**2. Merger (squash) :**
-```bash
-gh pr merge <numero> --squash --delete-branch \
-  --subject "$(gh pr view <numero> --json title -q .title)"
-```
-
-**3. Tuer la session screen du worker et nettoyer le worktree :**
+**3. Nettoyer : screen worker → worktree → branche locale (dans cet ordre) :**
 ```bash
 # Kill la session screen (le worker n'a plus rien à faire)
 if screen -ls 2>/dev/null | grep -qE "[0-9]+\.${SESSION_NAME}[[:space:]]"; then
   screen -S "$SESSION_NAME" -X quit
 fi
 
-# Supprimer le worktree git
+# Worktree D'ABORD (sinon la suppression de branche échoue), puis la branche :
 WORKTREE="/tmp/wt-${SESSION_NAME}"
-if [[ -d "$WORKTREE" ]]; then
-  git -C /home/developer/artisan-mvp-temp worktree remove "$WORKTREE" --force
-fi
+[ -d "$WORKTREE" ] && git -C /home/developer/artisan-mvp-temp worktree remove "$WORKTREE" --force
+git branch -D "feat/${SESSION_NAME}" 2>/dev/null
+
+# Synchroniser staging local avec le merge avant de déployer :
+git fetch origin staging -q && git merge --ff-only origin/staging
 ```
 
 **4. Déployer si le backend est touché :**
