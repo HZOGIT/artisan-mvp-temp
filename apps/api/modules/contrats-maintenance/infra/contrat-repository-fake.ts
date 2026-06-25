@@ -29,7 +29,8 @@ export class FakeContratRepository implements IContratRepository {
 
   seedClient(artisanId: number, clientId: number, nom = "Client"): void {
     if (!this.clientsByArtisan.has(artisanId)) this.clientsByArtisan.set(artisanId, new Set());
-    this.clientsByArtisan.get(artisanId)!.add(clientId);
+    const artisanClients = this.clientsByArtisan.get(artisanId);
+    if (artisanClients) artisanClients.add(clientId);
     this.clientNoms.set(`${artisanId}:${clientId}`, nom);
   }
 
@@ -131,7 +132,7 @@ export class FakeContratRepository implements IContratRepository {
     endOfToday.setHours(23, 59, 59, 999);
     return this.scoped(ctx)
       .filter((c) => c.statut === "actif" && c.prochainFacturation !== null && c.prochainFacturation <= endOfToday)
-      .sort((a, b) => (a.prochainFacturation!.getTime() - b.prochainFacturation!.getTime()))
+      .sort((a, b) => (a.prochainFacturation?.getTime() ?? 0) - (b.prochainFacturation?.getTime() ?? 0))
       .map((c) => ({ ...c, clientNom: this.clientNoms.get(`${ctx.artisanId}:${c.clientId}`) ?? "Client" }));
   }
 

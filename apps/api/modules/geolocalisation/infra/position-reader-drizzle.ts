@@ -53,16 +53,19 @@ export class TechnicienPositionReaderDrizzle implements ITechnicienPositionReade
       const latest = new Map<number, PosRow>();
       for (const p of positions) if (!latest.has(p.technicienId)) latest.set(p.technicienId, p);
 
-      return techs.map((t) => ({
-        id: t.id,
-        nom: t.nom,
-        prenom: t.prenom ?? null,
-        email: t.email ?? null,
-        telephone: t.telephone ?? null,
-        specialite: t.specialite ?? null,
-        couleur: t.couleur ?? null,
-        position: latest.has(t.id) ? toPosition(latest.get(t.id)!) : null,
-      }));
+      return techs.map((t) => {
+        const latestPos = latest.get(t.id);
+        return {
+          id: t.id,
+          nom: t.nom,
+          prenom: t.prenom ?? null,
+          email: t.email ?? null,
+          telephone: t.telephone ?? null,
+          specialite: t.specialite ?? null,
+          couleur: t.couleur ?? null,
+          position: latestPos != null ? toPosition(latestPos) : null,
+        };
+      });
     });
   }
 }

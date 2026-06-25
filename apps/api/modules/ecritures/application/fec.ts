@@ -61,7 +61,8 @@ export function exporterFEC(ecritures: readonly EcritureComptable[]): string {
 
   const lignes = [FEC_HEADER.join(SEP)];
   for (const e of tri) {
-    const num = numParPiece.get(clePiece(e))!;
+    const num = numParPiece.get(clePiece(e));
+    if (num === undefined) continue;
     const dateF = ymd(e.dateEcriture);
     lignes.push(
       [

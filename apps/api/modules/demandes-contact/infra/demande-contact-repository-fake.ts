@@ -15,7 +15,8 @@ export class FakeDemandeContactRepository implements IDemandeContactRepository {
 
   seedClient(artisanId: number, clientId: number): void {
     if (!this.clientsByArtisan.has(artisanId)) this.clientsByArtisan.set(artisanId, new Set());
-    this.clientsByArtisan.get(artisanId)!.add(clientId);
+    const artisanClients = this.clientsByArtisan.get(artisanId);
+    if (artisanClients) artisanClients.add(clientId);
   }
 
   private scoped(ctx: TenantContext): DemandeContact[] {
