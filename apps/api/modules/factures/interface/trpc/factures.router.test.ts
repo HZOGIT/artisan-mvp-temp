@@ -269,23 +269,34 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
   it("markAsPaid (parité client) : statut payee + montantPaye/datePaiement + écritures FEC équilibrées ; date invalide → 400 ; cross-tenant 404 ; 401", async () => {
     const tA = await token(UA);
     const tB = await token(UB);
-    // facture émise avec une ligne (totaux dérivés) — créée via l'API puis émise + ligne
     const id = (await callMutation(server, "factures.create", { clientId: clientA, objet: "À payer" }, tA)).json().result.data.id as number;
     await callMutation(server, "factures.addLigne", { factureId: id, designation: "Pose", quantite: "1", prixUnitaireHT: "100.00", tauxTVA: "20" }, tA);
     await admin.query(`update factures set statut='envoyee' where id=$1`, [id]);
-    const total = (await callQuery(server, "factures.getById", { id }, tA)).json().result.data.totalTTC as string; // "120.00"
-    // 401 sans cookie
+    const total = (await callQuery(server, "factures.getById", { id }, tA)).json().result.data.totalTTC as string;
     expect((await callMutation(server, "factures.markAsPaid", { id, montantPaye: total, datePaiement: "2026-07-01" })).statusCode).toBe(401);
-    // date invalide → 400 (AVANT toute écriture)
     expect((await callMutation(server, "factures.markAsPaid", { id, montantPaye: total, datePaiement: "pas-une-date" }, tA)).statusCode).toBe(400);
-    // markAsPaid → payee + montantPaye + datePaiement (la génération FEC est testée dans fec-e2e
-    // avec le vrai ComptaEcrituresAdapter ; ce routeur-test injecte un NoopComptaPort).
     const paid = await callMutation(server, "factures.markAsPaid", { id, montantPaye: total, datePaiement: "2026-07-01" }, tA);
     expect(paid.statusCode).toBe(200);
     expect(paid.json().result.data.statut).toBe("payee");
     expect(paid.json().result.data.montantPaye).toBe(total);
-    // cross-tenant : B ne paie pas la facture de A → 404
     expect((await callMutation(server, "factures.markAsPaid", { id, montantPaye: total, datePaiement: "2026-07-01" }, tB)).statusCode).toBe(404);
+  });
+
+  it("OPE-60 — markAsPaid paiement partiel : statut reste envoyee ; paiement soldant : statut payee", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "factures.create", { clientId: clientA, objet: "Partiel" }, tA)).json().result.data.id as number;
+    await callMutation(server, "factures.addLigne", { factureId: id, designation: "Travaux", quantite: "1", prixUnitaireHT: "100.00", tauxTVA: "20" }, tA);
+    await admin.query(`update factures set statut='envoyee' where id=$1`, [id]);
+
+    const partiel = await callMutation(server, "factures.markAsPaid", { id, montantPaye: "50.00", datePaiement: "2026-07-01" }, tA);
+    expect(partiel.statusCode).toBe(200);
+    expect(partiel.json().result.data.statut).toBe("envoyee");
+    expect(partiel.json().result.data.montantPaye).toBe("50.00");
+
+    const solde = await callMutation(server, "factures.markAsPaid", { id, montantPaye: "70.00", datePaiement: "2026-07-01" }, tA);
+    expect(solde.statusCode).toBe(200);
+    expect(solde.json().result.data.statut).toBe("payee");
+    expect(solde.json().result.data.montantPaye).toBe("120.00");
   });
 
   it("getAuditLog (parité client) : entrées triées récent→ancien, scopées ; hors tenant → [] ; 401", async () => {
