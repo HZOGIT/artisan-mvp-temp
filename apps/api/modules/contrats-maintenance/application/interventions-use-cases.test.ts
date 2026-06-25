@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { FakeContratRepository } from "../infra/contrat-repository-fake";
 import { FacturesContratFactureGenerator } from "../infra/factures-contrat-facture-generator";
 import { FakeFactureRepository } from "../../factures/infra/facture-repository-fake";
+import { FakeArtisanRepository } from "../../artisan/infra/artisan-repository-fake";
 import {
   listContratsAFacturer,
   getInterventionsContrat,
@@ -161,5 +162,25 @@ describe("contrats — interventions & à-facturer use-cases", () => {
     const c = await repo.create(A, base({ clientId: 100 }), "CTR-00001");
     const gen = new FacturesContratFactureGenerator(new FakeFactureRepository());
     await expect(genererFactureContrat(repo, gen, B, c.id)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("genererFactureContrat : franchise TVA (tauxTVA=0) → tvaCategorieId=FR_FRANCHISE, pas FR_EXONERE", async () => {
+    const repo = new FakeContratRepository();
+    repo.seedClient(A.artisanId, 100, "Franchise");
+    const c = await repo.create(
+      A,
+      base({ clientId: 100, montantHT: "150.00", tauxTVA: "0.00", periodicite: "mensuel" }),
+      "CTR-00001",
+    );
+    const factureRepo = new FakeFactureRepository();
+    factureRepo.registerClient(A.artisanId, 100);
+    const gen = new FacturesContratFactureGenerator(factureRepo);
+    const artisanRepo = new FakeArtisanRepository();
+    artisanRepo.seed({ id: A.artisanId, franchiseTVA: true });
+
+    const ref = await genererFactureContrat(repo, gen, A, c.id, () => new Date(), artisanRepo);
+
+    const lignes = await factureRepo.listLignes(A, ref.id);
+    expect(lignes[0].tvaCategorieId).toBe("FR_FRANCHISE");
   });
 });

@@ -3,6 +3,7 @@ import { tauxStringToCategorie } from "../../../shared/tva/taux-tva-fr";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IContratRepository } from "./contrat-repository";
 import type { ContratFactureGenerator, FactureGenereeRef } from "./contrat-facture-generator";
+import type { IArtisanRepository } from "../../artisan/application/artisan-repository";
 import type {
   ContratIntervention,
   ContratAFacturer,
@@ -93,6 +94,7 @@ export async function genererFactureContrat(
   ctx: TenantContext,
   contratId: number,
   maintenant: () => Date = () => new Date(),
+  artisanRepo?: IArtisanRepository,
 ): Promise<FactureGenereeRef> {
   const contrat = await repo.getById(ctx, contratId);
   if (!contrat) throw new NotFoundError("Contrat introuvable");
@@ -107,6 +109,12 @@ export async function genererFactureContrat(
     throw new ConflictError("Une facture a déjà été émise pour cette période (prochaine échéance de facturation non atteinte).");
   }
 
+  const artisan = artisanRepo ? await artisanRepo.getProfile(ctx) : null;
+  const tvaCategorieId =
+    artisan?.franchiseTVA && parseFloat(contrat.tauxTVA || "0") === 0
+      ? "FR_FRANCHISE"
+      : tauxStringToCategorie(contrat.tauxTVA || "20");
+
   const facture = await factureGen.genererFactureEmise(ctx, {
     clientId: contrat.clientId,
     objet: `${contrat.titre} - ${contrat.reference}`,
@@ -114,7 +122,7 @@ export async function genererFactureContrat(
     description: contrat.description,
     montantHT: contrat.montantHT,
     tauxTVA: contrat.tauxTVA,
-    tvaCategorieId: tauxStringToCategorie(contrat.tauxTVA || "20"),
+    tvaCategorieId,
   });
 
   const periodeFin = addMonthsClamped(now, MOIS_PAR_PERIODICITE[contrat.periodicite] ?? 1);
