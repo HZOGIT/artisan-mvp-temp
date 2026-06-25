@@ -8,6 +8,9 @@ vars:
   # DB locale (PG sur 5432). Les tâches drizzle/seed tournent depuis le HOST (plus de
   # conteneur bind-mount après l'unification du compose) → DATABASE_URL + DB_DIALECT injectés.
   LOCAL_DATABASE_URL: postgres://artisan_user:artisan_password@localhost:5432/artisan_mvp
+  # Rôle applicatif (non-superuser, soumis RLS) du même PG de test — creds dérivés de l'owner par
+  # `vitest.setup.api.ts` (owner → app_tenant:app_tenant_pw). Sert `task db:provision` (mirroir du boot).
+  LOCAL_APP_DATABASE_URL: postgres://app_tenant:app_tenant_pw@localhost:5432/artisan_mvp
   # Consolidé : on développe directement sur la branche `staging` dans ce dépôt
   # (plus de worktree séparé). Le déploiement rebuild le conteneur depuis ce checkout.
   STAGING_DIR: /home/developer/artisan-mvp-temp
@@ -54,6 +57,11 @@ tasks:
 
   # Provision de la base (rôle applicatif + migrations schéma/RLS) = AUTOMATIQUE au boot du serveur
   # (apps/api/shared/db/provision-database.ts). Staging = dev : `task stack:up`/`stack:restart` (re)provisionne.
+  db:provision:
+    desc: "Applique migrations (schéma + RLS) + (re)assure le rôle app_tenant sur le PG de test (5432). Identique au boot serveur — à lancer quand la BDD de test est en retard de migrations (gate L3)."
+    cmds:
+      - 'DATABASE_URL={{.LOCAL_DATABASE_URL}} APP_DATABASE_URL={{.LOCAL_APP_DATABASE_URL}} DB_DIALECT=postgresql pnpm exec tsx apps/api/shared/db/provision-cli.ts'
+
   db:generate:
     desc: Generate a new migration from schema.ts changes (does NOT touch the DB)
     cmds:
