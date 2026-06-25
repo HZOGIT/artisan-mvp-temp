@@ -33,6 +33,18 @@ function toDate(v: string | null | undefined): Date | null | undefined {
   return new Date(v);
 }
 
+const ligneCreateSchema = z.object({
+  designation: z.string().min(1).max(500),
+  prixUnitaireHT: decimal,
+  quantite: decimal.optional(),
+  unite: z.string().max(20).optional(),
+  tvaCategorieId: tvaCategorieEnum.optional(),
+  reference: z.string().max(50).nullish(),
+  description: z.string().max(5000).nullish(),
+  ordre: z.number().int().optional(),
+  type: ligneTypeEnum.optional(),
+});
+
 /*
  * Bornes alignées sur les tables `factures`/`factures_lignes` (defense-in-depth). ⚠️ Le client NE
  * fournit PAS `numero` (généré serveur), `statut` (workflow), totaux ni `montantPaye` (dérivés/
@@ -61,18 +73,6 @@ const updateSchema = z.object({
   conditionsPaiement: z.string().max(2000).nullish(),
   notes: z.string().max(5000).nullish(),
   dateEcheance: isoDate.nullish(),
-});
-
-const ligneCreateSchema = z.object({
-  designation: z.string().min(1).max(500),
-  prixUnitaireHT: decimal,
-  quantite: decimal.optional(),
-  unite: z.string().max(20).optional(),
-  tvaCategorieId: tvaCategorieEnum.optional(),
-  reference: z.string().max(50).nullish(),
-  description: z.string().max(5000).nullish(),
-  ordre: z.number().int().optional(),
-  type: ligneTypeEnum.optional(),
 });
 
 const ligneUpdateSchema = z.object({
