@@ -21,12 +21,17 @@ export function registerInterventionPdfRoute(app: FastifyInstance, deps: Interve
 
     try {
       const { buffer, filename } = await getInterventionPdf(deps, { artisanId: auth.artisanId, userId: auth.userId }, id);
+      req.log.info({ event: "intervention_pdf_generated", interventionId: id, artisanId: auth.artisanId }, "PDF intervention généré");
       return reply
         .header("Content-Type", "application/pdf")
         .header("Content-Disposition", `inline; filename="${filename}"`)
         .send(buffer);
     } catch (e) {
-      if (e instanceof NotFoundError) return reply.code(404).send({ error: e.message });
+      if (e instanceof NotFoundError) {
+        req.log.warn({ event: "intervention_pdf_not_found", interventionId: id, artisanId: auth.artisanId }, e.message);
+        return reply.code(404).send({ error: e.message });
+      }
+      req.log.error({ event: "intervention_pdf_error", interventionId: id, artisanId: auth.artisanId, err: e instanceof Error ? e : new Error(String(e)) }, "Erreur génération PDF intervention");
       return reply.code(500).send({ error: "Erreur lors de la génération du PDF" });
     }
   });
