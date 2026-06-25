@@ -69,7 +69,9 @@ export function ligneFromArticle(ligne: LigneDevis, article: ArticleSearchResult
 export function iaToLignes(proposition: IAProposition): LigneDevis[] {
   return proposition.lignes.map((l, i) => ({
     id: `ia-${Date.now()}-${i}`, description: l.designation || "", quantite: Number(l.quantite) || 1,
-    prixUnitaireHT: Number(l.prixUnitaire) || 0, tvaCategorieId: tauxStringToCategorie(l.tauxTva), unite: l.unite || "u",
+    prixUnitaireHT: Number(l.prixUnitaire) || 0,
+    tvaCategorieId: (l.tvaCategorieId as TvaCategorieId | undefined) ?? tauxStringToCategorie(l.tauxTva),
+    unite: l.unite || "u",
   }));
 }
 

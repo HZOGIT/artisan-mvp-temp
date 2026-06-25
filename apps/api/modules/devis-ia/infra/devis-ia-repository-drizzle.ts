@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import { analysesPhotosChantier, photosAnalyse, resultatsAnalyseIA, suggestionsArticlesIA, devisGenereIA, clients, devis, devisLignes } from "../../../../../drizzle/schema.pg";
+import { analysesPhotosChantier, photosAnalyse, resultatsAnalyseIA, suggestionsArticlesIA, devisGenereIA, clients, devis, devisLignes, artisans } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
@@ -120,7 +120,8 @@ export class DevisIARepositoryDrizzle implements IDevisIARepository {
       const resultats = await tx.select({ id: resultatsAnalyseIA.id }).from(resultatsAnalyseIA).where(eq(resultatsAnalyseIA.analyseId, params.analyseId));
       const resultatIds = resultats.map((r) => r.id);
       const suggestions = resultatIds.length ? await tx.select().from(suggestionsArticlesIA).where(inArray(suggestionsArticlesIA.resultatId, resultatIds)) : [];
-      const devisData = genererLignesDevis(suggestions.map(toSuggestion), params.suggestionIds);
+      const [artisan] = await tx.select({ franchiseTVA: artisans.franchiseTVA }).from(artisans).where(eq(artisans.id, ctx.artisanId)).limit(1);
+      const devisData = genererLignesDevis(suggestions.map(toSuggestion), params.suggestionIds, artisan?.franchiseTVA ?? false);
       if (!devisData) return null;
 
       /** Numéro spécial (préfixe IA, parité legacy — distinct du compteur devis standard). */
@@ -130,7 +131,7 @@ export class DevisIARepositoryDrizzle implements IDevisIARepository {
         .values({ artisanId: ctx.artisanId, clientId: params.clientId, numero, statut: "brouillon", objet: a.titre || "Devis depuis analyse photos IA", totalHT: devisData.totalHT.toFixed(2), totalTVA: devisData.totalTVA.toFixed(2), totalTTC: devisData.totalTTC.toFixed(2) })
         .returning({ id: devis.id });
       for (const l of devisData.lignes) {
-        await tx.insert(devisLignes).values({ devisId: created.id, ordre: l.ordre, designation: l.designation, quantite: l.quantite.toFixed(2), unite: l.unite, prixUnitaireHT: l.prixUnitaireHT.toFixed(2), tauxTVA: l.tauxTVA.toFixed(2), montantHT: l.montantHT.toFixed(2), montantTVA: l.montantTVA.toFixed(2), montantTTC: l.montantTTC.toFixed(2) });
+        await tx.insert(devisLignes).values({ devisId: created.id, ordre: l.ordre, designation: l.designation, quantite: l.quantite.toFixed(2), unite: l.unite, prixUnitaireHT: l.prixUnitaireHT.toFixed(2), tauxTVA: l.tauxTVA.toFixed(2), tvaCategorieId: l.tvaCategorieId, montantHT: l.montantHT.toFixed(2), montantTVA: l.montantTVA.toFixed(2), montantTTC: l.montantTTC.toFixed(2) });
       }
       /** Lien analyse→devis (remplace l'existant). */
       await tx.delete(devisGenereIA).where(eq(devisGenereIA.analyseId, params.analyseId));

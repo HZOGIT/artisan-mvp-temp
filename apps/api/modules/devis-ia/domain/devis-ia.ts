@@ -1,5 +1,5 @@
 import { round2 } from "../../../shared/money";
-import { TVA_CATEGORIES_MAP } from "../../../shared/tva/taux-tva-fr";
+import { TVA_CATEGORIES_MAP, type TvaCategorieId } from "../../../shared/tva/taux-tva-fr";
 
 /*
  * Devis IA : analyse de photos de chantier (Vision) → résultats détectés → suggestions d'articles →
@@ -96,6 +96,7 @@ export interface LigneDevisIA {
   readonly unite: string;
   readonly prixUnitaireHT: number;
   readonly tauxTVA: number;
+  readonly tvaCategorieId: string;
   readonly montantHT: number;
   readonly montantTVA: number;
   readonly montantTTC: number;
@@ -113,7 +114,7 @@ export interface DevisIATotals {
  * `creerDevisDepuisAnalyseIA`). TVA fixe 20 %. `suggestionIds` optionnel restreint le sous-ensemble.
  * Renvoie null si aucune ligne (rien à générer). PUR (totaux dérivés des lignes → cohérents).
  */
-export function genererLignesDevis(suggestions: readonly Suggestion[], suggestionIds?: readonly number[]): DevisIATotals | null {
+export function genererLignesDevis(suggestions: readonly Suggestion[], suggestionIds?: readonly number[], franchiseTVA = false): DevisIATotals | null {
   const idSet = suggestionIds ? new Set(suggestionIds) : null;
   const lignes: LigneDevisIA[] = [];
   let totalHT = 0;
@@ -123,12 +124,12 @@ export function genererLignesDevis(suggestions: readonly Suggestion[], suggestio
     if (!s.selectionne) continue;
     const quantite = Number(s.quantiteSuggeree || 1);
     const prixUnitaireHT = Number(s.prixEstime || 0);
-    const categorieId = "FR_20";
+    const categorieId: TvaCategorieId = franchiseTVA ? "FR_FRANCHISE" : "FR_20";
     const tauxTVA = parseFloat(TVA_CATEGORIES_MAP[categorieId].taux);
     const montantHT = round2(quantite * prixUnitaireHT);
     const montantTVA = round2(montantHT * (tauxTVA / 100));
     const montantTTC = round2(montantHT + montantTVA);
-    lignes.push({ ordre: lignes.length, designation: s.nomArticle || "", quantite, unite: s.unite || "u", prixUnitaireHT, tauxTVA, montantHT, montantTVA, montantTTC });
+    lignes.push({ ordre: lignes.length, designation: s.nomArticle || "", quantite, unite: s.unite || "u", prixUnitaireHT, tauxTVA, tvaCategorieId: categorieId, montantHT, montantTVA, montantTTC });
     totalHT += montantHT;
     totalTVA += montantTVA;
   }

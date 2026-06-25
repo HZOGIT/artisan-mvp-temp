@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/sha
 import { Label } from "@/shared/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/shared/ui/alert-dialog";
+import { Switch } from "@/shared/ui/switch";
+import { TVA_CATEGORIES } from "@/shared/tva/taux-tva-fr";
 import { useProfil, useAccountSettings } from "../application/use-profil";
 import { defaultProfilForm, formFromArtisan, buildUpdatePayload, passwordStrength, validateEmailChange, validatePasswordChange, SOCIETE_FORMES, FORME_OPTIONS, METIERS_IA, type ProfilForm, type Specialite, type FormeJuridique } from "../domain/profil";
 
@@ -96,7 +98,19 @@ export default function ProfilPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2"><Label htmlFor="tauxTVA">{t("tauxTVA")}</Label><Input id="tauxTVA" type="number" step="0.01" className="max-w-[200px]" value={form.tauxTVA} onChange={(e) => set("tauxTVA", e.target.value)} /></div>
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label>{t("tauxTVA")}</Label>
+                <Select value={form.tauxTVA} onValueChange={(v) => set("tauxTVA", v)} disabled={form.franchiseTVA}>
+                  <SelectTrigger className="max-w-[280px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>{TVA_CATEGORIES.map((c) => <SelectItem key={c.id} value={c.taux}>{c.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-3">
+                <Switch id="franchiseTVA" checked={form.franchiseTVA} onCheckedChange={(v) => { set("franchiseTVA", v); if (v) set("tauxTVA", "0"); }} />
+                <Label htmlFor="franchiseTVA" className="cursor-pointer">{t("franchiseTVA")}</Label>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
