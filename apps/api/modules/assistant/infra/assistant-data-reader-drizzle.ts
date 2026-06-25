@@ -93,7 +93,7 @@ export class AssistantDataReaderDrizzle implements AssistantDataReader {
 
       const [c] = await tx.select({ nom: clients.nom, prenom: clients.prenom }).from(clients).where(and(eq(clients.id, d.clientId), eq(clients.artisanId, ctx.artisanId))).limit(1);
       const lignes = await tx
-        .select({ designation: devisLignes.designation, quantite: devisLignes.quantite, unite: devisLignes.unite, prixUnitaireHT: devisLignes.prixUnitaireHT, tauxTVA: devisLignes.tauxTVA })
+        .select({ designation: devisLignes.designation, quantite: devisLignes.quantite, unite: devisLignes.unite, prixUnitaireHT: devisLignes.prixUnitaireHT, tauxTVA: devisLignes.tauxTVA, tvaCategorieId: devisLignes.tvaCategorieId })
         .from(devisLignes)
         .where(eq(devisLignes.devisId, devisId));
       const arts = (await this.articlesTenant(tx, ctx)).slice(0, 30);
@@ -110,6 +110,7 @@ export class AssistantDataReaderDrizzle implements AssistantDataReader {
           unite: l.unite ?? "u",
           prixUnitaireHT: l.prixUnitaireHT ?? "0.00",
           tauxTVA: l.tauxTVA ?? "20.00",
+          tvaCategorieId: l.tvaCategorieId ?? null,
         })),
         tarifs,
       };

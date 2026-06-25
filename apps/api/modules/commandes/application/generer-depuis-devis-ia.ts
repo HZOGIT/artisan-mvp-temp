@@ -104,6 +104,7 @@ ${JSON.stringify(stockPourPrompt, null, 2)}
 
 Tâche : à partir des lignes du devis, déduis la liste des MATÉRIAUX et FOURNITURES à commander au fournisseur. Exclus strictement la main d'œuvre et les forfaits intellectuels. Pour chaque fourniture, propose une quantité adaptée aux quantités du devis et au stock disponible. Si une fourniture est déjà en stock en quantité suffisante, retire-la ou réduis la quantité à 0. Estime le prixUnitaire HT marché français.
 
+Taux TVA légaux FR : 20 (standard), 10 (restauration, travaux), 5.5 (alimentation), 2.1 (médicaments). Utilise le taux approprié à la nature du produit.
 Réponds UNIQUEMENT en JSON pur :
 {"lignes":[{"designation":"texte","reference":"","quantite":1,"unite":"u|m|m2|kg|ml","prixUnitaire":0,"tauxTVA":20}],"notes":"remarques optionnelles"}`;
 

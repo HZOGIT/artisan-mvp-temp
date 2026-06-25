@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { ArrowLeft, Plus, Trash2, Search, Loader2, Send, Save, Sparkles, ChevronDown } from "lucide-react";
 import { matchSearch } from "@/shared/lib/normalize";
+import { TVA_CATEGORIES } from "@/shared/tva/taux-tva-fr";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -184,7 +185,10 @@ export default function CommandeFormPage() {
                     <Input type="number" min="0" step="0.01" placeholder={t("qte")} value={ligne.quantite} disabled={isEdit} onChange={(e) => setLigne(ligne.id, { quantite: parseFloat(e.target.value) || 0 })} className="text-center" />
                     <Input placeholder={t("unite")} value={ligne.unite} disabled={isEdit} onChange={(e) => setLigne(ligne.id, { unite: e.target.value })} className="text-center" />
                     <Input type="number" min="0" step="0.01" placeholder={t("prixHT")} value={ligne.prixUnitaire ?? ""} disabled={isEdit} onChange={(e) => setLigne(ligne.id, { prixUnitaire: e.target.value ? parseFloat(e.target.value) : undefined })} className="text-right" />
-                    <Input type="number" min="0" max="100" step="0.1" value={ligne.tauxTVA} disabled={isEdit} onChange={(e) => setLigne(ligne.id, { tauxTVA: parseFloat(e.target.value) || 0 })} className="text-center" />
+                    <Select value={String(ligne.tauxTVA)} onValueChange={(v) => setLigne(ligne.id, { tauxTVA: parseFloat(v) || 20 })} disabled={isEdit}>
+                      <SelectTrigger className="text-center"><SelectValue /></SelectTrigger>
+                      <SelectContent>{TVA_CATEGORIES.map((c) => (<SelectItem key={c.id} value={c.taux}>{c.label}</SelectItem>))}</SelectContent>
+                    </Select>
                     <div className="flex items-center justify-end text-sm font-medium h-9 px-2">{formatCurrency(ligne.quantite * (ligne.prixUnitaire || 0))}</div>
                     <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive" disabled={isEdit} onClick={() => setLignes((ls) => ls.filter((l) => l.id !== ligne.id))}><Trash2 className="h-4 w-4" /></Button>
                   </div>
