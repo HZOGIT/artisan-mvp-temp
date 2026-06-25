@@ -272,7 +272,7 @@ interface InfoBlock {
  * pour une société, forme juridique + capital + RCS (ville + SIREN dérivé du SIRET) ;
  * « RM … » si inscrit au Répertoire des Métiers. Rien d'imposé en plus pour un EI/micro.
  */
-function buildMentionsLegalesEmetteur(artisan: Artisan): string[] {
+export function buildMentionsLegalesEmetteur(artisan: Artisan): string[] {
   const lines: string[] = [];
   const SOCIETES = ["EURL", "SARL", "SAS", "SASU", "SA"];
   if (artisan.formeJuridique && SOCIETES.includes(artisan.formeJuridique)) {
