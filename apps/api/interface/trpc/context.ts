@@ -1,5 +1,5 @@
 import type { FastifyRequest, FastifyReply, FastifyBaseLogger } from "fastify";
-import { verifyAuthToken, type TokenClaims, type TenantContext, type TenantResolver, type UserRoleReader, type PermissionsReader } from "../../shared/tenant";
+import { verifyAuthToken, type TokenClaims, type TenantContext, type TenantResolver, type UserRoleReader, type PermissionsReader, type SessionRevocationReader } from "../../shared/tenant";
 import { extractClientIp, extractUserAgent } from "../http/client-ip";
 import { maskEmail } from "../../shared/mask-email";
 
@@ -41,15 +41,23 @@ export interface ContextDeps {
   readonly resolver?: TenantResolver;
   readonly roleReader?: UserRoleReader;
   readonly permissionsReader?: PermissionsReader;
+  readonly revocationReader?: SessionRevocationReader;
 }
 
 export function makeCreateContext(deps: ContextDeps = {}) {
   const secret = deps.jwtSecret ?? process.env.JWT_SECRET ?? "";
   return async function createContext(opts: { req: FastifyRequest; res: FastifyReply }): Promise<AppContext> {
     const token = (opts.req.cookies as Record<string, string | undefined> | undefined)?.token ?? null;
-    const claims = await verifyAuthToken(token, secret);
+    let claims = await verifyAuthToken(token, secret);
     if (token && !claims) {
       opts.req.log.warn({ event: "auth_invalid_token" }, "Token JWT invalide ou expiré");
+    }
+    if (claims && deps.revocationReader) {
+      const changedAt = await deps.revocationReader.getPasswordChangedAt(claims.userId);
+      if (changedAt && claims.iat != null && claims.iat * 1000 < changedAt.getTime()) {
+        opts.req.log.warn({ event: "auth_token_revoked", userId: claims.userId }, "Token révoqué (changement de mot de passe)");
+        claims = null;
+      }
     }
     const tenant = claims && deps.resolver ? await deps.resolver.resolve(claims) : null;
     /*

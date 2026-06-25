@@ -27,6 +27,10 @@ export interface IAuthRepository {
   resetPasswordWithToken(userId: number, passwordHash: string): Promise<void>;
   /** Soft-delete : `actif=false` + email neutralisé (réutilisable). */
   softDelete(userId: number, neutralizedEmail: string): Promise<void>;
+  /** Lit la date du dernier changement de mot de passe (révocation de tokens antérieurs). null si jamais changé. */
+  getPasswordChangedAt(userId: number): Promise<Date | null>;
+  /** Set `passwordChangedAt = now()` — invalide tous les tokens JWT émis avant cet instant. */
+  bumpPasswordChangedAt(userId: number): Promise<void>;
   /** Crée un utilisateur (signup) : email + hash + name, loginMethod 'email'. Renvoie l'identité. */
   createUser(data: { email: string; passwordHash: string; name?: string | null }): Promise<{ id: number; email: string | null }>;
   /*

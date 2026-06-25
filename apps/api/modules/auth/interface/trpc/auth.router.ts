@@ -2,7 +2,7 @@ import { z } from "zod";
 import { router, publicProcedure, protectedProcedure } from "../../../../interface/trpc/trpc";
 import { clearAuthCookie, setAuthCookie } from "../../../../interface/http/auth-cookie";
 import type { AuthDeps } from "../../application/use-cases";
-import { deleteAccount, forgotPassword, me, resetPassword, signin, signup, updateEmail, updatePassword } from "../../application/use-cases";
+import { deleteAccount, forgotPassword, logoutEverywhere, me, resetPassword, signin, signup, updateEmail, updatePassword } from "../../application/use-cases";
 import { maskEmail } from "../../../../shared/mask-email";
 
 /*
@@ -82,6 +82,15 @@ export function createAuthRouter(deps: AuthDeps) {
       .mutation(async ({ ctx, input }) => {
         const r = await resetPassword(deps, input.token, input.newPassword);
         ctx.log.info({ event: "auth_reset_password" }, "Mot de passe réinitialisé");
+        return r;
+      }),
+
+    /** Déconnecte toutes les sessions actives (bump `passwordChangedAt`) sans changer le mot de passe. */
+    logoutEverywhere: protectedProcedure
+      .mutation(async ({ ctx }) => {
+        const r = await logoutEverywhere(deps, ctx.tenant.userId);
+        if (ctx.res) clearAuthCookie(ctx.res);
+        ctx.log.info({ event: "auth_logout_everywhere" }, "Déconnexion de toutes les sessions");
         return r;
       }),
   });

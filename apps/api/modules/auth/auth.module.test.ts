@@ -29,7 +29,7 @@ describe("auth.module (router via createCaller)", () => {
 
   it("expose les 9 procédures auth", () => {
     const procedures = Object.keys((build().router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["deleteAccount", "forgotPassword", "logout", "me", "resetPassword", "signin", "signup", "updateEmail", "updatePassword"]);
+    expect(procedures).toEqual(["deleteAccount", "forgotPassword", "logout", "logoutEverywhere", "me", "resetPassword", "signin", "signup", "updateEmail", "updatePassword"]);
   });
 
   it("signin : pose le cookie `token` et renvoie {success, user}", async () => {

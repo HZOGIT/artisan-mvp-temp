@@ -102,6 +102,7 @@ export async function updatePassword(deps: AuthDeps, userId: number, currentPass
     throw new UnauthorizedError("Mot de passe actuel incorrect");
   }
   await deps.repo.updatePassword(userId, await deps.hasher.hash(newPassword));
+  await deps.repo.bumpPasswordChangedAt(userId);
   return { success: true };
 }
 
@@ -146,6 +147,13 @@ export async function resetPassword(deps: AuthDeps, token: string, newPassword: 
     throw new ValidationError("Lien invalide ou expiré. Veuillez refaire une demande.");
   }
   await deps.repo.resetPasswordWithToken(user.id, await deps.hasher.hash(newPassword));
+  await deps.repo.bumpPasswordChangedAt(user.id);
+  return { success: true };
+}
+
+/** Invalide toutes les sessions actives (bump `passwordChangedAt`) sans changer le mot de passe. */
+export async function logoutEverywhere(deps: AuthDeps, userId: number): Promise<{ success: true }> {
+  await deps.repo.bumpPasswordChangedAt(userId);
   return { success: true };
 }
 

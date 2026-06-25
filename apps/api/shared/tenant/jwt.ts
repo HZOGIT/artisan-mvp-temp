@@ -33,7 +33,8 @@ export async function verifyAuthToken(
     const userId = payload.userId;
     const email = payload.email;
     if (typeof userId !== "number" || typeof email !== "string") return null;
-    return { userId, email };
+    const base: TokenClaims = { userId, email };
+    return typeof payload.iat === "number" ? { ...base, iat: payload.iat } : base;
   } catch {
     return null;
   }
