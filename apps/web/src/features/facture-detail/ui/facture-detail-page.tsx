@@ -14,7 +14,7 @@ import { Label } from "@/shared/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Badge } from "@/shared/ui/badge";
 import { Textarea } from "@/shared/ui/textarea";
-import { useFactureDetail, searchArticlesRest } from "../application/use-facture-detail";
+import { useFactureDetail, useSearchArticles } from "../application/use-facture-detail";
 import { formatCurrency, isAvoirDoc, avoirSolde, avoirLignesMontantTTC, buildAvoirTotalLignes, pdfLignes, activitesForFacture, pendingCount, allowedNext, statutAction, STATUS_LABEL_KEY, STATUS_COLORS, RAPPEL_TYPE_KEY, type ArticleSearchResult, type AvoirLigneForm, type RappelType } from "../domain/facture-detail";
 import { TVA_CATEGORIES } from "@/shared/tva/taux-tva-fr";
 import type { TvaCategorieId } from "@/shared/tva/taux-tva-fr";
@@ -49,13 +49,14 @@ export default function FactureDetailPage() {
   const [rappelType, setRappelType] = useState<RappelType>("relance");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const fetchArticles = useSearchArticles();
 
   const searchArticles = useCallback((query: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (query.length < 2) { setSearchResults([]); setIsSearching(false); setShowDropdown(false); return; }
     setIsSearching(true);
-    debounceRef.current = setTimeout(async () => { const data = await searchArticlesRest(query); setSearchResults(data); setShowDropdown(data.length > 0); setIsSearching(false); }, 300);
-  }, []);
+    debounceRef.current = setTimeout(async () => { const data = await fetchArticles(query); setSearchResults(data); setShowDropdown(data.length > 0); setIsSearching(false); }, 300);
+  }, [fetchArticles]);
 
   useEffect(() => {
     const onClickOutside = (e: MouseEvent) => { if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setShowDropdown(false); };
@@ -275,9 +276,9 @@ export default function FactureDetailPage() {
                         {showDropdown && searchResults.length > 0 && (
                           <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
                             {searchResults.map((article) => (
-                              <button key={article.id} type="button" onClick={() => { const n2 = article.tauxTVA != null && article.tauxTVA !== "" ? parseFloat(article.tauxTVA) : null; const cat: TvaCategorieId = n2 != null ? (n2 >= 20 ? "FR_20" : n2 >= 10 ? "FR_10" : n2 >= 5.5 ? "FR_5_5" : n2 >= 2.1 ? "FR_2_1" : "FR_EXONERE") : lineForm.tvaCategorieId; setLineForm({ ...lineForm, designation: article.nom, description: article.description || "", prixUnitaireHT: article.prix_base, unite: article.unite || "unité", tvaCategorieId: cat }); setShowDropdown(false); toast.success(t("articleSelectionne", { nom: article.nom })); }} className="w-full text-left px-4 py-2.5 hover:bg-blue-50 border-b last:border-b-0 transition-colors">
+                              <button key={article.id} type="button" onClick={() => { const n2 = article.tauxTVA != null && article.tauxTVA !== "" ? parseFloat(article.tauxTVA) : null; const cat: TvaCategorieId = n2 != null ? (n2 >= 20 ? "FR_20" : n2 >= 10 ? "FR_10" : n2 >= 5.5 ? "FR_5_5" : n2 >= 2.1 ? "FR_2_1" : "FR_EXONERE") : lineForm.tvaCategorieId; setLineForm({ ...lineForm, designation: article.nom, description: article.description || "", prixUnitaireHT: article.prixBase, unite: article.unite || "unité", tvaCategorieId: cat }); setShowDropdown(false); toast.success(t("articleSelectionne", { nom: article.nom })); }} className="w-full text-left px-4 py-2.5 hover:bg-blue-50 border-b last:border-b-0 transition-colors">
                                 <div className="font-medium text-sm">{article.nom}</div>
-                                <div className="text-xs text-gray-500">{formatCurrency(article.prix_base)} / {article.unite}<span className="ml-2 text-gray-400">{article.categorie}</span></div>
+                                <div className="text-xs text-gray-500">{formatCurrency(article.prixBase)} / {article.unite}<span className="ml-2 text-gray-400">{article.categorie}</span></div>
                               </button>
                             ))}
                           </div>

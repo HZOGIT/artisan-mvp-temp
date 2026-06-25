@@ -17,8 +17,8 @@ export type AvoirInput = RouterInputs["factures"]["createAvoir"];
 export type AddLigneInput = RouterInputs["factures"]["addLigne"];
 export type RappelType = RouterInputs["activites"]["create"]["type"];
 
-/** Article du REST public `/api/articles/search` (snake_case). */
-export type ArticleSearchResult = { id: number; nom: string; description: string | null; prix_base: string; unite: string; categorie: string; tauxTVA?: string | null };
+/** Article renvoyé par `articles.search` (tRPC, camelCase — catalogue bibliothèque partagée). */
+export type ArticleSearchResult = RouterOutputs["articles"]["search"][number];
 export type AvoirLigneForm = { designation: string; quantite: string; prixUnitaireHT: string; tvaCategorieId: TvaCategorieId; unite: string };
 
 export const STATUS_LABEL_KEY: Record<string, string> = {

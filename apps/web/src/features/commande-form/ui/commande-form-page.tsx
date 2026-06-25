@@ -10,7 +10,7 @@ import { Label } from "@/shared/ui/label";
 import { Textarea } from "@/shared/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
-import { useCommandeForm, searchBiblioRest } from "../application/use-commande-form";
+import { useCommandeForm, useSearchBiblio } from "../application/use-commande-form";
 import { defaultCommandeForm, emptyLigne, formatCurrency, totals, mapArtisanArticles, mapBiblioResults, ligneFromSearchResult, mapIaLignes, ligneFromCommande, validateForm, buildCreatePayload, buildUpdatePayload, type LigneCommande, type SearchResult, type CommandeForm } from "../domain/commande-form";
 
 /*
@@ -35,6 +35,7 @@ export default function CommandeFormPage() {
 
   const C = useCommandeForm(commandeId, iaSectionOpen);
   const { fournisseurs, artisanArticles, devisAcceptes, devisAcceptesList, commande, lignesExistantes, utils } = C;
+  const fetchBiblio = useSearchBiblio();
 
   /** Chargement de la commande existante (édition). */
   useEffect(() => {
@@ -54,11 +55,11 @@ export default function CommandeFormPage() {
     setIsSearching(true);
     debounceRef.current = setTimeout(async () => {
       const local = mapArtisanArticles(artisanArticles, query, matchSearch);
-      const biblio = mapBiblioResults(await searchBiblioRest(query));
+      const biblio = mapBiblioResults(await fetchBiblio(query));
       setSearchResults([...local, ...biblio]);
       setIsSearching(false);
     }, 300);
-  }, [artisanArticles]);
+  }, [artisanArticles, fetchBiblio]);
 
   const goList = () => { window.location.href = "/commandes"; };
   const setLigne = (id: string, patch: Partial<LigneCommande>) => setLignes((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)));

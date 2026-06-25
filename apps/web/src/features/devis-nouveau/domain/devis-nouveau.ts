@@ -15,11 +15,8 @@ export type CreateDevisInput = RouterInputs["devis"]["create"];
 export type AddLigneInput = RouterInputs["devis"]["addLigne"];
 export type AddLigneModeleInput = RouterInputs["devis"]["addLigneToModele"];
 
-/** Article renvoyé par le REST public `/api/articles/search` (snake_case — contrat distinct de getBibliotheque). */
-export type ArticleSearchResult = {
-  id: number; nom: string; description: string | null; prix_base: string; unite: string;
-  metier: string; categorie: string; sous_categorie: string; duree_moyenne_minutes: number | null; tauxTVA?: string | null;
-};
+/** Article renvoyé par `articles.search` (tRPC, camelCase — catalogue bibliothèque partagée). */
+export type ArticleSearchResult = RouterOutputs["articles"]["search"][number];
 
 export type LigneDevis = { id: string; description: string; quantite: number; prixUnitaireHT: number; tvaCategorieId: TvaCategorieId; unite: string };
 
@@ -65,7 +62,7 @@ export function moveLine(lignes: readonly LigneDevis[], index: number, dir: "up"
 /** Pré-remplit une ligne depuis un article (TVA de l'article sinon valeur courante). PUR. */
 export function ligneFromArticle(ligne: LigneDevis, article: ArticleSearchResult): LigneDevis {
   const tvaCategorieId = article.tauxTVA != null && article.tauxTVA !== "" ? tauxStringToCategorie(article.tauxTVA) : ligne.tvaCategorieId;
-  return { ...ligne, description: article.nom, prixUnitaireHT: parseFloat(article.prix_base) || 0, unite: article.unite || "unité", tvaCategorieId };
+  return { ...ligne, description: article.nom, prixUnitaireHT: parseFloat(article.prixBase) || 0, unite: article.unite || "unité", tvaCategorieId };
 }
 
 /** Mappe les lignes IA → lignes de formulaire. PUR. */

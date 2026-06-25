@@ -14,8 +14,8 @@ export type CommandeLigne = RouterOutputs["commandesFournisseurs"]["getLignes"][
 export type CreateInput = RouterInputs["commandesFournisseurs"]["create"];
 export type UpdateInput = RouterInputs["commandesFournisseurs"]["update"];
 
-/** Article du REST public `/api/articles/search` (snake_case, sous-ensemble consommé). */
-export type BiblioArticle = { id: number; nom: string; unite: string | null; prix_base: string | null };
+/** Article du catalogue bibliothèque partagée (`articles.search` tRPC, camelCase, sous-ensemble). */
+export type BiblioArticle = { id: number; nom: string; unite: string | null; prixBase: string | null };
 
 export type LigneCommande = { id: string; articleId?: number | null; stockId?: number; designation: string; reference?: string; quantite: number; unite: string; prixUnitaire?: number; tauxTVA: number };
 export type SearchResult = { id: number | string; type: "artisan" | "bibliotheque"; nom: string; reference: string; unite: string; prixAchat?: number; prixVente?: number };
@@ -48,7 +48,7 @@ export function mapArtisanArticles(articles: readonly ArtisanArticle[], query: s
 
 /** Mappe les résultats de la bibliothèque (REST). PUR. */
 export function mapBiblioResults(data: readonly BiblioArticle[]): SearchResult[] {
-  return data.slice(0, 5).map((a) => ({ id: `biblio-${a.id}`, type: "bibliotheque", nom: a.nom, reference: "", unite: a.unite || "unité", prixAchat: undefined, prixVente: a.prix_base ? parseFloat(a.prix_base) : undefined }));
+  return data.slice(0, 5).map((a) => ({ id: `biblio-${a.id}`, type: "bibliotheque", nom: a.nom, reference: "", unite: a.unite || "unité", prixAchat: undefined, prixVente: a.prixBase ? parseFloat(a.prixBase) : undefined }));
 }
 
 /** Applique un article sélectionné à une ligne (prix d'achat uniquement, jamais le prix de vente). PUR. */

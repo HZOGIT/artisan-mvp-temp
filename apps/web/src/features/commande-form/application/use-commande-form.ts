@@ -1,16 +1,11 @@
 import { skipToken } from "@tanstack/react-query";
 import { trpc } from "@/shared/trpc";
-import type { Fournisseur, ArtisanArticle, DevisAccepte, BiblioArticle } from "../domain/commande-form";
+import type { Fournisseur, ArtisanArticle, DevisAccepte } from "../domain/commande-form";
 
-/** Recherche bibliothèque via le REST public `/api/articles/search` (effet). Renvoie [] sur échec. */
-export async function searchBiblioRest(query: string): Promise<BiblioArticle[]> {
-  try {
-    const res = await fetch(`/api/articles/search?q=${encodeURIComponent(query)}`, { credentials: "include" });
-    if (!res.ok) return [];
-    return (await res.json()) as BiblioArticle[];
-  } catch {
-    return [];
-  }
+/** Recherche bibliothèque via `articles.search` (tRPC publicProcedure). Renvoie [] si aucun résultat. */
+export function useSearchBiblio() {
+  const utils = trpc.useUtils();
+  return (query: string) => utils.articles.search.fetch({ query }).catch(() => []);
 }
 
 /*

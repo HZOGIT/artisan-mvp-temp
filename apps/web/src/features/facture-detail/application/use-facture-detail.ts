@@ -1,16 +1,10 @@
 import { skipToken } from "@tanstack/react-query";
 import { trpc } from "@/shared/trpc";
-import type { ArticleSearchResult } from "../domain/facture-detail";
 
-/** Recherche d'articles via le REST public `/api/articles/search` (effet). Renvoie [] sur échec. */
-export async function searchArticlesRest(query: string): Promise<ArticleSearchResult[]> {
-  try {
-    const res = await fetch(`/api/articles/search?q=${encodeURIComponent(query)}`, { credentials: "include" });
-    if (!res.ok) return [];
-    return (await res.json()) as ArticleSearchResult[];
-  } catch {
-    return [];
-  }
+/** Recherche d'articles via `articles.search` (tRPC publicProcedure). Renvoie [] si aucun résultat. */
+export function useSearchArticles() {
+  const utils = trpc.useUtils();
+  return (query: string) => utils.articles.search.fetch({ query }).catch(() => []);
 }
 
 /*

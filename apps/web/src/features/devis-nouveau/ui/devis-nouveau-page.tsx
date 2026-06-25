@@ -7,7 +7,7 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Textarea } from "@/shared/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
-import { useDevisNouveau, useModeleLoader, searchArticlesRest } from "../application/use-devis-nouveau";
+import { useDevisNouveau, useModeleLoader, useSearchArticles } from "../application/use-devis-nouveau";
 import { emptyLigne, formatCurrency, totals, moveLine, ligneFromArticle, iaToLignes, iaTotals, buildCreatePayload, buildAddLignePayload, buildModeleLignePayload, type LigneDevis, type ArticleSearchResult, type IAProposition } from "../domain/devis-nouveau";
 import { TVA_CATEGORIES } from "@/shared/tva/taux-tva-fr";
 import type { TvaCategorieId } from "@/shared/tva/taux-tva-fr";
@@ -39,13 +39,14 @@ export default function DevisNouveauPage() {
 
   const { clients, encours, modeles, refetchModeles, utils, create, addLigne, createModele, addLigneToModele } = useDevisNouveau(clientId);
   const loadModele = useModeleLoader();
+  const fetchArticles = useSearchArticles();
 
   const searchArticles = useCallback((query: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (query.length < 2) { setSearchResults([]); setIsSearching(false); return; }
     setIsSearching(true);
-    debounceRef.current = setTimeout(async () => { setSearchResults(await searchArticlesRest(query)); setIsSearching(false); }, 300);
-  }, []);
+    debounceRef.current = setTimeout(async () => { setSearchResults(await fetchArticles(query)); setIsSearching(false); }, 300);
+  }, [fetchArticles]);
 
   useEffect(() => {
     const onClickOutside = (e: MouseEvent) => { if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setActiveSearchLigneId(null); };
@@ -200,7 +201,7 @@ export default function DevisNouveauPage() {
                         {searchResults.map((article) => (
                           <button key={article.id} type="button" onClick={() => selectArticle(ligne.id, article)} className="w-full text-left px-4 py-2.5 hover:bg-blue-50 border-b last:border-b-0 transition-colors">
                             <div className="font-medium text-sm">{article.nom}</div>
-                            <div className="text-xs text-gray-500">{formatCurrency(article.prix_base)} / {article.unite}<span className="ml-2 text-gray-400">{article.categorie}</span></div>
+                            <div className="text-xs text-gray-500">{formatCurrency(article.prixBase)} / {article.unite}<span className="ml-2 text-gray-400">{article.categorie}</span></div>
                           </button>
                         ))}
                       </div>
