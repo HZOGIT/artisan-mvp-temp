@@ -165,20 +165,13 @@ export default function DevisPage() {
       resolveClientName(devis.clientId) || "-",
       devis.dateDevis ? format(new Date(devis.dateDevis), "dd/MM/yyyy") : "-",
       devis.objet || "-",
-      parseFloat(devis.totalHT || "0"),
-      parseFloat(devis.totalTVA || "0"),
-      parseFloat(devis.totalTTC || "0"),
+      String(parseFloat(devis.totalHT || "0")),
+      String(parseFloat(devis.totalTVA || "0")),
+      String(parseFloat(devis.totalTTC || "0")),
       statutLabelOf(devis.statut),
     ]);
 
-    const csv = [headers, ...rows].map(row => row.map(v => `"${v}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `devis_${format(new Date(), "yyyy-MM-dd")}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    exportToCsv(`devis_${format(new Date(), "yyyy-MM-dd")}.csv`, headers, rows as Array<Array<string | number | null>>);
     toast.success(t("toastExcelDownloaded"));
   };
 

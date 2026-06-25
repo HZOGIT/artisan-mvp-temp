@@ -1,9 +1,8 @@
 import { useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-/* @ts-ignore - read-excel-file module resolution */
-import readXlsxFile from "read-excel-file";
 import { Upload, AlertCircle, CheckCircle, Loader2, Download } from "lucide-react";
+import { exportToCsv } from "@/shared/lib/csv-export";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
@@ -32,6 +31,7 @@ export default function ClientsImportPage() {
     setFile(selected);
     setIsLoading(true);
     try {
+      const { default: readXlsxFile } = await import("read-excel-file");
       const sheets = (await readXlsxFile(selected)) as Array<{ data: unknown[][] }>;
       const sheetData = sheets[0].data as unknown[][];
       const [headers, ...dataRows] = sheetData;
@@ -64,14 +64,8 @@ export default function ClientsImportPage() {
 
   const downloadTemplate = () => {
     const headers = Object.keys(TEMPLATE_ROW);
-    const csv = [headers, Object.values(TEMPLATE_ROW)].map(row => row.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "modele_clients.csv";
-    a.click();
-    URL.revokeObjectURL(url);
+    const rows = [Object.values(TEMPLATE_ROW).map(String)];
+    exportToCsv("modele_clients.csv", headers, rows);
     toast.success(t("modeleTelecharge"));
   };
 
