@@ -166,21 +166,6 @@ export class FakeTechnicienRepository implements ITechnicienRepository {
     return before - this.positions.length;
   }
 
-  async setSuiviActif(ctx: TenantContext, technicienId: number, actif: boolean): Promise<Technicien | null> {
-    const t = await this.getById(ctx, technicienId);
-    if (!t) return null;
-    const updated: Technicien = { ...t, suiviActif: actif, updatedAt: new Date() };
-    this.store = this.store.map((x) => (x.id === technicienId ? updated : x));
-    return updated;
-  }
-
-  async purgerPositionsExpirees(): Promise<number> {
-    const cutoff = new Date(Date.now() - 8 * 60 * 60 * 1000);
-    const before = this.positions.length;
-    this.positions = this.positions.filter((p) => p.timestamp >= cutoff);
-    return before - this.positions.length;
-  }
-
   async getUsersLiables(ctx: TenantContext): Promise<UtilisateurLiable[]> {
     return this.usersLiables.get(ctx.artisanId) ?? [];
   }
