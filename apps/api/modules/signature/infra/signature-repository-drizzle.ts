@@ -20,6 +20,8 @@ function toDomain(r: typeof signaturesDevis.$inferSelect): Signature {
     signedAt: r.signedAt ?? null,
     expiresAt: r.expiresAt,
     createdAt: r.createdAt,
+    documentHash: r.documentHash ?? null,
+    documentHashedAt: r.documentHashedAt ?? null,
   };
 }
 

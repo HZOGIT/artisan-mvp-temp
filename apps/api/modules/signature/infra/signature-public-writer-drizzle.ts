@@ -25,6 +25,8 @@ function toDomain(r: typeof signaturesDevis.$inferSelect): Signature {
     signedAt: r.signedAt ?? null,
     expiresAt: r.expiresAt,
     createdAt: r.createdAt,
+    documentHash: r.documentHash ?? null,
+    documentHashedAt: r.documentHashedAt ?? null,
   };
 }
 
@@ -48,6 +50,8 @@ export class SignaturePublicWriterDrizzle implements SignaturePublicWriter {
           ipAddress: input.ipAddress,
           userAgent: input.userAgent,
           signedAt: new Date(),
+          documentHash: input.documentHash,
+          documentHashedAt: input.documentHashedAt,
         })
         .where(and(eq(signaturesDevis.token, input.token), eq(signaturesDevis.statut, "en_attente")));
       await tx

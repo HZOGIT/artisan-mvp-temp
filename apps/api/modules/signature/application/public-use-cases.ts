@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { NotFoundError, ValidationError, TooManyRequestsError } from "../../../shared/errors";
 import type { EmailPort } from "../../../shared/ports/email";
 import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
@@ -66,6 +67,50 @@ function tenantOf(artisanId: number): TenantContext {
   return { artisanId, userId: 0 };
 }
 
+/**
+ * Représentation canonique déterministe du contenu d'un devis → SHA-256 hex (64 car.).
+ * Sert de preuve d'intégrité : le hash lié à la signature permet de vérifier que le contenu
+ * n'a pas changé depuis l'acceptation (lignes triées par ordre, champs stables).
+ */
+export function computeDevisHash(view: SignatureDevisView): string {
+  const sortLignes = (lignes: readonly SignatureDevisView["lignes"][number][]) =>
+    [...lignes].sort((a, b) => a.ordre - b.ordre).map((l) => ({
+      ordre: l.ordre,
+      designation: l.designation,
+      description: l.description ?? null,
+      quantite: l.quantite,
+      unite: l.unite ?? null,
+      prixUnitaireHT: l.prixUnitaireHT,
+      tauxTVA: l.tauxTVA,
+      montantHT: l.montantHT,
+      montantTTC: l.montantTTC,
+    }));
+  const canonical = {
+    devis: {
+      numero: view.devis.numero,
+      objet: view.devis.objet ?? null,
+      dateValidite: view.devis.dateValidite?.toISOString() ?? null,
+      conditionsPaiement: view.devis.conditionsPaiement ?? null,
+      totalHT: view.devis.totalHT,
+      totalTVA: view.devis.totalTVA,
+      totalTTC: view.devis.totalTTC,
+    },
+    lignes: sortLignes(view.lignes),
+    options: [...view.options]
+      .sort((a, b) => a.ordre - b.ordre)
+      .map((o) => ({
+        ordre: o.ordre,
+        nom: o.nom,
+        description: o.description ?? null,
+        selectionnee: o.selectionnee,
+        totalHT: o.totalHT,
+        totalTTC: o.totalTTC,
+        lignes: sortLignes(o.lignes),
+      })),
+  };
+  return createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
+}
+
 /*
  * `signature.selectDevisOption` (PUBLIC) : le client choisit une option/variante AVANT de signer.
  * - token inconnu → 404 ; **déjà signé (`signedAt`) → 400** ; expiré → 400.
@@ -129,6 +174,11 @@ export async function signDevis(
   }
 
   const ctx = tenantOf(resolution.artisanId);
+
+  const signView = await deps.reader.getDevisView(ctx, resolution.devisId).catch(() => null);
+  const documentHash = signView ? computeDevisHash(signView) : null;
+  const documentHashedAt = documentHash ? now : null;
+
   const signature = await deps.writer.signDevis(ctx, {
     token: input.token,
     devisId: resolution.devisId,
@@ -137,6 +187,8 @@ export async function signDevis(
     signataireEmail: input.signataireEmail,
     ipAddress: input.ipAddress,
     userAgent: input.userAgent,
+    documentHash,
+    documentHashedAt,
   });
 
   await notifyArtisanBestEffort(deps, ctx, resolution.devisId, async (view) => {
