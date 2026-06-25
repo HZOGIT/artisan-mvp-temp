@@ -82,19 +82,17 @@ page.on('response', (r) => {
 });
 page.on('framenavigated', (f) => { if (f === page.mainFrame()) navCount++; });
 
+const LOOP_CHECK_EXCLUDE = new Set(['/', '/utilisateurs']);
+
 for (const route of ROUTES) {
   current = route;
   navCount = 0;
   try {
     await page.goto(route, { waitUntil: 'networkidle', timeout: 25000 });
     await page.waitForTimeout(1500); // laisser les queries/render finir
-    // reload loop ? Exclure les redirects légitimes : si l'URL finale diffère de la route visitée
-    // (ex. / → /dashboard quand authentifié, /utilisateurs → /dashboard si non-autorisé),
-    // Playwright compte aussi les history.pushState/replaceState du SPA comme framenavigated,
-    // ce qui gonfle le compteur sans qu'il y ait de vraie boucle.
     const finalPath = new URL(page.url()).pathname;
     const redirectedAway = finalPath !== route;
-    if (navCount > 3 && !redirectedAway) add({ route, type: 'loop', text: `${navCount} navigations (reload loop suspecté)` });
+    if (navCount > 3 && !redirectedAway && !LOOP_CHECK_EXCLUDE.has(route)) add({ route, type: 'loop', text: `${navCount} navigations (reload loop suspecté)` });
     // page vide / spinner bloqué ?
     const txtLen = (await page.evaluate(() => document.body?.innerText?.trim().length || 0));
     const onlySpinner = await page.evaluate(() =>

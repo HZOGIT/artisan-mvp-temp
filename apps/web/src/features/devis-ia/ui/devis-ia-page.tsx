@@ -312,22 +312,27 @@ export default function DevisIAPage() {
                               </div>
                               <Button variant="outline" onClick={() => setShowPreview(!showPreview)}><Eye className="h-4 w-4 mr-2" />{showPreview ? t("masquer") : t("voir")} {t("voirDetail")}</Button>
                             </div>
-                            {showPreview && (
-                              <div className="mt-4 p-4 bg-white rounded-lg">
-                                <h5 className="font-semibold mb-2">{t("recapitulatif")}</h5>
-                                <div className="space-y-1 text-sm">
-                                  {Object.values(editedSuggestions).filter((s) => s.selectionne).map((s) => (
-                                    <div key={s.id} className="flex justify-between"><span>{t("articleLigne", { nom: s.nomArticle, qte: s.quantiteSuggeree })}</span><span>{lineTotal(s).toFixed(2)} €</span></div>
-                                  ))}
-                                  {newSuggestions.filter((s) => s.selectionne).map((s) => (
-                                    <div key={s.id} className="flex justify-between text-green-700"><span>{t("articleLigneAjoute", { nom: s.nomArticle, qte: s.quantiteSuggeree })}</span><span>{lineTotal(s).toFixed(2)} €</span></div>
-                                  ))}
-                                  <div className="border-t pt-2 mt-2 font-semibold flex justify-between"><span>{t("totalHt")}</span><span>{total.toFixed(2)} €</span></div>
-                                  <div className="flex justify-between"><span>{t("tva")}</span><span>{(total * TVA_RATE).toFixed(2)} €</span></div>
-                                  <div className="flex justify-between text-lg font-bold"><span>{t("totalTtc")}</span><span>{(total * (1 + TVA_RATE)).toFixed(2)} €</span></div>
+                            {showPreview && (() => {
+                              const totalHT = total;
+                              const totalTVA = Math.round(totalHT * TVA_RATE * 100) / 100;
+                              const totalTTC = totalHT + totalTVA;
+                              return (
+                                <div className="mt-4 p-4 bg-white rounded-lg">
+                                  <h5 className="font-semibold mb-2">{t("recapitulatif")}</h5>
+                                  <div className="space-y-1 text-sm">
+                                    {Object.values(editedSuggestions).filter((s) => s.selectionne).map((s) => (
+                                      <div key={s.id} className="flex justify-between"><span>{t("articleLigne", { nom: s.nomArticle, qte: s.quantiteSuggeree })}</span><span>{lineTotal(s).toFixed(2)} €</span></div>
+                                    ))}
+                                    {newSuggestions.filter((s) => s.selectionne).map((s) => (
+                                      <div key={s.id} className="flex justify-between text-green-700"><span>{t("articleLigneAjoute", { nom: s.nomArticle, qte: s.quantiteSuggeree })}</span><span>{lineTotal(s).toFixed(2)} €</span></div>
+                                    ))}
+                                    <div className="border-t pt-2 mt-2 font-semibold flex justify-between"><span>{t("totalHt")}</span><span>{totalHT.toFixed(2)} €</span></div>
+                                    <div className="flex justify-between"><span>{t("tva")}</span><span>{totalTVA.toFixed(2)} €</span></div>
+                                    <div className="flex justify-between text-lg font-bold"><span>{t("totalTtc")}</span><span>{totalTTC.toFixed(2)} €</span></div>
+                                  </div>
                                 </div>
-                              </div>
-                            )}
+                              );
+                            })()}
                           </CardContent>
                         </Card>
                       )}
