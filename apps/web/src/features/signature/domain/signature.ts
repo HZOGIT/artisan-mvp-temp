@@ -41,6 +41,7 @@ export interface PdfLigne {
   unite: string | null | undefined;
   prixUnitaire: number;
   tauxTva: number;
+  tvaCategorieId?: string | null;
 }
 
 /** Transformation PURE des lignes de devis → lignes PDF (parse des montants, valeurs par défaut legacy). */
@@ -52,5 +53,6 @@ export function buildPdfLignes(lignes: readonly SignatureLigne[]): PdfLigne[] {
     unite: ligne.unite,
     prixUnitaire: toNum(ligne.prixUnitaireHT),
     tauxTva: toNum(ligne.tauxTVA) || 20,
+    tvaCategorieId: ligne.tvaCategorieId ?? null,
   }));
 }

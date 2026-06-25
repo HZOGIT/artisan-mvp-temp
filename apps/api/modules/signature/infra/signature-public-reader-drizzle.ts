@@ -122,6 +122,7 @@ export class SignaturePublicReaderDrizzle implements SignaturePublicReader {
                 montantTVA: l.montantTVA ?? "0.00",
                 montantTTC: l.montantTTC ?? "0.00",
                 ordre: l.ordre ?? 0,
+                tvaCategorieId: l.tvaCategorieId ?? null,
               }),
             ),
           };
@@ -182,6 +183,7 @@ export class SignaturePublicReaderDrizzle implements SignaturePublicReader {
             montantTVA: l.montantTVA ?? "0.00",
             montantTTC: l.montantTTC ?? "0.00",
             ordre: l.ordre ?? 0,
+            tvaCategorieId: l.tvaCategorieId ?? null,
           }),
         ),
         options,

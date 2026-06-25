@@ -71,6 +71,7 @@ export interface SignatureLigneRow {
   readonly montantTVA: string;
   readonly montantTTC: string;
   readonly ordre: number;
+  readonly tvaCategorieId?: string | null;
 }
 
 export interface SignatureOptionRow {
