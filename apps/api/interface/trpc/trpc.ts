@@ -69,17 +69,24 @@ const requireTenant = t.middleware(({ ctx, next }) => {
   return next({ ctx: { ...ctx, tenant } });
 });
 
-/*
- * Exige un utilisateur authentifié avec le rôle `admin` (staff Operioz). ⚠️ INDÉPENDANT du tenant :
- * un admin n'a pas forcément d'artisan → on s'appuie sur `ctx.role` (résolu depuis `users`), pas sur
- * `ctx.tenant`. Sert aux surfaces globales (catalogue bibliothèque, modération, config globale…).
- */
 const requireAdmin = t.middleware(({ ctx, next }) => {
   if (!ctx.claims) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: "Authentification requise" });
   }
   if (ctx.role !== "admin") {
     throw new TRPCError({ code: "FORBIDDEN", message: "Réservé aux administrateurs" });
+  }
+  return next();
+});
+
+/*
+ * Staff Operioz uniquement : admin SANS tenant résolu. Un admin d'un artisan (tenant résolu) est
+ * explicitement rejeté — il ne doit pas accéder aux surfaces plateforme (platformAdmin.*).
+ * Composé APRÈS requireAdmin pour ne pas dupliquer le check rôle.
+ */
+const requirePlatformStaff = t.middleware(({ ctx, next }) => {
+  if (ctx.tenant != null) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Accès réservé au staff plateforme (non-tenant)" });
   }
   return next();
 });
@@ -94,8 +101,11 @@ export const publicProcedure = t.procedure.use(logProcedureTiming).use(mapDomain
 /** Procédure protégée : mapping erreurs domaine + exigence de tenant. */
 export const protectedProcedure = t.procedure.use(logProcedureTiming).use(mapDomainErrors).use(requireTenant);
 
-/** Procédure ADMIN (staff Operioz) : mapping erreurs domaine + exigence du rôle admin (sans tenant). */
+/** Procédure ADMIN : mapping erreurs domaine + exigence du rôle admin (peut avoir un tenant). */
 export const adminProcedure = t.procedure.use(logProcedureTiming).use(mapDomainErrors).use(requireAdmin);
+
+/** Procédure PLATFORM ADMIN — staff Operioz uniquement (admin + sans tenant résolu). */
+export const platformAdminProcedure = t.procedure.use(logProcedureTiming).use(mapDomainErrors).use(requireAdmin).use(requirePlatformStaff);
 
 /*
  * Fabrique de middleware d'autorisation PAR PERMISSION (parité legacy `requirePermission`) : le rôle

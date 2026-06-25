@@ -107,6 +107,7 @@ import { createSubscriptionModule } from "./modules/subscription/subscription.mo
 import { createBillingModule } from "./modules/billing/billing.module";
 import { BillingRepositoryDrizzle } from "./modules/billing/infra/billing-repository-drizzle";
 import { BillingAdapter } from "./shared/ports/billing-adapter";
+import { createPlatformAdminModule } from "./modules/platform-admin/platform-admin.module";
 import { SubscriptionReaderDrizzle } from "./modules/subscription/infra/subscription-reader-drizzle";
 import type { ISubscriptionRepository } from "./modules/subscription/application/subscription-reader";
 import { StripeAdapter } from "./shared/ports/stripe-adapter";
@@ -925,7 +926,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     deps: { repo: billingRepo, billing: new BillingAdapter(), stripe: deps.stripePort ?? new StripeAdapter() },
   });
 
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp, interventionsMobile, vitrine, clientPortal, integrationsComptables, devisIA, billing });
+  const platformAdmin = createPlatformAdminModule(getDbHandle().db);
+
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp, interventionsMobile, vitrine, clientPortal, integrationsComptables, devisIA, billing, platformAdmin });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
