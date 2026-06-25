@@ -2,107 +2,124 @@
  * Types d'ENTRÉE des générateurs PDF (internalisés depuis le legacy `server/_core/pdfGenerator.ts`).
  * Le générateur jsPDF est repris VERBATIM (déjà correct au runtime avec les objets domaine migrés
  * passés via `PdfPort.render`). Ces types ne servent qu'à documenter la SURFACE consommée — les champs
- * sont volontairement larges (`any`) : le générateur coerce tout (`Number(...)`, `new Date(...)`,
+ * sont volontairement larges : le générateur coerce tout (`Number(...)`, `new Date(...)`,
  * formatage) et l'adapter (`js-pdf-adapter.ts`) caste l'entrée. La sécurité de type utile est portée en
  * amont par les domaines migrés (Devis/Facture/Commande/Client/…), pas ici.
  */
- 
+
 
 export interface DevisLigne {
-  designation?: any;
-  quantite?: any;
-  unite?: any;
-  prixUnitaireHT?: any;
-  prixUnitaire?: any;
-  tauxTVA?: any;
-  tvaCategorieId?: any;
-  montantHT?: any;
-  montantTVA?: any;
-  type?: any;
+  designation?: string | null;
+  quantite?: number | string | null;
+  unite?: string | null;
+  prixUnitaireHT?: number | string | null;
+  prixUnitaire?: number | string | null;
+  tauxTVA?: number | string | null;
+  tvaCategorieId?: string | null;
+  montantHT?: number | string | null;
+  montantTVA?: number | string | null;
+  type?: string | null;
 }
 
 export type FactureLigne = DevisLigne;
 export type LigneCommandeFournisseur = DevisLigne;
 
 export interface Devis {
-  numero?: any;
-  dateDevis?: any;
-  dateValidite?: any;
-  referenceClient?: any;
-  totalHT?: any;
-  totalTVA?: any;
-  totalTTC?: any;
+  numero?: string | null;
+  dateDevis?: string | Date;
+  dateValidite?: string | Date | null;
+  referenceClient?: string | null;
+  totalHT?: number | string | null;
+  totalTVA?: number | string | null;
+  totalTTC?: number | string | null;
 }
 
 export interface Facture {
-  numero?: any;
-  dateFacture?: any;
-  dateEcheance?: any;
-  referenceClient?: any;
-  statut?: any;
+  numero?: string | null;
+  dateFacture?: string | Date;
+  dateEcheance?: string | Date | null;
+  referenceClient?: string | null;
+  statut?: string | null;
   /** Lus par le générateur Factur-X (CII) : */
-  totalHT?: any;
-  totalTVA?: any;
-  totalTTC?: any;
+  totalHT?: number | string | null;
+  totalTVA?: number | string | null;
+  totalTTC?: number | string | null;
+  typeDocument?: string | null;
+  objet?: string | null;
+  conditionsPaiement?: string | null;
 }
 
 export interface Artisan {
-  nomEntreprise?: any;
-  adresse?: any;
-  codePostal?: any;
-  ville?: any;
-  email?: any;
-  telephone?: any;
-  siret?: any;
-  tauxTVA?: any;
+  nomEntreprise?: string | null;
+  adresse?: string | null;
+  codePostal?: string | null;
+  ville?: string | null;
+  email?: string | null;
+  telephone?: string | null;
+  siret?: string | null;
+  tauxTVA?: number | string | null;
   /** Factur-X (CII) */
-  numeroTVA?: any;
-  conditionsGenerales?: any;
+  numeroTVA?: string | null;
+  conditionsGenerales?: string | null;
+  logo?: string | null;
+  formeJuridique?: string | null;
+  capitalSocial?: number | string | null;
+  villeRCS?: string | null;
+  numeroRM?: string | null;
+  codeAPE?: string | null;
+  iban?: string | null;
 }
 
 export interface Client {
-  nom?: any;
-  prenom?: any;
-  email?: any;
-  telephone?: any;
-  adresse?: any;
-  codePostal?: any;
-  ville?: any;
+  nom?: string | null;
+  prenom?: string | null;
+  email?: string | null;
+  telephone?: string | null;
+  adresse?: string | null;
+  codePostal?: string | null;
+  ville?: string | null;
+  type?: string | null;
+  raisonSociale?: string | null;
+  adresseFacturation?: string | null;
+  codePostalFacturation?: string | null;
+  villeFacturation?: string | null;
+  siret?: string | null;
+  numeroTVA?: string | null;
 }
 
 export interface ContratMaintenance {
-  titre?: any;
-  type?: any;
-  reference?: any;
-  description?: any;
-  dateDebut?: any;
-  dateFin?: any;
-  periodicite?: any;
-  montantHT?: any;
-  tauxTVA?: any;
-  reconduction?: any;
-  preavisResiliation?: any;
-  conditionsParticulieres?: any;
+  titre?: string | null;
+  type?: string | null;
+  reference?: string | null;
+  description?: string | null;
+  dateDebut?: string | Date;
+  dateFin?: string | Date | null;
+  periodicite?: string | null;
+  montantHT?: number | string | null;
+  tauxTVA?: number | string | null;
+  reconduction?: boolean | string | null;
+  preavisResiliation?: number | string | null;
+  conditionsParticulieres?: string | null;
 }
 
 export interface CommandeFournisseur {
-  numero?: any;
-  dateCommande?: any;
-  reference?: any;
-  delaiLivraison?: any;
-  adresseLivraison?: any;
-  notes?: any;
-  totalHT?: any;
-  totalTVA?: any;
-  totalTTC?: any;
+  numero?: string | null;
+  dateCommande?: string | Date;
+  reference?: string | null;
+  delaiLivraison?: string | null;
+  adresseLivraison?: string | null;
+  notes?: string | null;
+  totalHT?: number | string | null;
+  totalTVA?: number | string | null;
+  totalTTC?: number | string | null;
 }
 
 export interface Fournisseur {
-  nom?: any;
-  contact?: any;
-  email?: any;
-  telephone?: any;
-  adresse?: any;
-  codePostal?: any;
-  ville?: any;
+  nom?: string | null;
+  contact?: string | null;
+  email?: string | null;
+  telephone?: string | null;
+  adresse?: string | null;
+  codePostal?: string | null;
+  ville?: string | null;
 }

@@ -5,6 +5,25 @@ import { vlog } from './voice-debug';
 import { closeSharedAudioContext } from './shared-audio-context';
 import { BACKEND_URL } from '@/shared/backend-url';
 
+type GeminiLivePart = { inlineData?: { mimeType?: string; data?: string }; text?: string };
+type GeminiLiveServerContent = {
+  modelTurn?: { parts?: GeminiLivePart[] };
+  inputTranscription?: { text?: string };
+  outputTranscription?: { text?: string };
+  interrupted?: boolean;
+  turnComplete?: boolean;
+  generationComplete?: boolean;
+};
+type GeminiLiveFunctionCall = { id?: string; name: string; args?: Record<string, unknown> };
+type GeminiLiveMsg = {
+  setupComplete?: unknown;
+  toolCall?: { functionCalls?: GeminiLiveFunctionCall[] };
+  toolCallCancellation?: unknown;
+  serverContent?: GeminiLiveServerContent;
+  usageMetadata?: Record<string, unknown>;
+  goAway?: unknown;
+};
+
 export class GeminiLiveVoiceSession implements VoiceSession {
   private _ws: WebSocket | null = null;
   private _capture = new WebAudioCapture();
@@ -95,7 +114,7 @@ export class GeminiLiveVoiceSession implements VoiceSession {
      * shared context). Doing all addModule() calls before the capture worklet is
      * running avoids any chance of interrupting it mid-stream.
      */
-    try { await this._output.resume(); vlog('output prewarmed (before capture)'); } catch (e: any) { vlog(`output prewarm failed: ${e?.message}`); }
+    try { await this._output.resume(); vlog('output prewarmed (before capture)'); } catch (e: unknown) { vlog(`output prewarm failed: ${(e as { message?: string })?.message}`); }
 
     /** 3) Start audio capture — stream PCM chunks to WS */
     vlog('starting mic capture…');
@@ -152,9 +171,9 @@ export class GeminiLiveVoiceSession implements VoiceSession {
       }
     } catch { return; }
 
-    let msg: any;
+    let msg: GeminiLiveMsg;
     try {
-      msg = JSON.parse(text);
+      msg = JSON.parse(text) as GeminiLiveMsg;
     } catch { return; }
     if (!msg) return;
 
@@ -260,17 +279,17 @@ export class GeminiLiveVoiceSession implements VoiceSession {
    * Execute each requested function on our server (DB-backed) and send the
    * results back to Gemini so it can continue the spoken response.
    */
-  private async _handleToolCall(toolCall: any, signal: AbortSignal): Promise<void> {
-    const calls: any[] = toolCall?.functionCalls || [];
+  private async _handleToolCall(toolCall: NonNullable<GeminiLiveMsg['toolCall']>, signal: AbortSignal): Promise<void> {
+    const calls: GeminiLiveFunctionCall[] = toolCall.functionCalls ?? [];
     if (calls.length === 0) {
       vlog(`🔧 toolCall with empty functionCalls — ignored`);
       return;
     }
-    const functionResponses: any[] = [];
+    const functionResponses: unknown[] = [];
     for (const fc of calls) {
       if (signal.aborted) { vlog(`🔧 ${fc.name} skipped (aborted)`); return; }
       vlog(`🔧 toolCall ${fc.name}(${JSON.stringify(fc.args || {})})`);
-      let response: any;
+      let response: unknown;
       try {
         const r = await fetch(`${BACKEND_URL}/api/voice/tool`, {
           method: 'POST',
@@ -282,13 +301,14 @@ export class GeminiLiveVoiceSession implements VoiceSession {
             : signal,
         });
         if (signal.aborted) { vlog(`🔧 ${fc.name} aborted after fetch`); return; }
-        const data = await r.json();
+        const data = await r.json() as Record<string, unknown>;
         response = data?.result ?? { ok: false, error: 'no result' };
         vlog(`🔧 ${fc.name} → ${JSON.stringify(response).slice(0, 120)}`);
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (signal.aborted) { vlog(`🔧 ${fc.name} aborted`); return; }
-        response = { ok: false, error: e?.message || 'tool error' };
-        vlog(`🔧 ${fc.name} FAILED: ${e?.message}`);
+        const errMsg = e instanceof Error ? e.message : 'tool error';
+        response = { ok: false, error: errMsg };
+        vlog(`🔧 ${fc.name} FAILED: ${errMsg}`);
       }
       functionResponses.push({ id: fc.id, name: fc.name, response });
     }

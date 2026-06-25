@@ -159,7 +159,7 @@ function getImageDimensions(buf: Buffer, format: ImgFormat): { width: number; he
  */
 
 function renderLogo(doc: jsPDF, artisan: Artisan): boolean {
-  const logo = (artisan as any).logo as string | null | undefined;
+  const logo = artisan.logo;
   if (!logo || typeof logo !== "string") return false;
   const match = logo.match(/^data:image\/(png|jpe?g|webp);base64,(.+)$/i);
   /** unsupported (e.g. SVG — jsPDF cannot rasterize) */
@@ -273,24 +273,22 @@ interface InfoBlock {
  * « RM … » si inscrit au Répertoire des Métiers. Rien d'imposé en plus pour un EI/micro.
  */
 function buildMentionsLegalesEmetteur(artisan: Artisan): string[] {
-  const a = artisan as any;
   const lines: string[] = [];
   const SOCIETES = ["EURL", "SARL", "SAS", "SASU", "SA"];
-  if (a.formeJuridique && SOCIETES.includes(a.formeJuridique)) {
-    const siren = a.siret ? String(a.siret).replace(/\D/g, "").slice(0, 9) : "";
-    const cap = a.capitalSocial != null && String(a.capitalSocial) !== ""
-      ? `au capital de ${Number(a.capitalSocial).toLocaleString("fr-FR")} €` : "";
-    const head = [a.formeJuridique, cap].filter(Boolean).join(" ");
-    const rcs = a.villeRCS && siren ? `RCS ${a.villeRCS} ${siren}` : "";
+  if (artisan.formeJuridique && SOCIETES.includes(artisan.formeJuridique)) {
+    const siren = artisan.siret ? String(artisan.siret).replace(/\D/g, "").slice(0, 9) : "";
+    const cap = artisan.capitalSocial != null && String(artisan.capitalSocial) !== ""
+      ? `au capital de ${Number(artisan.capitalSocial).toLocaleString("fr-FR")} €` : "";
+    const head = [artisan.formeJuridique, cap].filter(Boolean).join(" ");
+    const rcs = artisan.villeRCS && siren ? `RCS ${artisan.villeRCS} ${siren}` : "";
     const line = [head, rcs].filter(Boolean).join(" — ");
     if (line) lines.push(line);
   }
-  if (a.numeroRM) lines.push(`Inscrit au Répertoire des Métiers — RM ${a.numeroRM}`);
+  if (artisan.numeroRM) lines.push(`Inscrit au Répertoire des Métiers — RM ${artisan.numeroRM}`);
   return lines;
 }
 
 function buildArtisanBlock(artisan: Artisan): InfoBlock {
-  const a = artisan as any;
   const lines: string[] = [];
   if (artisan.adresse) lines.push(artisan.adresse);
   const cpVille = `${artisan.codePostal || ""} ${artisan.ville || ""}`.trim();
@@ -298,8 +296,8 @@ function buildArtisanBlock(artisan: Artisan): InfoBlock {
   if (artisan.telephone) lines.push(`Tél: ${artisan.telephone}`);
   if (artisan.email) lines.push(`Email: ${artisan.email}`);
   if (artisan.siret) lines.push(`SIRET: ${artisan.siret}`);
-  if (a.numeroTVA) lines.push(`TVA: ${a.numeroTVA}`);
-  if (a.codeAPE) lines.push(`APE: ${a.codeAPE}`);
+  if (artisan.numeroTVA) lines.push(`TVA: ${artisan.numeroTVA}`);
+  if (artisan.codeAPE) lines.push(`APE: ${artisan.codeAPE}`);
   return { label: "ÉMETTEUR", name: artisan.nomEntreprise || "Artisan", lines };
 }
 
@@ -310,23 +308,23 @@ function buildClientBlock(client: Client): InfoBlock {
    * Client professionnel : la raison sociale devient l'intitulé,
    * le contact figure en première ligne, et SIRET / n° TVA sont rappelés (mentions B2B).
    */
-  const isPro = (client as any).type === "professionnel";
-  const raisonSociale = (client as any).raisonSociale as string | null | undefined;
+  const isPro = client.type === "professionnel";
+  const raisonSociale = client.raisonSociale;
   if (isPro && raisonSociale && personName) lines.push(`Contact: ${personName}`);
   /*
    * Sur une facture/devis on utilise l'adresse de FACTURATION si renseignée
    * (fallback par champ vers l'adresse principale = adresse de chantier).
    */
-  const adrFact = (client as any).adresseFacturation || client.adresse;
-  const cpFact = (client as any).codePostalFacturation || client.codePostal;
-  const villeFact = (client as any).villeFacturation || client.ville;
+  const adrFact = client.adresseFacturation || client.adresse;
+  const cpFact = client.codePostalFacturation || client.codePostal;
+  const villeFact = client.villeFacturation || client.ville;
   if (adrFact) lines.push(adrFact);
   const cpVille = `${cpFact || ""} ${villeFact || ""}`.trim();
   if (cpVille) lines.push(cpVille);
   if (client.telephone) lines.push(`Tél: ${client.telephone}`);
   if (client.email) lines.push(`Email: ${client.email}`);
-  if (isPro && (client as any).siret) lines.push(`SIRET: ${(client as any).siret}`);
-  if (isPro && (client as any).numeroTVA) lines.push(`TVA: ${(client as any).numeroTVA}`);
+  if (isPro && client.siret) lines.push(`SIRET: ${client.siret}`);
+  if (isPro && client.numeroTVA) lines.push(`TVA: ${client.numeroTVA}`);
   return {
     label: "CLIENT",
     name: isPro && raisonSociale ? raisonSociale : personName,
@@ -342,7 +340,7 @@ function buildFournisseurBlock(f: Fournisseur): InfoBlock {
   if (cpVille) lines.push(cpVille);
   if (f.telephone) lines.push(`Tél: ${f.telephone}`);
   if (f.email) lines.push(`Email: ${f.email}`);
-  return { label: "FOURNISSEUR", name: f.nom, lines };
+  return { label: "FOURNISSEUR", name: f.nom ?? "", lines };
 }
 
 function renderInfoBlocks(doc: jsPDF, primary: RGB, left: InfoBlock, right: InfoBlock): number {
@@ -534,7 +532,7 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
     title: "DEVIS",
     number: `N° ${devis.numero}`,
     dateLines: [
-      `Date : ${new Date(devis.dateDevis).toLocaleDateString("fr-FR")}`,
+      `Date : ${new Date(devis.dateDevis ?? "").toLocaleDateString("fr-FR")}`,
       `Validité : ${devis.dateValidite ? new Date(devis.dateValidite).toLocaleDateString("fr-FR") : "Non définie"}`,
       /** Référence/N° de commande du client (B2B), rappelée si renseignée. */
       ...(devis.referenceClient ? [`Votre réf. : ${devis.referenceClient}`] : []),
@@ -551,16 +549,16 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
      */
     const type = ligne.type ?? "produit";
     if (type === "section") {
-      return [{ content: ligne.designation, colSpan: 4, styles: { fontStyle: "bold" as const, fillColor: [226, 232, 240] as [number, number, number], textColor: [30, 41, 59] as [number, number, number] } }];
+      return [{ content: ligne.designation ?? "", colSpan: 4, styles: { fontStyle: "bold" as const, fillColor: [226, 232, 240] as [number, number, number], textColor: [30, 41, 59] as [number, number, number] } }];
     }
     if (type === "note") {
-      return [{ content: ligne.designation, colSpan: 4, styles: { fontStyle: "italic" as const, textColor: [100, 100, 100] as [number, number, number] } }];
+      return [{ content: ligne.designation ?? "", colSpan: 4, styles: { fontStyle: "italic" as const, textColor: [100, 100, 100] as [number, number, number] } }];
     }
     const quantite = Number(ligne.quantite) || 0;
     const prixUnitaire = Number(ligne.prixUnitaireHT) || 0;
     const montantHT = ligne.montantHT != null ? Number(ligne.montantHT) : prixUnitaire * quantite;
     return [
-      ligne.designation,
+      ligne.designation ?? "",
       quantite.toString(),
       `${prixUnitaire.toFixed(2)} €`,
       `${montantHT.toFixed(2)} €`,
@@ -604,7 +602,7 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
           .map(([taux, montant]) => ({ label: `TVA (${taux}%)`, value: `${montant.toFixed(2)} €` }))
       : [{ label: `TVA (${tvaParTaux.size === 1 ? Array.from(tvaParTaux.keys())[0] : (Number(artisan.tauxTVA) || 20)}%)`, value: `${tva.toFixed(2)} €` }];
 
-  const totalsStartY = (doc as any).lastAutoTable.finalY + 8;
+  const totalsStartY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
   const totalsEndY = renderTotalsBox(
     doc,
     primary,
@@ -689,7 +687,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
    * typeDocument ∈ { facture, avoir } (défaut « facture ») → comportement inchangé
    * pour toute facture normale (isAvoir = false).
    */
-  const isAvoir = (facture as any).typeDocument === "avoir";
+  const isAvoir = facture.typeDocument === "avoir";
   const avoirRed: RGB = [220, 53, 69];
 
   renderHeaderBand(doc, {
@@ -698,13 +696,13 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
     title: isAvoir ? "AVOIR" : "FACTURE",
     number: `N° ${facture.numero}`,
     dateLines: [
-      `Date : ${new Date(facture.dateFacture).toLocaleDateString("fr-FR")}`,
+      `Date : ${new Date(facture.dateFacture ?? "").toLocaleDateString("fr-FR")}`,
       /*
        * Un avoir n'a pas d'échéance de règlement : on rappelle la facture d'origine
        * (l'objet par défaut d'un avoir = « Avoir sur facture {numéro} »).
        */
       ...(isAvoir
-        ? ((facture as any).objet ? [String((facture as any).objet)] : [])
+        ? (facture.objet ? [facture.objet] : [])
         : [`Échéance : ${facture.dateEcheance ? new Date(facture.dateEcheance).toLocaleDateString("fr-FR") : "Non définie"}`]),
       /** Référence/N° de commande du client (B2B), rappelée si renseignée. */
       ...(facture.referenceClient ? [`Votre réf. : ${facture.referenceClient}`] : []),
@@ -735,16 +733,16 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
      */
     const type = ligne.type ?? "produit";
     if (type === "section") {
-      return [{ content: ligne.designation, colSpan: 4, styles: { fontStyle: "bold" as const, fillColor: [226, 232, 240] as [number, number, number], textColor: [30, 41, 59] as [number, number, number] } }];
+      return [{ content: ligne.designation ?? "", colSpan: 4, styles: { fontStyle: "bold" as const, fillColor: [226, 232, 240] as [number, number, number], textColor: [30, 41, 59] as [number, number, number] } }];
     }
     if (type === "note") {
-      return [{ content: ligne.designation, colSpan: 4, styles: { fontStyle: "italic" as const, textColor: [100, 100, 100] as [number, number, number] } }];
+      return [{ content: ligne.designation ?? "", colSpan: 4, styles: { fontStyle: "italic" as const, textColor: [100, 100, 100] as [number, number, number] } }];
     }
     const quantite = Number(ligne.quantite) || 0;
     const prixUnitaire = Number(ligne.prixUnitaireHT) || 0;
     const montantHT = ligne.montantHT != null ? Number(ligne.montantHT) : prixUnitaire * quantite;
     return [
-      ligne.designation,
+      ligne.designation ?? "",
       quantite.toString(),
       `${prixUnitaire.toFixed(2)} €`,
       `${montantHT.toFixed(2)} €`,
@@ -788,7 +786,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
           .map(([taux, montant]) => ({ label: `TVA (${taux}%)`, value: `${montant.toFixed(2)} €` }))
       : [{ label: `TVA (${tvaParTauxF.size === 1 ? Array.from(tvaParTauxF.keys())[0] : (Number(artisan.tauxTVA) || 20)}%)`, value: `${tva.toFixed(2)} €` }];
 
-  const totalsStartY = (doc as any).lastAutoTable.finalY + 8;
+  const totalsStartY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
   const totalsEndY = renderTotalsBox(
     doc,
     primary,
@@ -817,7 +815,6 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   }
 
   /** Pied de page — mentions légales obligatoires */
-  const a = artisan as any;
   let footerY = Math.max(totalsEndY + 14, 258);
 
   doc.setFont("Roboto", "normal");
@@ -833,7 +830,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   if (isAvoir) {
     doc.setFontSize(7);
     doc.setTextColor(...TEXT_MUTED);
-    const origineObjet = (facture as any).objet ? String((facture as any).objet) : "la facture d'origine";
+    const origineObjet = facture.objet ?? "la facture d'origine";
     const avoirNote = doc.splitTextToSize(
       `${origineObjet}. Le présent avoir vient en déduction d'un règlement ultérieur ou donne lieu à remboursement. Un avoir n'a pas d'échéance de paiement.`,
       175,
@@ -842,11 +839,11 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
     doc.text(noteLines, MARGIN, footerY);
     fy = footerY + (noteLines.length - 1) * 4;
   } else {
-    if (a.iban) {
+    if (artisan.iban) {
       doc.setFont("Roboto", "bold");
       doc.text("Règlement par virement bancaire :", MARGIN, footerY);
       doc.setFont("Roboto", "normal");
-      doc.text(`IBAN : ${a.iban}`, MARGIN, footerY + 4);
+      doc.text(`IBAN : ${artisan.iban}`, MARGIN, footerY + 4);
       footerY += 10;
     }
 
@@ -856,9 +853,8 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
      * OPE-164 — condition de paiement RÉELLE de la facture (au lieu du « 30 jours » figé) :
      * `conditionsPaiement` si renseignée, sinon repli sur l'échéance, sinon « à réception ».
      */
-    const fctr = facture as any;
-    const condRaw = fctr.conditionsPaiement && String(fctr.conditionsPaiement).trim()
-      ? String(fctr.conditionsPaiement).trim()
+    const condRaw = facture.conditionsPaiement && String(facture.conditionsPaiement).trim()
+      ? String(facture.conditionsPaiement).trim()
       : (facture.dateEcheance
           ? `Paiement à échéance : ${new Date(facture.dateEcheance).toLocaleDateString("fr-FR")}`
           : "Paiement à réception.");
@@ -888,7 +884,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   const tvaFactureMentions = Array.from(
     new Set(
       facture.lignes
-        .map((l) => (l as any).tvaCategorieId as string | null | undefined)
+        .map((l) => l.tvaCategorieId)
         .filter((id): id is string => !!id)
         .map((id) => TVA_CATEGORIES_MAP[id as TvaCategorieId]?.mentionLegale)
         .filter((m): m is string => !!m),
@@ -915,7 +911,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   }
 
   /** OPE-127 — CGV sur page dédiée (parité PDF client) ; PAS sur un avoir (document d'annulation). */
-  if (data.cgv && String(data.cgv).trim() && (facture as any).typeDocument !== "avoir") {
+  if (data.cgv && String(data.cgv).trim() && facture.typeDocument !== "avoir") {
     renderCgvPage(doc, String(data.cgv));
   }
 
@@ -962,7 +958,7 @@ export function generateContratPDF(data: PDFContratData): Buffer {
     number: `Réf : ${contrat.reference}`,
     dateLines: [
       `Type : ${typeLabels[contrat.type || "entretien"] || contrat.type}`,
-      `Début : ${new Date(contrat.dateDebut).toLocaleDateString("fr-FR")}`,
+      `Début : ${new Date(contrat.dateDebut ?? "").toLocaleDateString("fr-FR")}`,
     ],
   });
 
@@ -973,7 +969,7 @@ export function generateContratPDF(data: PDFContratData): Buffer {
   doc.setFont("Roboto", "bold");
   doc.setFontSize(14);
   doc.setTextColor(...primary);
-  doc.text(contrat.titre, MARGIN, y);
+  doc.text(contrat.titre ?? "", MARGIN, y);
   y += 8;
 
   /** Description */
@@ -981,20 +977,20 @@ export function generateContratPDF(data: PDFContratData): Buffer {
     doc.setFont("Roboto", "normal");
     doc.setFontSize(10);
     doc.setTextColor(...TEXT_BODY);
-    const descLines = doc.splitTextToSize(contrat.description, PAGE_W - 2 * MARGIN);
+    const descLines = doc.splitTextToSize(contrat.description ?? "", PAGE_W - 2 * MARGIN);
     doc.text(descLines, MARGIN, y);
     y += descLines.length * 5 + 4;
   }
 
   /** Détails du contrat */
-  const montantHT = parseFloat(contrat.montantHT || "0");
-  const tauxTVA = parseFloat(contrat.tauxTVA || "20");
+  const montantHT = parseFloat(String(contrat.montantHT ?? 0));
+  const tauxTVA = parseFloat(String(contrat.tauxTVA ?? 20));
   const montantTVA = montantHT * (tauxTVA / 100);
   const montantTTC = montantHT + montantTVA;
 
   const detailsData = [
-    ["Périodicité", periodiciteLabels[contrat.periodicite] || contrat.periodicite],
-    ["Date de début", new Date(contrat.dateDebut).toLocaleDateString("fr-FR")],
+    ["Périodicité", periodiciteLabels[contrat.periodicite ?? ""] ?? contrat.periodicite ?? ""],
+    ["Date de début", new Date(contrat.dateDebut ?? "").toLocaleDateString("fr-FR")],
     ["Date de fin", contrat.dateFin ? new Date(contrat.dateFin).toLocaleDateString("fr-FR") : "Indéterminée"],
     ["Reconduction tacite", contrat.reconduction ? "Oui" : "Non"],
     ["Préavis de résiliation", `${contrat.preavisResiliation || 1} mois`],
@@ -1015,7 +1011,7 @@ export function generateContratPDF(data: PDFContratData): Buffer {
     margin: { left: MARGIN, right: MARGIN },
   });
 
-  y = (doc as any).lastAutoTable.finalY + 8;
+  y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
 
   /** Conditions particulières */
   if (contrat.conditionsParticulieres) {
@@ -1076,11 +1072,11 @@ export function generateContratPDF(data: PDFContratData): Buffer {
 
 export interface PDFInterventionData {
   /** titre, description, dateDebut, dateFin, adresse, statut, numero? */
-  intervention: any;
+  intervention: Record<string, unknown>;
   artisan: Artisan;
   client: Client;
   /** signatureClient (base64), signatureDate, heureArrivee/Depart, notesIntervention */
-  mobile?: any | null;
+  mobile?: Record<string, unknown> | null;
   technicienNom?: string | null;
 }
 
@@ -1091,9 +1087,9 @@ export function generateInterventionPDF(data: PDFInterventionData): Buffer {
 
   const primary = COLOR_COMMANDE;
 
-  const fmtDate = (d: any) => (d ? new Date(d).toLocaleDateString("fr-FR") : "—");
-  const fmtHeure = (d: any) =>
-    d ? new Date(d).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : null;
+  const fmtDate = (d: unknown) => (d ? new Date(d as string).toLocaleDateString("fr-FR") : "—");
+  const fmtHeure = (d: unknown) =>
+    d ? new Date(d as string).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : null;
 
   renderHeaderBand(doc, {
     primaryColor: primary,
@@ -1113,7 +1109,7 @@ export function generateInterventionPDF(data: PDFInterventionData): Buffer {
   doc.setFont("Roboto", "bold");
   doc.setFontSize(14);
   doc.setTextColor(...primary);
-  doc.text(intervention.titre || "Intervention", MARGIN, y);
+  doc.text(String(intervention.titre || "Intervention"), MARGIN, y);
   y += 8;
 
   /** Détails */
@@ -1122,13 +1118,13 @@ export function generateInterventionPDF(data: PDFInterventionData): Buffer {
   let duree = "—";
   if (mobile?.heureArrivee && mobile?.heureDepart) {
     const mins = Math.round(
-      (new Date(mobile.heureDepart).getTime() - new Date(mobile.heureArrivee).getTime()) / 60000,
+      (new Date(mobile.heureDepart as string).getTime() - new Date(mobile.heureArrivee as string).getTime()) / 60000,
     );
     if (mins > 0) duree = `${Math.floor(mins / 60)} h ${String(mins % 60).padStart(2, "0")}`;
   }
   const detailsData: string[][] = [
     ["Date", fmtDate(intervention.dateDebut)],
-    ["Statut", intervention.statut === "terminee" ? "Terminée" : (intervention.statut || "—")],
+    ["Statut", intervention.statut === "terminee" ? "Terminée" : String(intervention.statut || "—")],
   ];
   if (intervention.adresse) detailsData.push(["Lieu", String(intervention.adresse)]);
   if (technicienNom) detailsData.push(["Technicien", technicienNom]);
@@ -1147,7 +1143,7 @@ export function generateInterventionPDF(data: PDFInterventionData): Buffer {
     },
     margin: { left: MARGIN, right: MARGIN },
   });
-  y = (doc as any).lastAutoTable.finalY + 8;
+  y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
 
   /** Travaux réalisés (description + notes terrain) */
   const corps = [intervention.description, mobile?.notesIntervention].filter(Boolean).join("\n\n");
@@ -1166,7 +1162,7 @@ export function generateInterventionPDF(data: PDFInterventionData): Buffer {
   }
 
   /** Signature client (image base64 déjà capturée) */
-  const sig: string | undefined = mobile?.signatureClient;
+  const sig: string | undefined = mobile?.signatureClient as string | undefined;
   y = Math.max(y + 6, 225);
   doc.setFont("Roboto", "bold");
   doc.setFontSize(10);
@@ -1228,7 +1224,7 @@ export function generateBonCommandePDF(data: PDFBonCommandeData): Buffer {
   const primary = COLOR_COMMANDE;
 
   const dateLines: string[] = [
-    `Date : ${new Date(commande.dateCommande).toLocaleDateString("fr-FR")}`,
+    `Date : ${new Date(commande.dateCommande ?? "").toLocaleDateString("fr-FR")}`,
   ];
   if (commande.reference) dateLines.push(`Réf : ${commande.reference}`);
 
@@ -1249,7 +1245,7 @@ export function generateBonCommandePDF(data: PDFBonCommandeData): Buffer {
     const tauxTVALigne = Number(ligne.tauxTVA) || 20;
     const totalLigne = quantite * prixUnitaire;
     return [
-      ligne.designation,
+      ligne.designation ?? "",
       quantite.toString(),
       ligne.unite || "unité",
       prixUnitaire > 0 ? `${prixUnitaire.toFixed(2)} €` : "—",
@@ -1286,7 +1282,7 @@ export function generateBonCommandePDF(data: PDFBonCommandeData): Buffer {
     );
   const totalTTC = Number(commande.totalTTC) || totalHT + totalTVA;
 
-  const totalsStartY = (doc as any).lastAutoTable.finalY + 8;
+  const totalsStartY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
   let yPosition = renderTotalsBox(
     doc,
     primary,

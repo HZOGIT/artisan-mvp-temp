@@ -10,7 +10,7 @@ export interface VoiceSessionEvents {
   onStateChange: (state: VoiceState) => void;
   onUserTranscript: (text: string, isFinal: boolean) => void;
   onAssistantDelta: (delta: string) => void;
-  onTurnComplete: (userTranscript: string, assistantTranscript: string, metadata?: any) => void;
+  onTurnComplete: (userTranscript: string, assistantTranscript: string, metadata?: Record<string, unknown>) => void;
   onInterrupted: () => void;
   onError: (error: Error) => void;
   /** Fired after each batch of voice tool calls completes — use to invalidate queries. */
