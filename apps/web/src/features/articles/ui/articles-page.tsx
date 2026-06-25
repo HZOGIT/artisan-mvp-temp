@@ -21,6 +21,7 @@ import { Search, Package, Filter, Plus, Pencil, Trash2, Upload, Download, MoreHo
 import { Badge } from "@/shared/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/shared/ui/dropdown-menu";
 import { toast } from "sonner";
+import { TVA_CATEGORIES } from "@/shared/tva/taux-tva-fr";
 
 /*
  * Page Bibliothèque d'articles du FRONT NEUF (`/articles`) — clean-archi : présentation pure. Données
@@ -60,13 +61,6 @@ const UNITE_KEYS: { value: string; key: string }[] = [
   { value: "pot", key: "unite_pot" },
   { value: "sac", key: "unite_sac" },
   { value: "boîte", key: "unite_boite" },
-];
-const TVA_KEYS: { value: string; key: string }[] = [
-  { value: "20", key: "tva_20" },
-  { value: "10", key: "tva_10" },
-  { value: "5.5", key: "tva_5_5" },
-  { value: "2.1", key: "tva_2_1" },
-  { value: "0", key: "tva_0" },
 ];
 const SOUS_CATEGORIE_KEYS = [
   "cables_conduits", "carrelage_exterieur", "carrelage_interieur", "chaudieres",
@@ -480,8 +474,8 @@ export default function ArticlesPage() {
                 <Select value={form.tauxTVA} onValueChange={(v) => setForm({ ...form, tauxTVA: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {TVA_KEYS.map((tv) => (
-                      <SelectItem key={tv.value} value={tv.value}>{t(tv.key)}</SelectItem>
+                    {TVA_CATEGORIES.map((c) => (
+                      <SelectItem key={c.id} value={c.taux}>{c.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
