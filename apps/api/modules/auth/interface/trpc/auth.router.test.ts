@@ -66,7 +66,7 @@ describe.skipIf(!URL)("auth.router e2e (session + gardes)", () => {
   });
 
   it("updateEmail sans cookie → 401 (procédure protégée)", async () => {
-    const res = await injectTrpc(app, "POST", "auth.updateEmail", { newEmail: "x@y.fr" });
+    const res = await injectTrpc(app, "POST", "auth.updateEmail", { newEmail: "x@y.fr", currentPassword: "any" });
     expect(res.statusCode).toBe(401);
   });
 });
