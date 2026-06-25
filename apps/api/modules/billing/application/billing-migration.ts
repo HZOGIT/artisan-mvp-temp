@@ -2,6 +2,7 @@ import type { IBillingRepository } from "./billing-repository";
 import type { DbClient } from "../../../shared/db";
 import { subscriptions, billingSubscriptions } from "../../../../../drizzle/schema.pg";
 import { eq } from "drizzle-orm";
+import { planById } from "../domain/plan";
 
 export interface MigrationResult {
   readonly migrated: number;
@@ -94,6 +95,26 @@ export async function migrateSubscriptionsFromLegacy(
           { artisanId: sub.artisan_id, userId: 0 },
           cancelAt,
         );
+      }
+
+      if ((status === "active" || status === "past_due") && sub.current_period_end && sub.current_period_end > new Date()) {
+        const periodStart = sub.current_period_start ?? new Date();
+        const existing = await repo.findPendingCycleForPeriod(savedSub.id, periodStart);
+        if (!existing) {
+          const intervalDays = sub.current_period_start
+            ? Math.round((sub.current_period_end.getTime() - sub.current_period_start.getTime()) / 86_400_000)
+            : 30;
+          const interval = intervalDays >= 300 ? "yearly" : "monthly";
+          const plan = planById(planId);
+          const amountCents = plan?.amountCentsByInterval[interval] ?? 2900;
+          await repo.createCycle({
+            subscriptionId: savedSub.id,
+            periodStart,
+            periodEnd: sub.current_period_end,
+            amountCents,
+            currency: "eur",
+          });
+        }
       }
 
       await repo.appendEvent({
