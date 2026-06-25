@@ -1,7 +1,11 @@
 import v8 from "node:v8";
+import { PgBoss } from "pg-boss";
 import { buildApp } from "./app";
 import { getDbHandle } from "./shared/db/client";
 import { provisionDatabase, assertAppRoleExistsAndRestricted } from "./shared/db/provision-database";
+import { PgBossEventBus } from "./shared/queue/pg-boss-event-bus";
+import { PgBossWorkerAdapter } from "./shared/queue/pg-boss-worker-adapter";
+import { registerWorkers } from "./shared/queue/workers";
 
 async function main(): Promise<void> {
   /* Provision automatique au boot (sous verrou) : migrations schéma + RLS, rôle applicatif + droits. */
@@ -11,7 +15,20 @@ async function main(): Promise<void> {
   /* Fail-closed : refuse de servir si le pool runtime peut contourner la RLS. */
   await assertAppRoleExistsAndRestricted(getDbHandle().db);
 
-  const app = buildApp();
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) throw new Error("DATABASE_URL manquant — requis pour pg-boss");
+
+  const boss = new PgBoss({ connectionString: databaseUrl });
+  await boss.start().catch(async (err: unknown) => {
+    await boss.stop().catch(() => void 0);
+    throw new Error(`Impossible de démarrer pg-boss : ${String(err)}`);
+  });
+
+  const eventBus = new PgBossEventBus(boss);
+  registerWorkers(new PgBossWorkerAdapter(boss));
+
+  const app = buildApp({ eventBus });
+  app.addHook("onClose", async () => { await boss.stop(); });
   const port = Number(process.env.NEW_STACK_PORT ?? process.env.PORT ?? 3001);
   const host = process.env.HOST ?? "0.0.0.0";
 
