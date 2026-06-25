@@ -18,6 +18,22 @@ cd "$(dirname "$0")/.."
 COMPOSE="docker compose -f infra/docker-compose.yml --env-file .env.staging"
 NEWSTACK_URL="http://localhost:3010"
 
+echo "▶ Snapshot PostgreSQL avant déploiement…"
+BACKUP_DIR='/var/backups/pg'
+BACKUP_FILE="${BACKUP_DIR}/artisan_mvp_$(date +%Y%m%d_%H%M%S).dump"
+mkdir -p "$BACKUP_DIR"
+
+PG_CONTAINER=$($COMPOSE ps -q postgres 2>/dev/null || true)
+if [ -n "$PG_CONTAINER" ]; then
+  echo "  Sauvegarde vers $BACKUP_FILE…"
+  docker exec "$PG_CONTAINER" pg_dump -U artisan_user -Fc artisan_mvp > "$BACKUP_FILE" 2>/dev/null || echo "  [WARN] snapshot échoué — déploiement continue"
+
+  ls -t "$BACKUP_DIR"/*.dump 2>/dev/null | tail -n +6 | xargs -r rm 2>/dev/null || true
+  echo "  Snapshot OK"
+else
+  echo "  [INFO] conteneur postgres non trouvé — snapshot ignoré (première exécution ?)"
+fi
+
 echo "▶ Rebuild + recreate du conteneur new-stack (docker compose --build)…"
 $COMPOSE up -d --build new-stack
 
