@@ -51,9 +51,10 @@ export async function inviterUtilisateur(deps: UtilisateurDeps, ctx: TenantConte
 
   const subscription = await deps.subscriptionReader.getSubscription(ctx);
   const maxUsers = subscription?.maxUsers ?? 1;
-  const currentUsers = await deps.repo.list(ctx);
-  if (currentUsers.length >= maxUsers) {
-    throw new ConflictError(`Limite d'utilisateurs atteinte (${maxUsers})`);
+  const allUsers = await deps.repo.list(ctx);
+  const activeUsers = allUsers.filter((u) => u.actif).length;
+  if (activeUsers >= maxUsers) {
+    throw new ConflictError(`Limite d'utilisateurs actifs atteinte (${maxUsers})`);
   }
   const tempPassword = deps.genTempPassword();
   const passwordHash = await deps.hasher.hash(tempPassword);

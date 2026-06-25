@@ -167,4 +167,18 @@ describe("utilisateurs use-cases", () => {
     repo.setOwner(A, 100);
     await expect(inviterUtilisateur(deps, ctx(A), { email: "new@t.fr", nom: "X", role: "artisan" })).rejects.toBeInstanceOf(ConflictError);
   });
+
+  it("invite : maxUsers 5 (pro) → 5 users total mais 1 inactif → 4 actifs → invitation OK", async () => {
+    const { deps, repo, subscriptionReader } = makeDeps();
+    repo.setNomEntreprise(A, "Test");
+    subscriptionReader.seed(A, { ...blankSub(A), plan: "pro", maxUsers: 5 });
+    repo.seedUser({ id: 100, role: "artisan", artisanId: null }); /* owner */
+    repo.setOwner(A, 100);
+    for (let i = 1; i < 4; i++) {
+      repo.seedUser({ id: 100 + i, role: "technicien", artisanId: A, actif: true });
+    }
+    repo.seedUser({ id: 104, role: "technicien", artisanId: A, actif: false }); /* inactif → ne compte pas */
+    const res = await inviterUtilisateur(deps, ctx(A), { email: "new@t.fr", nom: "X", role: "artisan" });
+    expect(res.email).toBe("new@t.fr");
+  });
 });
