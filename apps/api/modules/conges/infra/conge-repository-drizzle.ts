@@ -3,7 +3,7 @@ import { conges, techniciens, soldesConges } from "../../../../../drizzle/schema
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
-import type { ICongeRepository, AjustementSolde } from "../application/conge-repository";
+import type { ICongeRepository, AjustementSolde, SoldeResult } from "../application/conge-repository";
 import type { Conge, CongeStatut, CreateCongeInput, UpdateCongeInput } from "../domain/conge";
 
 type CongeRow = typeof conges.$inferSelect;
@@ -187,6 +187,29 @@ export class CongeRepositoryDrizzle implements ICongeRepository {
         });
       }
       /** Absente + recrédit (≤0) → no-op (rien n'avait été décompté). */
+    });
+  }
+
+  getSolde(ctx: TenantContext, technicienId: number, annee: number): Promise<SoldeResult[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(soldesConges)
+        .where(
+          and(
+            eq(soldesConges.technicienId, technicienId),
+            eq(soldesConges.artisanId, ctx.artisanId),
+            eq(soldesConges.annee, annee),
+          ),
+        );
+      return rows.map((r) => ({
+        type: r.type as SoldeResult["type"],
+        annee: r.annee,
+        soldeInitial: Number(r.soldeInitial),
+        soldeRestant: Number(r.soldeRestant),
+        joursAcquis: Number(r.joursAcquis),
+        joursPris: Number(r.joursPris),
+      }));
     });
   }
 }

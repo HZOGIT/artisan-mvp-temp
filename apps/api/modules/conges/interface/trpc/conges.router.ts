@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import { router, protectedProcedure, permissionProcedure } from "../../../../interface/trpc/trpc";
 import type { ICongeRepository } from "../../application/conge-repository";
-import { listConges, listCongesEnAttente, getConge } from "../../application/read-use-cases";
+import { listConges, listCongesEnAttente, getConge, getSoldeConge } from "../../application/read-use-cases";
 import {
   creerConge,
   modifierConge,
@@ -37,6 +37,8 @@ const updateSchema = z.object({
   demiJourneeFin: z.boolean().optional(),
   motif: z.string().max(2000).nullish(),
 });
+
+const gerer = permissionProcedure("conges.gerer");
 
 /*
  * Routeur tRPC du domaine conges (RH). Transport mince : valide les inputs (zod), délègue aux
@@ -77,8 +79,8 @@ export function createCongesRouter(repo: ICongeRepository) {
         return { success: true };
       }),
 
-    /** Workflow d'approbation. ⚠️ anti self-approbation porté par le use-case (403 si self). */
-    approuver: protectedProcedure
+    /** Workflow d'approbation. ⚠️ anti self-approbation porté par le use-case (403 si self). Gate : conges.gerer. */
+    approuver: gerer
       .input(z.object({ id: z.number().int(), commentaire: z.string().max(2000).nullish() }))
       .mutation(async ({ ctx, input }) => {
         const result = await approuverConge(repo, ctx.tenant, input.id, input.commentaire);
@@ -86,7 +88,7 @@ export function createCongesRouter(repo: ICongeRepository) {
         return result;
       }),
 
-    refuser: protectedProcedure
+    refuser: gerer
       .input(z.object({ id: z.number().int(), commentaire: z.string().max(2000).nullish() }))
       .mutation(async ({ ctx, input }) => {
         const result = await refuserConge(repo, ctx.tenant, input.id, input.commentaire);
@@ -101,5 +103,11 @@ export function createCongesRouter(repo: ICongeRepository) {
         ctx.log.warn({ event: "conge_annule", congeId: input.id }, "Congé annulé");
         return result;
       }),
+
+    getSolde: protectedProcedure
+      .input(z.object({ technicienId: z.number().int(), annee: z.number().int().optional() }))
+      .query(({ ctx, input }) =>
+        getSoldeConge(repo, ctx.tenant, input.technicienId, input.annee ?? new Date().getFullYear()),
+      ),
   });
 }

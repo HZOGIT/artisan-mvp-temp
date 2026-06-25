@@ -44,6 +44,7 @@ describe.skipIf(!URL)("conges.router e2e (HTTP → tRPC → use-case → repo �
     await admin.query('delete from soldes_conges where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from techniciens where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from artisans where "userId"=$1', [uid]);
+    await admin.query('delete from permissions_utilisateur where "userId"=$1', [uid]);
     await admin.query("delete from users where id=$1", [uid]);
   };
 
@@ -64,6 +65,8 @@ describe.skipIf(!URL)("conges.router e2e (HTTP → tRPC → use-case → repo �
     artisanB = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UB])).rows[0].id;
     techA = (await admin.query('insert into techniciens ("artisanId",nom) values ($1,$2) returning id', [artisanA, "Tech A"])).rows[0].id;
     techB = (await admin.query('insert into techniciens ("artisanId",nom) values ($1,$2) returning id', [artisanB, "Tech B"])).rows[0].id;
+    /* UA peut approuver/refuser — UB n'a aucune permission (sert au test 403). */
+    await admin.query('insert into permissions_utilisateur ("userId", permission, autorise) values ($1,$2,true)', [UA, "conges.gerer"]);
     server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(app.db), congeRepo: new CongeRepositoryDrizzle(app.db) });
   });
 
@@ -196,6 +199,26 @@ describe.skipIf(!URL)("conges.router e2e (HTTP → tRPC → use-case → repo �
     expect((await callQuery(server, "conges.getById", { id }, tA)).json().result.data.statut).toBe("en_attente");
     // nettoyage : délier la fiche
     await admin.query('update techniciens set "userId"=null where id=$1', [techA]);
+  });
+
+  it("PERMISSION GATE : approuver/refuser sans conges.gerer → 403", async () => {
+    const tB = await token(UB);
+    expect((await callMutation(server, "conges.approuver", { id: 1 }, tB)).statusCode).toBe(403);
+    expect((await callMutation(server, "conges.refuser", { id: 1 }, tB)).statusCode).toBe(403);
+  });
+
+  it("getSolde : retourne les lignes soldes_conges du technicien pour l'année", async () => {
+    const tA = await token(UA);
+    await admin.query('delete from soldes_conges where "artisanId"=$1 and "technicienId"=$2', [artisanA, techA]);
+    const id = (await callMutation(server, "conges.create", { technicienId: techA, type: "conge_paye", dateDebut: "2028-01-02", dateFin: "2028-01-04" }, tA)).json().result.data.id as number;
+    await callMutation(server, "conges.approuver", { id }, tA);
+    const res = await callQuery(server, "conges.getSolde", { technicienId: techA, annee: 2028 }, tA);
+    expect(res.statusCode).toBe(200);
+    const soldes = res.json().result.data as Array<{ type: string; joursPris: number }>;
+    const cp = soldes.find((s) => s.type === "conge_paye");
+    expect(cp).toBeDefined();
+    expect(cp!.joursPris).toBe(3);
+    await admin.query('delete from soldes_conges where "artisanId"=$1 and "technicienId"=$2', [artisanA, techA]);
   });
 
   it("SOLDE e2e : approuver décompte (5 j), ré-approuver idempotent, annuler recrédite", async () => {
