@@ -18,6 +18,8 @@ export function registerStripeWebhookRoute(app: FastifyInstance, deps: StripeWeb
       const result = await processStripeWebhook({ ...deps, log: req.log as unknown as AppLogger }, { rawBody, signature });
       if (result.http >= 400) {
         req.log.error({ event: "stripe_webhook_error", status: result.http, body: result.body }, "Stripe webhook failed");
+      } else {
+        req.log.info({ event: "stripe_webhook_processed", status: result.http }, "Stripe webhook OK");
       }
       return reply.code(result.http).send(result.body);
     });
