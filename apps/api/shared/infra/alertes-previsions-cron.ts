@@ -32,7 +32,7 @@ export const alertesPrevisionsCronPlugin = fp(
           }
           const rows = await opts.db.select({ id: artisansTable.id }).from(artisansTable);
           const artisanIds = rows.map((r) => r.id);
-          const result = await runAlertesSchedulerTick(opts.repo, artisanIds);
+          const result = await runAlertesSchedulerTick(opts.repo, artisanIds, new Date(), app.log);
           app.log.info({ event: "alertes_tick_done", ...result }, "Alertes prévisions tick terminé");
         });
       },
