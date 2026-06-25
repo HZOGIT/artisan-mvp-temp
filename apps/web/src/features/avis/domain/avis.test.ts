@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { avisStatutKind, distributionPercent, nextModerationStatut, canReply, type Avis } from "./avis";
+import { avisStatutKind, distributionPercent, canReply, type Avis } from "./avis";
 
 describe("avisStatutKind", () => {
   it("publie / masque / en_attente reconnus, sinon other", () => {
@@ -16,15 +16,6 @@ describe("distributionPercent", () => {
     expect(distributionPercent(3, 12)).toBe(25);
     expect(distributionPercent(0, 0)).toBe(0);
     expect(distributionPercent(5, 0)).toBe(0);
-  });
-});
-
-describe("nextModerationStatut", () => {
-  it("toggle publié → masqué, sinon → publié", () => {
-    expect(nextModerationStatut("publie")).toBe("masque");
-    expect(nextModerationStatut("masque")).toBe("publie");
-    expect(nextModerationStatut("en_attente")).toBe("publie");
-    expect(nextModerationStatut(null)).toBe("publie");
   });
 });
 

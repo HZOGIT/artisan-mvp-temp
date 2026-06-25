@@ -13,7 +13,7 @@ import { getInfoDemandeAvis, soumettreAvisPublic, type AvisPublicDeps } from "..
 const idInput = z.object({ id: z.number().int() });
 /** Parité legacy avisRouter : input.avisId pour repondre/moderer. */
 const repondreSchema = z.object({ avisId: z.number().int(), reponse: z.string().min(1).max(5000) });
-const modererSchema = z.object({ avisId: z.number().int(), statut: z.enum(["publie", "masque"]) });
+const modererSchema = z.object({ avisId: z.number().int(), statut: z.enum(["publie"]) });
 
 /*
  * Routeur tRPC du domaine avis. Transport mince : valide les inputs (zod), délègue aux
@@ -46,8 +46,7 @@ export function createAvisRouter(repo: IAvisRepository, demandeDeps: DemandeAvis
       .input(modererSchema)
       .mutation(async ({ ctx, input }) => {
         const result = await changerStatutAvis(repo, ctx.tenant, input.avisId, input.statut);
-        const level = input.statut === "masque" ? "warn" : "info";
-        ctx.log[level]({ event: "avis_modere", avisId: input.avisId, statut: input.statut }, `Avis ${input.statut}`);
+        ctx.log.info({ event: "avis_modere", avisId: input.avisId, statut: input.statut }, `Avis ${input.statut}`);
         return result;
       }),
 

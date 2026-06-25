@@ -9,7 +9,7 @@ import type { Avis, StatutAvis } from "../domain/avis";
  * (ne révèle pas l'existence cross-tenant). Modération limitée au tenant propriétaire.
  */
 
-const STATUTS_VALIDES: readonly StatutAvis[] = ["en_attente", "publie", "masque"];
+const STATUTS_VALIDES: readonly StatutAvis[] = ["publie"];
 
 /** Réponse publique de l'artisan à un avis. Réponse vide refusée (ValidationError). */
 export async function repondreAvis(
@@ -25,13 +25,14 @@ export async function repondreAvis(
   return updated;
 }
 
-/** Modération : changement de statut (en_attente / publie / masque). */
+/** Modération : publication d'un avis uniquement. Le masquage est interdit — un avis masqué ne comptait plus dans la note publique, permettant à l'artisan de gonfler son évaluation (décret 2017-1436). */
 export async function changerStatutAvis(
   repo: IAvisRepository,
   ctx: TenantContext,
   id: number,
   statut: StatutAvis,
 ): Promise<Avis> {
+  if (statut === "masque") throw new ValidationError("Masquage d'avis non autorisé");
   if (!STATUTS_VALIDES.includes(statut)) throw new ValidationError("Statut invalide");
   const updated = await repo.changerStatut(ctx, id, statut);
   if (!updated) throw new NotFoundError("Avis introuvable");

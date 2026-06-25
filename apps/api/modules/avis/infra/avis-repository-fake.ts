@@ -89,14 +89,14 @@ export class FakeAvisRepository implements IAvisRepository {
   }
 
   async getStats(ctx: TenantContext): Promise<AvisStats> {
-    const publies = this.store.filter((a) => a.artisanId === ctx.artisanId && a.statut === "publie");
+    const comptes = this.store.filter((a) => a.artisanId === ctx.artisanId && a.statut !== "en_attente");
     const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } as AvisStats["distribution"];
     let somme = 0;
-    for (const a of publies) {
+    for (const a of comptes) {
       if (a.note >= 1 && a.note <= 5) (distribution as Record<number, number>)[a.note] += 1;
       somme += a.note;
     }
-    const total = publies.length;
+    const total = comptes.length;
     const moyenne = total > 0 ? Math.round((somme / total) * 10) / 10 : 0;
     return { moyenne, total, distribution };
   }

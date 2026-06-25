@@ -20,11 +20,6 @@ export function distributionPercent(count: number, total: number): number {
   return total ? (count / total) * 100 : 0;
 }
 
-/** Statut de modération suivant (toggle publié <-> masqué). PUR. */
-export function nextModerationStatut(statut: string | null): "publie" | "masque" {
-  return statut === "publie" ? "masque" : "publie";
-}
-
 /** Un avis peut-il encore recevoir une réponse de l'artisan ? PUR. */
 export function canReply(avis: Pick<Avis, "reponseArtisan">): boolean {
   return !avis.reponseArtisan;

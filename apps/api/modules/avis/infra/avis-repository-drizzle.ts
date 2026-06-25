@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, ne, sql } from "drizzle-orm";
 import { avisClients, clients, interventions } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
@@ -89,12 +89,13 @@ export class AvisRepositoryDrizzle implements IAvisRepository {
     return withTenant(this.db, ctx, async (tx) => {
       /*
        * Agrégats scopés tenant : moyenne, total, distribution des notes 1..5.
-       * Seuls les avis publiés comptent dans les statistiques publiques.
+       * Tous les avis soumis (publie + masque) sont comptés — exclure les masqués permettrait
+       * de gonfler la note publique en cachant des avis négatifs (décret 2017-1436).
        */
       const rows = await tx
         .select({ note: avisClients.note, count: sql<number>`count(*)::int` })
         .from(avisClients)
-        .where(and(eq(avisClients.artisanId, ctx.artisanId), eq(avisClients.statut, "publie")))
+        .where(and(eq(avisClients.artisanId, ctx.artisanId), ne(avisClients.statut, "en_attente")))
         .groupBy(avisClients.note);
 
       const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } as { 1: number; 2: number; 3: number; 4: number; 5: number };
