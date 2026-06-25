@@ -39,10 +39,10 @@ describe.skipIf(!URL)("subscription.router e2e (billing protégé)", () => {
 
   it("toutes les procédures sans cookie → 401 (billing protégé)", async () => {
     expect((await injectTrpc(app, "GET", "subscription.getCurrent", undefined)).statusCode).toBe(401);
-    expect((await injectTrpc(app, "POST", "subscription.createCheckout", { plan: "pro", interval: "month", extraUsers: 0 })).statusCode).toBe(401);
-    expect((await injectTrpc(app, "POST", "subscription.createPortal", {})).statusCode).toBe(401);
-    expect((await injectTrpc(app, "POST", "subscription.cancel", {})).statusCode).toBe(401);
-    expect((await injectTrpc(app, "POST", "subscription.reactivate", {})).statusCode).toBe(401);
+    expect((await injectTrpc(app, "POST", "billing.createSetupIntent", {})).statusCode).toBe(401);
+    expect((await injectTrpc(app, "POST", "billing.cancelAtPeriodEnd", {})).statusCode).toBe(401);
+    expect((await injectTrpc(app, "POST", "billing.reactivate", {})).statusCode).toBe(401);
+    expect((await injectTrpc(app, "GET", "billing.getBillingInfo", undefined)).statusCode).toBe(401);
   });
 
   it("getCurrent (cookie) → 200, état par défaut (aucun abonnement → plan trial/trialing)", async () => {

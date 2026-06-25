@@ -240,8 +240,8 @@ describe.skipIf(!URL)("billing.router e2e (billing maison protégé)", () => {
     /* Assure une sub active sans cancel_at */
     await admin.query(
       `insert into billing_subscriptions (artisan_id, plan_id, billing_mode, status, current_period_end)
-       values ($1,'starter','maison','active','2026-08-01')
-       on conflict (artisan_id) do update set status='active', cancel_at=null, plan_id='starter'`,
+       values ($1,'starter','maison','past_due','2026-08-01')
+       on conflict (artisan_id) do update set status='past_due', cancel_at=null, plan_id='starter'`,
       [ARTISAN_ID],
     );
 
@@ -264,8 +264,8 @@ describe.skipIf(!URL)("billing.router e2e (billing maison protégé)", () => {
     const tok = await jwt(UID);
     await admin.query(
       `insert into billing_subscriptions (artisan_id, plan_id, billing_mode, status)
-       values ($1,'starter','maison','active')
-       on conflict (artisan_id) do update set status='active', plan_id='starter'`,
+       values ($1,'starter','maison','trialing')
+       on conflict (artisan_id) do update set status='trialing', plan_id='starter'`,
       [ARTISAN_ID],
     );
 

@@ -38,7 +38,7 @@ describe.skipIf(!URL)("RapportRepositoryDrizzle (PG, RLS + scope tenant + execut
     await admin.query('insert into artisans (id, "userId") values ($1,$2)', [A, UA]);
     await admin.query('insert into artisans (id, "userId") values ($1,$2)', [B, UB]);
     clientA = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [A, "Client A"])).rows[0].id;
-    await admin.query('insert into factures ("artisanId","clientId",numero,statut,"totalTTC") values ($1,$2,$3,$4,$5)', [A, clientA, "RAP-A1", "payee", "400.00"]);
+    await admin.query('insert into factures ("artisanId","clientId",numero,statut,"totalHT") values ($1,$2,$3,$4,$5)', [A, clientA, "RAP-A1", "payee", "400.00"]);
     await admin.query('insert into factures ("artisanId","clientId",numero,statut,"totalTTC") values ($1,$2,$3,$4,$5)', [A, clientA, "RAP-A2", "envoyee", "100.00"]);
   });
 

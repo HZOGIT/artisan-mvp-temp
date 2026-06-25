@@ -488,7 +488,11 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
       .where(eq(billingPaymentMethods.artisan_id, artisanId))
       .orderBy(desc(billingPaymentMethods.created_at))
       .limit(1);
-    return pm?.cid ?? null;
+    if (pm?.cid) return pm.cid;
+    const legacy = await this.db.execute(
+      sql`SELECT stripe_customer_id FROM subscriptions WHERE artisan_id = ${artisanId} AND stripe_customer_id IS NOT NULL LIMIT 1`,
+    );
+    return (legacy.rows[0]?.stripe_customer_id as string | undefined) ?? null;
   }
 
   async saveStripeCustomerId(_artisanId: number, _stripeCustomerId: string): Promise<void> {

@@ -289,6 +289,7 @@ describe.skipIf(!URL)("BillingRepositoryDrizzle (PG, scope explicite artisan_id)
 
     const found = await repo.findPendingCycle(sub.id);
     expect(found?.id).toBe(cycle.id);
+    await admin.query("update billing_cycles set status='paid' where id=$1", [cycle.id]);
   });
 
   it("findPendingCycle : plusieurs cycles pending → retourne le plus récent (orderBy period_start DESC)", async () => {
@@ -321,6 +322,7 @@ describe.skipIf(!URL)("BillingRepositoryDrizzle (PG, scope explicite artisan_id)
     const found = await repo.findPendingCycle(sub.id);
     expect(found?.id).toBe(newer.id);
     expect(found?.id).not.toBe(older.id);
+    await admin.query("update billing_cycles set status='paid' where id in ($1,$2)", [older.id, newer.id]);
   });
 
   it("findPendingCycle : null si aucun cycle pending (status paid)", async () => {
@@ -659,7 +661,7 @@ describe.skipIf(!URL)("BillingRepositoryDrizzle (PG, scope explicite artisan_id)
   it("FIX-CDR — findNonTerminalCycle : retourne null si seul cycle est paid", async () => {
     const sub = await repo.saveSubscription({
       artisanId: B, planId: "starter", billingMode: "maison",
-      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      status: "past_due", currentPeriodStart: null, currentPeriodEnd: null,
       trialEndsAt: null, paymentMethodId: null,
     });
     const cycle = await repo.createCycle({

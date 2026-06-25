@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { billingSubscriptions } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
@@ -25,7 +25,30 @@ function toSubscriptionRow(r: BillingSub): SubscriptionRow {
   };
 }
 
-/** Lit depuis `billing_subscriptions` (billing maison). HORS RLS → scope explicite par `artisan_id`. */
+type LegacyRow = {
+  id: number; artisan_id: number; plan: string; status: string;
+  trial_ends_at: Date | null; current_period_start: Date | null; current_period_end: Date | null;
+  cancel_at_period_end: boolean; max_users: number; max_devices_per_user: number; max_concurrent_sessions: number;
+};
+
+function toLegacySubscriptionRow(r: LegacyRow): SubscriptionRow {
+  const toDate = (v: unknown) => (v ? new Date(v as string) : null);
+  return {
+    id: r.id as unknown as number,
+    artisanId: r.artisan_id as unknown as number,
+    plan: r.plan as unknown as string,
+    status: r.status as unknown as string,
+    trialEndsAt: toDate(r.trial_ends_at),
+    currentPeriodStart: toDate(r.current_period_start),
+    currentPeriodEnd: toDate(r.current_period_end),
+    cancelAtPeriodEnd: Boolean(r.cancel_at_period_end),
+    maxUsers: Number(r.max_users) || 1,
+    maxDevicesPerUser: Number(r.max_devices_per_user) || 3,
+    maxConcurrentSessions: Number(r.max_concurrent_sessions) || 2,
+  };
+}
+
+/** Lit depuis `billing_subscriptions` (billing maison), avec fallback sur `subscriptions` (legacy). HORS RLS → scope explicite par `artisan_id`. */
 export class SubscriptionReaderDrizzle implements ISubscriptionReader {
   constructor(private readonly db: DbClient) {}
 
@@ -35,6 +58,11 @@ export class SubscriptionReaderDrizzle implements ISubscriptionReader {
       .from(billingSubscriptions)
       .where(eq(billingSubscriptions.artisan_id, ctx.artisanId))
       .limit(1);
-    return row ? toSubscriptionRow(row) : null;
+    if (row) return toSubscriptionRow(row);
+    const legacy = await this.db.execute(
+      sql`SELECT id, artisan_id, plan, status, trial_ends_at, current_period_start, current_period_end, cancel_at_period_end, max_users, max_devices_per_user, max_concurrent_sessions FROM subscriptions WHERE artisan_id = ${ctx.artisanId} LIMIT 1`,
+    );
+    if (!legacy.rows[0]) return null;
+    return toLegacySubscriptionRow(legacy.rows[0] as LegacyRow);
   }
 }
