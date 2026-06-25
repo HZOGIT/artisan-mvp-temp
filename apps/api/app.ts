@@ -388,8 +388,16 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   app.register(cookie);
   app.register(fastifySchedule);
+  /*
+   * Origines CORS autorisées : CORS_ORIGIN (liste séparée par virgules) sinon APP_URL. Plusieurs
+   * fronts cross-origin partagent le backend (app artisan + SPA admin) → on parse en tableau.
+   */
+  const corsOriginEnv = process.env.CORS_ORIGIN ?? process.env.APP_URL;
+  const corsOrigins = corsOriginEnv
+    ? corsOriginEnv.split(",").map((o) => o.trim()).filter(Boolean)
+    : false;
   app.register(cors, {
-    origin: process.env.CORS_ORIGIN ?? process.env.APP_URL ?? false,
+    origin: corsOrigins,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   });
