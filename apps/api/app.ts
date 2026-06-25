@@ -1014,6 +1014,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       await billingRepo.updateSubscriptionStatus(ctx, status);
     },
     markWebhookProcessed: (eventId, eventType) => billingRepo.markWebhookProcessed(eventId, eventType, {}),
+    genererEcrituresFacture: async (artisanId: number, factureId: number) => {
+      await compta.genererEcrituresVente({ artisanId, userId: 0 }, factureId);
+      await compta.genererEcrituresEncaissement({ artisanId, userId: 0 }, factureId);
+    },
   });
 
   /** Scheduler billing maison — `POST /internal/billing/tick` sécurisé par x-scheduler-secret. */

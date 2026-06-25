@@ -76,6 +76,31 @@ describe("processStripeWebhook (fail-closed)", () => {
     expect(notifier.notifs[0]).toMatchObject({ artisanId: 7, type: "succes", titre: "Paiement reçu" });
   });
 
+  it("OPE-245 — checkout.session.completed : genererEcrituresFacture appelé avec (artisanId, factureId)", async () => {
+    const { deps, paymentWriter } = build();
+    paymentWriter.seed("tok_compta", { paiementId: 11, factureId: 55, artisanId: 9 });
+    const calls: Array<{ artisanId: number; factureId: number }> = [];
+    const event = { id: "evt_compta", type: "checkout.session.completed", data: { object: { id: "cs_compta", payment_intent: "pi_compta", metadata: { token_paiement: "tok_compta", facture_id: "55" } } } };
+    const r = await processStripeWebhook(
+      { ...deps, genererEcrituresFacture: async (artisanId, factureId) => { calls.push({ artisanId, factureId }); } },
+      { rawBody: raw(event), signature: SIG },
+    );
+    expect(r.http).toBe(200);
+    expect(calls).toEqual([{ artisanId: 9, factureId: 55 }]);
+  });
+
+  it("OPE-245 — checkout.session.completed : erreur genererEcrituresFacture → 200 (best-effort, paiement non annulé)", async () => {
+    const { deps, paymentWriter } = build();
+    paymentWriter.seed("tok_compta_err", { paiementId: 12, factureId: 56, artisanId: 10 });
+    const event = { id: "evt_compta_err", type: "checkout.session.completed", data: { object: { id: "cs_err", payment_intent: "pi_err", metadata: { token_paiement: "tok_compta_err", facture_id: "56" } } } };
+    const r = await processStripeWebhook(
+      { ...deps, genererEcrituresFacture: async () => { throw new Error("compta DB error"); } },
+      { rawBody: raw(event), signature: SIG },
+    );
+    expect(r.http).toBe(200);
+    expect(paymentWriter.completed).toHaveLength(1);
+  });
+
   it("checkout.session.completed : metadata incomplet (pas de token) → skip", async () => {
     const { deps, paymentWriter } = build();
     const event = { id: "evt_8", type: "checkout.session.completed", data: { object: { id: "cs_2", metadata: { facture_id: "42" } } } };

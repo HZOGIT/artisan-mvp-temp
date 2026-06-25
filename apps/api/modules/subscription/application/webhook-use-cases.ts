@@ -23,6 +23,11 @@ export interface StripeWebhookDeps {
    * Non fourni = pas de dédup (mode test, hors-billing).
    */
   readonly markWebhookProcessed?: (eventId: string, eventType: string) => Promise<boolean>;
+  /**
+   * Génère les écritures vente + encaissement après paiement portail.
+   * Best-effort : une erreur compta ne doit pas annuler le paiement déjà confirmé.
+   */
+  readonly genererEcrituresFacture?: (artisanId: number, factureId: number) => Promise<void>;
 }
 
 export interface WebhookResult {
@@ -107,6 +112,7 @@ async function handleCheckoutCompleted(deps: StripeWebhookDeps, session: Record<
     factureId: resolved.factureId,
     stripePaymentIntentId: session.payment_intent ? String(session.payment_intent) : "",
   });
+  await deps.genererEcrituresFacture?.(resolved.artisanId, resolved.factureId).catch(() => {});
   deps.log?.info({ event: "stripe_checkout_completed", artisanId: resolved.artisanId, factureId: resolved.factureId }, `Paiement portail complété (artisan ${resolved.artisanId})`);
   try {
     await deps.notifier.notifyArtisan(resolved.artisanId, {
