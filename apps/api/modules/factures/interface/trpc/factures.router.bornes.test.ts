@@ -35,11 +35,15 @@ function callQuery(app: ReturnType<typeof buildApp>, path: string, input: unknow
   return injectTrpc(app, "GET", path, input, tok);
 }
 
+const UC = 9894303;
+
 describe.skipIf(!URL)("factures.router e2e — bornes & invariants transport", () => {
   const admin = new Pool({ connectionString: URL });
   const app = createDbClient(APP_URL!);
   let artisanA = 0;
+  let artisanC = 0;
   let clientA = 0;
+  let clientC = 0;
   let server: ReturnType<typeof buildApp>;
 
   const purge = async (uid: number) => {
@@ -52,18 +56,20 @@ describe.skipIf(!URL)("factures.router e2e — bornes & invariants transport", (
   };
 
   beforeAll(async () => {
-    for (const uid of [UA, UB]) {
+    for (const uid of [UA, UB, UC]) {
       await purge(uid);
       await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [uid, `u${uid}@t.fr`]);
     }
     artisanA = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UA])).rows[0].id;
+    artisanC = (await admin.query('insert into artisans ("userId","franchiseTVA") values ($1,true) returning id', [UC])).rows[0].id;
     clientA = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [artisanA, "Client A"])).rows[0].id;
+    clientC = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [artisanC, "Client C"])).rows[0].id;
     server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(app.db), factureRepo: new FactureRepositoryDrizzle(app.db), compta: new NoopComptaPort() });
   });
 
   afterAll(async () => {
     await server.close();
-    for (const uid of [UA, UB]) await purge(uid);
+    for (const uid of [UA, UB, UC]) await purge(uid);
     await app.close();
     await admin.end();
   });
@@ -159,5 +165,20 @@ describe.skipIf(!URL)("factures.router e2e — bornes & invariants transport", (
     expect((await callMutation(server, "factures.deleteLigne", { id: 999999999, factureId: id1 }, tA)).statusCode).toBe(404);
     await callMutation(server, "factures.deleteLigne", { id: l1, factureId: id1 }, tA);
     expect((await callQuery(server, "factures.getById", { id: id1 }, tA)).json().result.data.totalTTC).toBe("0.00");
+  });
+
+  it("franchise TVA — addLigne sans tvaCategorieId → FR_FRANCHISE (0%) ; avec tvaCategorieId → respecté", async () => {
+    const tC = await token(UC);
+    const facId = (await callMutation(server, "factures.create", { clientId: clientC }, tC)).json().result.data.id as number;
+    const l = (await callMutation(server, "factures.addLigne", { factureId: facId, designation: "Pose", prixUnitaireHT: "100.00" }, tC)).json().result.data as { tvaCategorieId: string; tauxTVA: string; montantTVA: string };
+    expect(l.tvaCategorieId).toBe("FR_FRANCHISE");
+    expect(l.tauxTVA).toBe("0.00");
+    expect(l.montantTVA).toBe("0.00");
+    const detail = (await callQuery(server, "factures.getById", { id: facId }, tC)).json().result.data as { totalTVA: string; totalTTC: string; totalHT: string };
+    expect(detail.totalTVA).toBe("0.00");
+    expect(detail.totalTTC).toBe("100.00");
+    const l2 = (await callMutation(server, "factures.addLigne", { factureId: facId, designation: "Matériaux", prixUnitaireHT: "50.00", tvaCategorieId: "FR_10" }, tC)).json().result.data as { tvaCategorieId: string; tauxTVA: string };
+    expect(l2.tvaCategorieId).toBe("FR_10");
+    expect(l2.tauxTVA).toBe("10.00");
   });
 });

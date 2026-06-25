@@ -48,12 +48,12 @@ describe.skipIf(!URL)("DrizzleTenantResolver — OWNER ∪ COLLABORATEUR (OPE-26
 
   it("OWNER → tenant de son artisan + rôle", async () => {
     const ctx = await resolver.resolve({ userId: OWNER_A });
-    expect(ctx).toEqual({ artisanId: A, userId: OWNER_A, role: "artisan", isOwner: true });
+    expect(ctx).toEqual({ artisanId: A, userId: OWNER_A, role: "artisan", isOwner: true, franchiseTVA: false });
   });
 
   it("COLLABORATEUR (users.artisanId, pas de ligne artisans) → tenant rattaché + rôle (régression OPE-264)", async () => {
     const ctx = await resolver.resolve({ userId: COLLAB_A });
-    expect(ctx).toEqual({ artisanId: A, userId: COLLAB_A, role: "secretaire", isOwner: false });
+    expect(ctx).toEqual({ artisanId: A, userId: COLLAB_A, role: "secretaire", isOwner: false, franchiseTVA: false });
   });
 
   it("isolation : le collaborateur de A n'est JAMAIS résolu vers le tenant B", async () => {
