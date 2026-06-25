@@ -20,6 +20,7 @@ function toLigne(r: LigneRow): ModeleDevisLigne {
     unite: r.unite ?? "unité",
     prixUnitaireHT: r.prixUnitaireHT ?? "0.00",
     tauxTVA: r.tauxTVA ?? "20.00",
+    tvaCategorieId: r.tvaCategorieId ?? null,
     ordre: r.ordre ?? 1,
   };
 }
@@ -49,6 +50,7 @@ function ligneValues(modeleId: number, l: CreateModeleDevisLigneInput) {
     unite: l.unite ?? undefined,
     prixUnitaireHT: l.prixUnitaireHT ?? undefined,
     tauxTVA: l.tauxTVA ?? undefined,
+    tvaCategorieId: l.tvaCategorieId ?? null,
     ordre: l.ordre ?? undefined,
   };
 }

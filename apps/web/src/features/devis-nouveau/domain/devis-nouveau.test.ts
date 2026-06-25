@@ -28,6 +28,6 @@ describe("devis-nouveau — domain pur", () => {
   });
   it("buildAddLignePayload / buildModeleLignePayload", () => {
     expect(buildAddLignePayload(7, ligne({ description: "L", quantite: 3, prixUnitaireHT: 10, tvaCategorieId: "FR_20" }))).toEqual({ devisId: 7, designation: "L", quantite: "3", prixUnitaireHT: "10", tvaCategorieId: "FR_20" });
-    expect(buildModeleLignePayload(5, ligne({ description: "L", quantite: 3, prixUnitaireHT: 10, tvaCategorieId: "FR_20", unite: "u" }))).toEqual({ modeleId: 5, designation: "L", quantite: 3, prixUnitaireHT: 10, tauxTVA: 20, unite: "u" });
+    expect(buildModeleLignePayload(5, ligne({ description: "L", quantite: 3, prixUnitaireHT: 10, tvaCategorieId: "FR_20", unite: "u" }))).toEqual({ modeleId: 5, designation: "L", quantite: 3, prixUnitaireHT: 10, tauxTVA: 20, tvaCategorieId: "FR_20", unite: "u" });
   });
 });

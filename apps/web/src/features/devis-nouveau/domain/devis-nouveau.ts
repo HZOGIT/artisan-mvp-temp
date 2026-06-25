@@ -92,5 +92,5 @@ export function buildAddLignePayload(devisId: number, ligne: LigneDevis): AddLig
 
 export function buildModeleLignePayload(modeleId: number, ligne: LigneDevis): AddLigneModeleInput {
   const taux = parseFloat(TVA_CATEGORIES_MAP[ligne.tvaCategorieId]?.taux ?? "20") || 20;
-  return { modeleId, designation: ligne.description, quantite: ligne.quantite, prixUnitaireHT: ligne.prixUnitaireHT, tauxTVA: taux, unite: ligne.unite || "unité" };
+  return { modeleId, designation: ligne.description, quantite: ligne.quantite, prixUnitaireHT: ligne.prixUnitaireHT, tauxTVA: taux, tvaCategorieId: ligne.tvaCategorieId, unite: ligne.unite || "unité" };
 }

@@ -197,6 +197,13 @@
       "when": 1782392626907,
       "tag": "0027_geo-cnil-backfill-expires-at",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1782402062633,
+      "tag": "0028_opposite_luckman",
+      "breakpoints": true
     }
   ]
 }

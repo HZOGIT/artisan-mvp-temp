@@ -667,11 +667,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   });
   const contratsMaintenance = createContratsMaintenanceModule({
     repository: deps.contratRepo ?? new ContratRepositoryDrizzle(getDbHandle().db),
-    /*
-     * generateFacture : réutilise le domaine factures (numéro serveur + totaux dérivés), facture émise
-     * SANS écritures FEC (parité legacy). Partage l'instance `factureRepo` du module factures.
-     */
     factureGenerator: new FacturesContratFactureGenerator(factureRepo),
+    artisanRepo: deps.artisanRepo ?? new ArtisanRepositoryDrizzle(getDbHandle().db),
   });
   const demandeContactRepo = deps.demandeContactRepo ?? new DemandeContactRepositoryDrizzle(getDbHandle().db);
   const demandesContact = createDemandesContactModule({ repository: demandeContactRepo });

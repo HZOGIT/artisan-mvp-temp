@@ -5,6 +5,7 @@ const voir = permissionProcedure("contrats.voir");
 const gerer = permissionProcedure("contrats.gerer");
 import type { IContratRepository } from "../../application/contrat-repository";
 import type { ContratFactureGenerator } from "../../application/contrat-facture-generator";
+import type { IArtisanRepository } from "../../../artisan/application/artisan-repository";
 import { listContrats, getContrat } from "../../application/read-use-cases";
 import { creerContrat, modifierContrat, supprimerContrat } from "../../application/write-use-cases";
 import { suspendreContrat, reactiverContrat, terminerContrat, annulerContrat } from "../../application/transition-use-cases";
@@ -63,7 +64,7 @@ const updateSchema = z.object({
  * laisse remonter les Domain errors (NotFound→404, Validation→400, Conflict→409). ⚠️ Les transitions
  * de statut (suspendre/reactiver/terminer/annuler) seront exposées en 7/9. Repo injecté.
  */
-export function createContratsMaintenanceRouter(repo: IContratRepository, factureGen: ContratFactureGenerator) {
+export function createContratsMaintenanceRouter(repo: IContratRepository, factureGen: ContratFactureGenerator, artisanRepo?: IArtisanRepository) {
   return router({
     list: voir.query(({ ctx }) => listContrats(repo, ctx.tenant)),
 
@@ -134,7 +135,7 @@ export function createContratsMaintenanceRouter(repo: IContratRepository, factur
     generateFacture: gerer
       .input(z.object({ contratId: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await genererFactureContrat(repo, factureGen, ctx.tenant, input.contratId);
+        const result = await genererFactureContrat(repo, factureGen, ctx.tenant, input.contratId, () => new Date(), artisanRepo);
         ctx.log.info({ event: "contrat_facture_generee", contratId: input.contratId, factureId: result.id }, "Facture contrat maintenance générée");
         return result;
       }),

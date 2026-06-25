@@ -22,6 +22,7 @@ export interface ModeleDevisLigne {
   readonly unite: string;
   readonly prixUnitaireHT: string;
   readonly tauxTVA: string;
+  readonly tvaCategorieId: string | null;
   readonly ordre: number;
 }
 
@@ -49,6 +50,7 @@ export interface CreateModeleDevisLigneInput {
   readonly unite?: string;
   readonly prixUnitaireHT?: string;
   readonly tauxTVA?: string;
+  readonly tvaCategorieId?: string | null;
   readonly ordre?: number;
 }
 
