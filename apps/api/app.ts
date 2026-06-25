@@ -155,6 +155,10 @@ import fastifySchedule from "@fastify/schedule";
 import { billingCronPlugin } from "./shared/infra/billing-cron";
 import { geoPurgeCronPlugin } from "./shared/infra/geo-purge-cron";
 import { rgpdCronPlugin } from "./shared/infra/rgpd-cron";
+import { notificationsCronPlugin } from "./shared/infra/notifications-cron";
+import { genererRappelsFacturesEnRetard } from "./modules/notifications/application/derived-use-cases";
+import { genererAlertesStock } from "./modules/stocks/application/alertes-use-cases";
+import { artisans as artisansTable } from "../../drizzle/schema.pg";
 import { ensureStripeWebhookEndpoint } from "./shared/infra/stripe-webhook-setup";
 import { WebhookPaymentWriterDrizzle } from "./modules/subscription/infra/webhook-payment-writer-drizzle";
 import { SubscriptionEventNotifierDrizzle } from "./modules/subscription/infra/subscription-event-notifier-drizzle";
@@ -998,6 +1002,34 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   /** Cron RGPD Art. 17 — purge définitive des comptes en attente de suppression depuis > 30j. */
   app.register(rgpdCronPlugin, { db: getDbHandle().db });
+
+  /*
+   * Cron notifications — tick toutes les heures : rappels factures en retard (idempotent)
+   * + alertes stock bas (best-effort). Itère sur tous les artisans (table hors RLS).
+   */
+  app.register(notificationsCronPlugin, {
+    db: getDbHandle().db,
+    deps: {
+      generateOverdueReminders: async () => {
+        const rows = await getDbHandle().db.select({ id: artisansTable.id }).from(artisansTable);
+        let rappelsCreated = 0;
+        for (const { id: artisanId } of rows) {
+          const r = await genererRappelsFacturesEnRetard(notificationRepo, { artisanId, userId: 0 }).catch(() => ({ rappelsCreated: 0 }));
+          rappelsCreated += r.rappelsCreated;
+        }
+        return { rappelsCreated };
+      },
+      generateAlerts: async () => {
+        const rows = await getDbHandle().db.select({ id: artisansTable.id }).from(artisansTable);
+        let alertsCreated = 0;
+        for (const { id: artisanId } of rows) {
+          const r = await genererAlertesStock(stockRepo, notificationRepo, { artisanId, userId: 0 }).catch(() => ({ alertsCreated: 0 }));
+          alertsCreated += r.alertsCreated;
+        }
+        return { alertsCreated };
+      },
+    },
+  });
 
   /** Upload/suppression du logo artisan `/api/upload-logo` (auth cookie JWT). Stocké en data-URL base64. */
   registerUploadLogoRoute(app, {

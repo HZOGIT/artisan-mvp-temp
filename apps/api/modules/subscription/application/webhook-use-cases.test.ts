@@ -66,13 +66,14 @@ describe("processStripeWebhook (fail-closed)", () => {
     expect(notifier.notifs).toHaveLength(0);
   });
 
-  it("checkout.session.completed : paiement résolu par token → completeCheckout", async () => {
-    const { deps, paymentWriter } = build();
+  it("checkout.session.completed : paiement résolu par token → completeCheckout + notif succes", async () => {
+    const { deps, paymentWriter, notifier } = build();
     paymentWriter.seed("tok_pay", { paiementId: 5, factureId: 42, artisanId: 7 });
     const event = { id: "evt_7", type: "checkout.session.completed", data: { object: { id: "cs_1", payment_intent: "pi_1", metadata: { token_paiement: "tok_pay", facture_id: "42" } } } };
     const r = await processStripeWebhook(deps, { rawBody: raw(event), signature: SIG });
     expect(r.http).toBe(200);
     expect(paymentWriter.completed).toEqual([{ artisanId: 7, paiementId: 5, factureId: 42, stripePaymentIntentId: "pi_1" }]);
+    expect(notifier.notifs[0]).toMatchObject({ artisanId: 7, type: "succes", titre: "Paiement reçu" });
   });
 
   it("checkout.session.completed : metadata incomplet (pas de token) → skip", async () => {
