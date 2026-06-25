@@ -10,6 +10,7 @@ import {
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
+import { round2 } from "../../../shared/money";
 import type { ICommandeRepository, ReceptionLigne } from "../application/commande-repository";
 import type {
   Commande,
@@ -67,7 +68,7 @@ function toLigne(r: LigneRow): LigneCommande {
 
 /*
  * Totaux calculés CÔTÉ SERVEUR (jamais fournis par le client). Parité legacy :
- * ligneHT = quantite × prixUnitaire ; ligneTVA = ligneHT × tauxTVA/100 ; totaux = Σ.
+ * ligneHT = quantite × prixUnitaire ; ligneTVA = round2(ligneHT × tauxTVA/100) ; totaux = Σ.
  */
 function calculerTotaux(lignes: readonly CreateLigneInput[]): {
   totalHT: number;
@@ -80,12 +81,12 @@ function calculerTotaux(lignes: readonly CreateLigneInput[]): {
   const lignesHT: number[] = [];
   for (const l of lignes) {
     const ligneHT = Number(l.quantite) * Number(l.prixUnitaire ?? 0);
-    const ligneTVA = ligneHT * (Number(l.tauxTVA ?? "20") / 100);
+    const ligneTVA = round2(ligneHT * (Number(l.tauxTVA ?? "20") / 100));
     lignesHT.push(ligneHT);
     totalHT += ligneHT;
     totalTVA += ligneTVA;
   }
-  return { totalHT, totalTVA, totalTTC: totalHT + totalTVA, lignesHT };
+  return { totalHT: round2(totalHT), totalTVA: round2(totalTVA), totalTTC: round2(totalHT + totalTVA), lignesHT };
 }
 
 /*
