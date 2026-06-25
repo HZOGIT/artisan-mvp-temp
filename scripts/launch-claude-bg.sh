@@ -7,46 +7,66 @@
 #   ./scripts/launch-claude-bg.sh <session-name> [model] [--worktree]
 #
 #   <session-name>  screen session + Claude --remote-control name (required)
-#   [model]         Claude model id (default: claude-sonnet-4-6)
+#   [model]         haiku | sonnet (default) | opus  — or a full model ID
 #   [--worktree]    create an isolated git worktree at /tmp/wt-<name> on branch
-#                   feat/<name>; appends scripts/prompts/_worktree-footer.md to
-#                   the init prompt; the reviewer session merges and cleans up.
+#                   feat/<name>; appends the worktree PR protocol to the prompt;
+#                   the reviewer session merges and cleans up.
 #
-# Env:
-#   INIT_PROMPT     path to a file whose contents are sent as the initial prompt
-#                   (optional; plain interactive session if unset)
+# Env (mutually exclusive — pick one):
+#   LINEAR_ISSUE=OPE-XXX   task plan lives in a Linear comment; bootstrap prompt
+#                           is generated inline (no .md file needed).
+#   INIT_PROMPT=<path>     path to a .md file (for infra sessions: reviewer, etc.)
+#
+# Model aliases:
+#   haiku   → claude-haiku-4-5-20251001   (simple fixes, research, formatting)
+#   sonnet  → claude-sonnet-4-6           (default — most tasks)
+#   opus    → claude-opus-4-8             (reviewer, complex architecture)
 #
 # Examples:
-#   ./scripts/launch-claude-bg.sh project-manager
-#   ./scripts/launch-claude-bg.sh reviewer claude-opus-4-8
-#   INIT_PROMPT=./scripts/prompts/pm.md ./scripts/launch-claude-bg.sh pm
-#   INIT_PROMPT=./scripts/prompts/fix-bug.md ./scripts/launch-claude-bg.sh fix-bug --worktree
-#   INIT_PROMPT=./scripts/prompts/fix-bug.md ./scripts/launch-claude-bg.sh fix-bug opus --worktree
+#   # Task driven by a Linear issue (plan in a comment on OPE-487):
+#   LINEAR_ISSUE=OPE-487 ./scripts/launch-claude-bg.sh fix-pdf haiku
+#   LINEAR_ISSUE=OPE-540 ./scripts/launch-claude-bg.sh impl-tva sonnet --worktree
+#
+#   # Infrastructure session (reviewer — plan in a local file):
+#   INIT_PROMPT=./scripts/prompts/reviewer-agent.md \
+#     ./scripts/launch-claude-bg.sh reviewer opus
 #
 set -euo pipefail
 
 MAIN_REPO="/home/developer/artisan-mvp-temp"
 CLAUDE_BIN="$(command -v claude || echo "$HOME/.local/bin/claude")"
-DEFAULT_MODEL="claude-sonnet-4-6"
 
 SESSION_NAME="${1:-}"
 shift || true
 
-# Parse remaining positional + flag args: [model] [--worktree] (order-independent).
-MODEL="$DEFAULT_MODEL"
+# Parse remaining args: [model] [--worktree] (order-independent).
+RAW_MODEL="sonnet"
 USE_WORKTREE=false
 for arg in "$@"; do
   case "$arg" in
     --worktree) USE_WORKTREE=true ;;
-    *) MODEL="$arg" ;;
+    *) RAW_MODEL="$arg" ;;
   esac
 done
+
+# Resolve model aliases.
+case "$RAW_MODEL" in
+  haiku)  MODEL="claude-haiku-4-5-20251001" ;;
+  sonnet) MODEL="claude-sonnet-4-6" ;;
+  opus)   MODEL="claude-opus-4-8" ;;
+  *)      MODEL="$RAW_MODEL" ;;
+esac
 
 WORKDIR="$MAIN_REPO"
 
 if [[ -z "$SESSION_NAME" ]]; then
   echo "ERROR: session name required." >&2
-  echo "Usage: $0 <session-name> [model] [--worktree]" >&2
+  echo "Usage: $0 <session-name> [haiku|sonnet|opus] [--worktree]" >&2
+  exit 1
+fi
+
+if [[ -n "${LINEAR_ISSUE:-}" && -n "${INIT_PROMPT:-}" ]]; then
+  echo "ERROR: LINEAR_ISSUE and INIT_PROMPT are mutually exclusive." >&2
   exit 1
 fi
 
@@ -67,9 +87,7 @@ if screen -ls 2>/dev/null | grep -qE "[0-9]+\.${SESSION_NAME}[[:space:]]"; then
 fi
 
 # --- Worktree setup ----------------------------------------------------------
-WORKTREE_PATH=""
 if $USE_WORKTREE; then
-  BRANCH="feat/${SESSION_NAME}"
   WORKTREE_PATH="/tmp/wt-${SESSION_NAME}"
 
   if [[ -d "$WORKTREE_PATH" ]]; then
@@ -78,8 +96,8 @@ if $USE_WORKTREE; then
     exit 1
   fi
 
-  echo "Creating worktree at ${WORKTREE_PATH} on branch ${BRANCH}..."
-  git -C "$MAIN_REPO" worktree add "$WORKTREE_PATH" -b "$BRANCH" \
+  echo "Creating worktree at ${WORKTREE_PATH} on branch feat/${SESSION_NAME}..."
+  git -C "$MAIN_REPO" worktree add "$WORKTREE_PATH" -b "feat/${SESSION_NAME}" \
     || { echo "ERROR: git worktree add failed." >&2; exit 1; }
 
   WORKDIR="$WORKTREE_PATH"
@@ -88,7 +106,18 @@ fi
 # --- Build init prompt -------------------------------------------------------
 export CLAUDE_INIT_PROMPT=""
 
-if [[ -n "${INIT_PROMPT:-}" ]]; then
+if [[ -n "${LINEAR_ISSUE:-}" ]]; then
+  # Bootstrap inline — no .md file. The session reads its full plan from Linear.
+  CLAUDE_INIT_PROMPT="Tu es l'agent **${SESSION_NAME}** sur le projet Operioz (repo : ${MAIN_REPO}, branche staging).
+
+Ton plan détaillé se trouve dans les commentaires de l'issue Linear **${LINEAR_ISSUE}**.
+Commence par le lire :
+  mcp__plugin_linear_linear__get_issue({ id: \"${LINEAR_ISSUE}\" })
+  mcp__plugin_linear_linear__list_comments({ issueId: \"${LINEAR_ISSUE}\" })
+
+Exécute le plan dans l'ordre indiqué dans le commentaire. Si plusieurs commentaires existent, le plan est dans le plus récent marqué comme plan / instructions."
+
+elif [[ -n "${INIT_PROMPT:-}" ]]; then
   if [[ ! -f "$INIT_PROMPT" ]]; then
     echo "ERROR: INIT_PROMPT file not found: $INIT_PROMPT" >&2
     exit 1
@@ -96,11 +125,11 @@ if [[ -n "${INIT_PROMPT:-}" ]]; then
   CLAUDE_INIT_PROMPT="$(cat "$INIT_PROMPT")"
 fi
 
+# Append worktree PR protocol (file-based — infrastructure, not task-specific).
 if $USE_WORKTREE; then
   FOOTER_FILE="$MAIN_REPO/scripts/prompts/_worktree-footer.md"
   if [[ -f "$FOOTER_FILE" ]]; then
     FOOTER="$(cat "$FOOTER_FILE")"
-    # Inject runtime values the footer references.
     FOOTER="${FOOTER//__SESSION_NAME__/$SESSION_NAME}"
     FOOTER="${FOOTER//__MAIN_REPO__/$MAIN_REPO}"
     FOOTER="${FOOTER//__BRANCH__/feat\/$SESSION_NAME}"
@@ -114,7 +143,7 @@ ${FOOTER}"
       CLAUDE_INIT_PROMPT="$FOOTER"
     fi
   else
-    echo "WARN: _worktree-footer.md not found at $FOOTER_FILE — no PR protocol injected." >&2
+    echo "WARN: _worktree-footer.md not found — no PR protocol injected." >&2
   fi
 fi
 
@@ -125,9 +154,9 @@ CMD=("$CLAUDE_BIN" --model "$MODEL" --permission-mode auto \
 QUOTED_CMD=$(printf '%q ' "${CMD[@]}")
 
 if $USE_WORKTREE; then
-  echo "Launching Claude session '${SESSION_NAME}' (model: ${MODEL}) in worktree ${WORKTREE_PATH}..."
+  echo "Launching '${SESSION_NAME}' (${RAW_MODEL} → ${MODEL}) in worktree /tmp/wt-${SESSION_NAME}..."
 else
-  echo "Launching Claude session '${SESSION_NAME}' (model: ${MODEL}) in ${WORKDIR}..."
+  echo "Launching '${SESSION_NAME}' (${RAW_MODEL} → ${MODEL}) in ${WORKDIR}..."
 fi
 
 if [[ -n "$CLAUDE_INIT_PROMPT" ]]; then
@@ -143,13 +172,12 @@ if screen -ls 2>/dev/null | grep -qE "[0-9]+\.${SESSION_NAME}[[:space:]]"; then
   echo "Detach:  Ctrl-a d"
   echo "Kill:    screen -S ${SESSION_NAME} -X quit"
   if $USE_WORKTREE; then
-    echo "Worktree:  $WORKTREE_PATH  (branch: feat/${SESSION_NAME})"
-    echo "Cleanup:   git -C '$MAIN_REPO' worktree remove '$WORKTREE_PATH' --force"
+    echo "Worktree: /tmp/wt-${SESSION_NAME}  (branch: feat/${SESSION_NAME})"
   fi
 else
   echo "ERROR: session '${SESSION_NAME}' failed to start." >&2
-  if $USE_WORKTREE && [[ -d "$WORKTREE_PATH" ]]; then
-    git -C "$MAIN_REPO" worktree remove "$WORKTREE_PATH" --force 2>/dev/null || true
+  if $USE_WORKTREE && [[ -d "/tmp/wt-${SESSION_NAME}" ]]; then
+    git -C "$MAIN_REPO" worktree remove "/tmp/wt-${SESSION_NAME}" --force 2>/dev/null || true
   fi
   exit 1
 fi

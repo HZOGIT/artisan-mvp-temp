@@ -6,38 +6,59 @@ Instructions et conventions pour les agents Claude Code travaillant sur ce proje
 
 Voir le skill → `.claude/skills/launch-agent.md`
 
-```bash
-# Session classique (commit direct sur staging)
-INIT_PROMPT=./scripts/prompts/<prompt>.md ./scripts/launch-claude-bg.sh <nom> [model]
+**Principe** : le plan détaillé d'une tâche vit dans un **commentaire Linear** (pas dans un fichier
+`.md` commité). Le script génère un bootstrap prompt qui dit à la session d'aller le lire.
+Les fichiers `.md` dans `scripts/prompts/` sont réservés aux sessions **infrastructure** (reviewer,
+worktree-footer) dont les instructions sont permanentes, pas task-specific.
 
-# Session worktree isolée (branche + PR → reviewer merge)
-INIT_PROMPT=./scripts/prompts/<prompt>.md ./scripts/launch-claude-bg.sh <nom> [model] --worktree
+```bash
+# Tâche pilotée par une issue Linear (plan dans un commentaire sur OPE-XXX) :
+LINEAR_ISSUE=OPE-487 ./scripts/launch-claude-bg.sh fix-pdf haiku
+LINEAR_ISSUE=OPE-540 ./scripts/launch-claude-bg.sh impl-tva sonnet --worktree
+
+# Session infrastructure (reviewer — instructions permanentes dans un fichier) :
+INIT_PROMPT=./scripts/prompts/reviewer-agent.md ./scripts/launch-claude-bg.sh reviewer opus
 ```
+
+### Modèles — guide de choix
+
+| Alias | Modèle | Quand l'utiliser |
+|---|---|---|
+| `haiku` | claude-haiku-4-5-20251001 | Fix simple, recherche web, formatage, audit lecture seule |
+| `sonnet` | claude-sonnet-4-6 | **Défaut** — implémentation, refacto, tests |
+| `opus` | claude-opus-4-8 | Reviewer, architecture complexe, décisions critiques |
+
+### Workflow par tâche (Linear → session)
+
+1. Créer ou identifier l'issue Linear (ex. OPE-487)
+2. Poster le plan détaillé en **commentaire** sur l'issue (instructions, fichiers à modifier, critères de done)
+3. Lancer la session : `LINEAR_ISSUE=OPE-487 ./scripts/launch-claude-bg.sh <nom> <modèle> [--worktree]`
+4. La session lit son plan depuis Linear et l'exécute
 
 ### Mode worktree + reviewer (recommandé pour les nouvelles features / fixes non urgents)
 
 `--worktree` crée automatiquement un `git worktree` isolé à `/tmp/wt-<nom>` sur la branche
 `feat/<nom>`, et injecte `scripts/prompts/_worktree-footer.md` dans le prompt. Ce footer
-impose au agent de : committer sur sa branche → `gh pr create --base staging` → notifier
+impose à l'agent de : committer sur sa branche → `gh pr create --base staging` → notifier
 le reviewer via `notify.sh reviewer PR_READY`.
 
 **Session reviewer** — persistante, lancée une seule fois :
 ```bash
-INIT_PROMPT=./scripts/prompts/reviewer-agent.md ./scripts/launch-claude-bg.sh reviewer claude-opus-4-8
+INIT_PROMPT=./scripts/prompts/reviewer-agent.md ./scripts/launch-claude-bg.sh reviewer opus
 ```
 Au démarrage, le reviewer crée un `CronCreate(*/5 * * * *)` pour se réveiller automatiquement.
 À chaque tick il : liste les PRs ouvertes → checkout → `pnpm check` + lint → décide :
 - **Corrections requises** : commente la PR sur GitHub + `notify.sh <session> REVIEW_FEEDBACK "message"`
   (injecté dans le terminal de la session comme si l'humain tapait).
-- **PR approuvée** : `gh pr merge --squash` → cleanup du worktree → `deploy-backend.sh` si
-  backend touché → `ntfy-pub.sh human`.
+- **PR approuvée** : `gh pr merge --squash` → kill screen worker + cleanup worktree →
+  `deploy-backend.sh` si backend touché → mise à jour Linear (Done + lien PR) → `ntfy-pub.sh human`.
 
 **Règle** : le reviewer ne merge jamais si `pnpm check` échoue ou si lint retourne des `error`.
 Après 3 rounds de corrections sans avancée → `notify.sh human BLOCKED`.
 
-**Types de messages bus ajoutés** :
+**Types de messages bus** :
 - `PR_READY` — envoyé par la session worker quand la PR est prête
-- `REVIEW_FEEDBACK` — envoyé par le reviewer vers la session worker pour demander des corrections
+- `REVIEW_FEEDBACK` — envoyé par le reviewer vers la session worker (demande de corrections)
 
 ## Structure du projet
 
