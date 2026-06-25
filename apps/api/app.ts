@@ -1125,6 +1125,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
     registry: agentRegistry,
     rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
+    checkSubscriptionActive: async (artisanId: number) => {
+      const sub = await billingRepo.findSubscription({ artisanId, userId: 0 });
+      return sub?.status === "active" || sub?.status === "trialing";
+    },
   });
 
   /** Token éphémère Gemini Live `POST /api/voice/token` — auth cookie, déclare les mêmes outils que le registry agentique. */
@@ -1138,6 +1142,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     threadsRepo: new AssistantThreadsRepositoryDrizzle(getDbHandle().db),
     tools: agentRegistry.tools,
     rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
+    checkSubscriptionActive: async (artisanId: number) => {
+      const sub = await billingRepo.findSubscription({ artisanId, userId: 0 });
+      return sub?.status === "active" || sub?.status === "trialing";
+    },
   });
 
   /** PDF bon de commande fournisseur `/api/commandes-fournisseurs/:id/pdf` (auth cookie, jsPDF). */
@@ -1243,6 +1251,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
     threadsRepo: new AssistantThreadsRepositoryDrizzle(getDbHandle().db),
     threadWriter: new AssistantThreadWriterDrizzle(getDbHandle().db),
+    checkSubscriptionActive: async (artisanId: number) => {
+      const sub = await billingRepo.findSubscription({ artisanId, userId: 0 });
+      return sub?.status === "active" || sub?.status === "trialing";
+    },
   });
 
   /** Expose le routeur racine assemblé (introspection : garde-fou de cohérence des domaines montés). */

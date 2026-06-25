@@ -3,7 +3,9 @@ import type { VoicePersistDeps } from "../../modules/assistant/application/voice
 import { persistVoiceTranscript } from "../../modules/assistant/application/voice-use-cases";
 import { authArtisanFromCookie, type CookieAuthDeps } from "./cookie-auth";
 
-export interface VoiceRouteDeps extends CookieAuthDeps, VoicePersistDeps {}
+export interface VoiceRouteDeps extends CookieAuthDeps, VoicePersistDeps {
+  readonly checkSubscriptionActive: (artisanId: number) => Promise<boolean>;
+}
 
 /*
  * Route HORS-tRPC `POST /api/voice/persist` (auth cookie JWT) : persiste les transcripts d'une session
@@ -14,6 +16,7 @@ export function registerVoiceRoute(app: FastifyInstance, deps: VoiceRouteDeps): 
     const auth = await authArtisanFromCookie(req, deps);
     if (auth.status === "unauthenticated") return reply.code(401).send({ error: "Non autorisé" });
     if (auth.status === "no-artisan") return reply.code(404).send({ error: "Artisan non trouvé" });
+    if (!(await deps.checkSubscriptionActive(auth.artisanId))) return reply.code(402).send({ error: "Abonnement requis" });
 
     const body = (req.body ?? {}) as { threadId?: unknown; userTranscript?: unknown; assistantTranscript?: unknown; usageMetadata?: unknown };
     const input = {
