@@ -14,7 +14,7 @@ export type Devis = RouterOutputs["devis"]["list"][number];
  * Le backend type `generateDevis.lignes` et `suggestRelances` en `unknown` → on déclare la forme connue
  * ici et l'application caste à la frontière (assertion typée, pas de `any`).
  */
-export type DevisLigne = { designation: string; quantite: number; unite: string; prixUnitaireHT: number; tauxTVA: number };
+export type DevisLigne = { designation: string; quantite: number; unite: string; prixUnitaireHT: number; tauxTVA: number; tvaCategorieId?: string | null };
 export type RelanceItem = { numero: string; objet?: string | null; email?: { sujet: string; corps: string } | null };
 export type Relances = RelanceItem[] | { suggestions: string } | string;
 
@@ -79,7 +79,7 @@ export function buildDevisMarkdown(description: string, lignes: readonly DevisLi
   let content = `**Devis suggéré pour : ${description}**\n\n`;
   content += `| Désignation | Qté | Unité | Prix HT | TVA |\n|---|---|---|---|---|\n`;
   for (const l of lignes) {
-    content += `| ${l.designation} | ${l.quantite} | ${l.unite} | ${l.prixUnitaireHT.toFixed(2)} | ${l.tauxTVA}% |\n`;
+    content += `| ${l.designation} | ${l.quantite} | ${l.unite} | ${l.prixUnitaireHT.toFixed(2)} | ${l.tauxTVA}%${l.tvaCategorieId ? ` (${l.tvaCategorieId})` : ""} |\n`;
   }
   const total = lignes.reduce((s, l) => s + l.quantite * l.prixUnitaireHT, 0);
   content += `\n**Total HT : ${total.toFixed(2)} EUR**`;

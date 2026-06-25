@@ -75,6 +75,7 @@ export interface DevisAnalyseLigne {
   readonly unite: string;
   readonly prixUnitaireHT: string;
   readonly tauxTVA: string;
+  readonly tvaCategorieId?: string | null;
 }
 export interface DevisAnalyseData {
   readonly numero: string;
