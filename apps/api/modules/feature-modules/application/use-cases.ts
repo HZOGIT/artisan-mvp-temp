@@ -1,6 +1,7 @@
 import { ForbiddenError, NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
-import { enrichirModules, isPlanInsuffisant } from "../domain/plan";
+import type { ISubscriptionReader } from "../../subscription/application/subscription-reader";
+import { enrichirModules, isPlanInsuffisant, resolveGatingPlan } from "../domain/plan";
 import type { ModuleAvecEtat, OnboardingStatus } from "../domain/module";
 import type { IModulesRepository } from "./modules-repository";
 
@@ -9,18 +10,17 @@ const DEFAULT_ONBOARDING: OnboardingStatus = { onboardingCompleted: true, metier
 
 export interface CompleteOnboardingInput {
   readonly metier?: string;
-  readonly plan?: string;
   readonly moduleSlugs?: readonly string[];
 }
 
 /** Catalogue enrichi de l'état du tenant (actif/locked), trié par ordre du catalogue. */
-export async function listModules(repo: IModulesRepository, ctx: TenantContext): Promise<ModuleAvecEtat[]> {
-  const [catalogue, slugsActifs, status] = await Promise.all([
+export async function listModules(repo: IModulesRepository, subscriptionReader: ISubscriptionReader, ctx: TenantContext): Promise<ModuleAvecEtat[]> {
+  const [catalogue, slugsActifs, sub] = await Promise.all([
     repo.listCatalogue(),
     repo.getSlugsActifs(ctx),
-    repo.getOnboardingStatus(ctx),
+    subscriptionReader.getSubscription(ctx),
   ]);
-  return enrichirModules(catalogue, slugsActifs, status?.plan ?? "essentiel");
+  return enrichirModules(catalogue, slugsActifs, resolveGatingPlan(sub));
 }
 
 export function getMine(repo: IModulesRepository, ctx: TenantContext): Promise<string[]> {
@@ -32,15 +32,15 @@ export async function getOnboardingStatus(repo: IModulesRepository, ctx: TenantC
 }
 
 /*
- * Active/désactive un module : module connu (sinon 404), et activation interdite si le plan du tenant
- * est insuffisant (403 — parité legacy « Passez au plan supérieur »).
+ * Active/désactive un module : module connu (sinon 404), et activation interdite si le plan réel du tenant
+ * (billing_subscriptions) est insuffisant (403 — parité legacy « Passez au plan supérieur »).
  */
-export async function toggleModule(repo: IModulesRepository, ctx: TenantContext, slug: string, actif: boolean): Promise<{ success: true }> {
+export async function toggleModule(repo: IModulesRepository, subscriptionReader: ISubscriptionReader, ctx: TenantContext, slug: string, actif: boolean): Promise<{ success: true }> {
   const module = await repo.getBySlug(slug);
   if (!module) throw new NotFoundError("Module inconnu");
   if (actif) {
-    const status = await repo.getOnboardingStatus(ctx);
-    if (isPlanInsuffisant(module.planMinimum, status?.plan)) {
+    const sub = await subscriptionReader.getSubscription(ctx);
+    if (isPlanInsuffisant(module.planMinimum, resolveGatingPlan(sub))) {
       throw new ForbiddenError("Passez au plan supérieur pour activer ce module");
     }
   }
@@ -49,15 +49,16 @@ export async function toggleModule(repo: IModulesRepository, ctx: TenantContext,
 }
 
 /*
- * Termine l'onboarding : enregistre completed/metier/plan, puis applique la sélection de modules
- * (chaque module accessible au plan est activé/désactivé selon `moduleSlugs`) ou les défauts.
+ * Termine l'onboarding : enregistre completed/metier, puis applique la sélection de modules selon
+ * le plan RÉEL de l'abonnement (billing_subscriptions). `input.plan` est ignoré — le client ne peut
+ * pas auto-déclarer son plan de gating.
  */
-export async function completeOnboarding(repo: IModulesRepository, ctx: TenantContext, input: CompleteOnboardingInput): Promise<{ success: true }> {
-  await repo.updateOnboarding(ctx, { onboardingCompleted: true, metier: input.metier, plan: input.plan });
+export async function completeOnboarding(repo: IModulesRepository, subscriptionReader: ISubscriptionReader, ctx: TenantContext, input: CompleteOnboardingInput): Promise<{ success: true }> {
+  await repo.updateOnboarding(ctx, { onboardingCompleted: true, metier: input.metier });
   if (input.moduleSlugs) {
     const wanted = new Set(input.moduleSlugs);
-    const catalogue = await repo.listCatalogue();
-    const planArtisan = input.plan ?? "essentiel";
+    const [catalogue, sub] = await Promise.all([repo.listCatalogue(), subscriptionReader.getSubscription(ctx)]);
+    const planArtisan = resolveGatingPlan(sub);
     for (const m of catalogue) {
       if (isPlanInsuffisant(m.planMinimum, planArtisan)) continue;
       await repo.setModule(ctx, m.slug, wanted.has(m.slug));

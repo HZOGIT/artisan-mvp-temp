@@ -681,6 +681,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   });
   const modules = createFeatureModulesModule({
     repository: deps.modulesRepo ?? new ModulesRepositoryDrizzle(getDbHandle().db),
+    subscriptionReader: deps.subscriptionRepo ?? new SubscriptionReaderDrizzle(getDbHandle().db),
   });
   const statistiques = createStatistiquesModule({
     devisStatsReader: deps.devisStatsReader ?? new DevisStatsReaderDrizzle(getDbHandle().db),

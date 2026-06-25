@@ -1,7 +1,24 @@
 import type { ModuleAvecEtat, ModuleCatalogue } from "./module";
+import type { SubscriptionRow } from "../../subscription/domain/subscription";
 
 /** Hiérarchie des plans (parité legacy). Un module exige un plan ≥ son `planMinimum`. */
 const PLAN_ORDER: Record<string, number> = { essentiel: 0, pro: 1, entreprise: 2 };
+
+/**
+ * Résout le plan de gating depuis l'abonnement réel (source de vérité = billing_subscriptions).
+ * Trial actif → accès entreprise complet ; pas d'abonnement ou trial expiré → essentiel.
+ */
+export function resolveGatingPlan(sub: SubscriptionRow | null, now: Date = new Date()): string {
+  if (!sub) return "essentiel";
+  if (sub.status === "trialing" && sub.trialEndsAt !== null && sub.trialEndsAt > now) {
+    return "entreprise";
+  }
+  switch (sub.plan) {
+    case "enterprise": return "entreprise";
+    case "pro": return "pro";
+    default: return "essentiel";
+  }
+}
 
 /** Le plan de l'artisan est-il INSUFFISANT pour ce module ? (plan inconnu → traité comme « essentiel »). */
 export function isPlanInsuffisant(planModule: string, planArtisan: string | null | undefined): boolean {
