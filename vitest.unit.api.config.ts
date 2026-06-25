@@ -20,5 +20,6 @@ export default defineConfig({
       "apps/api/**/interface/**/*.test.ts",
     ],
     setupFiles: ["./vitest.setup.api.ts"],
+    reporter: ["dot"],
   },
 });

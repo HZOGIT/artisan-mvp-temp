@@ -15,5 +15,10 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["apps/web/src/**/*.test.ts", "apps/web/src/**/*.test.tsx"],
+    pool: "threads",
+    poolOptions: {
+      threads: { minThreads: 1, maxThreads: "75%" },
+    },
+    reporter: ["dot"],
   },
 });
