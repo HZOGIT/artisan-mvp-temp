@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance, type FastifyError } from "fastify";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import { randomUUID } from "node:crypto";
+import { sql } from "drizzle-orm";
 import { buildFastifyLoggerConfig } from "./shared/ports/logger-fastify";
 import { fastifyTRPCPlugin } from "@trpc/server/adapters/fastify";
 import { createAppRouter } from "./interface/trpc/router";
@@ -423,7 +424,15 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     void reply.code(status).send({ error: error.message ?? "Erreur serveur" });
   });
 
-  app.get("/health", () => ({ status: "ok" }));
+  app.get("/health", async (req, reply) => {
+    try {
+      await getDbHandle().db.execute(sql`SELECT 1`);
+      return { status: "ok" as const };
+    } catch (err: unknown) {
+      reply.code(503);
+      return { status: "database_down" as const, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
 
   const vehiculeRepo = deps.vehiculeRepo ?? new VehiculeRepositoryDrizzle(getDbHandle().db);
   const avis = createAvisModule({
