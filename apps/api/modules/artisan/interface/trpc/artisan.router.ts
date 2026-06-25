@@ -2,6 +2,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IArtisanRepository } from "../../application/artisan-repository";
 import { getProfile, updateProfile } from "../../application/use-cases";
+import { isValidSiret } from "../../../../../../packages/contract/validation";
 
 const specialiteEnum = z.enum(["plomberie", "electricite", "chauffage", "multi-services"]);
 const formeJuridiqueEnum = z.enum(["EI", "micro", "EURL", "SARL", "SAS", "SASU", "SA", "autre"]);
@@ -11,7 +12,7 @@ const formeJuridiqueEnum = z.enum(["EI", "micro", "EURL", "SARL", "SAS", "SASU",
  * data-URI base64 (vecteur volumineux) borné à ~3 Mo. IBAN/slug/metier traités au use-case.
  */
 const updateSchema = z.object({
-  siret: z.string().max(20).optional(),
+  siret: z.string().regex(/^\d{14}$/, "SIRET invalide (14 chiffres requis)").refine(isValidSiret, "SIRET invalide (clé de contrôle incorrecte)").optional().or(z.literal("")),
   nomEntreprise: z.string().max(200).optional(),
   adresse: z.string().max(300).optional(),
   codePostal: z.string().max(10).optional(),

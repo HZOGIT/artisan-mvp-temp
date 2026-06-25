@@ -189,7 +189,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
     envoyer: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await changerStatutFacture(repo, ctx.tenant, input.id, "envoyee", compta);
+        const result = await changerStatutFacture(repo, ctx.tenant, input.id, "envoyee", compta, mailing.artisanReader);
         ctx.log.info({ event: "facture_envoyee", factureId: input.id }, "Facture envoyée au client");
         return result;
       }),

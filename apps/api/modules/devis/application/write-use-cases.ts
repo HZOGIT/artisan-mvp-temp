@@ -1,5 +1,6 @@
 import { ConflictError, NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
+import type { ArtisanReader } from "../../../shared/readers/contact-readers";
 import type { IDevisRepository } from "./devis-repository";
 import type {
   Devis,
@@ -128,12 +129,17 @@ export async function changerStatutDevis(
   ctx: TenantContext,
   id: number,
   cible: DevisStatut,
+  artisanReader?: ArtisanReader,
 ): Promise<Devis> {
   const devis = await getDevisOwned(repo, ctx, id);
   /** idempotent */
   if (devis.statut === cible) return devis;
   if (!TRANSITIONS[devis.statut].includes(cible)) {
     throw new ConflictError(`Transition de statut invalide : ${devis.statut} → ${cible}`);
+  }
+  if (cible === "envoye" && artisanReader) {
+    const artisan = await artisanReader.getArtisan(ctx);
+    if (!artisan?.siret) throw new ValidationError("Le SIRET de l'artisan est requis pour envoyer un devis");
   }
   const updated = await repo.setStatut(ctx, id, cible);
   if (!updated) throw new NotFoundError("Devis introuvable");

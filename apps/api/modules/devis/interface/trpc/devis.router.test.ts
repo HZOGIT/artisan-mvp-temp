@@ -55,8 +55,8 @@ describe.skipIf(!URL)("devis.router e2e (HTTP → tRPC → use-case → repo →
       await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [uid, `u${uid}@t.fr`]);
       for (const __p of ["devis.creer", "factures.creer"]) await admin.query('insert into permissions_utilisateur ("userId", permission, autorise) values ($1,$2,true)', [uid, __p]);
     }
-    artisanA = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UA])).rows[0].id;
-    artisanB = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UB])).rows[0].id;
+    artisanA = (await admin.query('insert into artisans ("userId",siret) values ($1,$2) returning id', [UA, "73282932000074"])).rows[0].id;
+    artisanB = (await admin.query('insert into artisans ("userId",siret) values ($1,$2) returning id', [UB, "73282932000074"])).rows[0].id;
     clientA = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [artisanA, "Client A"])).rows[0].id;
     clientB = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [artisanB, "Client B"])).rows[0].id;
     server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(app.db), devisRepo: new DevisRepositoryDrizzle(app.db) });

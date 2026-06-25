@@ -5,6 +5,7 @@ import type { IFactureRepository, AvoirLigneData, CopiedLigneData } from "./fact
 import type { IDevisReader } from "./devis-reader";
 import type { ComptaPort } from "./compta-port";
 import { NOOP_COMPTA } from "./compta-port";
+import type { ArtisanReader } from "./contact-readers";
 import { calculerMontantsAvoirLigne } from "./montants";
 import type {
   Facture,
@@ -378,12 +379,17 @@ export async function changerStatutFacture(
   id: number,
   cible: FactureStatut,
   compta: ComptaPort = NOOP_COMPTA,
+  artisanReader?: ArtisanReader,
 ): Promise<Facture> {
   const facture = await getFactureOwned(repo, ctx, id);
   /** idempotent */
   if (facture.statut === cible) return facture;
   if (!TRANSITIONS[facture.statut].includes(cible)) {
     throw new ConflictError(`Transition de statut invalide : ${facture.statut} → ${cible}`);
+  }
+  if (cible === "envoyee" && artisanReader) {
+    const artisan = await artisanReader.getArtisan(ctx);
+    if (!artisan?.siret) throw new ValidationError("Le SIRET de l'artisan est requis pour émettre une facture");
   }
   const updated = await repo.setStatut(ctx, id, cible);
   if (!updated) throw new NotFoundError("Facture introuvable");

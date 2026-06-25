@@ -60,4 +60,18 @@ describe.skipIf(!URL)("artisan.router e2e (profil protégé)", () => {
     expect((await injectTrpc(app, "POST", "artisan.updateProfile", { email: "pas-un-email" }, tok)).statusCode).toBe(400);
     expect((await injectTrpc(app, "POST", "artisan.updateProfile", { specialite: "astronaute" }, tok)).statusCode).toBe(400);
   });
+
+  it("validation : siret invalide (format / clé de contrôle) → 400 ; siret vide ou valide → 200", async () => {
+    const tok = await jwt(UID);
+    // 14 chiffres mais clé de contrôle incorrecte
+    expect((await injectTrpc(app, "POST", "artisan.updateProfile", { siret: "11111111111111" }, tok)).statusCode).toBe(400);
+    // trop court
+    expect((await injectTrpc(app, "POST", "artisan.updateProfile", { siret: "1234" }, tok)).statusCode).toBe(400);
+    // 15 chiffres
+    expect((await injectTrpc(app, "POST", "artisan.updateProfile", { siret: "123456789012345" }, tok)).statusCode).toBe(400);
+    // vider le siret → accepté
+    expect((await injectTrpc(app, "POST", "artisan.updateProfile", { siret: "" }, tok)).statusCode).toBe(200);
+    // SIRET valide (Luhn OK) → accepté
+    expect((await injectTrpc(app, "POST", "artisan.updateProfile", { siret: "73282932000074" }, tok)).statusCode).toBe(200);
+  });
 });
