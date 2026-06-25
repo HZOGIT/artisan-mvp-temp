@@ -46,8 +46,7 @@ export function createAvisRouter(repo: IAvisRepository, demandeDeps: DemandeAvis
       .input(modererSchema)
       .mutation(async ({ ctx, input }) => {
         const result = await changerStatutAvis(repo, ctx.tenant, input.avisId, input.statut);
-        const level = input.statut === "masque" ? "warn" : "info";
-        ctx.log[level]({ event: "avis_modere", avisId: input.avisId, statut: input.statut }, `Avis ${input.statut}`);
+        ctx.log.info({ event: "avis_modere", avisId: input.avisId, statut: input.statut }, `Avis ${input.statut}`);
         return result;
       }),
 

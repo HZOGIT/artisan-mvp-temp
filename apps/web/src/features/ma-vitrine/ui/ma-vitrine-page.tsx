@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { Globe, ExternalLink, Copy, Save, Star, MessageSquare, Eye, EyeOff, Send, Link2 } from "lucide-react";
+import { Globe, ExternalLink, Copy, Save, Star, MessageSquare, Eye, Send, Link2 } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -190,11 +190,7 @@ export default function MaVitrinePage() {
                         {!a.reponseArtisan && (
                           <Button variant="outline" size="sm" onClick={() => setRepondreAvisId(a.id)}><MessageSquare className="h-4 w-4 mr-1" />{t("repondre")}</Button>
                         )}
-                        {statut === "publie" ? (
-                          <Button variant="outline" size="sm" onClick={() => moderer.mutate({ avisId: a.id, statut: "masque" }, { onSuccess: () => toast.success(t("toastModere")), onError: (e) => toast.error(e.message) })}>
-                            <EyeOff className="h-4 w-4 mr-1" />{t("masquer")}
-                          </Button>
-                        ) : (
+                        {statut !== "publie" && (
                           <Button variant="outline" size="sm" onClick={() => moderer.mutate({ avisId: a.id, statut: "publie" }, { onSuccess: () => toast.success(t("toastModere")), onError: (e) => toast.error(e.message) })}>
                             <Eye className="h-4 w-4 mr-1" />{t("publier")}
                           </Button>

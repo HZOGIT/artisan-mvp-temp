@@ -40,13 +40,13 @@ describe("avis — use-cases écriture (repo mocké)", () => {
     expect(r.statut).toBe("publie");
   });
 
-  it("changerStatutAvis avec statut invalide → ValidationError", async () => {
+  it("changerStatutAvis avec statut invalide ou non autorisé → ValidationError", async () => {
     // @ts-expect-error statut hors union testé au runtime
     await expect(changerStatutAvis(repo, A, avisA, "supprime")).rejects.toBeInstanceOf(ValidationError);
+    await expect(changerStatutAvis(repo, A, avisA, "en_attente")).rejects.toBeInstanceOf(ValidationError);
   });
 
   it("changerStatutAvis avec statut masque → ValidationError (masquage interdit)", async () => {
-    // @ts-expect-error masque retiré de l'API — toujours dans le type mais rejeté au runtime
     await expect(changerStatutAvis(repo, A, avisA, "masque")).rejects.toBeInstanceOf(ValidationError);
     expect((await repo.getById(A, avisA))?.statut).toBe("en_attente");
   });
