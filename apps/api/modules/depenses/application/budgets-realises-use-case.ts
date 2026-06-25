@@ -4,6 +4,7 @@ import type { ICategorieDepenseRepository } from "../../categories-depenses/appl
 import type { IBudgetCategorieRepository } from "../../budgets-categories/application/budget-categorie-repository";
 import { listCategories } from "../../categories-depenses/application/read-use-cases";
 import { budgetsParMois } from "../../budgets-categories/application/read-use-cases";
+import { round2 } from "../../../shared/money";
 
 /*
  * Vue « budgets réalisés » d'un mois (parité legacy `trpc.depenses.getBudgets`). Montants en NUMBER
@@ -46,7 +47,7 @@ export async function budgetsRealises(
       icone: c.icone,
       budget,
       reel,
-      ecart: budget - reel,
+      ecart: round2(budget - reel),
       pct: budget > 0 ? Math.round((reel / budget) * 100) : 0,
     };
   });

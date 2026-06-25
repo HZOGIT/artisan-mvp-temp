@@ -1,3 +1,5 @@
+import { round2 } from "../../../shared/money";
+
 /*
  * Domaine « dashboard » : agrégats de lecture (accueil). Toutes les fonctions sont PURES et prennent
  * `now` en paramètre (déterminisme des tests). Les formes de sortie répliquent EXACTEMENT le legacy
@@ -136,16 +138,16 @@ export function computeStats(factures: readonly DashFacture[], devis: readonly D
   const devisEnCours = devis.filter((d) => d.statut === "brouillon" || d.statut === "envoye").length;
   const interventionsAVenir = interventions.filter((i) => i.statut === "planifiee" && new Date(i.dateDebut) >= now).length;
   return {
-    caMonth,
-    caYear,
+    caMonth: round2(caMonth),
+    caYear: round2(caYear),
     devisEnCours,
-    facturesImpayees: { count: impayeesCount, total: impayeesTotal },
+    facturesImpayees: { count: impayeesCount, total: round2(impayeesTotal) },
     totalClients,
     interventionsAVenir,
     totalDevis: devis.length,
     totalFactures: factures.length,
     totalInterventions: interventions.length,
-    chiffreAffaires: caYear,
+    chiffreAffaires: round2(caYear),
     devisEnAttente: devisEnCours,
   };
 }
