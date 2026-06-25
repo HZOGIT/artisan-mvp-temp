@@ -60,6 +60,7 @@ export class DevisReaderDrizzle implements IDevisReader {
         unite: l.unite ?? "unité",
         prixUnitaireHT: l.prixUnitaireHT,
         tauxTVA: l.tauxTVA ?? "20.00",
+        tvaCategorieId: l.tvaCategorieId ?? null,
         montantHT: l.montantHT ?? "0.00",
         montantTVA: l.montantTVA ?? "0.00",
         montantTTC: l.montantTTC ?? "0.00",
