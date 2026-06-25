@@ -29,6 +29,7 @@ export interface ParametresForm {
   prefixeFacture: string;
   mentionsLegalesDevis: string;
   mentionsLegalesFacture: string;
+  mediateurConsommation: string;
   conditionsPaiementDefaut: string;
   delaiPaiementJours: string;
   delaiPaiementType: DelaiPaiementType;
@@ -51,6 +52,7 @@ export const FORM_DEFAULTS: ParametresForm = {
   prefixeFacture: "FAC-",
   mentionsLegalesDevis: "",
   mentionsLegalesFacture: "",
+  mediateurConsommation: "",
   conditionsPaiementDefaut: "Paiement à 30 jours",
   delaiPaiementJours: "",
   delaiPaiementType: "net",
@@ -116,6 +118,7 @@ export function parametresToForm(p: Parametres, slug: string): ParametresForm {
     prefixeFacture: p.prefixeFacture || "FAC-",
     mentionsLegalesDevis: p.mentionsLegales || "",
     mentionsLegalesFacture: p.conditionsGenerales || "",
+    mediateurConsommation: p.mediateurConsommation || "",
     conditionsPaiementDefaut: p.conditionsPaiementDefaut || "Paiement à 30 jours",
     delaiPaiementJours: p.delaiPaiementJours != null ? String(p.delaiPaiementJours) : "",
     delaiPaiementType: p.delaiPaiementType === "fin_de_mois" ? "fin_de_mois" : "net",
@@ -134,6 +137,7 @@ export function formToUpdateInput(f: ParametresForm): UpdateParametresInput {
     prefixeFacture: f.prefixeFacture,
     mentionsLegales: f.mentionsLegalesDevis,
     conditionsGenerales: f.mentionsLegalesFacture,
+    mediateurConsommation: f.mediateurConsommation || null,
     conditionsPaiementDefaut: f.conditionsPaiementDefaut,
     delaiPaiementJours: f.delaiPaiementJours.trim() === "" ? null : (parseInt(f.delaiPaiementJours) || 0),
     delaiPaiementType: f.delaiPaiementType,

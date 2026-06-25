@@ -203,9 +203,11 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
   nextNumero(ctx: TenantContext): Promise<string> {
     return withTenant(this.db, ctx, async (tx) => {
       /*
-       * Parité legacy `getNextFactureNumber` : préfixe + compteur persistés dans
-       * `parametres_artisan`, bornés par MAX(numero) en base (anti-doublon), compteur réavancé.
+       * Verrou advisory par tenant (namespace 1 = allocation numéro) : sérialise les appels
+       * concurrents pour le même artisan sans exiger que la ligne parametres_artisan existe.
+       * Le verrou est libéré automatiquement en fin de transaction (pg_advisory_xact_lock).
        */
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(1, ${ctx.artisanId})`);
       const [params] = await tx
         .select({ prefixe: parametresArtisan.prefixeFacture, compteur: parametresArtisan.compteurFacture })
         .from(parametresArtisan)
@@ -234,7 +236,8 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
 
   nextNumeroAvoir(ctx: TenantContext): Promise<string> {
     return withTenant(this.db, ctx, async (tx) => {
-      /** Parité legacy `getNextAvoirNumber` : préfixe/compteur dédiés ; MAX scopé typeDocument='avoir'. */
+      /** Verrou advisory tenant (namespace 1) — sérialise l'allocation du numéro avoir. */
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(1, ${ctx.artisanId})`);
       const [params] = await tx
         .select({ prefixe: parametresArtisan.prefixeAvoir, compteur: parametresArtisan.compteurAvoir })
         .from(parametresArtisan)

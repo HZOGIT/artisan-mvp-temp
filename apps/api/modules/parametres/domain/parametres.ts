@@ -24,6 +24,8 @@ export interface ParametresArtisan {
   /** — CGV / mentions — */
   readonly mentionsLegales: string | null;
   readonly conditionsGenerales: string | null;
+  /** Mention médiateur (L616-1 C. conso.) — obligatoire sur devis/factures si renseigné. */
+  readonly mediateurConsommation: string | null;
   /** — Paiement — */
   readonly conditionsPaiementDefaut: string | null;
   readonly delaiPaiementJours: number | null;
@@ -49,6 +51,7 @@ export interface UpdateParametresInput {
   readonly prefixeAvoir?: string;
   readonly mentionsLegales?: string | null;
   readonly conditionsGenerales?: string | null;
+  readonly mediateurConsommation?: string | null;
   readonly conditionsPaiementDefaut?: string | null;
   readonly delaiPaiementJours?: number | null;
   readonly delaiPaiementType?: string;
@@ -77,6 +80,7 @@ export function defaultParametres(artisanId: number): ParametresArtisan {
     compteurAvoir: 1,
     mentionsLegales: null,
     conditionsGenerales: null,
+    mediateurConsommation: null,
     conditionsPaiementDefaut: null,
     delaiPaiementJours: null,
     delaiPaiementType: "net",

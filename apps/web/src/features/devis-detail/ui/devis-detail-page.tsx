@@ -58,7 +58,7 @@ export default function DevisDetailPage() {
       objet: devis.objet, referenceClient: devis.referenceClient, lignes: pdfLignes(devis.lignes),
       totalHT: parseFloat(String(devis.totalHT)) || 0, totalTVA: parseFloat(String(devis.totalTVA)) || 0, totalTTC: parseFloat(String(devis.totalTTC)) || 0,
       conditions: devis.conditionsPaiement || null,
-    }, { mentionsLegales: parametres?.mentionsLegales || null, cgv: parametres?.conditionsGenerales || null });
+    }, { mentionsLegales: parametres?.mentionsLegales || null, cgv: parametres?.conditionsGenerales || null, mediateurConsommation: parametres?.mediateurConsommation || null });
     toast.success(t("toastPdfOk"));
   };
 

@@ -103,7 +103,7 @@ export default function FactureDetailPage() {
       objet: facture.objet, referenceClient: facture.referenceClient, lignes: pdfLignes(facture.lignes),
       totalHT: parseFloat(String(facture.totalHT)) || 0, totalTVA: parseFloat(String(facture.totalTVA)) || 0, totalTTC: parseFloat(String(facture.totalTTC)) || 0,
       montantPaye: parseFloat(String(facture.montantPaye)) || 0, conditions: facture.conditionsPaiement || null, isAvoir: isAvoirDoc(facture),
-    }, { mentionsLegales: parametres?.mentionsLegales || null, cgv: parametres?.conditionsGenerales || null });
+    }, { mentionsLegales: parametres?.mentionsLegales || null, cgv: parametres?.conditionsGenerales || null, mediateurConsommation: parametres?.mediateurConsommation || null });
     toast.success(t("toastPdfOk"));
   };
 

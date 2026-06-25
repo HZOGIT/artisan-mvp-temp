@@ -18,6 +18,7 @@ const updateSchema = z.object({
   prefixeAvoir: z.string().min(1).max(10).optional(),
   mentionsLegales: z.string().max(5000).nullish(),
   conditionsGenerales: z.string().max(5000).nullish(),
+  mediateurConsommation: z.string().max(1000).nullish(),
   conditionsPaiementDefaut: z.string().max(5000).nullish(),
   delaiPaiementJours: z.number().int().min(0).nullish(),
   delaiPaiementType: z.enum(["net", "fin_de_mois"]).optional(),

@@ -170,9 +170,10 @@ export class DevisRepositoryDrizzle implements IDevisRepository {
   nextNumero(ctx: TenantContext): Promise<string> {
     return withTenant(this.db, ctx, async (tx) => {
       /*
-       * Parité legacy `getNextDevisNumber` : préfixe + compteur persistés dans
-       * `parametres_artisan`, borné par MAX(numero) en base (anti-doublon), compteur réavancé.
+       * Verrou advisory par tenant (namespace 1 = allocation numéro) : sérialise les appels
+       * concurrents pour le même artisan. Libéré automatiquement en fin de transaction.
        */
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(1, ${ctx.artisanId})`);
       const [params] = await tx
         .select({ prefixe: parametresArtisan.prefixeDevis, compteur: parametresArtisan.compteurDevis })
         .from(parametresArtisan)

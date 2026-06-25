@@ -350,6 +350,7 @@ export const parametresArtisan = pgTable("parametres_artisan", {
   compteurAvoir: integer("compteurAvoir").default(1),
   mentionsLegales: text("mentionsLegales"),
   conditionsGenerales: text("conditionsGenerales"),
+  mediateurConsommation: text("mediateurConsommation"),
   notificationsEmail: boolean("notificationsEmail").default(true),
   rappelDevisJours: integer("rappelDevisJours").default(7),
   rappelFactureJours: integer("rappelFactureJours").default(30),
