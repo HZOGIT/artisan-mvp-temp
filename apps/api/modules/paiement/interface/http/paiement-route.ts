@@ -28,7 +28,8 @@ export function registerPaiementRoute(app: FastifyInstance, deps: PaiementRouteD
     let outcome;
     try {
       outcome = await getPaiementStatut(deps.reader, { token, factureId });
-    } catch {
+    } catch (e) {
+      req.log.error({ err: e instanceof Error ? e : new Error(String(e)) }, 'paiement_status_error');
       return reply.code(500).send({ error: "Erreur lors de la vérification du statut" });
     }
     switch (outcome.kind) {
@@ -39,6 +40,7 @@ export function registerPaiementRoute(app: FastifyInstance, deps: PaiementRouteD
       case "not-found":
         return reply.code(404).send({ error: "Facture non trouvée" });
       case "ok":
+        req.log.info({ status: outcome.payload.statutFacture }, 'paiement_status_checked');
         return reply.send(outcome.payload);
     }
   });

@@ -29,16 +29,22 @@ export function registerUploadLogoRoute(app: FastifyInstance, deps: UploadLogoDe
       }
       let buffer: Buffer;
       try {
-        /** lève si > MAX_LOGO_BYTES (limite multipart) */
         buffer = await data.toBuffer();
-      } catch {
+      } catch (e) {
+        req.log.error({ artisanId: auth.artisanId, err: e instanceof Error ? e : new Error(String(e)) }, 'logo_upload_error');
         return reply.code(400).send({ error: "Fichier trop volumineux (max 2MB)" });
       }
       if (data.file.truncated) return reply.code(400).send({ error: "Fichier trop volumineux (max 2MB)" });
 
       const dataUrl = logoDataUrl(data.mimetype, buffer);
-      await deps.writer.setLogo(auth.artisanId, dataUrl);
-      return reply.send({ success: true, logoUrl: dataUrl });
+      try {
+        await deps.writer.setLogo(auth.artisanId, dataUrl);
+        req.log.info({ artisanId: auth.artisanId, sizeBytes: buffer.length, mimeType: data.mimetype }, 'logo_uploaded');
+        return reply.send({ success: true, logoUrl: dataUrl });
+      } catch (e) {
+        req.log.error({ artisanId: auth.artisanId, err: e instanceof Error ? e : new Error(String(e)) }, 'logo_upload_error');
+        return reply.code(500).send({ error: "Erreur lors du téléchargement du logo" });
+      }
     });
 
     instance.delete("/api/upload-logo", async (req, reply) => {

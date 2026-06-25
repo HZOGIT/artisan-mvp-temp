@@ -28,8 +28,10 @@ export function registerExportLotRoutes(app: FastifyInstance, deps: ExportLotRou
     try {
       const { entries, filename } = await collectFacturxLot(deps, { artisanId: auth.artisanId, userId: auth.userId }, { dateDebut: parseDate(q.dateDebut), dateFin: parseDate(q.dateFin) });
       const zip = await zipEntries(entries);
+      req.log.info({ artisanId: auth.artisanId, nbDocuments: entries.length }, 'lot_export_generated');
       return reply.header("Content-Type", "application/zip").header("Content-Disposition", `attachment; filename="${filename}"`).send(zip);
     } catch (e) {
+      req.log.error({ artisanId: auth.artisanId, err: e instanceof Error ? e : new Error(String(e)) }, 'lot_export_error');
       if (e instanceof NotFoundError) return reply.code(404).send({ error: e.message });
       return reply.code(500).send({ error: "Erreur lors de l'export Factur-X en lot" });
     }
@@ -43,8 +45,10 @@ export function registerExportLotRoutes(app: FastifyInstance, deps: ExportLotRou
     try {
       const { entries, filename } = await collectFacturePdfLot(deps, { artisanId: auth.artisanId, userId: auth.userId }, { dateDebut: parseDate(q.dateDebut), dateFin: parseDate(q.dateFin) });
       const zip = await zipEntries(entries);
+      req.log.info({ artisanId: auth.artisanId, nbDocuments: entries.length }, 'lot_export_generated');
       return reply.header("Content-Type", "application/zip").header("Content-Disposition", `attachment; filename="${filename}"`).send(zip);
     } catch (e) {
+      req.log.error({ artisanId: auth.artisanId, err: e instanceof Error ? e : new Error(String(e)) }, 'lot_export_error');
       if (e instanceof NotFoundError) return reply.code(404).send({ error: e.message });
       return reply.code(500).send({ error: "Erreur lors de l'export PDF en lot" });
     }

@@ -30,6 +30,7 @@ export function registerVoiceTokenRoute(app: FastifyInstance, deps: VoiceTokenRo
 
     try {
       const out = await mintVoiceToken(deps, { artisanId: auth.artisanId, userId: auth.userId }, input);
+      req.log.info({ artisanId: auth.artisanId }, 'voice_token_issued');
       return reply.send(out);
     } catch (e) {
       if (e instanceof RealtimeTokenError) return reply.code(502).send({ error: "Impossible de créer le token vocal" });
