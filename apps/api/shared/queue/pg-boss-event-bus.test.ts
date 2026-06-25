@@ -16,6 +16,7 @@ const makeEvent = <T>(type: string, payload: T): DomainEvent<T> => ({
 
 function makeMockBoss(): PgBoss {
   return {
+    createQueue: vi.fn().mockResolvedValue(undefined),
     send: vi.fn().mockResolvedValue("job-id"),
     insert: vi.fn().mockResolvedValue(["job-id"]),
     work: vi.fn().mockResolvedValue("worker-id"),
@@ -58,11 +59,13 @@ describe("PgBossEventBus — contrat adaptateur", () => {
 });
 
 describe("PgBossWorkerAdapter — contrat adaptateur", () => {
-  it("register appelle boss.work avec le bon type", () => {
+  it("register crée la queue puis appelle boss.work avec le bon type", async () => {
     const boss = makeMockBoss();
     const adapter = new PgBossWorkerAdapter(boss);
     adapter.register("FACTURE_PAYEE", async () => void 0);
-    expect(boss.work).toHaveBeenCalledOnce();
+    /* register chaîne createQueue().then(work) — on attend la résolution des microtâches. */
+    await vi.waitFor(() => expect(boss.work).toHaveBeenCalledOnce());
+    expect(boss.createQueue).toHaveBeenCalledWith("FACTURE_PAYEE");
     expect((boss.work as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe("FACTURE_PAYEE");
   });
 });
