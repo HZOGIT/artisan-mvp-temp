@@ -11,6 +11,8 @@ export interface IModeleEmailRepository {
   listByType(ctx: TenantContext, type: TypeModeleEmail): Promise<ModeleEmail[]>;
   /** null si le modèle n'appartient pas au tenant. */
   getById(ctx: TenantContext, id: number): Promise<ModeleEmail | null>;
+  /** Modèle marqué `isDefault` pour ce type, scopé tenant ; null si aucun. */
+  getDefaultByType(ctx: TenantContext, type: TypeModeleEmail): Promise<ModeleEmail | null>;
   create(ctx: TenantContext, input: CreateModeleEmailInput): Promise<ModeleEmail>;
   /** null si le modèle n'appartient pas au tenant. */
   update(ctx: TenantContext, id: number, input: UpdateModeleEmailInput): Promise<ModeleEmail | null>;

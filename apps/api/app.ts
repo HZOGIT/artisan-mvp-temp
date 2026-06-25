@@ -459,6 +459,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const factureRepo = deps.factureRepo ?? new FactureRepositoryDrizzle(getDbHandle().db);
   /** Repo modèles de devis partagé : module modelesDevis + composé par devis (getModeles/…). */
   const modeleDevisRepo = deps.modeleDevisRepo ?? new ModeleDevisRepositoryDrizzle(getDbHandle().db);
+  /** Repo modèles email partagé : module modelesEmail + composé par envois (devis/facture/relances). */
+  const modeleEmailRepo = deps.modeleEmailRepo ?? new ModeleEmailRepositoryDrizzle(getDbHandle().db);
   /** Repo relances partagé : module relancesDevis + composé par devis (envoyerRelance/…). */
   const relanceDevisRepo = deps.relanceDevisRepo ?? new RelanceDevisRepositoryDrizzle(getDbHandle().db);
   const fournisseurs = createFournisseursModule({
@@ -562,6 +564,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
       signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db),
       appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+      modeleEmailRepo,
     },
     /*
      * convertToFacture : délègue au domaine factures (devis accepté → facture brouillon). Partage
@@ -598,6 +601,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       pdf: new JsPdfAdapter(),
       email: emailAdapter,
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
+      modeleEmailRepo,
     },
   });
   /*
@@ -628,7 +632,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     repository: deps.parametresRepo ?? new ParametresRepositoryDrizzle(getDbHandle().db),
   });
   const modelesEmail = createModelesEmailModule({
-    repository: deps.modeleEmailRepo ?? new ModeleEmailRepositoryDrizzle(getDbHandle().db),
+    repository: modeleEmailRepo,
   });
   const modelesDevis = createModelesDevisModule({
     repository: modeleDevisRepo,
@@ -784,9 +788,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     buildAssistantWriteHandlersFromRepos(
       { clientRepo, interventionRepo, devisRepo, factureRepo, devisReader: new DevisReaderDrizzle(getDbHandle().db), commandeRepo },
       {
-        devis: { artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db), clientReader: new SharedClientReaderDrizzle(getDbHandle().db), signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db), appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com", pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
-        facture: { artisanReader: new ArtisanReaderDrizzle(getDbHandle().db), clientReader: new ClientReaderDrizzle(getDbHandle().db), pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
-        relance: { artisanReader: new ArtisanReaderDrizzle(getDbHandle().db), clientReader: new ClientReaderDrizzle(getDbHandle().db), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
+        devis: { artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db), clientReader: new SharedClientReaderDrizzle(getDbHandle().db), signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db), appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com", pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000), modeleEmailRepo },
+        facture: { artisanReader: new ArtisanReaderDrizzle(getDbHandle().db), clientReader: new ClientReaderDrizzle(getDbHandle().db), pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000), modeleEmailRepo },
+        relance: { artisanReader: new ArtisanReaderDrizzle(getDbHandle().db), clientReader: new ClientReaderDrizzle(getDbHandle().db), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000), modeleEmailRepo },
         commande: { repo: commandeRepo, fournisseurRepo, artisanReader: new CommandeArtisanReaderDrizzle(getDbHandle().db), pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
       },
     ),

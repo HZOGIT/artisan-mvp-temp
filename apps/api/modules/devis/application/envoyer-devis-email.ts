@@ -6,6 +6,8 @@ import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { ArtisanReader, ClientReader } from "../../../shared/readers/contact-readers";
 import type { IDevisRepository } from "./devis-repository";
 import type { DevisSignatureReader } from "./devis-signature-reader";
+import type { IModeleEmailRepository } from "../../modeles-email/application/modele-email-repository";
+import { buildModeleEmail } from "../../modeles-email/domain/render";
 
 /*
  * Dépendances de l'envoi d'un devis par email (composition : artisan + client + PDF + email +
@@ -19,6 +21,8 @@ export interface DevisMailingDeps {
   readonly rateLimiter: RateLimiterPort;
   readonly signatureReader: DevisSignatureReader;
   readonly appUrl: string;
+  /** Optionnel : si présent, le modèle `isDefault` du type `envoi_devis` remplace le gabarit codé en dur. */
+  readonly modeleEmailRepo?: IModeleEmailRepository;
 }
 
 export interface EnvoyerDevisEmailInput {
@@ -140,16 +144,31 @@ export async function envoyerDevisParEmail(
   const signature = await deps.signatureReader.getByDevisId(ctx, devis.id);
   const portalUrl = signature ? `${deps.appUrl}/portail/${signature.token}` : null;
 
-  const { subject, body } = buildDevisEmail({
-    artisanName,
-    clientName,
-    numero: devis.numero,
-    objet: devis.objet,
-    totalTTC,
-    dateValidite,
-    customMessage: input.customMessage ?? null,
-    portalUrl,
-  });
+  const modele = deps.modeleEmailRepo ? await deps.modeleEmailRepo.getDefaultByType(ctx, "envoi_devis") : null;
+  const { subject, body } = modele
+    ? buildModeleEmail(
+        modele,
+        {
+          client_nom: clientName,
+          client_prenom: client.prenom ?? "",
+          numero: devis.numero,
+          montant_ttc: totalTTC,
+          date_validite: dateValidite ?? "",
+          lien_signature: portalUrl ?? "",
+          nom_entreprise: artisanName,
+        },
+        input.customMessage ?? null,
+      )
+    : buildDevisEmail({
+        artisanName,
+        clientName,
+        numero: devis.numero,
+        objet: devis.objet,
+        totalTTC,
+        dateValidite,
+        customMessage: input.customMessage ?? null,
+        portalUrl,
+      });
 
   const attachments = input.attachPdf
     ? await (async () => {

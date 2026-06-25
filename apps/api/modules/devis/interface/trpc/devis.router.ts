@@ -113,6 +113,7 @@ export function createDevisRouter(
     artisanReader: mailing.artisanReader,
     email: mailing.email,
     rateLimiter: mailing.rateLimiter,
+    modeleEmailRepo: mailing.modeleEmailRepo,
   };
   const nonSignesDeps = { devisRepo: repo, clientReader: mailing.clientReader, signatureReader };
   return router({

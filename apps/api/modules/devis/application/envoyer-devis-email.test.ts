@@ -7,6 +7,7 @@ import { NotFoundError, ValidationError, TooManyRequestsError } from "../../../s
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ClientInfo } from "../../../shared/readers/contact-readers";
+import { FakeModeleEmailRepository } from "../../modeles-email/infra/modele-email-repository-fake";
 
 const A: TenantContext = { artisanId: 1, userId: 10 };
 const B: TenantContext = { artisanId: 2, userId: 20 };
@@ -110,5 +111,40 @@ describe("envoyerDevisParEmail", () => {
     const mailing = makeMailing();
     await envoyerDevisParEmail(repo, mailing, A, { devisId: d.id, attachPdf: false });
     expect((await repo.getById(A, d.id))!.statut).toBe("accepte");
+  });
+
+  it("utilise le modèle personnalisé `envoi_devis` quand il est défini comme default", async () => {
+    const repo = new FakeDevisRepository();
+    const d = await seedDevis(repo, A);
+    const modeleRepo = new FakeModeleEmailRepository();
+    await modeleRepo.create(A, { nom: "Mon modèle", type: "envoi_devis", sujet: "Devis {{numero}}", contenu: "<p>Bonjour {{client_nom}}</p>", isDefault: true });
+    const mailing = makeMailing({ modeleEmailRepo: modeleRepo });
+    await envoyerDevisParEmail(repo, mailing, A, { devisId: d.id, attachPdf: false });
+    const email = mailing.email as FakeEmailPort;
+    expect(email.sent[0].subject).toBe("Devis DEV-00001");
+    expect(email.sent[0].body).toContain("Bonjour Marie Durand");
+    expect(email.sent[0].body).not.toContain("Veuillez trouver ci-joint");
+  });
+
+  it("fallback gabarit codé en dur si aucun modèle default n'existe", async () => {
+    const repo = new FakeDevisRepository();
+    const d = await seedDevis(repo, A);
+    const modeleRepo = new FakeModeleEmailRepository();
+    const mailing = makeMailing({ modeleEmailRepo: modeleRepo });
+    await envoyerDevisParEmail(repo, mailing, A, { devisId: d.id, attachPdf: false });
+    const email = mailing.email as FakeEmailPort;
+    expect(email.sent[0].body).toContain("Veuillez trouver ci-joint");
+  });
+
+  it("modèle + customMessage → message ajouté après le contenu du modèle", async () => {
+    const repo = new FakeDevisRepository();
+    const d = await seedDevis(repo, A);
+    const modeleRepo = new FakeModeleEmailRepository();
+    await modeleRepo.create(A, { nom: "Mon modèle", type: "envoi_devis", sujet: "Devis {{numero}}", contenu: "<p>Corps</p>", isDefault: true });
+    const mailing = makeMailing({ modeleEmailRepo: modeleRepo });
+    await envoyerDevisParEmail(repo, mailing, A, { devisId: d.id, attachPdf: false, customMessage: "Note spéciale" });
+    const email = mailing.email as FakeEmailPort;
+    expect(email.sent[0].body).toContain("Note spéciale");
+    expect(email.sent[0].body).toContain("<p>Corps</p>");
   });
 });

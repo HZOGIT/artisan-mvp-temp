@@ -4,6 +4,8 @@ import type { EmailPort } from "../../../shared/ports/email";
 import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { ArtisanReader, ClientReader } from "./contact-readers";
 import type { IFactureRepository } from "./facture-repository";
+import type { IModeleEmailRepository } from "../../modeles-email/application/modele-email-repository";
+import { buildModeleEmail } from "../../modeles-email/domain/render";
 
 /*
  * Relance d'une facture impayée par email (parité fonctionnelle du legacy `execEnvoyerRelance`) :
@@ -16,6 +18,8 @@ export interface RelanceMailingDeps {
   readonly clientReader: ClientReader;
   readonly email: EmailPort;
   readonly rateLimiter: RateLimiterPort;
+  /** Optionnel : si présent, le modèle `isDefault` du type `rappel_paiement` remplace le gabarit codé en dur. */
+  readonly modeleEmailRepo?: IModeleEmailRepository;
 }
 
 export interface EnvoyerRelanceInput {
@@ -132,14 +136,28 @@ export async function envoyerRelanceFacture(
   const totalTTC = `${(parseFloat(facture.totalTTC || "0") || 0).toFixed(2)} €`;
   const joursRetard = joursDeRetard(facture.dateEcheance, Date.now());
 
-  const { subject, body } = buildRelanceEmail({
-    artisanName,
-    clientName,
-    factureNumero: facture.numero,
-    totalTTC,
-    joursRetard,
-    customMessage: input.customMessage ?? null,
-  });
+  const modele = deps.modeleEmailRepo ? await deps.modeleEmailRepo.getDefaultByType(ctx, "rappel_paiement") : null;
+  const { subject, body } = modele
+    ? buildModeleEmail(
+        modele,
+        {
+          client_nom: clientName,
+          client_prenom: client.prenom ?? "",
+          numero: facture.numero,
+          montant_ttc: totalTTC,
+          jours_retard: String(joursRetard),
+          nom_entreprise: artisanName,
+        },
+        input.customMessage ?? null,
+      )
+    : buildRelanceEmail({
+        artisanName,
+        clientName,
+        factureNumero: facture.numero,
+        totalTTC,
+        joursRetard,
+        customMessage: input.customMessage ?? null,
+      });
 
   await deps.email.send({ to: client.email, subject, body });
 

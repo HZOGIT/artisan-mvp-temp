@@ -6,6 +6,7 @@ import { NotFoundError, ValidationError, TooManyRequestsError } from "../../../s
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ClientInfo } from "./contact-readers";
+import { FakeModeleEmailRepository } from "../../modeles-email/infra/modele-email-repository-fake";
 
 const A: TenantContext = { artisanId: 1, userId: 10 };
 const B: TenantContext = { artisanId: 2, userId: 20 };
@@ -118,5 +119,28 @@ describe("envoyerFactureParEmail", () => {
     const deps = makeDeps();
     await envoyerFactureParEmail(repo, deps, A, { factureId: f.id, attachPdf: true });
     expect((await repo.getById(A, f.id))!.statut).toBe("payee");
+  });
+
+  it("utilise le modèle personnalisé `envoi_facture` quand il est défini comme default", async () => {
+    const repo = new FakeFactureRepository();
+    const f = await seedFacture(repo, A);
+    const modeleRepo = new FakeModeleEmailRepository();
+    await modeleRepo.create(A, { nom: "Mon modèle", type: "envoi_facture", sujet: "Facture {{numero}}", contenu: "<p>Bonjour {{client_nom}}</p>", isDefault: true });
+    const deps = makeDeps({ modeleEmailRepo: modeleRepo });
+    await envoyerFactureParEmail(repo, deps, A, { factureId: f.id, attachPdf: false });
+    const email = deps.email as FakeEmailPort;
+    expect(email.sent[0].subject).toBe("Facture FAC-00001");
+    expect(email.sent[0].body).toContain("Bonjour Marie Durand");
+    expect(email.sent[0].body).not.toContain("Veuillez trouver ci-joint");
+  });
+
+  it("fallback gabarit codé en dur si aucun modèle default n'existe pour envoi_facture", async () => {
+    const repo = new FakeFactureRepository();
+    const f = await seedFacture(repo, A);
+    const modeleRepo = new FakeModeleEmailRepository();
+    const deps = makeDeps({ modeleEmailRepo: modeleRepo });
+    await envoyerFactureParEmail(repo, deps, A, { factureId: f.id, attachPdf: false });
+    const email = deps.email as FakeEmailPort;
+    expect(email.sent[0].body).toContain("Veuillez trouver ci-joint");
   });
 });
