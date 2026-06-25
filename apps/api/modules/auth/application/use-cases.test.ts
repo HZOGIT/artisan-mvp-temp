@@ -125,15 +125,17 @@ describe("auth use-cases", () => {
     await expect(resetPassword(deps, "RAWTOKEN", "encore")).rejects.toBeInstanceOf(ValidationError);
   });
 
-  it("deleteAccount : soft-delete (actif=false + email neutralisé) ; confirmation incorrecte → 400", async () => {
+  it("deleteAccount : soft-delete + purgePersonalData appelé ; confirmation incorrecte → 400", async () => {
     const repo = new FakeAuthRepository();
     repo.seed({ id: 1, email: "u@t.fr" });
     const deps = makeDeps(repo);
     await expect(deleteAccount(deps, 1, "oui")).rejects.toBeInstanceOf(ValidationError);
+    expect(repo.purged).toHaveLength(0);
     expect(await deleteAccount(deps, 1, "SUPPRIMER")).toEqual({ success: true });
     const u = await repo.getById(1);
     expect(u?.actif).toBe(false);
     expect(u?.email).toMatch(/^deleted_1_\d+@operioz\.com$/);
+    expect(repo.purged).toContain(1);
   });
 
   it("updatePassword : bumpe passwordChangedAt (révocation des anciens tokens)", async () => {

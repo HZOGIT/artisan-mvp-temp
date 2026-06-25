@@ -154,6 +154,7 @@ import { handleBillingWebhookEvent } from "./modules/billing/interface/http/bill
 import fastifySchedule from "@fastify/schedule";
 import { billingCronPlugin } from "./shared/infra/billing-cron";
 import { geoPurgeCronPlugin } from "./shared/infra/geo-purge-cron";
+import { rgpdCronPlugin } from "./shared/infra/rgpd-cron";
 import { ensureStripeWebhookEndpoint } from "./shared/infra/stripe-webhook-setup";
 import { WebhookPaymentWriterDrizzle } from "./modules/subscription/infra/webhook-payment-writer-drizzle";
 import { SubscriptionEventNotifierDrizzle } from "./modules/subscription/infra/subscription-event-notifier-drizzle";
@@ -994,6 +995,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   /** Cron CNIL — purge des positions GPS expirées toutes les 6 h (rétention 8 h par position). */
   app.register(geoPurgeCronPlugin, { technicienRepo, db: getDbHandle().db });
+
+  /** Cron RGPD Art. 17 — purge définitive des comptes en attente de suppression depuis > 30j. */
+  app.register(rgpdCronPlugin, { db: getDbHandle().db });
 
   /** Upload/suppression du logo artisan `/api/upload-logo` (auth cookie JWT). Stocké en data-URL base64. */
   registerUploadLogoRoute(app, {

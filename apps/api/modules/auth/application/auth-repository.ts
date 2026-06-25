@@ -38,4 +38,10 @@ export interface IAuthRepository {
    * `users.artisanId` + abonnement d'essai 14 j (si absent) + permissions owner = toutes (si absentes).
    */
   bootstrapAccount(userId: number): Promise<void>;
+  /**
+   * Effacement RGPD Art. 17 — supprime ou pseudonymise les données personnelles du compte :
+   * clients sans facture supprimés, clients avec facture pseudonymisés, conversations/messages/RDV
+   * supprimés, PII artisan effacée. Pose `pendingDeletionAt` pour le job de purge différé 30j.
+   */
+  purgePersonalData(userId: number): Promise<void>;
 }

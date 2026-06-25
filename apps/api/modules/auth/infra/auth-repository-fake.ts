@@ -99,6 +99,12 @@ export class FakeAuthRepository implements IAuthRepository {
     this.bootstrapped.push(userId);
   }
 
+  public purged: number[] = [];
+
+  async purgePersonalData(userId: number): Promise<void> {
+    this.purged.push(userId);
+  }
+
   async getPasswordChangedAt(userId: number): Promise<Date | null> {
     return this.users.find((x) => x.id === userId)?.passwordChangedAt ?? null;
   }

@@ -73,7 +73,7 @@ export const CGU: LegalDoc = {
 <h2>Article 9 — Durée et résiliation</h2>
 <p>Le contrat est conclu pour une durée indéterminée, à compter de la création du compte. L'Utilisateur peut résilier à tout moment depuis son espace personnel (Paramètres → Abonnement → Annuler).</p>
 <p>L'éditeur se réserve le droit de suspendre ou supprimer un compte en cas de manquement grave aux présentes CGU, après notification préalable.</p>
-<p>Les données sont conservées <strong>30 jours</strong> après résiliation, permettant à l'Utilisateur de les exporter avant suppression définitive.</p>
+<p>Lors de la suppression du compte, les données personnelles sont effacées ou pseudonymisées immédiatement (hors données comptables soumises à obligation légale de 10 ans). Le compte est définitivement purgé après <strong>30 jours</strong>, délai permettant à l'Utilisateur d'exporter ses données au préalable.</p>
 <h2>Article 10 — Modifications</h2>
 <p>L'éditeur se réserve le droit de modifier les présentes CGU à tout moment. Les Utilisateurs sont informés des modifications substantielles par email au moins 30 jours avant entrée en vigueur.</p>
 <h2>Article 11 — Données personnelles</h2>
@@ -155,8 +155,8 @@ export const CONFIDENTIALITE: LegalDoc = {
 <h2>4. Durées de conservation</h2>
 <ul>
 <li><strong>Compte actif</strong> : pendant toute la durée d'utilisation du service.</li>
-<li><strong>Après résiliation</strong> : 30 jours pour permettre l'export, puis suppression définitive.</li>
-<li><strong>Factures et documents fiscaux</strong> : 10 ans (obligation légale).</li>
+<li><strong>Lors de la suppression du compte</strong> : les données personnelles sont effacées immédiatement (contacts clients sans facture supprimés, données de contact pseudonymisées sur les clients liés à des factures). Le compte est définitivement purgé après 30 jours (délai permettant un éventuel export préalable).</li>
+<li><strong>Factures et documents fiscaux</strong> : les données nécessaires à l'intégrité comptable sont conservées 10 ans (obligation légale, Code de commerce art. L123-22). Les informations personnelles rattachées sont pseudonymisées lors de la suppression du compte.</li>
 <li><strong>Logs de sécurité</strong> : 12 mois.</li>
 <li><strong>Sessions actives</strong> : 7 jours glissants.</li>
 </ul>
@@ -176,7 +176,7 @@ export const CONFIDENTIALITE: LegalDoc = {
 <ul>
 <li><strong>Accès</strong> : obtenir une copie de vos données.</li>
 <li><strong>Rectification</strong> : corriger des données inexactes (directement dans l'app).</li>
-<li><strong>Suppression</strong> («&nbsp;droit à l'oubli&nbsp;») : supprimer votre compte et vos données, hors obligations légales.</li>
+<li><strong>Suppression</strong> («&nbsp;droit à l'oubli&nbsp;») : supprimer votre compte et effacer vos données personnelles. Les données à caractère strictement comptable rattachées à vos factures sont pseudonymisées et conservées 10 ans conformément à la loi.</li>
 <li><strong>Portabilité</strong> : récupérer vos données dans un format structuré (Excel, CSV, PDF).</li>
 <li><strong>Opposition</strong> : vous opposer au traitement basé sur l'intérêt légitime.</li>
 <li><strong>Limitation</strong> : demander la limitation du traitement dans certains cas.</li>
