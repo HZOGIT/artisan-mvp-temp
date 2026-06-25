@@ -6,6 +6,7 @@ import { authArtisanFromCookie, type CookieAuthDeps } from "./cookie-auth";
 export interface VoiceToolRouteDeps extends CookieAuthDeps {
   readonly registry: AssistantToolRegistry;
   readonly rateLimiter: RateLimiterPort;
+  readonly checkSubscriptionActive: (artisanId: number) => Promise<boolean>;
 }
 
 /*
@@ -19,6 +20,7 @@ export function registerVoiceToolRoute(app: FastifyInstance, deps: VoiceToolRout
     const auth = await authArtisanFromCookie(req, deps);
     if (auth.status === "unauthenticated") return reply.code(401).send({ error: "Non autorisé" });
     if (auth.status === "no-artisan") return reply.code(404).send({ error: "Artisan non trouvé" });
+    if (!(await deps.checkSubscriptionActive(auth.artisanId))) return reply.code(402).send({ error: "Abonnement requis" });
 
     if (!(await deps.rateLimiter.check(`ia:${auth.artisanId}`))) {
       return reply.code(429).send({ result: { ok: false, error: "Trop de requêtes. Réessayez dans un instant." } });

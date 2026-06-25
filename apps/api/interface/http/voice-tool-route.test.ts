@@ -13,11 +13,11 @@ const resolver: TenantResolver = { resolve: async (claims) => ({ artisanId: 1, u
 const allow: RateLimiterPort = { check: async () => true };
 const deny: RateLimiterPort = { check: async () => false };
 
-async function buildTestApp(rateLimiter: RateLimiterPort = allow) {
+async function buildTestApp(rateLimiter: RateLimiterPort = allow, checkSubscriptionActive = async () => true) {
   const app = Fastify();
   await app.register(cookie);
   const registry = new AssistantReadToolRegistry({ lister_factures: async () => ({ ok: true, data: { count: 3 } }) });
-  registerVoiceToolRoute(app, { jwtSecret: SECRET, resolver, registry, rateLimiter });
+  registerVoiceToolRoute(app, { jwtSecret: SECRET, resolver, registry, rateLimiter, checkSubscriptionActive });
   await app.ready();
   return app;
 }
@@ -63,6 +63,15 @@ describe("registerVoiceToolRoute", () => {
     const res = await post(app, { name: "creer_client", args: { nom: "X" } }, token);
     expect(res.statusCode).toBe(200);
     expect(res.json().result.ok).toBe(false);
+    await app.close();
+  });
+
+  it("abonnement inactif → 402 Abonnement requis", async () => {
+    const app = await buildTestApp(allow, async () => false);
+    const token = await sign(7);
+    const res = await post(app, { name: "lister_factures" }, token);
+    expect(res.statusCode).toBe(402);
+    expect(res.json().error).toBe("Abonnement requis");
     await app.close();
   });
 });

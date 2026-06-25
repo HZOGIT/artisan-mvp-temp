@@ -12,10 +12,11 @@ async function signToken(userId: number): Promise<string> {
   return new SignJWT({ userId, email: `u${userId}@test.fr` }).setProtectedHeader({ alg: "HS256" }).setExpirationTime("1h").sign(new TextEncoder().encode(SECRET));
 }
 
-// E2E `POST /api/voice/persist` (auth cookie) : persiste les transcripts dans un thread du tenant.
+/** ponytail: checkSubscriptionActive injectable dans buildApp → pas besoin de seed billing_subscriptions */
 describe.skipIf(!URL)("POST /api/voice/persist (auth cookie)", () => {
   const admin = new Pool({ connectionString: URL });
   let app: ReturnType<typeof buildApp>;
+  let appNosub: ReturnType<typeof buildApp>;
   let threadId = 0;
 
   const cleanup = async () => {
@@ -33,34 +34,43 @@ describe.skipIf(!URL)("POST /api/voice/persist (auth cookie)", () => {
     const artisanId = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UID])).rows[0].id;
     await admin.query('insert into artisans ("userId") values ($1)', [UID_OTHER]);
     threadId = (await admin.query('insert into ai_threads ("artisanId",title,"lastMessageAt") values ($1,$2,now()) returning id', [artisanId, "Voix"])).rows[0].id;
-    app = buildApp({ jwtSecret: SECRET });
+    app = buildApp({ jwtSecret: SECRET, checkSubscriptionActive: async () => true });
+    appNosub = buildApp({ jwtSecret: SECRET, checkSubscriptionActive: async () => false });
   });
   afterAll(async () => {
     await app?.close();
+    await appNosub?.close();
     await cleanup();
     await admin.end();
   });
 
-  const post = (payload: object, token?: string) =>
-    app.inject({ method: "POST", url: "/api/voice/persist", headers: { "content-type": "application/json", ...(token ? { cookie: `token=${token}` } : {}) }, payload: JSON.stringify(payload) });
+  const post = (appInst: ReturnType<typeof buildApp>, payload: object, token?: string) =>
+    appInst.inject({ method: "POST", url: "/api/voice/persist", headers: { "content-type": "application/json", ...(token ? { cookie: `token=${token}` } : {}) }, payload: JSON.stringify(payload) });
 
   it("sans cookie → 401", async () => {
-    expect((await post({ threadId, userTranscript: "x" })).statusCode).toBe(401);
+    expect((await post(app, { threadId, userTranscript: "x" })).statusCode).toBe(401);
   });
 
   it("transcript manquant → 400", async () => {
     const token = await signToken(UID);
-    expect((await post({ threadId }, token)).statusCode).toBe(400);
+    expect((await post(app, { threadId }, token)).statusCode).toBe(400);
   });
 
   it("thread d'un autre tenant → 404 (anti-IDOR)", async () => {
     const tokenOther = await signToken(UID_OTHER);
-    expect((await post({ threadId, userTranscript: "intrus" }, tokenOther)).statusCode).toBe(404);
+    expect((await post(app, { threadId, userTranscript: "intrus" }, tokenOther)).statusCode).toBe(404);
+  });
+
+  it("abonnement inactif → 402 (anti-régression OPE-81)", async () => {
+    const token = await signToken(UID);
+    const res = await post(appNosub, { threadId, userTranscript: "test" }, token);
+    expect(res.statusCode).toBe(402);
+    expect(res.json().error).toBe("Abonnement requis");
   });
 
   it("succès → 200 {ok} + messages persistés (source voice)", async () => {
     const token = await signToken(UID);
-    const res = await post({ threadId, userTranscript: "bonjour", assistantTranscript: "salut !" }, token);
+    const res = await post(app, { threadId, userTranscript: "bonjour", assistantTranscript: "salut !" }, token);
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ ok: true });
     const { rows } = await admin.query('select role, metadata from ai_messages where "threadId"=$1 order by id', [threadId]);
