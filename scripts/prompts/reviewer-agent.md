@@ -114,8 +114,14 @@ gh pr merge <numero> --squash --delete-branch \
   --subject "$(gh pr view <numero> --json title -q .title)"
 ```
 
-**3. Nettoyer le worktree :**
+**3. Tuer la session screen du worker et nettoyer le worktree :**
 ```bash
+# Kill la session screen (le worker n'a plus rien à faire)
+if screen -ls 2>/dev/null | grep -qE "[0-9]+\.${SESSION_NAME}[[:space:]]"; then
+  screen -S "$SESSION_NAME" -X quit
+fi
+
+# Supprimer le worktree git
 WORKTREE="/tmp/wt-${SESSION_NAME}"
 if [[ -d "$WORKTREE" ]]; then
   git -C /home/developer/artisan-mvp-temp worktree remove "$WORKTREE" --force
