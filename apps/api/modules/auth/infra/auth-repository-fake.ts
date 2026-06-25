@@ -6,6 +6,7 @@ type FakeAuthUser = { -readonly [K in keyof AuthUser]: AuthUser[K] } & {
   password: string | null;
   resetToken?: string | null;
   resetTokenExpiry?: Date | null;
+  passwordChangedAt?: Date | null;
 };
 
 /** Repo auth fake in-memory déterministe. `password` stocké tel quel (les tests utilisent FakePasswordHasher). */
@@ -96,5 +97,14 @@ export class FakeAuthRepository implements IAuthRepository {
     const u = this.users.find((x) => x.id === userId);
     if (u && u.artisanId == null) u.artisanId = 1000 + userId;
     this.bootstrapped.push(userId);
+  }
+
+  async getPasswordChangedAt(userId: number): Promise<Date | null> {
+    return this.users.find((x) => x.id === userId)?.passwordChangedAt ?? null;
+  }
+
+  async bumpPasswordChangedAt(userId: number): Promise<void> {
+    const u = this.users.find((x) => x.id === userId);
+    if (u) u.passwordChangedAt = new Date();
   }
 }

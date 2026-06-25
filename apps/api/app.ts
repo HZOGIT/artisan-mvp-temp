@@ -10,6 +10,7 @@ import { getDbHandle } from "./shared/db";
 import { DrizzleTenantResolver } from "./shared/tenant/drizzle-tenant-resolver";
 import { DrizzleUserRoleReader } from "./shared/tenant/role-reader";
 import { DrizzlePermissionsReader } from "./shared/tenant/permissions-reader";
+import { DrizzleSessionRevocationReader } from "./shared/tenant/session-revocation-reader";
 import { VehiculeRepositoryDrizzle } from "./modules/vehicules/infra/vehicule-repository-drizzle";
 import type { IVehiculeRepository } from "./modules/vehicules/application/vehicule-repository";
 import { AvisRepositoryDrizzle } from "./modules/avis/infra/avis-repository-drizzle";
@@ -942,6 +943,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
         roleReader: deps.roleReader ?? new DrizzleUserRoleReader(getDbHandle().db),
         /** Permissions résolues idem (table `permissions_utilisateur`) → garde `permissionProcedure`. */
         permissionsReader: deps.permissionsReader ?? new DrizzlePermissionsReader(getDbHandle().db),
+        /** Révocation par `passwordChangedAt` : tout token antérieur au dernier changement de MDP est rejeté. */
+        revocationReader: deps.revocationReader ?? new DrizzleSessionRevocationReader(getDbHandle().db),
       }),
     },
   });

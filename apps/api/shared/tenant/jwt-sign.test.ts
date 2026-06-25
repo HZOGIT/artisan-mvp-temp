@@ -6,7 +6,7 @@ const SECRET = "test-secret-at-least-32-characters-long-xxxx";
 describe("signAuthToken (émission JWT, contrepartie de verifyAuthToken)", () => {
   it("round-trip : un token signé est vérifiable et restitue les claims", async () => {
     const token = await signAuthToken({ userId: 42, email: "u@t.fr" }, SECRET);
-    expect(await verifyAuthToken(token, SECRET)).toEqual({ userId: 42, email: "u@t.fr" });
+    expect(await verifyAuthToken(token, SECRET)).toMatchObject({ userId: 42, email: "u@t.fr" });
   });
 
   it("inter-opérabilité : signé avec le secret legacy → vérifiable par le new-stack (même secret)", async () => {

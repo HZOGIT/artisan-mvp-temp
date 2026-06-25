@@ -5,7 +5,7 @@ import { FakePasswordHasher } from "../../../shared/ports/password-hasher-bcrypt
 import { verifyAuthToken } from "../../../shared/tenant/jwt";
 import { FakeAuthRepository } from "../infra/auth-repository-fake";
 import type { AuthDeps } from "./use-cases";
-import { deleteAccount, forgotPassword, me, resetPassword, signin, signup, updateEmail, updatePassword } from "./use-cases";
+import { deleteAccount, forgotPassword, logoutEverywhere, me, resetPassword, signin, signup, updateEmail, updatePassword } from "./use-cases";
 
 const SECRET = "test-secret-at-least-32-characters-long-xxxx";
 const makeDeps = (repo: FakeAuthRepository): AuthDeps => ({ repo, hasher: new FakePasswordHasher(), jwtSecret: SECRET });
@@ -30,7 +30,7 @@ describe("auth use-cases", () => {
     const { user, token } = await signin(makeDeps(repo), { email: "ok@t.fr", password: "secret" });
     expect(user.id).toBe(7);
     expect((user as Record<string, unknown>).password).toBeUndefined(); // jamais le hash
-    expect(await verifyAuthToken(token, SECRET)).toEqual({ userId: 7, email: "ok@t.fr" });
+    expect(await verifyAuthToken(token, SECRET)).toMatchObject({ userId: 7, email: "ok@t.fr" });
     expect(repo.touched).toEqual([7]);
   });
 
@@ -123,5 +123,32 @@ describe("auth use-cases", () => {
     const u = await repo.getById(1);
     expect(u?.actif).toBe(false);
     expect(u?.email).toMatch(/^deleted_1_\d+@operioz\.com$/);
+  });
+
+  it("updatePassword : bumpe passwordChangedAt (révocation des anciens tokens)", async () => {
+    const repo = new FakeAuthRepository();
+    repo.seed({ id: 1, email: "u@t.fr", password: "hashed:vieux" });
+    expect(await repo.getPasswordChangedAt(1)).toBeNull();
+    await updatePassword(makeDeps(repo), 1, "vieux", "nouveaupass");
+    expect(await repo.getPasswordChangedAt(1)).toBeInstanceOf(Date);
+  });
+
+  it("resetPassword : bumpe passwordChangedAt (révocation des anciens tokens)", async () => {
+    const repo = new FakeAuthRepository();
+    repo.seed({ id: 1, email: "u@t.fr", password: "hashed:vieux", actif: true });
+    const deps: AuthDeps = { repo, hasher: new FakePasswordHasher(), jwtSecret: SECRET, email: new FakeEmailPort(), appUrl: "https://app.test", genResetToken: () => "RAWTOKEN" };
+    await forgotPassword(deps, "u@t.fr");
+    expect(await repo.getPasswordChangedAt(1)).toBeNull();
+    await resetPassword(deps, "RAWTOKEN", "nouveaupass");
+    expect(await repo.getPasswordChangedAt(1)).toBeInstanceOf(Date);
+  });
+
+  it("logoutEverywhere : bumpe passwordChangedAt sans changer le mot de passe", async () => {
+    const repo = new FakeAuthRepository();
+    repo.seed({ id: 1, email: "u@t.fr", password: "hashed:x" });
+    expect(await repo.getPasswordChangedAt(1)).toBeNull();
+    expect(await logoutEverywhere(makeDeps(repo), 1)).toEqual({ success: true });
+    expect(await repo.getPasswordChangedAt(1)).toBeInstanceOf(Date);
+    expect((await repo.findCredentialsById(1))?.password).toBe("hashed:x");
   });
 });

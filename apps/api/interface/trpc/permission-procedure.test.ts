@@ -46,6 +46,48 @@ describe("permissionProcedure (seam d'autorisation par permission)", () => {
   });
 });
 
+describe("makeCreateContext : révocation par passwordChangedAt", () => {
+  const KEY = new TextEncoder().encode(SECRET);
+  const signWithIat = (iatSec: number) =>
+    new SignJWT({ userId: 1, email: "u@t.fr" }).setProtectedHeader({ alg: "HS256" }).setIssuedAt(iatSec).setExpirationTime("1h").sign(KEY);
+  const signNoIat = () =>
+    new SignJWT({ userId: 1, email: "u@t.fr" }).setProtectedHeader({ alg: "HS256" }).setExpirationTime("1h").sign(KEY);
+
+  const nowSec = () => Math.floor(Date.now() / 1000);
+  const fakeLog = { warn: () => {}, info: () => {}, error: () => {}, debug: () => {}, child() { return fakeLog; } } as never;
+  const makeReq = (token: string) => ({ cookies: { token }, log: fakeLog, ip: undefined }) as never;
+
+  it("passwordChangedAt null → token accepté (pas de révocation)", async () => {
+    const create = makeCreateContext({ jwtSecret: SECRET, revocationReader: { getPasswordChangedAt: async () => null } });
+    const token = await signWithIat(nowSec() - 120);
+    const ctx = await create({ req: makeReq(token), res: {} as never });
+    expect(ctx.claims).toMatchObject({ userId: 1 });
+  });
+
+  it("iat après passwordChangedAt → token accepté", async () => {
+    const changedAtMs = Date.now() - 60_000;
+    const create = makeCreateContext({ jwtSecret: SECRET, revocationReader: { getPasswordChangedAt: async () => new Date(changedAtMs) } });
+    const token = await signWithIat(nowSec());
+    const ctx = await create({ req: makeReq(token), res: {} as never });
+    expect(ctx.claims).toMatchObject({ userId: 1 });
+  });
+
+  it("iat avant passwordChangedAt → token rejeté (claims null)", async () => {
+    const changedAtMs = Date.now();
+    const create = makeCreateContext({ jwtSecret: SECRET, revocationReader: { getPasswordChangedAt: async () => new Date(changedAtMs) } });
+    const token = await signWithIat(nowSec() - 120);
+    const ctx = await create({ req: makeReq(token), res: {} as never });
+    expect(ctx.claims).toBeNull();
+  });
+
+  it("token sans iat + passwordChangedAt posé → rejeté (fail-closed)", async () => {
+    const create = makeCreateContext({ jwtSecret: SECRET, revocationReader: { getPasswordChangedAt: async () => new Date(Date.now() - 60_000) } });
+    const token = await signNoIat();
+    const ctx = await create({ req: makeReq(token), res: {} as never });
+    expect(ctx.claims).toBeNull();
+  });
+});
+
 describe("makeCreateContext : résolution des permissions", () => {
   it("token valide → permissions résolues via le reader (clé par userId)", async () => {
     const create = makeCreateContext({

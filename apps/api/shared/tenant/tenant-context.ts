@@ -17,6 +17,13 @@ export interface TenantContext {
 export interface TokenClaims {
   readonly userId: number;
   readonly email: string;
+  /** `iat` (issued-at, secondes epoch) extrait du payload JWT — sert à la révocation par `passwordChangedAt`. */
+  readonly iat?: number;
+}
+
+/** Lit la date du dernier changement de mot de passe (révocation de tous les tokens antérieurs). */
+export interface SessionRevocationReader {
+  getPasswordChangedAt(userId: number): Promise<Date | null>;
 }
 
 /*
