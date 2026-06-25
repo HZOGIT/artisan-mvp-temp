@@ -5,7 +5,7 @@ Instructions et conventions pour les agents Claude Code travaillant sur ce proje
 ## Convention YAGNI — plugin ponytail
 
 Le plugin [ponytail](https://github.com/DietrichGebert/ponytail) est installé globalement sur ce serveur.
-Il injecte automatiquement une règle YAGNI dans chaque session agent via des hooks `SessionStart` / `SubagentStart`.
+Il injecte automatiquement une règle YAGNI dans chaque session agent via 3 hooks : `SessionStart` (démarrage), `SubagentStart` (sous-agents Task-spawned), `UserPromptSubmit` (commandes `/ponytail` et `stop ponytail` — léger, exit silencieux si pas de commande ponytail).
 
 **Principe** : avant d'écrire du code, grimper l'échelle — YAGNI → stdlib → plateforme native → dépendance existante → une ligne → minimum viable. Détail : `.claude/skills/ponytail.md`.
 

@@ -5,8 +5,12 @@ Source : [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) v
 
 ## Ce que ça fait
 
-Ponytail injecte automatiquement une règle YAGNI dans chaque session agent
-(hook `SessionStart`) et dans chaque sous-agent (hook `SubagentStart`).
+Ponytail injecte automatiquement une règle YAGNI via 3 hooks :
+
+- **`SessionStart`** — injecte les règles YAGNI au démarrage de chaque session agent.
+- **`SubagentStart`** — propage les règles à chaque sous-agent (Task-spawned), car le contexte SessionStart ne leur est pas transmis nativement.
+- **`UserPromptSubmit`** — détecte les commandes `/ponytail` et `stop ponytail` pour changer de mode en cours de session. Léger : ne produit de sortie que si le prompt contient une commande ponytail, sinon exit silencieux.
+
 Mode actif par défaut : `full`.
 
 ## L'échelle de décision (the ladder)
