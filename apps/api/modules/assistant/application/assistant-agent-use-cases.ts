@@ -116,11 +116,12 @@ export async function* runAssistantAgent(
     const calls: AgenticFunctionCall[] = [];
     let modelMessage: AgenticMessage | null = null;
 
-    for await (const ev of deps.llm.streamTurn({ system, tools: deps.registry.tools.filter(t =>
-      !isWriteTool(t.name) ||
-      (input.userCanWriteDevis !== false && ["creer_devis", "envoyer_devis", "creer_et_envoyer_devis"].includes(t.name)) ||
-      (input.userCanWriteFactures !== false && ["creer_facture", "envoyer_facture"].includes(t.name))
-    ), messages })) {
+    for await (const ev of deps.llm.streamTurn({ system, tools: deps.registry.tools.filter(t => {
+      if (!isWriteTool(t.name)) return true;
+      if (["creer_devis", "envoyer_devis", "creer_et_envoyer_devis"].includes(t.name)) return input.userCanWriteDevis !== false;
+      if (["creer_facture", "envoyer_facture", "envoyer_relance"].includes(t.name)) return input.userCanWriteFactures !== false;
+      return true;
+    }), messages })) {
       if (ev.kind === "text") {
         if (ev.text) {
           full += ev.text;
