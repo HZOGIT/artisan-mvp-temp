@@ -47,7 +47,7 @@ export function generateFacturXML(
           montantTVA: round2(v.montantTVA),
         }))
       : (() => {
-          const categId = tauxStringToCategorie(artisan.tauxTVA);
+          const categId = tauxStringToCategorie(artisan.tauxTVA ?? "20");
           const def = TVA_CATEGORIES_MAP[categId];
           return [{ tvaCategorieId: categId, taux: parseFloat(def.taux), baseHT: totalHT, montantTVA: totalTVA }];
         })();
