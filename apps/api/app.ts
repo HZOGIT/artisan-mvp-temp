@@ -1008,6 +1008,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
    * + alertes stock bas (best-effort). Itère sur tous les artisans (table hors RLS).
    */
   app.register(notificationsCronPlugin, {
+    db: getDbHandle().db,
     deps: {
       generateOverdueReminders: async () => {
         const rows = await getDbHandle().db.select({ id: artisansTable.id }).from(artisansTable);
