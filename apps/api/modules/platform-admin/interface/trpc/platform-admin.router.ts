@@ -1,0 +1,63 @@
+import { z } from "zod";
+import { count, desc, eq } from "drizzle-orm";
+import { platformAdminProcedure, router } from "../../../../interface/trpc/trpc";
+import { artisans, subscriptions, users } from "../../../../../../drizzle/schema.pg";
+import type { DbClient } from "../../../../shared/db";
+
+const PAGE_SIZE = 50;
+
+export function createPlatformAdminRouter(db: DbClient) {
+  return router({
+    artisans: router({
+      list: platformAdminProcedure
+        .input(z.object({ page: z.number().int().min(1).optional().default(1) }))
+        .query(async ({ input }) => {
+          const offset = (input.page - 1) * PAGE_SIZE;
+          const [items, totals] = await Promise.all([
+            db
+              .select({
+                id: artisans.id,
+                nomEntreprise: artisans.nomEntreprise,
+                siret: artisans.siret,
+                email: users.email,
+                plan: artisans.plan,
+                createdAt: artisans.createdAt,
+              })
+              .from(artisans)
+              .leftJoin(users, eq(users.id, artisans.userId))
+              .orderBy(desc(artisans.createdAt))
+              .limit(PAGE_SIZE)
+              .offset(offset),
+            db.select({ total: count() }).from(artisans),
+          ]);
+          return { items, total: Number(totals[0]?.total ?? 0) };
+        }),
+    }),
+    subscriptions: router({
+      list: platformAdminProcedure
+        .input(z.object({ page: z.number().int().min(1).optional().default(1) }))
+        .query(async ({ input }) => {
+          const offset = (input.page - 1) * PAGE_SIZE;
+          const [items, totals] = await Promise.all([
+            db
+              .select({
+                id: subscriptions.id,
+                artisanId: subscriptions.artisan_id,
+                nomEntreprise: artisans.nomEntreprise,
+                plan: subscriptions.plan,
+                status: subscriptions.status,
+                trialEndsAt: subscriptions.trial_ends_at,
+                currentPeriodEnd: subscriptions.current_period_end,
+              })
+              .from(subscriptions)
+              .leftJoin(artisans, eq(artisans.id, subscriptions.artisan_id))
+              .orderBy(desc(subscriptions.created_at))
+              .limit(PAGE_SIZE)
+              .offset(offset),
+            db.select({ total: count() }).from(subscriptions),
+          ]);
+          return { items, total: Number(totals[0]?.total ?? 0) };
+        }),
+    }),
+  });
+}

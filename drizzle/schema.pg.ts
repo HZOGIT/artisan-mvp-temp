@@ -2182,3 +2182,15 @@ export const llmUsage = pgTable("llm_usage", {
 });
 export type LlmUsageRow = typeof llmUsage.$inferSelect;
 export type InsertLlmUsage = typeof llmUsage.$inferInsert;
+
+export const adminAuditLog = pgTable("admin_audit_log", {
+  id:          serial("id").primaryKey(),
+  staffUserId: integer("staff_user_id").references(() => users.id),
+  action:      varchar("action", { length: 100 }).notNull(),
+  targetType:  varchar("target_type", { length: 50 }),
+  targetId:    integer("target_id"),
+  metadata:    jsonb("metadata"),
+  createdAt:   timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
+export type InsertAdminAuditLog = typeof adminAuditLog.$inferInsert;
