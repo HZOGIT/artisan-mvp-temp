@@ -246,6 +246,11 @@ export default function ParametresPage() {
                   <Textarea id="mentionsLegalesFacture" value={formData.mentionsLegalesFacture} onChange={(e) => setFormData({ ...formData, mentionsLegalesFacture: e.target.value })} placeholder={t("cgvPlaceholder")} rows={6} />
                   <p className="text-xs text-muted-foreground">{t("cgvHint")}</p>
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="mediateurConsommation">{t("mediateurConsommation")}</Label>
+                  <Input id="mediateurConsommation" value={formData.mediateurConsommation} onChange={(e) => setFormData({ ...formData, mediateurConsommation: e.target.value })} placeholder={t("mediateurConsommationPlaceholder")} maxLength={1000} />
+                  <p className="text-xs text-muted-foreground">{t("mediateurConsommationHint")}</p>
+                </div>
               </CardContent>
             </Card>
 

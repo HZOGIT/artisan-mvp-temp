@@ -300,6 +300,7 @@ interface FactureData {
 interface PdfOptions {
   mentionsLegales?: string | null;
   cgv?: string | null;
+  mediateurConsommation?: string | null;
 }
 
 function formatDate(date: Date | string | null | undefined): string {
@@ -648,7 +649,8 @@ export function generateDevisPDF(artisan: Artisan, client: Client, devis: DevisD
   yPos = addLignesTable(doc, devis.lignes, yPos);
   addTotals(doc, devis.totalHT, devis.totalTVA, devis.totalTTC, yPos);
   const devisTvaMention = tvaMentionsFromLignes(devis.lignes);
-  const devisMentions = [options?.mentionsLegales, devisTvaMention].filter(Boolean).join("\n") || null;
+  const devisMediateur = options?.mediateurConsommation ? `Médiateur de la consommation : ${options.mediateurConsommation}` : null;
+  const devisMentions = [options?.mentionsLegales, devisTvaMention, devisMediateur].filter(Boolean).join("\n") || null;
   addFooter(doc, devis.conditions, devisMentions);
 
   if (options?.cgv) {
@@ -705,7 +707,8 @@ export function generateFacturePDF(artisan: Artisan, client: Client, facture: Fa
         .filter(Boolean)
         .join("\n");
   const factureTvaMention = tvaMentionsFromLignes(facture.lignes);
-  const factureMentions = [options?.mentionsLegales, factureTvaMention].filter(Boolean).join("\n") || null;
+  const factureMediateur = options?.mediateurConsommation ? `Médiateur de la consommation : ${options.mediateurConsommation}` : null;
+  const factureMentions = [options?.mentionsLegales, factureTvaMention, factureMediateur].filter(Boolean).join("\n") || null;
   addFooter(doc, factureConditions, factureMentions);
 
   /*

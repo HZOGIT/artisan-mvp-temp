@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, publicProcedure } from "../../../../interface/trpc/trpc";
 import type { SignatureDeps } from "../../application/use-cases";
 import { getSignatureByDevis, createSignatureLink } from "../../application/use-cases";
@@ -20,8 +19,6 @@ const signInput = z.object({
   signatureData: z.string().max(500000),
   signataireName: z.string().max(200),
   signataireEmail: z.string().email().max(320),
-  /** accepté pour compat client, NON vérifié serveur (parité legacy) */
-  smsVerified: z.boolean().optional(),
 });
 const refuseInput = z.object({ token: z.string().min(1).max(64), motifRefus: z.string().max(2000).optional() });
 
@@ -39,16 +36,12 @@ export function createSignatureRouter(deps: SignatureDeps, publicDeps: Signature
      */
     getSignatureByDevis: protectedProcedure
       .input(devisIdInput)
-      .query(({ ctx, input }) => {
-        if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
-        return getSignatureByDevis(deps, ctx.tenant, input.devisId);
-      }),
+      .query(async ({ ctx, input }) => getSignatureByDevis(deps, ctx.tenant, input.devisId)),
 
     /** Génère (idempotent) le lien de signature d'un devis du tenant + email client + notification. */
     createSignatureLink: protectedProcedure
       .input(devisIdInput)
       .mutation(async ({ ctx, input }) => {
-        if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
         const result = await createSignatureLink(deps, ctx.tenant, input.devisId);
         ctx.log.info({ event: "signature_link_created", devisId: input.devisId }, "Lien de signature généré");
         return result;
@@ -61,12 +54,12 @@ export function createSignatureRouter(deps: SignatureDeps, publicDeps: Signature
      */
     getDevisForSignature: publicProcedure
       .input(tokenInput)
-      .query(({ input }) => getDevisForSignature(publicDeps, input.token)),
+      .query(async ({ input }) => getDevisForSignature(publicDeps, input.token)),
 
     /** Le client choisit une option/variante AVANT de signer (400 si déjà signé/expiré, rate-limité). */
     selectDevisOption: publicProcedure
       .input(selectOptionInput)
-      .mutation(({ input }) => selectDevisOption(publicDeps, { token: input.token, optionId: input.optionId })),
+      .mutation(async ({ input }) => selectDevisOption(publicDeps, { token: input.token, optionId: input.optionId })),
 
     /** Signature du devis : immutabilité (statut doit être en_attente) + capture IP probante/UA (ctx). */
     signDevis: publicProcedure

@@ -28,6 +28,7 @@ function toParametres(r: ParametresRow): ParametresArtisan {
     compteurAvoir: r.compteurAvoir ?? D.compteurAvoir,
     mentionsLegales: r.mentionsLegales ?? null,
     conditionsGenerales: r.conditionsGenerales ?? null,
+    mediateurConsommation: r.mediateurConsommation ?? null,
     conditionsPaiementDefaut: r.conditionsPaiementDefaut ?? null,
     delaiPaiementJours: r.delaiPaiementJours ?? null,
     delaiPaiementType: r.delaiPaiementType ?? D.delaiPaiementType,
@@ -53,6 +54,7 @@ function toConfigSet(input: UpdateParametresInput): Partial<ParametresInsert> {
   if (input.prefixeAvoir !== undefined) set.prefixeAvoir = input.prefixeAvoir;
   if (input.mentionsLegales !== undefined) set.mentionsLegales = input.mentionsLegales;
   if (input.conditionsGenerales !== undefined) set.conditionsGenerales = input.conditionsGenerales;
+  if (input.mediateurConsommation !== undefined) set.mediateurConsommation = input.mediateurConsommation;
   if (input.conditionsPaiementDefaut !== undefined) set.conditionsPaiementDefaut = input.conditionsPaiementDefaut;
   if (input.delaiPaiementJours !== undefined) set.delaiPaiementJours = input.delaiPaiementJours;
   if (input.delaiPaiementType !== undefined) set.delaiPaiementType = input.delaiPaiementType as ParametresInsert["delaiPaiementType"];

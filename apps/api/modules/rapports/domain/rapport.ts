@@ -43,8 +43,9 @@ export interface ExecutionResult {
 }
 
 /** Agrégat du rapport « financier » (parité legacy `executerRapport` case 'financier'). PURE. */
-export function computeFinancier(factures: ReadonlyArray<{ statut: string | null; totalTTC: string | null }>): Array<{ totalCA: number; nombreFactures: number; facturesPayees: number }> {
+export function computeFinancier(factures: ReadonlyArray<{ statut: string | null; totalHT: string | null; typeDocument?: string | null }>): Array<{ totalCA: number; nombreFactures: number; facturesPayees: number }> {
   const payees = factures.filter((f) => f.statut === "payee");
-  const totalCA = payees.reduce((sum, f) => sum + (parseFloat(String(f.totalTTC ?? "0")) || 0), 0);
+  const caLines = factures.filter((f) => f.statut === "payee" || (f.typeDocument === "avoir" && f.statut === "validee"));
+  const totalCA = caLines.reduce((sum, f) => sum + (parseFloat(String(f.totalHT ?? "0")) || 0), 0);
   return [{ totalCA, nombreFactures: factures.length, facturesPayees: payees.length }];
 }

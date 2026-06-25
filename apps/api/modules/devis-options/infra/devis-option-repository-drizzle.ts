@@ -114,6 +114,7 @@ export class DevisOptionRepositoryDrizzle implements IDevisOptionRepository {
           montantHT: l.montantHT,
           montantTVA: l.montantTVA,
           montantTTC: l.montantTTC,
+          tvaCategorieId: l.tvaCategorieId ?? null,
         });
       }
       /** Totaux du devis = totaux (stockés) de l'option (parité legacy `convertirOptionEnDevis`). */

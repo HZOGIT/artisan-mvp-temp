@@ -134,6 +134,27 @@
       "when": 1782309956058,
       "tag": "0018_tva-categories-extras",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1782370286509,
+      "tag": "0019_wooden_jackal",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1782370302131,
+      "tag": "0020_devis-options-lignes-tva-backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1782373321504,
+      "tag": "0021_add-mediateur-consommation",
+      "breakpoints": true
     }
   ]
 }

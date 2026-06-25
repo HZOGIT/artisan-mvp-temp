@@ -16,11 +16,11 @@ export class DashboardReaderDrizzle implements IDashboardReader {
   listFactures(ctx: TenantContext): Promise<DashFacture[]> {
     return withTenant(this.db, ctx, async (tx) => {
       const rows = await tx
-        .select({ id: factures.id, numero: factures.numero, clientId: factures.clientId, statut: factures.statut, totalTTC: factures.totalTTC, dateFacture: factures.dateFacture, datePaiement: factures.datePaiement, createdAt: factures.createdAt })
+        .select({ id: factures.id, numero: factures.numero, clientId: factures.clientId, statut: factures.statut, totalHT: factures.totalHT, totalTTC: factures.totalTTC, typeDocument: factures.typeDocument, dateFacture: factures.dateFacture, datePaiement: factures.datePaiement, createdAt: factures.createdAt })
         .from(factures)
         .where(eq(factures.artisanId, ctx.artisanId))
         .orderBy(desc(factures.createdAt), desc(factures.id));
-      return rows.map((r) => ({ ...r, statut: r.statut ?? null, totalTTC: r.totalTTC ?? null, datePaiement: r.datePaiement ?? null }));
+      return rows.map((r) => ({ ...r, statut: r.statut ?? null, totalHT: r.totalHT ?? null, totalTTC: r.totalTTC ?? null, typeDocument: r.typeDocument ?? null, datePaiement: r.datePaiement ?? null }));
     });
   }
 

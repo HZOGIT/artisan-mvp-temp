@@ -7,7 +7,9 @@
 /** ── Lignes brutes (projections minimales scopées tenant) ───────────────────────────────────────── */
 export interface DashFacture {
   readonly statut: string | null;
+  readonly totalHT: string | null;
   readonly totalTTC: string | null;
+  readonly typeDocument: string | null;
   readonly dateFacture: Date;
   readonly datePaiement: Date | null;
   readonly createdAt: Date;
@@ -103,6 +105,8 @@ export interface DashAlert {
 const num = (v: unknown): number => parseFloat(String(v ?? "0")) || 0;
 const monthKey = (d: Date): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 const FACTURE_PAYEE = "payee";
+/** Ligne comptable dans le CA réalisé : facture payée OU avoir validé (montants HT négatifs → déduction auto). */
+const isCALine = (f: DashFacture): boolean => f.statut === FACTURE_PAYEE || (f.typeDocument === "avoir" && f.statut === "validee");
 
 /*
  * getDashboardStats (parité : agrégations SQL legacy répliquées en mémoire). caMonth/caYear utilisent
@@ -116,15 +120,15 @@ export function computeStats(factures: readonly DashFacture[], devis: readonly D
   let impayeesCount = 0;
   let impayeesTotal = 0;
   for (const f of factures) {
-    if (f.statut === FACTURE_PAYEE) {
+    if (isCALine(f)) {
       const ref = f.datePaiement ?? f.createdAt;
       const rd = new Date(ref);
       if (rd.getFullYear() === y) {
-        caYear += num(f.totalTTC);
-        if (rd.getMonth() === m) caMonth += num(f.totalTTC);
+        caYear += num(f.totalHT);
+        if (rd.getMonth() === m) caMonth += num(f.totalHT);
       }
     }
-    if (f.statut !== "payee" && f.statut !== "annulee" && f.statut !== "brouillon") {
+    if (f.statut !== "payee" && f.statut !== "annulee" && f.statut !== "brouillon" && f.typeDocument !== "avoir") {
       impayeesCount++;
       impayeesTotal += num(f.totalTTC);
     }
@@ -161,20 +165,20 @@ export function computeRecentActivity(devis: readonly DashDevis[], factures: rea
 }
 
 /*
- * getMonthlyCAStats : CA des factures PAYÉES bucketé par mois (dateFacture), sur `months` mois, du plus
- * ancien au plus récent.
+ * getMonthlyCAStats : CA HT des lignes CA (payées + avoirs validés) bucketé par mois (dateFacture),
+ * sur `months` mois, du plus ancien au plus récent.
  */
-export function computeMonthlyCA(facturesPayees: readonly DashFacture[], months: number, now: Date): MonthlyCAPoint[] {
+export function computeMonthlyCA(facturesCA: readonly DashFacture[], months: number, now: Date): MonthlyCAPoint[] {
   const stats: MonthlyCAPoint[] = [];
   for (let i = 0; i < months; i++) {
     const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
     let ca = 0;
     let count = 0;
-    for (const f of facturesPayees) {
+    for (const f of facturesCA) {
       const d = new Date(f.dateFacture);
       if (d >= monthStart && d <= monthEnd) {
-        ca += num(f.totalTTC);
+        ca += num(f.totalHT);
         count++;
       }
     }
@@ -183,17 +187,17 @@ export function computeMonthlyCA(facturesPayees: readonly DashFacture[], months:
   return stats;
 }
 
-/** getYearlyComparison : CA payé année courante vs année précédente (par dateFacture). */
-export function computeYearlyComparison(facturesPayees: readonly DashFacture[], now: Date): YearlyComparison {
+/** getYearlyComparison : CA HT (payées + avoirs validés) année courante vs année précédente (par dateFacture). */
+export function computeYearlyComparison(facturesCA: readonly DashFacture[], now: Date): YearlyComparison {
   const thisYearStart = new Date(now.getFullYear(), 0, 1);
   const lastYearStart = new Date(now.getFullYear() - 1, 0, 1);
   const lastYearEnd = new Date(now.getFullYear() - 1, 11, 31);
   let thisYear = 0;
   let lastYear = 0;
-  for (const f of facturesPayees) {
+  for (const f of facturesCA) {
     const d = new Date(f.dateFacture);
-    if (d >= thisYearStart) thisYear += num(f.totalTTC);
-    else if (d >= lastYearStart && d <= lastYearEnd) lastYear += num(f.totalTTC);
+    if (d >= thisYearStart) thisYear += num(f.totalHT);
+    else if (d >= lastYearStart && d <= lastYearEnd) lastYear += num(f.totalHT);
   }
   return { thisYear, lastYear };
 }
@@ -208,12 +212,12 @@ export function computeConversionRate(devis: readonly DashDevis[]): number {
   return Math.round((acceptes / devis.length) * 100);
 }
 
-/** getTopClients : clients triés par CA total (somme TTC de leurs factures), top `limit`. */
+/** getTopClients : clients triés par CA HT total (payées + avoirs déduits), top `limit`. */
 export function computeTopClients(factures: readonly DashFacture[], clients: readonly DashClient[], limit: number): TopClient[] {
   return clients
     .map((client) => {
       const cf = factures.filter((f) => f.clientId === client.id);
-      return { client, totalCA: cf.reduce((s, f) => s + num(f.totalTTC), 0), facturesCount: cf.length };
+      return { client, totalCA: cf.reduce((s, f) => s + num(f.totalHT), 0), facturesCount: cf.length };
     })
     .sort((a, b) => b.totalCA - a.totalCA)
     .slice(0, limit);
@@ -256,7 +260,7 @@ export function computeAlerts(factures: readonly DashFacture[], devis: readonly 
   const alerts: DashAlert[] = [];
   const days = (ref: Date) => Math.floor((now.getTime() - new Date(ref).getTime()) / 86400000);
 
-  const facturesRetard = factures.filter((f) => f.statut !== "payee" && f.statut !== "annulee" && days(f.createdAt) > 30);
+  const facturesRetard = factures.filter((f) => f.statut !== "payee" && f.statut !== "annulee" && f.typeDocument !== "avoir" && days(f.createdAt) > 30);
   if (facturesRetard.length > 0) {
     const total = facturesRetard.reduce((s, f) => s + num(f.totalTTC), 0);
     alerts.push({ type: "danger", titre: `${facturesRetard.length} facture(s) en retard de +30 jours`, message: `Montant total : ${total.toFixed(2)} EUR`, lien: "/factures" });

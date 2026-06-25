@@ -350,6 +350,7 @@ export const parametresArtisan = pgTable("parametres_artisan", {
   compteurAvoir: integer("compteurAvoir").default(1),
   mentionsLegales: text("mentionsLegales"),
   conditionsGenerales: text("conditionsGenerales"),
+  mediateurConsommation: text("mediateurConsommation"),
   notificationsEmail: boolean("notificationsEmail").default(true),
   rappelDevisJours: integer("rappelDevisJours").default(7),
   rappelFactureJours: integer("rappelFactureJours").default(30),
@@ -406,6 +407,7 @@ export const devisOptionsLignes = pgTable("devis_options_lignes", {
   montantTVA: numeric("montantTVA", { precision: 10, scale: 2 }).default("0.00"),
   montantTTC: numeric("montantTTC", { precision: 10, scale: 2 }).default("0.00"),
   ordre: integer("ordre").default(1),
+  tvaCategorieId: varchar("tvaCategorieId", { length: 30 }).references(() => tvaCategories.id),
 });
 export type DevisOptionLigne = typeof devisOptionsLignes.$inferSelect;
 export type InsertDevisOptionLigne = typeof devisOptionsLignes.$inferInsert;

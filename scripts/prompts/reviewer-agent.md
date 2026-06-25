@@ -62,9 +62,36 @@ Revenir sur staging après :
 git checkout staging
 ```
 
+#### b-bis. Traiter les commentaires Greptile (revue automatique)
+
+Greptile (`greptile-apps[bot]`) poste une revue automatique sur chaque PR : un résumé + parfois des
+commentaires **inline** classés par sévérité (P0/P1/P2/P3). **Tu dois les lire et t'assurer qu'ils sont
+traités** avant tout merge.
+
+```bash
+# Corps de la review Greptile (résumé + score de confiance)
+gh api repos/HZOGIT/artisan-mvp-temp/pulls/<numero>/reviews \
+  --jq '.[] | select(.user.login=="greptile-apps") | {state, body}'
+
+# Commentaires inline (les findings concrets, avec sévérité Pn et suggestions de code)
+gh api repos/HZOGIT/artisan-mvp-temp/pulls/<numero>/comments \
+  --jq '.[] | select(.user.login=="greptile-apps[bot]") | {path, line, body}'
+```
+
+Pour chaque finding Greptile :
+- **Évalue-le toi-même** (Greptile peut se tromper ou flagger du pré-existant hors périmètre — ne l'applique pas aveuglément).
+- S'il est **valide et pertinent** (bug, incohérence client/serveur, sécurité, etc.) → il fait partie des
+  **corrections demandées** (étape c) : liste-le explicitement dans ton commentaire et demande au worker de le traiter.
+- S'il est **non applicable** (faux positif, hors périmètre, choix assumé) → note-le dans ton commentaire de review
+  avec la justification, et n'en fais pas un blocage.
+
+**Vérifie que le worker a bien traité les commentaires Greptile** : au tour suivant, contrôle que chaque finding
+valide a été soit corrigé dans le code, soit explicitement résolu/répondu sur GitHub. Ne merge pas tant qu'un finding
+Greptile valide reste ouvert et non justifié.
+
 #### c. Décision : corrections nécessaires
 
-Si tu trouves des problèmes (tsc échoue, lint error, bug logique, violation d'architecture, règle `//` dans le code, etc.) :
+Si tu trouves des problèmes (tsc échoue, lint error, bug logique, violation d'architecture, règle `//` dans le code, **finding Greptile valide non traité**, etc.) :
 
 **1. Poster un commentaire GitHub détaillé :**
 ```bash
@@ -101,7 +128,7 @@ Puis passe à la PR suivante — tu reviendras sur celle-ci à la prochaine ité
 
 #### d. Décision : PR approuvée
 
-Si `pnpm check` passe, lint OK, et le code est correct :
+Si `pnpm check` passe, lint OK, **les commentaires Greptile valides sont traités (corrigés ou justifiés)**, et le code est correct :
 
 **1. Approuver sur GitHub :**
 ```bash
@@ -139,11 +166,34 @@ fi
 
 Le frontend (CF Pages) se redéploie automatiquement sur push `staging`.
 
-**5. Notifier l'humain :**
+**5. Mettre à jour les issues Linear liées :**
+
+Extraire les références OPE-XXX du titre et du corps de la PR :
+
+```bash
+PR_DATA=$(gh pr view <numero> --json title,body)
+PR_URL=$(gh pr view <numero> --json url -q .url)
+# Les OPE-XXX apparaissent dans le titre ou le body (format "OPE-NNN")
+```
+
+Pour chaque OPE-XXX trouvé :
+- Passer le statut de l'issue à **Done** via l'outil MCP Linear `save_issue` (champ `status: "Done"`)
+- Poster un commentaire sur l'issue via `save_comment` :
+  > "Corrigé dans [PR #<numero>](<PR_URL>) — mergée dans `staging`."
+
+Exemple d'appel (répéter pour chaque issue) :
+```
+mcp__plugin_linear_linear__save_issue({ id: "<id-issue>", status: "Done" })
+mcp__plugin_linear_linear__save_comment({ issueId: "<id-issue>", body: "Corrigé dans [PR #<numero>](<PR_URL>) — mergée dans `staging`." })
+```
+
+Pour trouver l'`id` de l'issue depuis son identifiant OPE-XXX : utiliser `get_issue` avec l'identifiant textuel ou `list_issues` avec filtre sur le projet.
+
+**6. Notifier l'humain :**
 ```bash
 /home/developer/artisan-mvp-temp/scripts/agents/ntfy-pub.sh "reviewer" \
   "✅ PR mergée : <titre>" \
-  "Branch feat/<session> mergée dans staging. Deploy OK."
+  "Branch feat/<session> mergée dans staging. Issues Linear mises à jour. Deploy OK."
 ```
 
 ---
