@@ -98,6 +98,14 @@ async function handleCheckoutCompleted(deps: StripeWebhookDeps, session: Record<
     stripePaymentIntentId: session.payment_intent ? String(session.payment_intent) : "",
   });
   deps.log?.info({ event: "stripe_checkout_completed", artisanId: resolved.artisanId, factureId: resolved.factureId }, `Paiement portail complété (artisan ${resolved.artisanId})`);
+  try {
+    await deps.notifier.notifyArtisan(resolved.artisanId, {
+      type: "succes",
+      titre: "Paiement reçu",
+      message: "La facture a été réglée par le client.",
+      lien: `/factures/${resolved.factureId}`,
+    });
+  } catch { /* best-effort */ }
 }
 
 async function handlePaymentFailed(deps: StripeWebhookDeps, pi: Record<string, unknown>): Promise<void> {
