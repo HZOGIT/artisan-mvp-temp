@@ -17,7 +17,6 @@ import { StatutBadge } from "@/shared/ui/statut-badge";
 import { useLocation, useSearch } from "@/shared/router/navigation";
 import { Plus, Search, FileText, MoreHorizontal, Eye, Pencil, Trash2, Receipt, Download, FileSpreadsheet } from "lucide-react";
 import jsPDF from "jspdf";
-import * as XLSX from "xlsx";
 import { exportToCsv, csvDateSuffix } from "@/shared/lib/csv-export";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/shared/ui/dropdown-menu";
 import { toast } from "sonner";
@@ -144,42 +143,42 @@ export default function DevisPage() {
     toast.success(t("toastPdfDownloaded"));
   };
 
-  /** Export Excel */
+  /** Export CSV */
   const exportToExcel = () => {
     if (!filteredDevis || filteredDevis.length === 0) {
       toast.error(t("toastNothingToExport"));
       return;
     }
 
-    const data = filteredDevis.map((devis: Devis) => {
-      return {
-        [t("thNumero")]: devis.numero || "-",
-        [t("thClient")]: resolveClientName(devis.clientId) || "-",
-        [t("thDate")]: devis.dateDevis ? format(new Date(devis.dateDevis), "dd/MM/yyyy") : "-",
-        [t("thObjet")]: devis.objet || "-",
-        [t("excelMontantHT")]: parseFloat(devis.totalHT || "0"),
-        [t("excelTVA")]: parseFloat(devis.totalTVA || "0"),
-        [t("thMontantTTC")]: parseFloat(devis.totalTTC || "0"),
-        [t("thStatut")]: statutLabelOf(devis.statut),
-      };
-    });
-
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, t("excelSheet"));
-
-    ws["!cols"] = [
-      { wch: 15 },
-      { wch: 25 },
-      { wch: 12 },
-      { wch: 35 },
-      { wch: 12 },
-      { wch: 10 },
-      { wch: 12 },
-      { wch: 12 },
+    const headers = [
+      t("thNumero"),
+      t("thClient"),
+      t("thDate"),
+      t("thObjet"),
+      t("excelMontantHT"),
+      t("excelTVA"),
+      t("thMontantTTC"),
+      t("thStatut"),
     ];
+    const rows = filteredDevis.map((devis: Devis) => [
+      devis.numero || "-",
+      resolveClientName(devis.clientId) || "-",
+      devis.dateDevis ? format(new Date(devis.dateDevis), "dd/MM/yyyy") : "-",
+      devis.objet || "-",
+      parseFloat(devis.totalHT || "0"),
+      parseFloat(devis.totalTVA || "0"),
+      parseFloat(devis.totalTTC || "0"),
+      statutLabelOf(devis.statut),
+    ]);
 
-    XLSX.writeFile(wb, `devis_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+    const csv = [headers, ...rows].map(row => row.map(v => `"${v}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `devis_${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
     toast.success(t("toastExcelDownloaded"));
   };
 

@@ -1,7 +1,8 @@
 import { useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
+/* @ts-ignore - read-excel-file module resolution */
+import readXlsxFile from "read-excel-file";
 import { Upload, AlertCircle, CheckCircle, Loader2, Download } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -31,9 +32,12 @@ export default function ClientsImportPage() {
     setFile(selected);
     setIsLoading(true);
     try {
-      const workbook = XLSX.read(await selected.arrayBuffer(), { type: "array" });
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[workbook.SheetNames[0]]);
-      const clients = parseRows(rows);
+      const sheets = (await readXlsxFile(selected)) as Array<{ data: unknown[][] }>;
+      const sheetData = sheets[0].data as unknown[][];
+      const [headers, ...dataRows] = sheetData;
+      const headerArray = (headers ?? []) as unknown[];
+      const rows = dataRows.map(row => Object.fromEntries(headerArray.map((h, i) => [String(h), (row as unknown[])[i]])));
+      const clients = parseRows(rows as Record<string, unknown>[]);
       setPreview(clients);
       if (clients.length === 0) { toast.error(t("errAucunValide")); setFile(null); }
       else toast.success(t("comptesToast", { valides: validCount(clients), erreurs: errorCount(clients) }));
@@ -59,10 +63,15 @@ export default function ClientsImportPage() {
   };
 
   const downloadTemplate = () => {
-    const ws = XLSX.utils.json_to_sheet([TEMPLATE_ROW]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Clients");
-    XLSX.writeFile(wb, "modele_clients.xlsx");
+    const headers = Object.keys(TEMPLATE_ROW);
+    const csv = [headers, Object.values(TEMPLATE_ROW)].map(row => row.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "modele_clients.csv";
+    a.click();
+    URL.revokeObjectURL(url);
     toast.success(t("modeleTelecharge"));
   };
 
