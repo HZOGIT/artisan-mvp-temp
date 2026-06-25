@@ -6,7 +6,6 @@ import {
   text,
   timestamp,
   boolean,
-  numeric,
   bigint,
   jsonb,
   unique,
