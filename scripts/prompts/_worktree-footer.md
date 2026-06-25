@@ -1,49 +1,71 @@
 ---
 
-## Protocole worktree — obligatoire à la fin de ta mission
+## WORKTREE ISOLE — REGLES ABSOLUES (lire avant toute action)
 
-Tu travailles dans un **worktree Git isolé** :
-- Répertoire courant : `/tmp/wt-__SESSION_NAME__`
-- Branche : `__BRANCH__`
-- Repo principal : `__MAIN_REPO__`
+Tu travailles dans un **worktree Git dédié, séparé du repo principal**.
 
-Les scripts utilitaires sont dans `__MAIN_REPO__/scripts/` — utilise leurs **chemins absolus** depuis ce worktree.
+| | Valeur |
+|---|---|
+| **Ton répertoire de travail** | `/tmp/wt-__SESSION_NAME__` |
+| **Ta branche** | `feat/__SESSION_NAME__` |
+| **Repo principal (pnpm UNIQUEMENT)** | `__MAIN_REPO__` |
 
-### 0. Préchauffer le cache TypeScript (dès le début)
+### REGLE 1 — jamais editer dans le repo principal
 
-Lance immédiatement en background pour que le cache `.tsbuildinfo` soit chaud au moment du premier commit :
+Tous tes fichiers (`Edit`, `Write`, `Read`, `git add`, `git commit`) **sont dans `/tmp/wt-__SESSION_NAME__`**.
+
+Le repo `__MAIN_REPO__` sert **uniquement** à lancer `pnpm` (node_modules y vivent). Tu n'y modifies rien, tu n'y commites rien.
+
+Chemin correct pour tout fichier :
+```
+/tmp/wt-__SESSION_NAME__/apps/api/...
+/tmp/wt-__SESSION_NAME__/apps/web/...
+/tmp/wt-__SESSION_NAME__/drizzle/...
+```
+
+### REGLE 2 — vérifier ton environnement en premier
+
+Avant de lire le plan Linear ou de modifier quoi que ce soit, lance :
+
+```bash
+git -C /tmp/wt-__SESSION_NAME__ branch --show-current
+```
+
+Résultat attendu : `feat/__SESSION_NAME__`. Si ce n'est pas le cas, arrête et signale le problème.
+
+### REGLE 3 — tous les git via chemin absolu du worktree
+
+```bash
+git -C /tmp/wt-__SESSION_NAME__ add apps/api/modules/...   # chemin relatif au worktree
+git -C /tmp/wt-__SESSION_NAME__ status                     # vérifier avant commit
+git -C /tmp/wt-__SESSION_NAME__ commit -m "fix(<module>): ... (OPE-XXX)"
+git -C /tmp/wt-__SESSION_NAME__ push origin feat/__SESSION_NAME__
+```
+
+Jamais `git add -A`, jamais `git add .`, jamais `git commit -a`. Jamais `git reset --hard`, jamais `push --force`.
+
+### Préchauffer le cache TypeScript (background, dès le début)
 
 ```bash
 cd __MAIN_REPO__ && pnpm check:parallel &
 ```
 
-Le pre-commit hook utilise `check:parallel` (incremental). Sans ce warm-up, le premier commit est lent (~2 min) car il compile tout from scratch.
+Le pre-commit hook utilise `check:parallel` (incremental). Sans ce warm-up, le premier commit compile tout from scratch (~2 min).
 
-### 1. Commits chirurgicaux (dans ce worktree)
-
-```bash
-git add <fichiers explicites — jamais git add -A ni git add .>
-git commit -m "feat/fix(<module>): <description> (OPE-XXX)"
-git push origin __BRANCH__
-```
-
-Règles : `//` interdit dans le TypeScript, pas de `git reset --hard` ni `push --force`.
-
-### 2. Vérifier avant de créer la PR
+### Vérifier avant la PR
 
 ```bash
-# Depuis __MAIN_REPO__ (pnpm check est global) :
 cd __MAIN_REPO__ && pnpm check
 ```
 
-Si `pnpm check` échoue → corriger avant de continuer.
+Si `pnpm check` échoue, corriger avant de continuer.
 
-### 3. Créer la Pull Request
+### Créer la Pull Request
 
 ```bash
-gh pr create \
+cd __MAIN_REPO__ && gh pr create \
   --base staging \
-  --head __BRANCH__ \
+  --head feat/__SESSION_NAME__ \
   --title "<titre court — max 70 car.>" \
   --body "$(cat <<'EOF'
 ## Résumé
@@ -51,40 +73,35 @@ gh pr create \
 - <bullet 2>
 
 ## Tests
-- [ ] pnpm check ✅
-- [ ] pnpm lint ✅
+- [ ] pnpm check
+- [ ] pnpm lint
 - [ ] Test navigateur / e2e si applicable
 
-🤖 Session : __SESSION_NAME__
+Session : __SESSION_NAME__
 EOF
 )"
 ```
 
-Note l'URL de la PR retournée par `gh pr create`.
-
-### 4. Notifier le reviewer
+### Notifier le reviewer
 
 ```bash
 __MAIN_REPO__/scripts/agents/notify.sh reviewer PR_READY \
-  "PR prête pour review — session : __SESSION_NAME__ — $(gh pr view __BRANCH__ --json url -q .url)"
+  "PR prête — __SESSION_NAME__ — $(cd __MAIN_REPO__ && gh pr view feat/__SESSION_NAME__ --json url -q .url)"
 ```
 
-### 5. Attendre les éventuels retours
-
-La session reviewer peut t'envoyer un message `REVIEW_FEEDBACK` si des corrections sont demandées.
-Quand tu le reçois, lis ta boîte :
+### Corrections reviewer (REVIEW_FEEDBACK)
 
 ```bash
 __MAIN_REPO__/scripts/agents/listen.sh __SESSION_NAME__ --drain
 ```
 
-Applique les corrections, pousse, puis renvoie une notification :
+Applique les corrections **dans le worktree** (`/tmp/wt-__SESSION_NAME__/...`), pousse, puis :
 
 ```bash
 __MAIN_REPO__/scripts/agents/notify.sh reviewer PR_READY \
-  "Corrections appliquées — __SESSION_NAME__ — $(gh pr view __BRANCH__ --json url -q .url)"
+  "Corrections appliquées — __SESSION_NAME__ — $(cd __MAIN_REPO__ && gh pr view feat/__SESSION_NAME__ --json url -q .url)"
 ```
 
-### 6. Fin
+### Fin
 
-Une fois le reviewer ayant mergé, ta mission est terminée. Le reviewer gère le cleanup du worktree et le déploiement.
+Une fois mergé par le reviewer, ta mission est terminée. Le reviewer gère le cleanup du worktree et le déploiement.

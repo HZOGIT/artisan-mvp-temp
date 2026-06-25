@@ -108,8 +108,21 @@ export CLAUDE_INIT_PROMPT=""
 
 if [[ -n "${LINEAR_ISSUE:-}" ]]; then
   # Bootstrap inline — no .md file. The session reads its full plan from Linear.
-  CLAUDE_INIT_PROMPT="Tu es l'agent **${SESSION_NAME}** sur le projet Operioz (repo : ${MAIN_REPO}, branche staging).
 
+  if $USE_WORKTREE; then
+    WORKTREE_NOTICE="
+WORKTREE ISOLE : tu travailles dans /tmp/wt-${SESSION_NAME} (branche feat/${SESSION_NAME}).
+JAMAIS dans ${MAIN_REPO} pour editer des fichiers.
+Tous tes Edit/Write/Read utilisent des chemins absolus sous /tmp/wt-${SESSION_NAME}/...
+Le repo principal ${MAIN_REPO} sert UNIQUEMENT a lancer pnpm (node_modules).
+Lance d'abord : git -C /tmp/wt-${SESSION_NAME} branch --show-current  -> doit afficher feat/${SESSION_NAME}
+"
+  else
+    WORKTREE_NOTICE=""
+  fi
+
+  CLAUDE_INIT_PROMPT="Tu es l'agent **${SESSION_NAME}** sur le projet Operioz.
+${WORKTREE_NOTICE}
 Ton plan détaillé se trouve dans les commentaires de l'issue Linear **${LINEAR_ISSUE}**.
 Commence par le lire :
   mcp__plugin_linear_linear__get_issue({ id: \"${LINEAR_ISSUE}\" })
