@@ -92,10 +92,12 @@ $PG "insert into permissions_utilisateur (\"userId\", permission, autorise) sele
 codeU=$(curl -s -o /dev/null -w "%{http_code}" --cookie "token=$TOKEN_A" \
   "$NEWSTACK_URL/api/trpc/utilisateurs.list?batch=1&input=%7B%7D")
 [ "$codeU" = "200" ] && echo "  ✓ utilisateurs.list (perm utilisateurs.gerer accordée) -> 200" || { echo "  ✖ utilisateurs.list -> $codeU (attendu 200)"; fail=1; }
-# Sans la permission, B doit être refusé (403) — preuve que le gate mord vraiment.
+# B est PROPRIÉTAIRE de son tenant (un artisan chacun) → il bypasse les gates de permission (OPE-243)
+# même sans la permission DB → 200 attendu. Le refus pour un NON-propriétaire (collaborateur sans perm)
+# est couvert par les tests unitaires `permission-procedure.test.ts` (collaborateur → FORBIDDEN).
 codeUB=$(curl -s -o /dev/null -w "%{http_code}" --cookie "token=$TOKEN_B" \
   "$NEWSTACK_URL/api/trpc/utilisateurs.list?batch=1&input=%7B%7D")
-[ "$codeUB" = "403" ] && echo "  ✓ utilisateurs.list (B sans permission) -> 403" || { echo "  ✖ utilisateurs.list B -> $codeUB (attendu 403)"; fail=1; }
+[ "$codeUB" = "200" ] && echo "  ✓ utilisateurs.list (B propriétaire → bypass perm) -> 200" || { echo "  ✖ utilisateurs.list B -> $codeUB (attendu 200, owner bypass OPE-243)"; fail=1; }
 
 # 2f) comptabilite : gardé par `comptabilite.voir`. On accorde la permission à A (idempotent) puis on
 # attend 200 sur getBalance ET getFecPreview (générateur FEC complet, lecture seule).
@@ -104,8 +106,9 @@ for cp in comptabilite.getBalance comptabilite.getFecPreview; do
   codeC=$(curl -s -o /dev/null -w "%{http_code}" --cookie "token=$TOKEN_A" "$NEWSTACK_URL/api/trpc/$cp?batch=1&input=%7B%7D")
   [ "$codeC" = "200" ] && echo "  ✓ $cp (perm comptabilite.voir) -> 200" || { echo "  ✖ $cp -> $codeC (attendu 200)"; fail=1; }
 done
+# Idem : B propriétaire → bypass de `comptabilite.voir` (OPE-243) → 200.
 codeCB=$(curl -s -o /dev/null -w "%{http_code}" --cookie "token=$TOKEN_B" "$NEWSTACK_URL/api/trpc/comptabilite.getBalance?batch=1&input=%7B%7D")
-[ "$codeCB" = "403" ] && echo "  ✓ comptabilite.getBalance (B sans permission) -> 403" || { echo "  ✖ comptabilite.getBalance B -> $codeCB (attendu 403)"; fail=1; }
+[ "$codeCB" = "200" ] && echo "  ✓ comptabilite.getBalance (B propriétaire → bypass perm) -> 200" || { echo "  ✖ comptabilite.getBalance B -> $codeCB (attendu 200, owner bypass OPE-243)"; fail=1; }
 
 # 3) Contrôle d'isolation : l'auth fonctionne aussi pour B (tenant distinct) — 200 (ses propres données).
 codeB=$(curl -s -o /dev/null -w "%{http_code}" --cookie "token=$TOKEN_B" \
