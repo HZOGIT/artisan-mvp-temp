@@ -162,6 +162,13 @@
       "when": 1782376071034,
       "tag": "0022_signature-document-hash",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1782377993952,
+      "tag": "0023_tricky_shard",
+      "breakpoints": true
     }
   ]
 }
