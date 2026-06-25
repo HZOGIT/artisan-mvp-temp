@@ -44,9 +44,9 @@ describe("rapports use-cases", () => {
   it("executer : type 'financier' → agrégat calculé depuis les factures", async () => {
     const repo = new FakeRapportRepository();
     const r = repo.seedRapport({ artisanId: A, nom: "Fin", type: "financier" });
-    repo.seedEntite(A, "ventes", [{ statut: "payee", totalTTC: "200" }, { statut: "brouillon", totalTTC: "50" }]);
+    repo.seedEntite(A, "ventes", [{ statut: "payee", totalHT: "167.00", typeDocument: "facture" }, { statut: "brouillon", totalHT: "42.00", typeDocument: "facture" }]);
     const res = await executerRapport(repo, ctx(A), r.id, undefined, () => 0);
-    expect(res.resultats).toEqual([{ totalCA: 200, nombreFactures: 2, facturesPayees: 1 }]);
+    expect(res.resultats).toEqual([{ totalCA: 167, nombreFactures: 2, facturesPayees: 1 }]);
     expect(res.nombreLignes).toBe(1);
   });
 
