@@ -17,7 +17,7 @@ BUS_PROCESSED="$BUS_DIR/processed"
 BUS_LOG="$BUS_DIR/bus.log"
 
 # Known message types (see CLAUDE.md "Communication inter-agents").
-BUS_TYPES="TASK_DELEGATE TASK_DONE REQUEST_REVIEW BLOCKED ALERT ACK"
+BUS_TYPES="TASK_DELEGATE TASK_DONE REQUEST_REVIEW BLOCKED ALERT ACK PR_READY REVIEW_FEEDBACK"
 
 # Reserved recipient that means "the human operator" — never has a screen.
 BUS_HUMAN="human"

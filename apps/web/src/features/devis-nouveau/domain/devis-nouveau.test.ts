@@ -16,7 +16,7 @@ describe("devis-nouveau — domain pur", () => {
     expect(moveLine([a, b, c], 2, "down").map((l) => l.id)).toEqual(["a", "b", "c"]);
   });
   it("ligneFromArticle : TVA article sinon courante", () => {
-    const art = { nom: "Robinet", prix_base: "75", unite: "u", tauxTVA: "5.5" } as ArticleSearchResult;
+    const art = { nom: "Robinet", prixBase: "75", unite: "u", tauxTVA: "5.5" } as ArticleSearchResult;
     expect(ligneFromArticle(ligne({ tvaCategorieId: "FR_20" }), art)).toMatchObject({ description: "Robinet", prixUnitaireHT: 75, tvaCategorieId: "FR_5_5" });
     expect(ligneFromArticle(ligne({ tvaCategorieId: "FR_20" }), { ...art, tauxTVA: null }).tvaCategorieId).toBe("FR_20");
   });

@@ -7,24 +7,63 @@ Instructions et conventions pour les agents Claude Code travaillant sur ce proje
 Voir le skill → `.claude/skills/launch-agent.md`
 
 ```bash
+# Session classique (commit direct sur staging)
 INIT_PROMPT=./scripts/prompts/<prompt>.md ./scripts/launch-claude-bg.sh <nom> [model]
+
+# Session worktree isolée (branche + PR → reviewer merge)
+INIT_PROMPT=./scripts/prompts/<prompt>.md ./scripts/launch-claude-bg.sh <nom> [model] --worktree
 ```
+
+### Mode worktree + reviewer (recommandé pour les nouvelles features / fixes non urgents)
+
+`--worktree` crée automatiquement un `git worktree` isolé à `/tmp/wt-<nom>` sur la branche
+`feat/<nom>`, et injecte `scripts/prompts/_worktree-footer.md` dans le prompt. Ce footer
+impose au agent de : committer sur sa branche → `gh pr create --base staging` → notifier
+le reviewer via `notify.sh reviewer PR_READY`.
+
+**Session reviewer** — persistante, lancée une seule fois :
+```bash
+INIT_PROMPT=./scripts/prompts/reviewer-agent.md ./scripts/launch-claude-bg.sh reviewer claude-opus-4-8
+```
+Au démarrage, le reviewer crée un `CronCreate(*/5 * * * *)` pour se réveiller automatiquement.
+À chaque tick il : liste les PRs ouvertes → checkout → `pnpm check` + lint → décide :
+- **Corrections requises** : commente la PR sur GitHub + `notify.sh <session> REVIEW_FEEDBACK "message"`
+  (injecté dans le terminal de la session comme si l'humain tapait).
+- **PR approuvée** : `gh pr merge --squash` → cleanup du worktree → `deploy-backend.sh` si
+  backend touché → `ntfy-pub.sh human`.
+
+**Règle** : le reviewer ne merge jamais si `pnpm check` échoue ou si lint retourne des `error`.
+Après 3 rounds de corrections sans avancée → `notify.sh human BLOCKED`.
+
+**Types de messages bus ajoutés** :
+- `PR_READY` — envoyé par la session worker quand la PR est prête
+- `REVIEW_FEEDBACK` — envoyé par le reviewer vers la session worker pour demander des corrections
 
 ## Structure du projet
 
 ```
 scripts/
-  launch-claude-bg.sh     # Lance une session agent en arrière-plan
-  prompts/                # Prompts d'initialisation des sessions agents
+  launch-claude-bg.sh          # Lance une session agent (--worktree pour isolation)
+  prompts/                     # Prompts d'initialisation des sessions agents
+    _worktree-footer.md        # Injecté auto dans tout prompt --worktree (protocole PR)
+    reviewer-agent.md          # Prompt de la session reviewer persistante
+  agents/
+    notify.sh                  # Envoyer un message inter-agent (ou waker screen)
+    listen.sh                  # Lire sa boîte de messages
+    ntfy-pub.sh                # Push notification vers l'humain
+    agents-status.sh           # Agents actifs + messages en attente
 docs/
-  architecture/           # Documents d'analyse et propositions techniques
-  audits/                 # Rapports d'audit de la codebase
+  architecture/                # Documents d'analyse et propositions techniques
+  audits/                      # Rapports d'audit de la codebase
 .claude/
-  skills/                 # Skills et conventions pour les agents
+  skills/                      # Skills et conventions pour les agents
 eslint/
-  comments-jsdoc-only.mjs # Règle : // interdit sauf directives
-  kebab-filename.mjs      # Règle : noms de fichiers kebab-case
-  no-trpc-in-ui.mjs       # Règle : tRPC interdit dans la couche ui/
+  comments-jsdoc-only.mjs      # Règle : // interdit sauf directives
+  kebab-filename.mjs           # Règle : noms de fichiers kebab-case
+  no-trpc-in-ui.mjs            # Règle : tRPC interdit dans la couche ui/
+  no-direct-env-access.mjs     # Règle : process.env interdit hors config
+  require-zod-input.mjs        # Règle : procédures tRPC doivent avoir .input()
+  require-llm-tracking.mjs     # Règle : appels LLM doivent être tracés
 ```
 
 > **⚠️ Répertoires INTERDITS à recréer** — le dossier `devtools/` a été dissout dans `scripts/` (commit `c1cb0b4f`). Ne jamais le recréer. Tout nouveau prompt va dans `scripts/prompts/`. Tout nouveau script va dans `scripts/`.
@@ -141,7 +180,8 @@ le TYPE, puis, si une étape suivante existe, renotifie l'agent concerné.
 ### Types
 TASK_DELEGATE (prends cette tâche) · TASK_DONE (j'ai fini, enchaîne) ·
 REQUEST_REVIEW (relis/valide) · BLOCKED (je suis bloqué) · ALERT (incident) ·
-ACK (accusé de réception, optionnel).
+ACK (accusé de réception, optionnel) · PR_READY (PR GitHub prête pour review) ·
+REVIEW_FEEDBACK (corrections demandées par le reviewer — injecté comme prompt humain).
 
 ### Superviser
     ./scripts/agents/agents-status.sh   # agents actifs + messages en attente
