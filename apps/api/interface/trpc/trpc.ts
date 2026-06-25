@@ -1,4 +1,5 @@
 import { initTRPC, TRPCError } from "@trpc/server";
+import { ZodError } from "zod";
 import superjson from "superjson";
 import type { AppContext } from "./context";
 import type { TenantContext } from "../../shared/tenant";
@@ -9,7 +10,15 @@ import { NotFoundError, ForbiddenError, ValidationError, ConflictError, TooManyR
  * new-stack DOIT l'utiliser aussi, sinon les payloads de mutation arrivent enveloppés (`{json:…}`)
  * et la validation échoue (`nom` undefined…), et les réponses ne sont pas désérialisables côté front.
  */
-const t = initTRPC.context<AppContext>().create({ transformer: superjson });
+const t = initTRPC.context<AppContext>().create({
+  transformer: superjson,
+  errorFormatter({ shape, error }) {
+    return {
+      ...shape,
+      data: { ...shape.data, zodError: error.cause instanceof ZodError ? error.cause.flatten() : null },
+    };
+  },
+});
 
 export const router = t.router;
 

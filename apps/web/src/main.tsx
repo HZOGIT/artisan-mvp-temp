@@ -100,7 +100,7 @@ const trpcClient = trpc.createClient({
       false: splitLink({
         condition: (op) => op.path.startsWith('dashboard.') || DASHBOARD_UNBATCHED.has(op.path),
         true: httpLink({ url: `${BACKEND_URL}/api/trpc`, transformer: superjson, fetch: fetchWithCreds }),
-        false: httpBatchLink({ url: `${BACKEND_URL}/api/trpc`, transformer: superjson, fetch: fetchWithCreds }),
+        false: httpBatchLink({ url: `${BACKEND_URL}/api/trpc`, transformer: superjson, fetch: fetchWithCreds, maxURLLength: 2083, maxItems: 10 }),
       }),
     }),
   ],
