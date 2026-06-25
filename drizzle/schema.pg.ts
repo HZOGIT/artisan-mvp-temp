@@ -444,6 +444,7 @@ export const modelesDevisLignes = pgTable("modeles_devis_lignes", {
   unite: varchar("unite", { length: 20 }).default("unité"),
   prixUnitaireHT: numeric("prixUnitaireHT", { precision: 10, scale: 2 }).default("0.00"),
   tauxTVA: numeric("tauxTVA", { precision: 5, scale: 2 }).default("20.00"),
+  tvaCategorieId: varchar("tvaCategorieId", { length: 30 }).references(() => tvaCategories.id),
   ordre: integer("ordre").default(1),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });

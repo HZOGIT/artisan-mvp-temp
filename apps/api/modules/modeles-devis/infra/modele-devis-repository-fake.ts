@@ -36,6 +36,7 @@ export class FakeModeleDevisRepository implements IModeleDevisRepository {
       unite: l.unite ?? "unité",
       prixUnitaireHT: l.prixUnitaireHT ?? "0.00",
       tauxTVA: l.tauxTVA ?? "20.00",
+      tvaCategorieId: l.tvaCategorieId ?? null,
       ordre: l.ordre ?? ordreParDefaut,
     };
   }
