@@ -31,25 +31,27 @@ export type ProfilForm = {
   nomEntreprise: string; siret: string; numeroTVA: string; codeAPE: string; specialite: Specialite;
   metier: string; telephone: string; email: string; adresse: string; codePostal: string; ville: string;
   tauxTVA: string; iban: string; formeJuridique: FormeJuridique | ""; capitalSocial: string;
-  villeRCS: string; numeroRM: string;
+  villeRCS: string; numeroRM: string; franchiseTVA: boolean;
 };
 
 export function defaultProfilForm(): ProfilForm {
   return { nomEntreprise: "", siret: "", numeroTVA: "", codeAPE: "", specialite: "plomberie", metier: "",
-    telephone: "", email: "", adresse: "", codePostal: "", ville: "", tauxTVA: "20.00", iban: "",
-    formeJuridique: "", capitalSocial: "", villeRCS: "", numeroRM: "" };
+    telephone: "", email: "", adresse: "", codePostal: "", ville: "", tauxTVA: "20", iban: "",
+    formeJuridique: "", capitalSocial: "", villeRCS: "", numeroRM: "", franchiseTVA: false };
 }
 
 /** Remplit le formulaire depuis le profil (specialite hors-enum → "plomberie"). PUR. */
 export function formFromArtisan(a: Artisan): ProfilForm {
   const spec = a.specialite && (SPECIALITES as string[]).includes(a.specialite) ? (a.specialite as Specialite) : "plomberie";
   const forme = a.formeJuridique && isFormeJuridique(a.formeJuridique) ? a.formeJuridique : "";
+  const rawTaux = parseFloat(a.tauxTVA || "20");
+  const tauxTVA = isNaN(rawTaux) ? "20" : String(rawTaux);
   return {
     nomEntreprise: a.nomEntreprise || "", siret: a.siret || "", numeroTVA: a.numeroTVA || "", codeAPE: a.codeAPE || "",
     specialite: spec, metier: a.metier || "", telephone: a.telephone || "", email: a.email || "",
-    adresse: a.adresse || "", codePostal: a.codePostal || "", ville: a.ville || "", tauxTVA: a.tauxTVA || "20.00",
+    adresse: a.adresse || "", codePostal: a.codePostal || "", ville: a.ville || "", tauxTVA,
     iban: a.iban || "", formeJuridique: forme, capitalSocial: a.capitalSocial != null ? String(a.capitalSocial) : "",
-    villeRCS: a.villeRCS || "", numeroRM: a.numeroRM || "",
+    villeRCS: a.villeRCS || "", numeroRM: a.numeroRM || "", franchiseTVA: a.franchiseTVA ?? false,
   };
 }
 
@@ -65,6 +67,7 @@ export function buildUpdatePayload(form: ProfilForm): UpdateProfileInput {
     adresse: form.adresse, codePostal: form.codePostal, ville: form.ville, tauxTVA: form.tauxTVA, iban: form.iban,
     formeJuridique: form.formeJuridique || undefined,
     capitalSocial: form.capitalSocial || undefined, villeRCS: form.villeRCS || undefined, numeroRM: form.numeroRM || undefined,
+    franchiseTVA: form.franchiseTVA,
   };
 }
 
