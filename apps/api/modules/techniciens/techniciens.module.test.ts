@@ -64,6 +64,7 @@ describe("techniciens.module", () => {
       "getStats",
       "list",
       "setDisponibilite",
+      "setSuiviActif",
       "update",
     ]);
   });

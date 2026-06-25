@@ -2,7 +2,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { ITechnicienRepository } from "../../application/technicien-repository";
 import { listTechniciens, getTechnicien, listDisponibilites, getDernierePosition, listerUtilisateursLiables, listHabilitations, getStatsTechnicien } from "../../application/read-use-cases";
-import { creerTechnicien, modifierTechnicien, supprimerTechnicien, definirDisponibilite, enregistrerPosition, ajouterHabilitation, supprimerHabilitation } from "../../application/write-use-cases";
+import { creerTechnicien, modifierTechnicien, supprimerTechnicien, definirDisponibilite, enregistrerPosition, ajouterHabilitation, supprimerHabilitation, setSuiviActif } from "../../application/write-use-cases";
 
 const couleur = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal(""));
 const coutHoraire = z.string().regex(/^\d+(\.\d{1,2})?$/, "Coût horaire invalide").max(12);
@@ -121,6 +121,11 @@ export function createTechniciensRouter(repo: ITechnicienRepository) {
         const { technicienId, ...data } = input;
         return enregistrerPosition(repo, ctx.tenant, technicienId, data);
       }),
+
+    /** CNIL — active/désactive le suivi GPS d'un technicien (interrupteur salarié). */
+    setSuiviActif: protectedProcedure
+      .input(z.object({ technicienId: z.number().int(), actif: z.boolean() }))
+      .mutation(({ ctx, input }) => setSuiviActif(repo, ctx.tenant, input.technicienId, input.actif)),
 
     /** ── Habilitations / certifications BTP (données salarié — anti-IDOR ownership) ──────────── */
     getHabilitations: protectedProcedure

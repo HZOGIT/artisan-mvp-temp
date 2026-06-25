@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { FakeTechnicienRepository } from "../infra/technicien-repository-fake";
-import { creerTechnicien, modifierTechnicien, supprimerTechnicien, definirDisponibilite, enregistrerPosition } from "./write-use-cases";
+import { creerTechnicien, modifierTechnicien, supprimerTechnicien, definirDisponibilite, enregistrerPosition, setSuiviActif } from "./write-use-cases";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import { NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
@@ -64,5 +64,24 @@ describe("techniciens — use-cases écriture (repo mocké)", () => {
     // anti-IDOR géoloc : B sur le technicien de A → NotFound
     await expect(enregistrerPosition(repo, B, techA, { latitude: "48.85", longitude: "2.35" })).rejects.toBeInstanceOf(NotFoundError);
     await expectCrossTenantDenied(() => enregistrerPosition(repo, B, techA, { latitude: "48.85", longitude: "2.35" }));
+  });
+
+  it("enregistrerPosition refusée si suiviActif = false (CNIL)", async () => {
+    await setSuiviActif(repo, A, techA, false);
+    await expect(
+      enregistrerPosition(repo, A, techA, { latitude: "48.85", longitude: "2.35" }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    // réactivation → OK
+    await setSuiviActif(repo, A, techA, true);
+    const p = await enregistrerPosition(repo, A, techA, { latitude: "48.85", longitude: "2.35" });
+    expect(p.latitude).toBe("48.85");
+  });
+
+  it("setSuiviActif : toggle OK / cross-tenant → NotFound", async () => {
+    const off = await setSuiviActif(repo, A, techA, false);
+    expect(off.suiviActif).toBe(false);
+    const on = await setSuiviActif(repo, A, techA, true);
+    expect(on.suiviActif).toBe(true);
+    await expect(setSuiviActif(repo, B, techA, false)).rejects.toBeInstanceOf(NotFoundError);
   });
 });

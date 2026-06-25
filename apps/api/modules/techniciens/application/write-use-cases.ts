@@ -72,6 +72,7 @@ export async function definirDisponibilite(
 /*
  * Enregistre une position GPS (anti-IDOR : null si technicien hors tenant → NotFound).
  * Valide la plage des coordonnées (latitude -90..90, longitude -180..180).
+ * CNIL : refuse si le suivi GPS est désactivé par le technicien (`suiviActif = false`).
  */
 export async function enregistrerPosition(
   repo: ITechnicienRepository,
@@ -83,9 +84,24 @@ export async function enregistrerPosition(
   const lon = Number(input.longitude);
   if (!Number.isFinite(lat) || lat < -90 || lat > 90) throw new ValidationError("Latitude invalide");
   if (!Number.isFinite(lon) || lon < -180 || lon > 180) throw new ValidationError("Longitude invalide");
+  const technicien = await repo.getById(ctx, technicienId);
+  if (!technicien) throw new NotFoundError("Technicien introuvable");
+  if (!technicien.suiviActif) throw new ValidationError("Suivi GPS désactivé pour ce technicien");
   const position = await repo.enregistrerPosition(ctx, technicienId, input);
   if (!position) throw new NotFoundError("Technicien introuvable");
   return position;
+}
+
+/** Active ou désactive le suivi GPS d'un technicien (CNIL — interrupteur salarié). */
+export async function setSuiviActif(
+  repo: ITechnicienRepository,
+  ctx: TenantContext,
+  technicienId: number,
+  actif: boolean,
+): Promise<Technicien> {
+  const updated = await repo.setSuiviActif(ctx, technicienId, actif);
+  if (!updated) throw new NotFoundError("Technicien introuvable");
+  return updated;
 }
 
 /*

@@ -37,7 +37,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/shared/ui/table";
-import { Users, Plus, Pencil, Trash2, Phone, Mail, Wrench, Calendar, ShieldCheck } from "lucide-react";
+import { Users, Plus, Pencil, Trash2, Phone, Mail, Wrench, Calendar, ShieldCheck, MapPin, MapPinOff } from "lucide-react";
 import { toast } from "sonner";
 
 /*
@@ -91,7 +91,7 @@ export default function TechniciensPage() {
   const [selectedTechnicien, setSelectedTechnicien] = useState<number | null>(null);
   const [habilForm, setHabilForm] = useState({ type: "", numero: "", organisme: "", dateObtention: "", dateExpiration: "" });
 
-  const { techniciens, linkableUsers, create: createMutation, update: updateMutation, remove: deleteMutation } =
+  const { techniciens, linkableUsers, create: createMutation, update: updateMutation, remove: deleteMutation, setSuiviActif: setSuiviActifMutation } =
     useTechniciens();
   const { stats, habilitations, addHabilitation: addHabilMutation, deleteHabilitation: deleteHabilMutation } =
     useTechnicienDetail(selectedTechnicien);
@@ -400,6 +400,25 @@ export default function TechniciensPage() {
                             }}
                           >
                             <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title={tech.suiviActif ? t("gpsDesactiver") : t("gpsActiver")}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSuiviActifMutation.mutate(
+                                { technicienId: tech.id, actif: !tech.suiviActif },
+                                {
+                                  onSuccess: () => toast.success(tech.suiviActif ? t("toastGpsOff") : t("toastGpsOn")),
+                                  onError: (error) => toast.error(error.message),
+                                },
+                              );
+                            }}
+                          >
+                            {tech.suiviActif
+                              ? <MapPin className="h-4 w-4 text-green-600" />
+                              : <MapPinOff className="h-4 w-4 text-muted-foreground" />}
                           </Button>
                           <Button
                             variant="ghost"

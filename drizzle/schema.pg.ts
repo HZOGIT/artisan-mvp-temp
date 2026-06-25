@@ -507,6 +507,8 @@ export const techniciens = pgTable("techniciens", {
   coutHoraire: numeric("coutHoraire", { precision: 8, scale: 2 }),
   userId: integer("userId"),
   notes: text("notes"),
+  /** CNIL géoloc — le technicien peut désactiver son suivi GPS hors temps de travail. */
+  suiviActif: boolean("suiviActif").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
@@ -539,6 +541,8 @@ export const positionsTechniciens = pgTable("positions_techniciens", {
   enDeplacement: boolean("enDeplacement").default(false),
   interventionEnCoursId: integer("interventionEnCoursId"),
   timestamp: timestamp("timestamp").defaultNow().notNull(),
+  /** CNIL — date d'expiration de la position (8 h après l'enregistrement, purgée par le cron). */
+  expiresAt: timestamp("expiresAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type PositionTechnicien = typeof positionsTechniciens.$inferSelect;

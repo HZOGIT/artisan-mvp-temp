@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, lt, or, sql } from "drizzle-orm";
 import {
   techniciens,
   positionsTechniciens,
@@ -81,10 +81,13 @@ function toTechnicien(r: TechnicienRow): Technicien {
     coutHoraire: r.coutHoraire ?? null,
     userId: r.userId ?? null,
     notes: r.notes ?? null,
+    suiviActif: r.suiviActif ?? true,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };
 }
+
+const GPS_RETENTION_MS = 8 * 60 * 60 * 1000;
 
 /*
  * Implémentation Drizzle du repository techniciens. Double cloisonnement : RLS (rôle app
@@ -237,6 +240,7 @@ export class TechnicienRepositoryDrizzle implements ITechnicienRepository {
   ): Promise<Position | null> {
     return withTenant(this.db, ctx, async (tx) => {
       if (!(await this.ownsTechnicien(tx, ctx, technicienId))) return null;
+      const expiresAt = new Date(Date.now() + GPS_RETENTION_MS);
       const [row] = await tx
         .insert(positionsTechniciens)
         .values({
@@ -249,10 +253,31 @@ export class TechnicienRepositoryDrizzle implements ITechnicienRepository {
           batterie: input.batterie ?? null,
           enDeplacement: input.enDeplacement ?? false,
           interventionEnCoursId: input.interventionEnCoursId ?? null,
+          expiresAt,
         })
         .returning();
       return toPosition(row);
     });
+  }
+
+  setSuiviActif(ctx: TenantContext, technicienId: number, actif: boolean): Promise<Technicien | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .update(techniciens)
+        .set({ suiviActif: actif, updatedAt: new Date() })
+        .where(and(eq(techniciens.id, technicienId), eq(techniciens.artisanId, ctx.artisanId)))
+        .returning();
+      return row ? toTechnicien(row) : null;
+    });
+  }
+
+  async purgerPositionsExpirees(): Promise<number> {
+    const now = new Date();
+    const deleted = await this.db
+      .delete(positionsTechniciens)
+      .where(lt(positionsTechniciens.expiresAt, now))
+      .returning({ id: positionsTechniciens.id });
+    return deleted.length;
   }
 
   getUsersLiables(ctx: TenantContext): Promise<UtilisateurLiable[]> {

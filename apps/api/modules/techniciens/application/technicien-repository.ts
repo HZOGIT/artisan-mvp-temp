@@ -37,6 +37,10 @@ export interface ITechnicienRepository {
   getDernierePosition(ctx: TenantContext, technicienId: number): Promise<Position | null>;
   /** Enregistre une position GPS — null si le technicien n'appartient pas au tenant. */
   enregistrerPosition(ctx: TenantContext, technicienId: number, input: EnregistrerPositionInput): Promise<Position | null>;
+  /** Active ou désactive le suivi GPS du technicien (CNIL) — null si hors tenant. */
+  setSuiviActif(ctx: TenantContext, technicienId: number, actif: boolean): Promise<Technicien | null>;
+  /** Supprime les positions GPS expirées (expiresAt < now()) — renvoie le nombre de lignes supprimées. */
+  purgerPositionsExpirees(): Promise<number>;
 
   /*
    * Utilisateurs du tenant liables à une fiche technicien (propriétaire + collaborateurs).
