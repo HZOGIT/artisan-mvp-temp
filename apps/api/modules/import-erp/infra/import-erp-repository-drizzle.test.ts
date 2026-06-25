@@ -86,4 +86,61 @@ describe.skipIf(!URL)("ImportErpRepositoryDrizzle (RLS import ERP)", () => {
     expect(numeros.filter((n) => n !== "LEGACY-2024-007")).toHaveLength(1); // l'autre a un numéro généré
     expect(await repo.listFactureNumeros(ctx(artisanB))).toEqual([]); // anti-IDOR
   });
+
+  it("createFactureLight : crée une ligne synthétique HT/TVA à partir du TTC", async () => {
+    await repo.createFactureLight(ctx(artisanA), {
+      clientId: clientA, numero: "IMPORT-HT-001", objet: "Import avec HT/TVA", statut: "brouillon",
+      dateFacture: new Date("2026-01-15"), dateEcheance: new Date("2026-02-15"), totalTTC: "120.00",
+      lignes: [
+        {
+          designation: "Reprise historique",
+          quantite: "1",
+          prixUnitaireHT: "100.00",
+          tauxTVA: "20.00",
+          tvaCategorieId: "FR_20",
+          montantHT: "100.00",
+          montantTVA: "20.00",
+        },
+      ],
+    });
+    const { rows } = await admin.query(
+      'select f.numero, f."totalTTC", l.designation, l."prixUnitaireHT", l."tauxTVA", l."montantHT", l."montantTVA" from factures f left join factures_lignes l on f.id = l."factureId" where f.numero = $1',
+      ["IMPORT-HT-001"],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].totalTTC).toBe("120.00");
+    expect(rows[0].designation).toBe("Reprise historique");
+    expect(rows[0].prixUnitaireHT).toBe("100.00");
+    expect(rows[0].tauxTVA).toBe("20.00");
+    expect(rows[0].montantHT).toBe("100.00");
+    expect(rows[0].montantTVA).toBe("20.00");
+  });
+
+  it("createFactureLight : crée une ligne avec tauxTVA personnalisé (10%)", async () => {
+    await repo.createFactureLight(ctx(artisanA), {
+      clientId: clientA, numero: "IMPORT-HT-002", objet: "Import 10% TVA", statut: "brouillon",
+      dateFacture: new Date("2026-01-20"), dateEcheance: new Date("2026-02-20"), totalTTC: "110.00",
+      lignes: [
+        {
+          designation: "Reprise historique",
+          quantite: "1",
+          prixUnitaireHT: "100.00",
+          tauxTVA: "10.00",
+          tvaCategorieId: "FR_10",
+          montantHT: "100.00",
+          montantTVA: "10.00",
+        },
+      ],
+    });
+    const { rows } = await admin.query(
+      'select f.numero, f."totalTTC", l."tauxTVA", l."montantHT", l."montantTVA", l."tvaCategorieId" from factures f left join factures_lignes l on f.id = l."factureId" where f.numero = $1',
+      ["IMPORT-HT-002"],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].totalTTC).toBe("110.00");
+    expect(rows[0].tauxTVA).toBe("10.00");
+    expect(rows[0].montantHT).toBe("100.00");
+    expect(rows[0].montantTVA).toBe("10.00");
+    expect(rows[0].tvaCategorieId).toBe("FR_10");
+  });
 });
