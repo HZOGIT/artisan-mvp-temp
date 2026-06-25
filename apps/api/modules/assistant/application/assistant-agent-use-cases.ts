@@ -88,29 +88,18 @@ export async function* runAssistantAgent(
   if (!input.message || !input.message.trim()) throw new ValidationError("Message requis");
   if (!(await deps.rateLimiter.check(`ia:${ctx.artisanId}`))) throw new TooManyRequestsError("Trop de requêtes. Réessayez dans quelques minutes.");
 
-  const artisan = await deps.artisanReader.getArtisan(ctx);
+  const [artisan, statsOrNull, threadId] = await Promise.all([
+    deps.artisanReader.getArtisan(ctx),
+    deps.statsReader.getStats(ctx).catch(() => null),
+    input.threadId
+      ? Promise.resolve(input.threadId)
+      : deps.threadWriter.createThread(ctx, input.message).catch(() => 0),
+  ]);
   const metier = (artisan?.metier as string | null | undefined) || (artisan?.specialite as string | null | undefined) || null;
-
-  /** Stats best-effort (un échec ne casse pas le chat). */
-  let stats = { devisEnCours: 0, facturesImpayeesCount: 0, facturesImpayeesTotal: 0 };
-  try {
-    const s = await deps.statsReader.getStats(ctx);
-    stats = { devisEnCours: s.nbDevisEnAttente, facturesImpayeesCount: s.nbFacturesImpayees, facturesImpayeesTotal: s.montantImpayees };
-  } catch {
-    /* best-effort */
-  }
-
+  const stats = statsOrNull
+    ? { devisEnCours: statsOrNull.nbDevisEnAttente, facturesImpayeesCount: statsOrNull.nbFacturesImpayees, facturesImpayeesTotal: statsOrNull.montantImpayees }
+    : { devisEnCours: 0, facturesImpayeesCount: 0, facturesImpayeesTotal: 0 };
   const system = buildAssistantSystemPrompt({ artisanName: artisan?.nomEntreprise ?? null, metier, stats, pageContext: input.pageContext });
-
-  /** Thread : réutilise le threadId fourni, sinon en crée un (best-effort). */
-  let threadId = input.threadId ?? 0;
-  if (!threadId) {
-    try {
-      threadId = await deps.threadWriter.createThread(ctx, input.message);
-    } catch {
-      threadId = 0;
-    }
-  }
   if (threadId) yield { threadId };
 
   /** Historique (≤ fenêtre) puis le message courant. */
