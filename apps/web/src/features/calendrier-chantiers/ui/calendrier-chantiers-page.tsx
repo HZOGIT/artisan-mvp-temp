@@ -87,7 +87,16 @@ export default function CalendrierChantiersPage() {
     }, 100);
   };
   const cancelChange = () => { setShowConfirmDialog(false); setPendingChange(null); };
-  const setInterventionColor = (id: number, colorClass: string) => { setCustomColors((p) => ({ ...p, [id]: colorClass })); setCouleur.mutate({ interventionId: id, couleur: colorClass }); toast.success(t("toastCouleur")); };
+  const setInterventionColor = (id: number, colorClass: string) => {
+    setCustomColors((p) => ({ ...p, [id]: colorClass }));
+    setCouleur.mutate(
+      { interventionId: id, couleur: colorClass },
+      {
+        onSuccess: () => toast.success(t("toastCouleur")),
+        onError: (e) => toast.error(t("errCouleur", { msg: e.message })),
+      }
+    );
+  };
 
   const exportCsv = () => {
     const blob = new Blob([buildCsv(filtered)], { type: "text/csv;charset=utf-8;" });

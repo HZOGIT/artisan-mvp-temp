@@ -71,6 +71,7 @@
   "conflitConge": "congé approuvé sur la période",
   "errReassignation": "Erreur lors de la réassignation: {{msg}}",
   "toastCouleur": "Couleur sauvegardée",
+  "errCouleur": "Erreur lors de la sauvegarde de la couleur: {{msg}}",
   "toastExporte": "Calendrier exporté",
   "toastPdf": "PDF téléchargé avec succès",
   "errImprimer": "Impossible d'imprimer le calendrier",

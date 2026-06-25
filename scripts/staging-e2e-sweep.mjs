@@ -57,12 +57,23 @@ let navCount = 0;
 page.on('console', (m) => {
   if (m.type() === 'error') {
     const t = m.text();
-    // bruit connu inoffensif à ignorer
-    if (/Download the React DevTools|preloaded using link preload|favicon/i.test(t)) return;
+    /* Ignorer SEULEMENT le bruit tiers ; JAMAIS ignorer /api/ interne */
+    if (/Download the React DevTools|preloaded using link preload|favicon|net::ERR_BLOCKED_BY_CLIENT|ERR_OICSP_|Uncaught SyntaxError|polyfill|extension/.test(t)) return;
+    /* Scope "Failed to fetch/load" : ignore seulement si c'est tiers (CDN/analytics), pas /api/ interne */
+    if (/^failed to (fetch|load)/i.test(t) && !/api\//.test(current)) return;
     add({ route: current, type: 'console', text: t.slice(0, 400) });
   }
 });
 page.on('pageerror', (e) => add({ route: current, type: 'pageerror', text: String(e?.message || e).slice(0, 400) }));
+page.on('requestfailed', (r) => {
+  const u = r.url();
+  /* Ignorer SEULEMENT les hôtes tiers (CDN, analytics tiers, etc.) */
+  /* JAMAIS ignorer /api/ interne */
+  if (/^https?:\/\/(cdn\.|[^/]*cloudflare|fonts\.googleapis|google-analytics\.com|googletagmanager\.com|sentry\.io|segment\.com|gtag\.)/.test(u)) return;
+  if (r.failure()?.errorText?.includes('ERR_BLOCKED_BY_CLIENT')) return;
+  /* Capturer toutes les erreurs de requête (sauf les hôtes tiers strictement définis) */
+  add({ route: current, type: 'request-failed', text: `${r.failure()?.errorText || 'unknown'}: ${u.replace(BASE, '').slice(0, 150)}` });
+});
 page.on('response', (r) => {
   const u = r.url();
   if (u.includes('/api/') && r.status() >= 400) {
