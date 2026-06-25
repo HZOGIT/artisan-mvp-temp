@@ -42,7 +42,7 @@ export function generateFacturXML(
           baseHT: round2(v.baseHT),
           montantTVA: round2(v.montantTVA),
         }))
-      : [{ taux: parseFloat(String(artisan.tauxTVA ?? "20")) || 20, baseHT: totalHT, montantTVA: totalTVA }];
+      : [{ taux: parseFloat(String(artisan.tauxTVA ?? "20")), baseHT: totalHT, montantTVA: totalTVA }];
 
   const sellerName = escXml(artisan.nomEntreprise || "Artisan");
   const sellerAddr = escXml(artisan.adresse || "");

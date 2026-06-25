@@ -27,7 +27,7 @@ function unwrap(raw: unknown): unknown {
   const env: unknown = Array.isArray(raw) ? raw[0] : raw;
   if (env != null && typeof env === "object" && "result" in env) {
     const typed = env as { result: Record<string, unknown> };
-    if ("data" in typed.result) {
+    if (typed.result != null && "data" in typed.result) {
       const deserialized = superjson.deserialize(typed.result["data"] as Parameters<typeof superjson.deserialize>[0]);
       return { ...typed, result: { ...typed.result, data: deserialized } };
     }

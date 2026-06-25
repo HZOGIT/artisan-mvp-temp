@@ -28,8 +28,8 @@ export class WebAudioCapture implements AudioCapture {
         },
       });
     } catch (e: unknown) {
-      const err = e as { name?: string; message?: string };
-      vlog(`❌ getUserMedia FAILED: ${err?.name} ${err?.message}`);
+      const isErr = e instanceof Error;
+      vlog(`❌ getUserMedia FAILED: ${isErr ? e.name : ''} ${isErr ? e.message : String(e)}`);
       throw e;
     }
 
