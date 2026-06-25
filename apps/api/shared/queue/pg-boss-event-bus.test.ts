@@ -1,6 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { FakeEventBus, FakeWorkerPort } from "../ports/fakes";
+import { PgBossEventBus } from "./pg-boss-event-bus";
+import { PgBossWorkerAdapter } from "./pg-boss-worker-adapter";
 import { registerWorkers } from "./workers";
+import type { PgBoss } from "pg-boss";
 import type { DomainEvent } from "../ports/event-bus";
 
 const makeEvent = <T>(type: string, payload: T): DomainEvent<T> => ({
@@ -9,6 +12,59 @@ const makeEvent = <T>(type: string, payload: T): DomainEvent<T> => ({
   aggregateType: "facture",
   payload,
   occurredAt: new Date("2026-01-01T00:00:00Z"),
+});
+
+function makeMockBoss(): PgBoss {
+  return {
+    send: vi.fn().mockResolvedValue("job-id"),
+    insert: vi.fn().mockResolvedValue(["job-id"]),
+    work: vi.fn().mockResolvedValue("worker-id"),
+  } as unknown as PgBoss;
+}
+
+describe("PgBossEventBus — contrat adaptateur", () => {
+  it("publish appelle boss.send avec le type et l'event comme data", async () => {
+    const boss = makeMockBoss();
+    const bus = new PgBossEventBus(boss);
+    const event = makeEvent("FACTURE_PAYEE", { factureId: 1 });
+    await bus.publish(event);
+    expect(boss.send).toHaveBeenCalledOnce();
+    expect(boss.send).toHaveBeenCalledWith("FACTURE_PAYEE", event);
+  });
+
+  it("publishMany groupe par type et appelle boss.insert par groupe (tout-ou-rien)", async () => {
+    const boss = makeMockBoss();
+    const bus = new PgBossEventBus(boss);
+    const events = [
+      makeEvent("FACTURE_PAYEE", { factureId: 1 }),
+      makeEvent("FACTURE_PAYEE", { factureId: 2 }),
+      makeEvent("DEVIS_ACCEPTE", { devisId: 3 }),
+    ];
+    await bus.publishMany(events);
+    expect(boss.insert).toHaveBeenCalledTimes(2);
+    const calls = (boss.insert as ReturnType<typeof vi.fn>).mock.calls as [string, { data: unknown }[]][];
+    const factureCall = calls.find(([name]) => name === "FACTURE_PAYEE");
+    expect(factureCall?.[1]).toHaveLength(2);
+    const devisCall = calls.find(([name]) => name === "DEVIS_ACCEPTE");
+    expect(devisCall?.[1]).toHaveLength(1);
+  });
+
+  it("publishMany type unique n'appelle boss.insert qu'une fois", async () => {
+    const boss = makeMockBoss();
+    const bus = new PgBossEventBus(boss);
+    await bus.publishMany([makeEvent("FACTURE_PAYEE", {}), makeEvent("FACTURE_PAYEE", {})]);
+    expect(boss.insert).toHaveBeenCalledOnce();
+  });
+});
+
+describe("PgBossWorkerAdapter — contrat adaptateur", () => {
+  it("register appelle boss.work avec le bon type", () => {
+    const boss = makeMockBoss();
+    const adapter = new PgBossWorkerAdapter(boss);
+    adapter.register("FACTURE_PAYEE", async () => void 0);
+    expect(boss.work).toHaveBeenCalledOnce();
+    expect((boss.work as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe("FACTURE_PAYEE");
+  });
 });
 
 describe("FakeEventBus", () => {

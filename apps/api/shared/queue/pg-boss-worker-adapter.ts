@@ -8,6 +8,8 @@ export class PgBossWorkerAdapter implements WorkerPort {
   register<T>(type: string, handler: (event: DomainEvent<T>) => Promise<void>): void {
     void this.boss.work(type, async (jobs: Job<DomainEvent<T>>[]) => {
       await Promise.all(jobs.map((job) => handler(job.data)));
+    }).catch((err: unknown) => {
+      throw new Error(`[PgBossWorkerAdapter] Échec enregistrement worker "${type}" : ${String(err)}`);
     });
   }
 }

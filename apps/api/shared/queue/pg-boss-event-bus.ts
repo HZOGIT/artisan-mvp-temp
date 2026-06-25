@@ -9,6 +9,16 @@ export class PgBossEventBus implements EventBusPort {
   }
 
   async publishMany<T>(events: readonly DomainEvent<T>[]): Promise<void> {
-    await Promise.all(events.map((e) => this.publish(e)));
+    const byType = new Map<string, DomainEvent<unknown>[]>();
+    for (const e of events) {
+      const group = byType.get(e.type);
+      if (group) group.push(e as DomainEvent<unknown>);
+      else byType.set(e.type, [e as DomainEvent<unknown>]);
+    }
+    await Promise.all(
+      Array.from(byType.entries()).map(([type, group]) =>
+        this.boss.insert(type, group.map((e) => ({ data: e as object })))
+      )
+    );
   }
 }

@@ -15,8 +15,15 @@ async function main(): Promise<void> {
   /* Fail-closed : refuse de servir si le pool runtime peut contourner la RLS. */
   await assertAppRoleExistsAndRestricted(getDbHandle().db);
 
-  const boss = new PgBoss({ connectionString: process.env.DATABASE_URL });
-  await boss.start();
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) throw new Error("DATABASE_URL manquant — requis pour pg-boss");
+
+  const boss = new PgBoss({ connectionString: databaseUrl });
+  await boss.start().catch(async (err: unknown) => {
+    await boss.stop().catch(() => void 0);
+    throw new Error(`Impossible de démarrer pg-boss : ${String(err)}`);
+  });
+
   const eventBus = new PgBossEventBus(boss);
   registerWorkers(new PgBossWorkerAdapter(boss));
 
