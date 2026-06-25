@@ -1,0 +1,1 @@
+ALTER TABLE "parametres_artisan" ADD COLUMN "mediateurConsommation" text;
