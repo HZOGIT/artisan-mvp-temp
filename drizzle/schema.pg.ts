@@ -457,6 +457,7 @@ export type InsertModeleDevisLigne = typeof modelesDevisLignes.$inferInsert;
 // ════════════════════════════════════════════════════════════════════════════
 export const interventionStatutEnum = pgEnum("intervention_statut", ["planifiee", "en_cours", "terminee", "annulee"]);
 export const technicienStatutEnum = pgEnum("technicien_statut", ["actif", "inactif", "conge"]);
+export const typeContratEnum = pgEnum("type_contrat", ["cdi", "cdd", "interimaire", "sous_traitant"]);
 export const vehiculeCarburantEnum = pgEnum("vehicule_carburant", ["essence", "diesel", "electrique", "hybride", "gpl"]);
 export const vehiculeStatutEnum = pgEnum("vehicule_statut", ["actif", "en_maintenance", "hors_service", "vendu"]);
 export const entretienTypeEnum = pgEnum("entretien_type", ["vidange", "pneus", "freins", "controle_technique", "revision", "reparation", "autre"]);
@@ -512,6 +513,7 @@ export const techniciens = pgTable("techniciens", {
   notes: text("notes"),
   /** CNIL géoloc — le technicien peut désactiver son suivi GPS hors temps de travail. */
   suiviActif: boolean("suiviActif").default(true).notNull(),
+  typeContrat: typeContratEnum("typeContrat"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });

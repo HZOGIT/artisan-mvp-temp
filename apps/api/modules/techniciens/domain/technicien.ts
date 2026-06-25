@@ -4,6 +4,7 @@
  */
 
 export type TechnicienStatut = "actif" | "inactif" | "conge";
+export type TypeContrat = "cdi" | "cdd" | "interimaire" | "sous_traitant";
 
 export interface Technicien {
   readonly id: number;
@@ -20,6 +21,7 @@ export interface Technicien {
   readonly notes: string | null;
   /** CNIL — le technicien peut désactiver son suivi GPS hors temps de travail. */
   readonly suiviActif: boolean;
+  readonly typeContrat: TypeContrat | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
@@ -35,6 +37,7 @@ export interface CreateTechnicienInput {
   readonly coutHoraire?: string | null;
   readonly userId?: number | null;
   readonly notes?: string | null;
+  readonly typeContrat?: TypeContrat | null;
 }
 
 export interface UpdateTechnicienInput {
@@ -48,4 +51,5 @@ export interface UpdateTechnicienInput {
   readonly coutHoraire?: string | null;
   readonly userId?: number | null;
   readonly notes?: string | null;
+  readonly typeContrat?: TypeContrat | null;
 }
