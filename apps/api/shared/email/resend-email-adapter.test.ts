@@ -1,11 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ResendEmailAdapter } from "./resend-email-adapter";
 
 // Sans RESEND_API_KEY (env de test) → mode simulation : send() résout sans throw pour un message valide,
 // et rejette sur message invalide (contrat EmailPort). Pas d'envoi réseau réel.
 describe("ResendEmailAdapter (EmailPort, mode simulation hors RESEND_API_KEY)", () => {
   const adapter = new ResendEmailAdapter();
-  it("message valide → résout (simulé)", async () => {
+  it("message valide en dev → résout (simulé)", async () => {
     await expect(adapter.send({ to: "client@example.com", subject: "Devis", body: "<p>Bonjour</p>" })).resolves.toBeUndefined();
   });
   it("paramètres manquants → throw", async () => {
@@ -13,5 +13,18 @@ describe("ResendEmailAdapter (EmailPort, mode simulation hors RESEND_API_KEY)", 
   });
   it("adresse invalide → throw", async () => {
     await expect(adapter.send({ to: "pas-un-email", subject: "x", body: "y" })).rejects.toThrow(/invalide/);
+  });
+  describe("mode production sans RESEND_API_KEY", () => {
+    const origEnv = process.env.NODE_ENV;
+    beforeEach(() => {
+      process.env.NODE_ENV = "production";
+    });
+    afterEach(() => {
+      process.env.NODE_ENV = origEnv;
+    });
+    it("message valide en prod → throw (pas de simulation)", async () => {
+      const prodAdapter = new ResendEmailAdapter();
+      await expect(prodAdapter.send({ to: "client@example.com", subject: "Devis", body: "<p>Bonjour</p>" })).rejects.toThrow(/Service email non configuré/);
+    });
   });
 });

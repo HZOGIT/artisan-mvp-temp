@@ -30,6 +30,10 @@ export class ResendEmailAdapter implements EmailPort {
     if (!to || !subject || !body) throw new Error("Paramètres d'email manquants");
     if (!EMAIL_RE.test(to)) throw new Error("Adresse email invalide");
     if (!resend) {
+      if (process.env.NODE_ENV === "production") {
+        this.log.error({ event: "email_not_configured", to: maskEmail(to), subject }, "RESEND_API_KEY non configuré en production");
+        throw new Error("Service email non configuré");
+      }
       this.log.warn({ event: "email_simulated", to: maskEmail(to), subject }, "Email simulé (Resend non configuré)");
       return;
     }
