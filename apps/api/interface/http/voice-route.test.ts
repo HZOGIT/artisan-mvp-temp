@@ -32,6 +32,7 @@ describe.skipIf(!URL)("POST /api/voice/persist (auth cookie)", () => {
     await admin.query("insert into users (id, email) values ($1,$2),($3,$4)", [UID, `u${UID}@test.fr`, UID_OTHER, `u${UID_OTHER}@test.fr`]);
     const artisanId = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UID])).rows[0].id;
     await admin.query('insert into artisans ("userId") values ($1)', [UID_OTHER]);
+    await admin.query("insert into billing_subscriptions (artisan_id, plan_id, billing_mode, status) values ($1,'pro','maison','active')", [artisanId]);
     threadId = (await admin.query('insert into ai_threads ("artisanId",title,"lastMessageAt") values ($1,$2,now()) returning id', [artisanId, "Voix"])).rows[0].id;
     app = buildApp({ jwtSecret: SECRET });
   });
@@ -56,6 +57,14 @@ describe.skipIf(!URL)("POST /api/voice/persist (auth cookie)", () => {
   it("thread d'un autre tenant → 404 (anti-IDOR)", async () => {
     const tokenOther = await signToken(UID_OTHER);
     expect((await post({ threadId, userTranscript: "intrus" }, tokenOther)).statusCode).toBe(404);
+  });
+
+  it("abonnement inactif → 402 (anti-régression OPE-81)", async () => {
+    const artisanOtherId = (await admin.query('select id from artisans where "userId"=$1', [UID_OTHER])).rows[0].id;
+    const token = await signToken(UID_OTHER);
+    const res = await post({ threadId: 999, userTranscript: "test" }, token);
+    expect(res.statusCode).toBe(402);
+    void artisanOtherId;
   });
 
   it("succès → 200 {ok} + messages persistés (source voice)", async () => {

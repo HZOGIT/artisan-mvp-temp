@@ -33,7 +33,7 @@ class ThrowingTokenPort implements RealtimeVoiceTokenPort {
   }
 }
 
-async function buildTestApp(opts: { rateLimiter?: RateLimiterPort; tokenPort?: RealtimeVoiceTokenPort } = {}) {
+async function buildTestApp(opts: { rateLimiter?: RateLimiterPort; tokenPort?: RealtimeVoiceTokenPort; checkSubscriptionActive?: (artisanId: number) => Promise<boolean> } = {}) {
   const app = Fastify();
   await app.register(cookie);
   registerVoiceTokenRoute(app, {
@@ -46,6 +46,7 @@ async function buildTestApp(opts: { rateLimiter?: RateLimiterPort; tokenPort?: R
     threadsRepo: new FakeAssistantThreadsRepository(),
     tools: TOOLS,
     rateLimiter: opts.rateLimiter ?? allow,
+    checkSubscriptionActive: opts.checkSubscriptionActive ?? (async () => true),
   });
   await app.ready();
   return app;
@@ -81,6 +82,14 @@ describe("registerVoiceTokenRoute", () => {
   it("erreur provider → 502", async () => {
     const app = await buildTestApp({ tokenPort: new ThrowingTokenPort() });
     expect((await post(app, {}, await sign(7))).statusCode).toBe(502);
+    await app.close();
+  });
+
+  it("abonnement inactif → 402 Abonnement requis", async () => {
+    const app = await buildTestApp({ checkSubscriptionActive: async () => false });
+    const res = await post(app, {}, await sign(7));
+    expect(res.statusCode).toBe(402);
+    expect(res.json().error).toBe("Abonnement requis");
     await app.close();
   });
 });
