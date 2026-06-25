@@ -54,7 +54,11 @@ export function makeCreateContext(deps: ContextDeps = {}) {
     }
     if (claims && deps.revocationReader) {
       const changedAt = await deps.revocationReader.getPasswordChangedAt(claims.userId);
-      if (changedAt && claims.iat != null && claims.iat * 1000 < changedAt.getTime()) {
+      /*
+       * Fail-closed : si `passwordChangedAt` est posé (MDP changé au moins une fois), tout token
+       * sans `iat` est également rejeté — un token legacy sans iat ne peut pas prouver sa fraîcheur.
+       */
+      if (changedAt && (claims.iat == null || claims.iat * 1000 < changedAt.getTime())) {
         opts.req.log.warn({ event: "auth_token_revoked", userId: claims.userId }, "Token révoqué (changement de mot de passe)");
         claims = null;
       }
