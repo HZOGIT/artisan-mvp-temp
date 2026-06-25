@@ -76,7 +76,7 @@ export class FakeRapportRepository implements IRapportRepository {
 
   async runReport(ctx: TenantContext, type: RapportType): Promise<unknown[]> {
     if (type === "financier") {
-      const factures = (this.entites.get(this.key(ctx.artisanId, "ventes")) ?? []) as Array<{ statut: string | null; totalTTC: string | null }>;
+      const factures = (this.entites.get(this.key(ctx.artisanId, "ventes")) ?? []) as Array<{ statut: string | null; totalHT: string | null; typeDocument?: string | null }>;
       return computeFinancier(factures);
     }
     return [...(this.entites.get(this.key(ctx.artisanId, type)) ?? [])];
