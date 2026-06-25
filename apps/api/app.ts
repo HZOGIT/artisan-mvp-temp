@@ -107,6 +107,7 @@ import { createSubscriptionModule } from "./modules/subscription/subscription.mo
 import { createBillingModule } from "./modules/billing/billing.module";
 import { BillingRepositoryDrizzle } from "./modules/billing/infra/billing-repository-drizzle";
 import { BillingAdapter } from "./shared/ports/billing-adapter";
+import { mapPlan, normalizeStatus } from "./modules/billing/application/billing-migration";
 import { createPlatformAdminModule } from "./modules/platform-admin/platform-admin.module";
 import { SubscriptionReaderDrizzle } from "./modules/subscription/infra/subscription-reader-drizzle";
 import type { ISubscriptionRepository } from "./modules/subscription/application/subscription-reader";
@@ -977,6 +978,13 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
     onBillingWebhookEvent: (eventType, piId, fc, fm, stripeEventId) =>
       handleBillingWebhookEvent({ repo: billingRepo }, eventType, piId, fc, fm, stripeEventId),
+    onSubscriptionWebhookEvent: async (artisanId, priceId, stripeStatus) => {
+      const planId = mapPlan(priceId, null);
+      const status = normalizeStatus(stripeStatus);
+      const ctx = { artisanId, userId: 0 };
+      await billingRepo.updateSubscriptionPlan(ctx, planId);
+      await billingRepo.updateSubscriptionStatus(ctx, status);
+    },
     markWebhookProcessed: (eventId, eventType) => billingRepo.markWebhookProcessed(eventId, eventType, {}),
   });
 

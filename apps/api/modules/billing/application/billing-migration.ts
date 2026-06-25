@@ -15,7 +15,7 @@ const STRIPE_PRICE_TO_PLAN: Record<string, string> = {
   enterprise: "enterprise",
 };
 
-function mapPlan(stripePriceId: string | null | undefined, legacyPlan: string | null | undefined): string {
+export function mapPlan(stripePriceId: string | null | undefined, legacyPlan: string | null | undefined): string {
   if (stripePriceId) {
     for (const [key, val] of Object.entries(STRIPE_PRICE_TO_PLAN)) {
       if (stripePriceId.toLowerCase().includes(key)) return val;

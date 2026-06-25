@@ -13,6 +13,12 @@ export interface StripeWebhookDeps {
   readonly log?: AppLogger;
   readonly onBillingWebhookEvent?: (eventType: string, paymentIntentId: string, failureCode?: string | null, failureMessage?: string | null, stripeEventId?: string) => Promise<void>;
   /**
+   * Callback déclenché sur customer.subscription.created/updated/deleted.
+   * Reçoit l'artisanId, le priceId Stripe (null si deleted), et le statut Stripe brut.
+   * Le mapping planId + normalisation statut est à la charge du câblage (app.ts).
+   */
+  readonly onSubscriptionWebhookEvent?: (artisanId: number, priceId: string | null, stripeStatus: string) => Promise<void>;
+  /**
    * Garde idempotence Stripe (at-least-once). INSERT ON CONFLICT DO NOTHING → false si déjà vu.
    * Non fourni = pas de dédup (mode test, hors-billing).
    */
@@ -77,6 +83,10 @@ export async function processStripeWebhook(
       }
     } else if (event.type === "customer.subscription.trial_will_end") {
       await handleTrialWillEnd(deps, event.data.object);
+    } else if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.created") {
+      await handleSubscriptionUpsert(deps, event.data.object);
+    } else if (event.type === "customer.subscription.deleted") {
+      await handleSubscriptionDeleted(deps, event.data.object);
     }
     return { http: 200, body: { received: true } };
   } catch (e) {
@@ -122,4 +132,23 @@ async function handleTrialWillEnd(deps: StripeWebhookDeps, sub: Record<string, u
       subscriptionEmail({ title: "Plus que 3 jours d'essai gratuit", body: "Votre periode d'essai Operioz se termine bientot. Choisissez votre plan pour continuer a beneficier de toutes les fonctionnalites sans interruption. Vos donnees sont conservees.", ctaLabel: "Choisir mon plan", ctaUrl: `${deps.appUrl}/parametres?tab=abonnement` }),
     );
   } catch { /* best-effort */ }
+}
+
+async function handleSubscriptionUpsert(deps: StripeWebhookDeps, sub: Record<string, unknown>): Promise<void> {
+  if (!deps.onSubscriptionWebhookEvent) return;
+  const metadata = (sub.metadata ?? {}) as Record<string, unknown>;
+  const artisanId = metadata.artisanId ? Number(metadata.artisanId) : null;
+  if (!artisanId) return;
+  const items = sub.items as { data: Array<{ price?: { id?: string } }> } | undefined;
+  const priceId = items?.data[0]?.price?.id ?? null;
+  const stripeStatus = typeof sub.status === "string" ? sub.status : "active";
+  await deps.onSubscriptionWebhookEvent(artisanId, priceId, stripeStatus);
+}
+
+async function handleSubscriptionDeleted(deps: StripeWebhookDeps, sub: Record<string, unknown>): Promise<void> {
+  if (!deps.onSubscriptionWebhookEvent) return;
+  const metadata = (sub.metadata ?? {}) as Record<string, unknown>;
+  const artisanId = metadata.artisanId ? Number(metadata.artisanId) : null;
+  if (!artisanId) return;
+  await deps.onSubscriptionWebhookEvent(artisanId, null, "canceled");
 }
