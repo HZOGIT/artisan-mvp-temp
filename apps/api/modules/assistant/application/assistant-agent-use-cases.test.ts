@@ -62,7 +62,7 @@ describe("runAssistantAgent", () => {
     expect(events.slice(1)).toEqual([{ content: "Bon" }, { content: "jour" }]);
     expect(events.some((e) => "toolStart" in e)).toBe(false);
     expect(llm.turnInputs[0].system).toContain("MonAssistant");
-    expect(llm.turnInputs[0].tools).toBe(TOOLS);
+    expect(llm.turnInputs[0].tools).toEqual(TOOLS);
     expect(writer.messages.map((m) => m.role)).toEqual(["user", "assistant"]);
     expect(writer.messages[1].transcript).toBe("Bonjour");
   });
@@ -136,5 +136,17 @@ describe("runAssistantAgent", () => {
     expect(events[0]).toEqual({ threadId: 42 });
     expect(writer.threads).toHaveLength(0);
     expect(writer.messages.every((m) => m.threadId === 42)).toBe(true);
+  });
+
+  it("userCanWriteDevis: false → creer_devis filtré, creer_client conservé", async () => {
+    const tools = [findTool("creer_devis")!, findTool("creer_client")!];
+    const writer = new FakeAssistantThreadWriter();
+    const llm = new FakeLlmAgenticPort([{ text: ["ok"] }]);
+    const registry = new FakeAssistantToolRegistry(tools);
+    const deps = { llm, registry, rateLimiter: allow, artisanReader: new FakeArtisan(), statsReader: stats, threadWriter: writer };
+    await collect(runAssistantAgent(deps, ctx(1), { message: "test", userCanWriteDevis: false }));
+    const names = llm.turnInputs[0].tools.map((t: { name: string }) => t.name);
+    expect(names).not.toContain("creer_devis");
+    expect(names).toContain("creer_client");
   });
 });
