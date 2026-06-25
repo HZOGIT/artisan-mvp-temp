@@ -6,6 +6,7 @@ import moduleLayerImports from "./eslint/module-layer-imports.mjs";
 import moduleCompleteness from "./eslint/module-completeness.mjs";
 import noDirectEnvAccess from "./eslint/no-direct-env-access.mjs";
 import requireZodInput from "./eslint/require-zod-input.mjs";
+import requireLlmTracking from "./eslint/require-llm-tracking.mjs";
 
 export default tseslint.config({
   plugins: {
@@ -19,6 +20,7 @@ export default tseslint.config({
         "module-completeness": moduleCompleteness,
         "no-direct-env-access": noDirectEnvAccess,
         "require-zod-input": requireZodInput,
+        "require-llm-tracking": requireLlmTracking,
       },
     },
   },
@@ -52,5 +54,6 @@ export default tseslint.config({
     "import-x/no-cycle": ["warn", { maxDepth: 5 }],
     "local/no-direct-env-access": "warn",
     "local/require-zod-input": "warn",
+    "local/require-llm-tracking": "warn",
   },
 });
