@@ -165,7 +165,8 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
         })
         .returning();
       const insertedMontants: { montantHT: string; montantTVA: string; montantTTC: string }[] = [];
-      for (const [i, l] of lignes.entries()) {
+      for (let i = 0; i < lignes.length; i++) {
+        const l = lignes[i];
         const type = l.type ?? "produit";
         const isDisplay = type === "section" || type === "note";
         const quantite = isDisplay ? "0" : l.quantite ?? "1";
