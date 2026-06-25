@@ -1,4 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
+import { round2 } from "../../../shared/money";
 import type { INotificationRepository } from "./notification-repository";
 
 const MS_PAR_JOUR = 24 * 60 * 60 * 1000;
@@ -28,7 +29,7 @@ export async function genererRappelsFacturesEnRetard(
     /** anti-doublon */
     if (await repo.existeNotificationActive(ctx, lien)) continue;
     const joursRetard = Math.max(0, Math.floor((now - f.dateEcheance.getTime()) / MS_PAR_JOUR));
-    const montant = Number.parseFloat(f.totalTTC || "0").toFixed(2);
+    const montant = round2(Number(f.totalTTC) || 0).toFixed(2);
     await repo.creer(ctx, {
       type: "rappel",
       titre: `Facture ${f.numero} en retard`,

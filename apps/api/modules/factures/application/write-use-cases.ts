@@ -1,6 +1,7 @@
 import { ConflictError, NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import { TVA_CATEGORIES_MAP } from "../../../shared/tva/taux-tva-fr";
+import { round2 } from "../../../shared/money";
 import type { IFactureRepository, AvoirLigneData, CopiedLigneData } from "./facture-repository";
 import type { IDevisReader } from "./devis-reader";
 import type { ComptaPort } from "./compta-port";
@@ -169,7 +170,7 @@ export async function enregistrerPaiementFacture(
   if (cumul > total + EPS) throw new ValidationError("Le montant payé dépasse le total TTC de la facture (sur-paiement)");
   const soldee = total > 0 && cumul >= total - EPS;
   const updated = await repo.enregistrerPaiement(ctx, id, {
-    montantPaye: cumul.toFixed(2),
+    montantPaye: round2(cumul).toFixed(2),
     datePaiement: input.date ?? (soldee ? new Date() : facture.datePaiement),
     modePaiement: input.mode ?? facture.modePaiement,
     statut: soldee ? "payee" : facture.statut,
