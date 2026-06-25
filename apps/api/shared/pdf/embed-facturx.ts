@@ -1,4 +1,4 @@
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, AFRelationship } from "pdf-lib";
 
 /**
  * Embeds Factur-X CII XML into an existing PDF buffer as a named attachment.
@@ -9,6 +9,7 @@ export async function embedFacturXml(pdfBuffer: Buffer, xmlString: string): Prom
   await doc.attach(Buffer.from(xmlString, "utf-8"), "factur-x.xml", {
     mimeType: "application/xml",
     description: "Factur-X XML",
+    afRelationship: AFRelationship.Data,
     creationDate: new Date(),
     modificationDate: new Date(),
   });

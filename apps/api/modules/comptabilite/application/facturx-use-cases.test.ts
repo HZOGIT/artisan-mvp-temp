@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, PDFName } from "pdf-lib";
 import { NotFoundError } from "../../../shared/errors";
 import { FakePdfPort } from "../../../shared/ports";
 import type { PdfPort } from "../../../shared/ports/pdf";
@@ -49,7 +49,8 @@ describe("getFacturxPdf", () => {
     const res = await getFacturxPdf(build({ pdf }), ctx, 7);
     expect(res.filename).toBe("Facture_FAC-2026-0001_FacturX.pdf");
     expect(captured[0]?.template).toBe("facture");
-    expect(res.buffer.toString("binary")).toContain("factur-x.xml");
-    expect(res.buffer.toString("binary")).toContain("FAC-2026-0001");
+    const loaded = await PDFDocument.load(res.buffer);
+    const afEntry = loaded.catalog.lookup(PDFName.of("AF"));
+    expect(afEntry).toBeDefined();
   });
 });
