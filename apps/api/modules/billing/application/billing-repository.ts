@@ -62,6 +62,15 @@ export interface SubscriptionWithDueCycle {
 
 export type BillingEntityType = "billing_cycle" | "billing_subscription" | "billing_payment_method" | "artisan";
 
+export interface CreateInvoiceForCycleParams {
+  readonly artisanId: number;
+  readonly cycleId: number;
+  readonly amountCents: number;
+  readonly taxCents: number;
+  readonly currency: string;
+  readonly planDescription: string;
+}
+
 export interface AppendEventParams {
   readonly entityType: BillingEntityType;
   readonly entityId: number;
@@ -121,6 +130,7 @@ export interface IBillingRepository {
 
   /** Factures */
   findInvoicesByArtisan(ctx: TenantContext, limit?: number): Promise<BillingInvoice[]>;
+  createInvoiceForCycle(params: CreateInvoiceForCycleParams): Promise<BillingInvoice>;
 
   /** Journal immuable */
   appendEvent(params: AppendEventParams): Promise<BillingEvent>;
