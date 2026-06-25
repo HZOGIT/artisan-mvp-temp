@@ -1018,7 +1018,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   registerBillingSchedulerRoute(app, { ...billingSchedulerDeps, secret: process.env.SCHEDULER_SECRET ?? "" });
 
   /** Cron billing maison — tick toutes les heures, lock pg_advisory_xact pour éviter les doublons multi-réplica. */
-  app.register(billingCronPlugin, { schedulerDeps: billingSchedulerDeps, db: getDbHandle().db, onCritical: (msg) => app.log.fatal({ event: "billing_tick_critical" }, msg) });
+  app.register(billingCronPlugin, { schedulerDeps: billingSchedulerDeps, db: getDbHandle().db, dbUrl: getDbHandle().pool.options.connectionString ?? "", onCritical: (msg) => app.log.fatal({ event: "billing_tick_critical" }, msg) });
 
   /** Cron CNIL — purge des positions GPS expirées toutes les 6 h (rétention 8 h par position). */
   app.register(geoPurgeCronPlugin, { technicienRepo, db: getDbHandle().db });

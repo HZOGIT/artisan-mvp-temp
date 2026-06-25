@@ -2,6 +2,7 @@ import fp from "fastify-plugin";
 import type { FastifyInstance } from "fastify";
 import "@fastify/schedule";
 import { AsyncTask, SimpleIntervalJob } from "toad-scheduler";
+import pg from "pg";
 import type { SchedulerDeps } from "../../modules/billing/application/billing-scheduler";
 import { runSchedulerTick } from "../../modules/billing/application/billing-scheduler";
 import type { DbClient } from "../db";
@@ -12,6 +13,8 @@ const SLOW_TICK_MS = 30_000;
 export interface BillingCronOptions {
   readonly schedulerDeps: SchedulerDeps;
   readonly db: DbClient;
+  /** Connection string du rôle applicatif — utilisée pour le verrou consultatif session-level. */
+  readonly dbUrl: string;
   readonly intervalMinutes?: number;
   /**
    * Appelé si le tick échoue — brancher sur `log.fatal` pour déclencher une alerte BetterStack.
@@ -26,27 +29,31 @@ export const billingCronPlugin = fp(
     const task = new AsyncTask(
       "billing-tick",
       async () => {
-        /*
-         * pg_advisory_xact_lock : lock transactionnel (même connexion garantie, unlock auto
-         * en fin de transaction). Évite la race condition du lock session-level sur pool Drizzle.
-         * ponytail: connexion tenue pendant runSchedulerTick (appels Stripe inclus) ;
-         * passer à session-level lock + connexion dédiée si la latence Stripe devient un problème.
-         */
+        /* ponytail: connexion dédiée hors pool — pg_try_advisory_lock session-level persiste pendant tout le tick */
+        const client = new pg.Client({ connectionString: opts.dbUrl });
+        await client.connect();
         const tickStart = Date.now();
-        await opts.db.transaction(async (tx) => {
-          const lockResult = await tx.execute(`SELECT pg_try_advisory_xact_lock(${LOCK_ID}) AS acquired`);
-          const acquired = (lockResult.rows[0] as { acquired: boolean }).acquired === true;
-          if (!acquired) {
-            app.log.debug({ event: "billing_tick_skipped" }, "Billing tick skipped — autre réplica actif");
+        try {
+          const { rows } = await client.query(
+            `SELECT pg_try_advisory_lock(${LOCK_ID}) AS acquired`,
+          );
+          if (!(rows[0] as { acquired: boolean }).acquired) {
+            app.log.debug({ event: "billing_lock_skipped" }, "billing tick: lock not acquired, autre instance active");
             return;
           }
-          const result = await runSchedulerTick(opts.schedulerDeps);
-          const elapsed = Date.now() - tickStart;
-          if (elapsed > SLOW_TICK_MS) {
-            app.log.warn({ event: "billing_tick_slow", elapsed_ms: elapsed }, "Billing tick lent — connexion DB tenue pendant appels Stripe");
+          try {
+            const result = await runSchedulerTick(opts.schedulerDeps);
+            const elapsed = Date.now() - tickStart;
+            if (elapsed > SLOW_TICK_MS) {
+              app.log.warn({ event: "billing_tick_slow", elapsed_ms: elapsed }, "Billing tick lent — appels Stripe dépassent 30s");
+            }
+            app.log.info({ event: "billing_tick_done", elapsed_ms: elapsed, ...result }, "Billing tick terminé");
+          } finally {
+            await client.query(`SELECT pg_advisory_unlock(${LOCK_ID})`);
           }
-          app.log.info({ event: "billing_tick_done", elapsed_ms: elapsed, ...result }, "Billing tick terminé");
-        });
+        } finally {
+          await client.end();
+        }
       },
       (err) => {
         const msg = err instanceof Error ? err.message : String(err);
