@@ -159,6 +159,7 @@ import { notificationsCronPlugin } from "./shared/infra/notifications-cron";
 import { genererRappelsFacturesEnRetard } from "./modules/notifications/application/derived-use-cases";
 import { genererAlertesStock } from "./modules/stocks/application/alertes-use-cases";
 import { artisans as artisansTable } from "../../drizzle/schema.pg";
+import { alertesPrevisionsCronPlugin } from "./shared/infra/alertes-previsions-cron";
 import { ensureStripeWebhookEndpoint } from "./shared/infra/stripe-webhook-setup";
 import { WebhookPaymentWriterDrizzle } from "./modules/subscription/infra/webhook-payment-writer-drizzle";
 import { SubscriptionEventNotifierDrizzle } from "./modules/subscription/infra/subscription-event-notifier-drizzle";
@@ -1029,6 +1030,12 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
         return { alertsCreated };
       },
     },
+  });
+
+  /** Cron alertes CA — tick horaire, liste tous les artisans (hors RLS) puis verifierEtEnvoyer par tenant. */
+  app.register(alertesPrevisionsCronPlugin, {
+    repo: new AlertesPrevisionsRepositoryDrizzle(getDbHandle().db),
+    db: getDbHandle().db,
   });
 
   /** Upload/suppression du logo artisan `/api/upload-logo` (auth cookie JWT). Stocké en data-URL base64. */
