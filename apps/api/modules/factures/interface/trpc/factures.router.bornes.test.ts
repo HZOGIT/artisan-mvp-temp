@@ -177,8 +177,8 @@ describe.skipIf(!URL)("factures.router e2e — bornes & invariants transport", (
     const detail = (await callQuery(server, "factures.getById", { id: facId }, tC)).json().result.data as { totalTVA: string; totalTTC: string; totalHT: string };
     expect(detail.totalTVA).toBe("0.00");
     expect(detail.totalTTC).toBe("100.00");
-    const l2 = (await callMutation(server, "factures.addLigne", { factureId: facId, designation: "Matériaux", prixUnitaireHT: "50.00", tvaCategorieId: "FR_20" }, tC)).json().result.data as { tvaCategorieId: string; tauxTVA: string };
-    expect(l2.tvaCategorieId).toBe("FR_20");
-    expect(l2.tauxTVA).toBe("20");
+    const l2 = (await callMutation(server, "factures.addLigne", { factureId: facId, designation: "Matériaux", prixUnitaireHT: "50.00", tvaCategorieId: "FR_10" }, tC)).json().result.data as { tvaCategorieId: string; tauxTVA: string };
+    expect(l2.tvaCategorieId).toBe("FR_10");
+    expect(l2.tauxTVA).toBe("10.00");
   });
 });
