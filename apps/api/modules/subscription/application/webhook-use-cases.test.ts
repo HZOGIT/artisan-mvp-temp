@@ -158,6 +158,22 @@ describe("processStripeWebhook (fail-closed)", () => {
     expect(notifier.emails).toHaveLength(1);
   });
 
+  it("OPE-29 P0 — payment_intent.* non consommé par garde top-level, slot laissé au billing handler", async () => {
+    const { deps } = build();
+    const topLevelConsumed: string[] = [];
+    const markWebhookProcessed = async (id: string, type: string) => { topLevelConsumed.push(`${type}:${id}`); return true; };
+    const billingCalled: string[] = [];
+    const event = { id: "evt_pi_p0", type: "payment_intent.succeeded", data: { object: { id: "pi_p0" } } };
+
+    await processStripeWebhook(
+      { ...deps, markWebhookProcessed, onBillingWebhookEvent: async (t) => { billingCalled.push(t); } },
+      { rawBody: raw(event), signature: SIG },
+    );
+
+    expect(topLevelConsumed).toHaveLength(0);
+    expect(billingCalled).toEqual(["payment_intent.succeeded"]);
+  });
+
   it("FIX-CT — onBillingWebhookEvent erreur payment_failed logguée, retourne 200", async () => {
     const { deps } = build();
     const logged: string[] = [];
