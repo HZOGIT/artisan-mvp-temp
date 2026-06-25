@@ -149,11 +149,14 @@ describe.skipIf(!URL)("clients.router e2e (HTTP → tRPC → use-case → repo �
     expect((await callMutation(server, "clients.delete", { id: 999999999 }, tA)).statusCode).toBe(404);
   });
 
-  it("bornes zod : nom > 100, email > 320, siret > 14, type invalide → 400", async () => {
+  it("bornes zod : nom > 100, email > 320, siret invalide, type invalide → 400", async () => {
     const tA = await token(UA);
     expect((await callMutation(server, "clients.create", { nom: "x".repeat(101) }, tA)).statusCode).toBe(400);
     expect((await callMutation(server, "clients.create", { nom: "OK", email: `${"a".repeat(320)}@b.fr` }, tA)).statusCode).toBe(400);
+    // siret > 14 chiffres
     expect((await callMutation(server, "clients.create", { nom: "OK", siret: "1".repeat(15) }, tA)).statusCode).toBe(400);
+    // siret 14 chiffres mais clé de contrôle Luhn incorrecte
+    expect((await callMutation(server, "clients.create", { nom: "OK", siret: "11111111111111" }, tA)).statusCode).toBe(400);
     expect((await callMutation(server, "clients.create", { nom: "OK", type: "inconnu" }, tA)).statusCode).toBe(400);
   });
 

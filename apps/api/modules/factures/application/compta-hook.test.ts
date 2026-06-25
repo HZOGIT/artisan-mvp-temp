@@ -5,6 +5,7 @@ import type { ComptaPort } from "./compta-port";
 import type { TenantContext } from "../../../shared/tenant";
 
 const A: TenantContext = { artisanId: 1, userId: 10 };
+const fakeArtisanReader = { getArtisan: async () => ({ id: 1, nomEntreprise: null, email: null, siret: "73282932000074" }) };
 
 // Double capturant : enregistre les appels au port compta (FEC) pour les assertions.
 class FakeComptaPort implements ComptaPort {
@@ -21,7 +22,7 @@ class FakeComptaPort implements ComptaPort {
 async function factureEmise(repo: FakeFactureRepository): Promise<number> {
   const f = await creerFacture(repo, A, { clientId: 100 });
   await ajouterLigneFacture(repo, A, f.id, { designation: "Pose", quantite: "1", prixUnitaireHT: "100.00", tauxTVA: "20" });
-  await changerStatutFacture(repo, A, f.id, "envoyee");
+  await changerStatutFacture(repo, A, f.id, "envoyee", undefined, fakeArtisanReader);
   return f.id;
 }
 

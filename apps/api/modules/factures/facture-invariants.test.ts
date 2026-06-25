@@ -19,6 +19,7 @@ import type { DevisReadModel } from "./application/devis-reader";
 // Revue de synthèse des invariants métier du domaine factures (financier CRITIQUE — pièce légale).
 const A: TenantContext = { artisanId: 1, userId: 50 };
 const B: TenantContext = { artisanId: 2, userId: 20 };
+const fakeArtisanReader = { getArtisan: async () => ({ id: 1, nomEntreprise: null, email: null, siret: "73282932000074" }) };
 
 function repoWithClient(cid = 100): FakeFactureRepository {
   const repo = new FakeFactureRepository();
@@ -28,7 +29,7 @@ function repoWithClient(cid = 100): FakeFactureRepository {
 async function factureEmise(repo: FakeFactureRepository): Promise<number> {
   const f = await creerFacture(repo, A, { clientId: 100 });
   await ajouterLigneFacture(repo, A, f.id, { designation: "Pose", quantite: "1", prixUnitaireHT: "100.00", tauxTVA: "20" });
-  await changerStatutFacture(repo, A, f.id, "envoyee");
+  await changerStatutFacture(repo, A, f.id, "envoyee", undefined, fakeArtisanReader);
   return f.id;
 }
 const devisAccepte = (over: Partial<DevisReadModel> = {}): DevisReadModel => ({
@@ -91,7 +92,7 @@ describe("factures — invariants métier (synthèse)", () => {
     const repo = repoWithClient();
     const f = await creerFacture(repo, A, { clientId: 100 });
     await expect(changerStatutFacture(repo, A, f.id, "payee")).rejects.toBeInstanceOf(ConflictError); // saute envoyee
-    await changerStatutFacture(repo, A, f.id, "envoyee");
+    await changerStatutFacture(repo, A, f.id, "envoyee", undefined, fakeArtisanReader);
     await changerStatutFacture(repo, A, f.id, "payee");
     await expect(changerStatutFacture(repo, A, f.id, "en_retard")).rejects.toBeInstanceOf(ConflictError); // payee terminal
   });

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { router, permissionProcedure } from "../../../../interface/trpc/trpc";
+import { SiretSchema } from "../../../../../../packages/contract/validation";
 
 /*
  * Procédures gatées par permission (parité legacy) : lecture = `clients.voir`, écriture = `clients.gerer`.
@@ -36,7 +37,7 @@ const createSchema = z.object({
   villeFacturation: z.string().max(100).nullish(),
   type: z.enum(["particulier", "professionnel"]).optional(),
   raisonSociale: z.string().max(255).nullish(),
-  siret: z.string().max(14).nullish(),
+  siret: SiretSchema.or(z.null()),
   numeroTVA: z.string().max(20).nullish(),
   etiquettes: z.string().max(500).nullish(),
   notes: z.string().nullish(),
@@ -56,7 +57,7 @@ const updateSchema = z.object({
   villeFacturation: z.string().max(100).nullish(),
   type: z.enum(["particulier", "professionnel"]).optional(),
   raisonSociale: z.string().max(255).nullish(),
-  siret: z.string().max(14).nullish(),
+  siret: SiretSchema.or(z.null()),
   numeroTVA: z.string().max(20).nullish(),
   etiquettes: z.string().max(500).nullish(),
   notes: z.string().nullish(),

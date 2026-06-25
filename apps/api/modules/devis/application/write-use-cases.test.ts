@@ -16,6 +16,7 @@ import type { TenantContext } from "../../../shared/tenant";
 
 const A: TenantContext = { artisanId: 1, userId: 10 };
 const B: TenantContext = { artisanId: 2, userId: 20 };
+const fakeArtisanReader = { getArtisan: async () => ({ id: 1, nomEntreprise: null, email: null, siret: "73282932000074" }) };
 
 // Crée un repo avec le client `cid` enregistré comme appartenant au tenant `ctx`.
 function repoWithClient(ctx: TenantContext, cid: number): FakeDevisRepository {
@@ -105,7 +106,7 @@ describe("devis — use-cases d'écriture", () => {
   it("changerStatutDevis — machine à états : brouillon→envoye→accepte ; idempotence", async () => {
     const repo = repoWithClient(A, 100);
     const d = await creerDevis(repo, A, { clientId: 100 });
-    expect((await changerStatutDevis(repo, A, d.id, "envoye")).statut).toBe("envoye");
+    expect((await changerStatutDevis(repo, A, d.id, "envoye", fakeArtisanReader)).statut).toBe("envoye");
     expect((await changerStatutDevis(repo, A, d.id, "envoye")).statut).toBe("envoye"); // idempotent
     expect((await changerStatutDevis(repo, A, d.id, "accepte")).statut).toBe("accepte");
     expect((await changerStatutDevis(repo, A, d.id, "accepte")).statut).toBe("accepte"); // idempotent
@@ -116,7 +117,7 @@ describe("devis — use-cases d'écriture", () => {
     const d = await creerDevis(repo, A, { clientId: 100 });
     // brouillon → accepte (saute envoye) interdit
     await expect(changerStatutDevis(repo, A, d.id, "accepte")).rejects.toBeInstanceOf(ConflictError);
-    await changerStatutDevis(repo, A, d.id, "envoye");
+    await changerStatutDevis(repo, A, d.id, "envoye", fakeArtisanReader);
     await changerStatutDevis(repo, A, d.id, "refuse");
     // refuse est terminal → toute autre transition → Conflict
     await expect(changerStatutDevis(repo, A, d.id, "envoye")).rejects.toBeInstanceOf(ConflictError);
@@ -134,7 +135,7 @@ describe("devis — use-cases d'écriture", () => {
     const repo = repoWithClient(A, 100);
     const origine = await creerDevis(repo, A, { clientId: 100, objet: "Réno cuisine" });
     await ajouterLigneDevis(repo, A, origine.id, { designation: "Pose", prixUnitaireHT: "300.00", quantite: "2" });
-    await changerStatutDevis(repo, A, origine.id, "envoye"); // l'origine peut être dans un autre statut
+    await changerStatutDevis(repo, A, origine.id, "envoye", fakeArtisanReader); // l'origine peut être dans un autre statut
 
     const copie = await dupliquerDevis(repo, A, origine.id, () => new Date("2026-06-14T00:00:00Z"));
     expect(copie.id).not.toBe(origine.id);

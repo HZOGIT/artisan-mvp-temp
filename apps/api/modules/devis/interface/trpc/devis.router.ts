@@ -180,7 +180,7 @@ export function createDevisRouter(
     envoyer: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await changerStatutDevis(repo, ctx.tenant, input.id, "envoye");
+        const result = await changerStatutDevis(repo, ctx.tenant, input.id, "envoye", mailing.artisanReader);
         ctx.log.info({ event: "devis_envoye", devisId: input.id }, "Devis envoyé au client");
         return result;
       }),

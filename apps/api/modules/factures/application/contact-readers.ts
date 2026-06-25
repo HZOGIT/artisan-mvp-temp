@@ -13,6 +13,7 @@ export interface ArtisanInfo {
   readonly id: number;
   readonly nomEntreprise: string | null;
   readonly email: string | null;
+  readonly siret?: string | null;
   readonly [key: string]: unknown;
 }
 
