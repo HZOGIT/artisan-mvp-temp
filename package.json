@@ -90,6 +90,7 @@
     "jose": "6.1.0",
     "jspdf": "^4.0.0",
     "jspdf-autotable": "^5.0.7",
+    "pdf-lib": "^1.17.1",
     "lucide-react": "^0.453.0",
     "multer": "^2.0.2",
     "nanoid": "^5.1.5",
