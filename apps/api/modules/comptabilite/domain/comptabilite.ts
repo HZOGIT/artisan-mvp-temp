@@ -71,7 +71,7 @@ export function computeGrandLivre(ecritures: readonly Ecriture[]): CompteGrandLi
     c.totalCredit += num(e.credit);
     c.solde = c.totalDebit - c.totalCredit;
   }
-  return Array.from(comptes.values());
+  return Array.from(comptes.values()).map((c) => ({ ...c, totalDebit: round2(c.totalDebit), totalCredit: round2(c.totalCredit), solde: round2(c.solde) }));
 }
 
 /** Balance : un poste par compte (débit/crédit cumulés + solde débiteur/créditeur), triée par compte. */
@@ -89,7 +89,9 @@ export function computeBalance(ecritures: readonly Ecriture[]): LigneBalance[] {
     c.soldeDebiteur = solde > 0 ? solde : 0;
     c.soldeCrediteur = solde < 0 ? Math.abs(solde) : 0;
   }
-  return Array.from(comptes.values()).sort((a, b) => a.numeroCompte.localeCompare(b.numeroCompte));
+  return Array.from(comptes.values())
+    .map((c) => ({ ...c, debit: round2(c.debit), credit: round2(c.credit), soldeDebiteur: round2(c.soldeDebiteur), soldeCrediteur: round2(c.soldeCrediteur) }))
+    .sort((a, b) => a.numeroCompte.localeCompare(b.numeroCompte));
 }
 
 /*

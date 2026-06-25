@@ -42,10 +42,12 @@ export interface ExecutionResult {
   readonly tempsExecution: number;
 }
 
+import { round2 } from "../../../shared/money";
+
 /** Agrégat du rapport « financier » (parité legacy `executerRapport` case 'financier'). PURE. */
 export function computeFinancier(factures: ReadonlyArray<{ statut: string | null; totalHT: string | null; typeDocument?: string | null }>): Array<{ totalCA: number; nombreFactures: number; facturesPayees: number }> {
   const payees = factures.filter((f) => f.statut === "payee");
   const caLines = factures.filter((f) => f.statut === "payee" || (f.typeDocument === "avoir" && f.statut === "validee"));
   const totalCA = caLines.reduce((sum, f) => sum + (parseFloat(String(f.totalHT ?? "0")) || 0), 0);
-  return [{ totalCA, nombreFactures: factures.length, facturesPayees: payees.length }];
+  return [{ totalCA: round2(totalCA), nombreFactures: factures.length, facturesPayees: payees.length }];
 }

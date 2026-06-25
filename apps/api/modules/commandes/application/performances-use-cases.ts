@@ -1,3 +1,4 @@
+import { round2 } from "../../../shared/money";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ICommandeRepository } from "./commande-repository";
 import type { IFournisseurRepository } from "../../fournisseurs/application/fournisseur-repository";
@@ -71,7 +72,7 @@ export function calculerPerformancesFournisseurs(
       tauxFiabilite = Math.round((aTemps / livreesAvecPrevu.length) * 100);
     }
 
-    const montantTotal = list.reduce((s, c) => s + (Number.parseFloat(c.totalTTC ?? c.montantTotal ?? "0") || 0), 0);
+    const montantTotal = round2(list.reduce((s, c) => s + (Number.parseFloat(c.totalTTC ?? c.montantTotal ?? "0") || 0), 0));
 
     return {
       fournisseur: { id: f.id, nom: f.nom, contact: f.contact, email: f.email, telephone: f.telephone },
