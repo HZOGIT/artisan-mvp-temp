@@ -26,8 +26,10 @@ import type {
  *    (parité legacy « Document fiscal verrouillé — émettez un avoir pour corriger ») → Conflict.
  */
 
-/** Entrée de création : pas de numero (généré serveur). */
-export type CreerFactureInput = Omit<CreateFactureInput, "numero">;
+/** Entrée de création : pas de numero (généré serveur). Lignes optionnelles pour insertion atomique. */
+export type CreerFactureInput = Omit<CreateFactureInput, "numero"> & {
+  readonly lignes?: readonly CreateFactureLigneInput[];
+};
 
 /** Seul le brouillon est modifiable ; tout autre statut = pièce verrouillée. */
 function assertModifiable(facture: Facture): void {
@@ -56,8 +58,10 @@ export async function creerFacture(repo: IFactureRepository, ctx: TenantContext,
   /** Anti-IDOR-FK : client (et devis lié) du tenant uniquement (ne révèle pas l'existence). */
   if (!(await repo.ownsClient(ctx, input.clientId))) throw new NotFoundError("Client introuvable");
   if (input.devisId != null && !(await repo.ownsDevis(ctx, input.devisId))) throw new NotFoundError("Devis introuvable");
+  const { lignes, ...header } = input;
   const numero = await repo.nextNumero(ctx);
-  return repo.create(ctx, { ...input, numero });
+  if (lignes && lignes.length > 0) return repo.createWithLignes(ctx, { ...header, numero }, lignes);
+  return repo.create(ctx, { ...header, numero });
 }
 
 export async function modifierFacture(

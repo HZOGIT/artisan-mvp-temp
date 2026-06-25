@@ -23,6 +23,8 @@ export interface IFactureRepository {
   /** null si la facture n'appartient pas au tenant. */
   getById(ctx: TenantContext, id: number): Promise<Facture | null>;
   create(ctx: TenantContext, input: CreateFactureInput): Promise<Facture>;
+  /** Crée un header + lignes dans une seule transaction — évite un header orphelin si les inserts lignes échouent. */
+  createWithLignes(ctx: TenantContext, header: CreateFactureInput, lignes: readonly CreateFactureLigneInput[]): Promise<Facture>;
   /** null si la facture n'appartient pas au tenant. */
   update(ctx: TenantContext, id: number, input: UpdateFactureInput): Promise<Facture | null>;
   /** false si la facture n'appartient pas au tenant. */

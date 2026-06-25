@@ -49,6 +49,8 @@ const createSchema = z.object({
   conditionsPaiement: z.string().max(2000).nullish(),
   notes: z.string().max(5000).nullish(),
   dateEcheance: isoDate.nullish(),
+  /** Lignes initiales — insérées dans la même transaction que le header (évite les headers orphelins). */
+  lignes: z.array(ligneCreateSchema).max(500).optional(),
 });
 
 /** ⚠️ clientId / devisId / numero / statut / typeDocument / totaux / montantPaye ABSENTS. */
@@ -139,8 +141,13 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
     create: protectedProcedure
       .input(createSchema)
       .mutation(async ({ ctx, input }) => {
-        const result = await creerFacture(repo, ctx.tenant, { ...input, dateEcheance: toDate(input.dateEcheance) });
-        ctx.log.info({ event: "facture_created", factureId: result.id, clientId: input.clientId }, "Facture créée");
+        const { lignes: rawLignes, ...rest } = input;
+        const lignes = rawLignes?.map(({ tvaCategorieId, ...l }) => {
+          const categorieId = tvaCategorieId ?? "FR_20";
+          return { ...l, tauxTVA: TVA_CATEGORIES_MAP[categorieId].taux, tvaCategorieId: categorieId };
+        });
+        const result = await creerFacture(repo, ctx.tenant, { ...rest, dateEcheance: toDate(rest.dateEcheance), lignes });
+        ctx.log.info({ event: "facture_created", factureId: result.id, clientId: rest.clientId }, "Facture créée");
         return result;
       }),
 

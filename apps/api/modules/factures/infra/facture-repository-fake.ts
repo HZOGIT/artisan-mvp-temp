@@ -98,6 +98,69 @@ export class FakeFactureRepository implements IFactureRepository {
     return f;
   }
 
+  async createWithLignes(ctx: TenantContext, header: CreateFactureInput, lignes: readonly CreateFactureLigneInput[]): Promise<Facture> {
+    const now = new Date();
+    const id = ++this.seq;
+    const processedLignes = lignes.map((l, i) => {
+      const type = l.type ?? "produit";
+      const isDisplay = type === "section" || type === "note";
+      const quantite = isDisplay ? "0" : l.quantite ?? "1";
+      const prixUnitaireHT = isDisplay ? "0" : l.prixUnitaireHT;
+      const tauxTVA = isDisplay ? "0" : l.tauxTVA ?? "20.00";
+      const montants = calculerMontantsLigne(type, quantite, prixUnitaireHT, tauxTVA);
+      return {
+        ligne: {
+          factureId: id,
+          ordre: l.ordre ?? i,
+          reference: isDisplay ? null : l.reference ?? null,
+          designation: l.designation,
+          description: l.description ?? null,
+          quantite,
+          unite: isDisplay ? "unité" : l.unite ?? "unité",
+          prixUnitaireHT,
+          tauxTVA,
+          tvaCategorieId: isDisplay ? null : (l.tvaCategorieId ?? null),
+          montantHT: montants.montantHT,
+          montantTVA: montants.montantTVA,
+          montantTTC: montants.montantTTC,
+          type,
+        } as Omit<FactureLigne, "id">,
+        montants,
+      };
+    });
+    const totaux = calculerTotaux(processedLignes.map((p) => p.montants));
+    const facture: Facture = {
+      id,
+      artisanId: ctx.artisanId,
+      clientId: header.clientId,
+      devisId: header.devisId ?? null,
+      numero: header.numero,
+      dateFacture: now,
+      dateEcheance: header.dateEcheance ?? null,
+      statut: "brouillon",
+      typeDocument: header.typeDocument ?? "facture",
+      factureOrigineId: header.factureOrigineId ?? null,
+      objet: header.objet ?? null,
+      referenceClient: header.referenceClient ?? null,
+      siretDestinataire: header.siretDestinataire ?? null,
+      conditionsPaiement: header.conditionsPaiement ?? null,
+      notes: header.notes ?? null,
+      totalHT: totaux.totalHT,
+      totalTVA: totaux.totalTVA,
+      totalTTC: totaux.totalTTC,
+      montantPaye: "0.00",
+      datePaiement: null,
+      modePaiement: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.factureStore.push(facture);
+    for (const { ligne } of processedLignes) {
+      this.lignesStore.push({ ...ligne, id: ++this.ligneSeq });
+    }
+    return facture;
+  }
+
   async update(ctx: TenantContext, id: number, input: UpdateFactureInput): Promise<Facture | null> {
     const f = await this.getById(ctx, id);
     if (!f) return null;

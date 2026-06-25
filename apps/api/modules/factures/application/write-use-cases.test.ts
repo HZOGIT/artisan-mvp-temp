@@ -25,6 +25,32 @@ function repoWithClient(ctx: TenantContext, cid: number): FakeFactureRepository 
 }
 
 describe("factures — use-cases d'écriture", () => {
+  it("creerFacture avec lignes — atomique : crash dans createWithLignes ne laisse pas de header orphelin", async () => {
+    class CrashOnCreateWithLignes extends FakeFactureRepository {
+      override createWithLignes(): Promise<never> {
+        throw new Error("crash simulé insert ligne");
+      }
+    }
+    const repo = new CrashOnCreateWithLignes();
+    repo.registerClient(A.artisanId, 100);
+    await expect(creerFacture(repo, A, { clientId: 100, lignes: [{ designation: "L", prixUnitaireHT: "50.00" }] })).rejects.toThrow("crash simulé insert ligne");
+    expect(await repo.list(A)).toHaveLength(0);
+  });
+
+  it("creerFacture avec lignes — totaux recalculés, lignes visibles, numéro généré serveur", async () => {
+    const repo = repoWithClient(A, 100);
+    const f = await creerFacture(repo, A, {
+      clientId: 100,
+      lignes: [
+        { designation: "Main d'œuvre", quantite: "2", prixUnitaireHT: "100.00", tauxTVA: "20" },
+        { designation: "Matériaux", quantite: "1", prixUnitaireHT: "50.00", tauxTVA: "20" },
+      ],
+    });
+    expect(f.numero).toBe("FAC-00001");
+    expect(f.totalTTC).toBe("300.00");
+    expect(await repo.listLignes(A, f.id)).toHaveLength(2);
+  });
+
   it("creerFacture génère le numéro serveur (FAC-00001) et scope au tenant", async () => {
     const repo = repoWithClient(A, 100);
     const f1 = await creerFacture(repo, A, { clientId: 100, objet: "Travaux" });
