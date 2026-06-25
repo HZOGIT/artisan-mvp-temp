@@ -76,6 +76,8 @@ export class FakeSignaturePublicWriter implements SignaturePublicWriter {
       ipAddress: input.ipAddress,
       userAgent: input.userAgent,
       signedAt: new Date(),
+      documentHash: input.documentHash,
+      documentHashedAt: input.documentHashedAt,
     };
     this.signatures.set(input.token, updated);
     return updated;

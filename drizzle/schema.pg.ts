@@ -334,6 +334,8 @@ export const signaturesDevis = pgTable("signatures_devis", {
   signedAt: timestamp("signedAt"),
   expiresAt: timestamp("expiresAt").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+  documentHash: varchar("documentHash", { length: 64 }),
+  documentHashedAt: timestamp("documentHashedAt"),
 });
 export type SignatureDevis = typeof signaturesDevis.$inferSelect;
 export type InsertSignatureDevis = typeof signaturesDevis.$inferInsert;

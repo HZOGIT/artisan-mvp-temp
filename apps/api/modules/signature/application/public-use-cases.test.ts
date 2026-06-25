@@ -6,7 +6,7 @@ import type { Signature } from "../domain/signature";
 import { FakeSignaturePublicReader, FakeSignaturePublicWriter } from "../infra/signature-public-reader-fake";
 import { FakeSignatureNotificationWriter } from "../infra/signature-repository-fake";
 import type { SignatureDevisView, SignatureTokenResolution } from "./signature-public-reader";
-import { getDevisForSignature, selectDevisOption, signDevis, refuseDevis } from "./public-use-cases";
+import { getDevisForSignature, selectDevisOption, signDevis, refuseDevis, computeDevisHash } from "./public-use-cases";
 
 class CapturingEmail implements EmailPort {
   public sent: EmailMessage[] = [];
@@ -41,6 +41,8 @@ const signature = (overrides: Partial<Signature> = {}): Signature => ({
   signedAt: null,
   expiresAt: new Date("2026-07-15T12:00:00Z"),
   createdAt: new Date("2026-06-15T12:00:00Z"),
+  documentHash: null,
+  documentHashedAt: null,
   ...overrides,
 });
 
@@ -251,6 +253,19 @@ describe("signDevis (public)", () => {
   it("rate-limit atteint → TooManyRequestsError (anti brute-force token)", async () => {
     const { deps } = build({ res: resolution(), view, rateLimiter: new DenyRateLimiter() });
     await expect(signDevis(deps, signPayload)).rejects.toBeInstanceOf(TooManyRequestsError);
+  });
+
+  it("documentHash non-null (64 hex) et déterministe quand la vue est disponible", async () => {
+    const { deps } = build({ res: resolution(), view });
+    const out = await signDevis(deps, signPayload);
+    expect(out.signature.documentHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(out.signature.documentHash).toBe(computeDevisHash(view));
+  });
+
+  it("documentHash null quand la vue n'est pas disponible (best-effort)", async () => {
+    const { deps } = build({ res: resolution() }); // pas de seedView
+    const out = await signDevis(deps, signPayload);
+    expect(out.signature.documentHash).toBeNull();
   });
 });
 

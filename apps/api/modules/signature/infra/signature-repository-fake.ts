@@ -36,6 +36,8 @@ export class FakeSignatureRepository implements ISignatureRepository {
       signedAt: null,
       expiresAt: data.expiresAt,
       createdAt: new Date(),
+      documentHash: null,
+      documentHashedAt: null,
     };
     this.rows.push(sig);
     return sig;

@@ -59,6 +59,8 @@ export class SignaturePublicReaderDrizzle implements SignaturePublicReader {
           signedAt: r.sig.signedAt ?? null,
           expiresAt: r.sig.expiresAt,
           createdAt: r.sig.createdAt,
+          documentHash: r.sig.documentHash ?? null,
+          documentHashedAt: r.sig.documentHashedAt ?? null,
         },
         devisId: r.devisId,
         artisanId: r.artisanId,

@@ -14,6 +14,8 @@ export interface SignDevisInput {
   readonly signataireEmail: string;
   readonly ipAddress: string;
   readonly userAgent: string;
+  readonly documentHash: string | null;
+  readonly documentHashedAt: Date | null;
 }
 
 export interface RefuseDevisInput {

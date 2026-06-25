@@ -26,6 +26,8 @@ export interface Signature {
   readonly signedAt: Date | null;
   readonly expiresAt: Date;
   readonly createdAt: Date;
+  readonly documentHash: string | null;
+  readonly documentHashedAt: Date | null;
 }
 
 /** Entrée de création d'une demande de signature (token + échéance générés serveur). */

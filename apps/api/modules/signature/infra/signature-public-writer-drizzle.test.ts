@@ -49,7 +49,9 @@ describe.skipIf(!URL)("SignaturePublicWriterDrizzle (effets publics sous RLS)", 
     await admin.end();
   });
 
-  it("signDevis : signature accepte + devis accepte (transaction) + IP/UA capturés", async () => {
+  it("signDevis : signature accepte + devis accepte (transaction) + IP/UA + documentHash capturés", async () => {
+    const testHash = "a".repeat(64);
+    const testHashedAt = new Date("2026-06-25T08:00:00Z");
     const sig = await writer.signDevis(ctx(), {
       token: TOKEN,
       devisId,
@@ -58,10 +60,14 @@ describe.skipIf(!URL)("SignaturePublicWriterDrizzle (effets publics sous RLS)", 
       signataireEmail: "jean@test.com",
       ipAddress: "203.0.113.7",
       userAgent: "Mozilla/5.0",
+      documentHash: testHash,
+      documentHashedAt: testHashedAt,
     });
     expect(sig.statut).toBe("accepte");
     expect(sig.ipAddress).toBe("203.0.113.7");
     expect(sig.signedAt).not.toBeNull();
+    expect(sig.documentHash).toBe(testHash);
+    expect(sig.documentHashedAt).not.toBeNull();
     const { rows } = await admin.query("select statut from devis where id=$1", [devisId]);
     expect(rows[0].statut).toBe("accepte");
   });
@@ -76,6 +82,8 @@ describe.skipIf(!URL)("SignaturePublicWriterDrizzle (effets publics sous RLS)", 
       signataireEmail: "evil@test.com",
       ipAddress: "10.0.0.1",
       userAgent: "evil",
+      documentHash: "b".repeat(64),
+      documentHashedAt: new Date(),
     });
     // La garde SQL (statut='en_attente') empêche toute réécriture : l'état reste la 1ʳᵉ signature.
     expect(sig.signataireName).toBe("Jean Dupont");
