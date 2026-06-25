@@ -21,7 +21,7 @@ export type ModePaiement = NonNullable<CreateInput["modePaiement"]>;
 export type Frequence = NonNullable<CreateInput["frequenceRecurrence"]>;
 
 export const FREQUENCES: readonly Frequence[] = ["mensuelle", "trimestrielle", "annuelle"];
-export const TAUX_TVA_OPTIONS = [0, 5.5, 10, 20] as const;
+export const TAUX_TVA_OPTIONS = [0, 2.1, 5.5, 10, 20] as const;
 export const MODES_PAIEMENT: readonly ModePaiement[] = ["carte", "especes", "virement", "cheque", "prelevement"];
 
 /** Mapping catégorie IA (code) → libellé de catégorie utilisateur. */

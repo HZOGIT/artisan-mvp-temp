@@ -1,4 +1,5 @@
 import { round2 } from "../../../shared/money";
+import { TVA_CATEGORIES_MAP } from "../../../shared/tva/taux-tva-fr";
 
 /*
  * Devis IA : analyse de photos de chantier (Vision) → résultats détectés → suggestions d'articles →
@@ -122,7 +123,8 @@ export function genererLignesDevis(suggestions: readonly Suggestion[], suggestio
     if (!s.selectionne) continue;
     const quantite = Number(s.quantiteSuggeree || 1);
     const prixUnitaireHT = Number(s.prixEstime || 0);
-    const tauxTVA = 20;
+    const categorieId = "FR_20";
+    const tauxTVA = parseFloat(TVA_CATEGORIES_MAP[categorieId].taux);
     const montantHT = round2(quantite * prixUnitaireHT);
     const montantTVA = round2(montantHT * (tauxTVA / 100));
     const montantTTC = round2(montantHT + montantTVA);

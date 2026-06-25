@@ -48,12 +48,13 @@ const ligneVente = obj(
     unite: str("Ex: u, h, m, m², forfait"),
     prixUnitaireHT: num(),
     tauxTVA: num("En pourcentage, ex: 20"),
+    tvaCategorieId: str('"FR_20"|"FR_10"|"FR_5_5"|"FR_2_1"|"FR_FRANCHISE"|"FR_EXONERE"|"FR_AUTO"'),
   },
   ["designation", "quantite", "prixUnitaireHT"],
 );
 /** Ligne de devis/facture sans description d'unité (variante creer_et_envoyer_devis / creer_facture). */
 const ligneVenteSimple = obj(
-  { designation: str(), quantite: num(), unite: str(), prixUnitaireHT: num(), tauxTVA: num() },
+  { designation: str(), quantite: num(), unite: str(), prixUnitaireHT: num(), tauxTVA: num(), tvaCategorieId: str() },
   ["designation", "quantite", "prixUnitaireHT"],
 );
 

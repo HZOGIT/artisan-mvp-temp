@@ -8,6 +8,7 @@ export interface GenererFactureContratInput {
   readonly description: string | null;
   readonly montantHT: string;
   readonly tauxTVA: string;
+  readonly tvaCategorieId?: string;
 }
 
 /** Référence de la facture créée (le client n'exploite pas le détail — toast + refetch). */
