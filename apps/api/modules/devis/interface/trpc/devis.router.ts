@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure, permissionProcedure } from "../../../../interface/trpc/trpc";
 import { TVA_CATEGORIES_MAP } from "../../../../shared/tva/taux-tva-fr";
+import type { PushPort } from "../../../../shared/push/web-push-adapter";
 /** Permissions (parité legacy) : actions sur lignes/envoi/duplication = `devis.creer` ; conversion en facture = `factures.creer`. */
 const devisCreer = permissionProcedure("devis.creer");
 const facturesCreer = permissionProcedure("factures.creer");
@@ -104,6 +105,7 @@ export function createDevisRouter(
   relanceRepo: IRelanceDevisRepository,
   signatureReader: DevisSignatureReader,
   ia: DevisIaDeps,
+  push?: PushPort,
 ) {
   /** Dépendances de relance (réutilise les readers/email/rate-limiter du mailing + le repo relances). */
   const relanceDeps = {
@@ -133,6 +135,7 @@ export function createDevisRouter(
       .mutation(async ({ ctx, input }) => {
         const result = await creerDevis(repo, ctx.tenant, { ...input, dateValidite: toDate(input.dateValidite) });
         ctx.log.info({ event: "devis_created", devisId: result.id, clientId: input.clientId }, "Devis créé");
+        push?.sendToUser(ctx.tenant.artisanId, { title: "Operioz", body: `Nouveau devis ${result.numero} créé` }).catch(() => undefined);
         return result;
       }),
 

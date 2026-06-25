@@ -5,6 +5,7 @@ import type { IModeleDevisRepository } from "../modeles-devis/application/modele
 import type { IRelanceDevisRepository } from "../relances-devis/application/relance-devis-repository";
 import type { DevisSignatureReader } from "./application/devis-signature-reader";
 import type { DevisIaDeps } from "./application/generer-lignes-ia";
+import type { PushPort } from "../../shared/push/web-push-adapter";
 import { createDevisRouter } from "./interface/trpc/devis.router";
 
 /*
@@ -23,6 +24,7 @@ export interface DevisModuleDeps {
   /** Lecture signature (getDevisNonSignes) + dépendances IA (genererLignesIA). */
   readonly signatureReader: DevisSignatureReader;
   readonly ia: DevisIaDeps;
+  readonly push?: PushPort;
 }
 
 export interface DevisModule {
@@ -41,6 +43,7 @@ export function createDevisModule(deps: DevisModuleDeps): DevisModule {
       deps.relanceRepository,
       deps.signatureReader,
       deps.ia,
+      deps.push,
     ),
   };
 }

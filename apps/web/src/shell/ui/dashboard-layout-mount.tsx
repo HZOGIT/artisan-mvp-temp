@@ -5,6 +5,7 @@ import { Outlet } from "@tanstack/react-router";
 import { Search } from "lucide-react";
 import { trpc } from "@/shared/trpc";
 import { useShell } from "../application/use-shell";
+import { usePushSubscription } from "../application/use-push-subscription";
 import { accountBlockState } from "../domain/subscription";
 import { DashboardLayout } from "./dashboard-layout";
 import { NotificationBell } from "./notification-bell";
@@ -62,6 +63,8 @@ export function DashboardLayoutMount() {
     window.addEventListener("operioz:open-assistant", onOpen);
     return () => window.removeEventListener("operioz:open-assistant", onOpen);
   }, []);
+
+  usePushSubscription();
 
   const { isBlocked, blockerAllowed } = accountBlockState(sub, location);
   const isAssistantPage = location === "/assistant";

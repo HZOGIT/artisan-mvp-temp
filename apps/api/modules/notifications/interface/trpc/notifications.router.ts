@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import { router, protectedProcedure, publicProcedure } from "../../../../interface/trpc/trpc";
 import type { INotificationRepository } from "../../application/notification-repository";
+import type { PushPort } from "../../../../shared/push/web-push-adapter";
 import { listNotifications, compterNonLues } from "../../application/read-use-cases";
 import { marquerLue, marquerToutesLues, archiver } from "../../application/write-use-cases";
 import { genererRappelsFacturesEnRetard } from "../../application/derived-use-cases";
@@ -22,8 +23,24 @@ const idInput = z.object({ id: z.number().int() });
  * aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors
  * (NotFound→404). Repository injecté (DI) → testable. `delete` = alias d'`archive` (legacy).
  */
-export function createNotificationsRouter(repo: INotificationRepository) {
+export function createNotificationsRouter(repo: INotificationRepository, push?: PushPort) {
   return router({
+    getVapidPublicKey: publicProcedure.query(() => ({ key: push?.getPublicKey() ?? null })),
+
+    subscribe: protectedProcedure
+      .input(z.object({ endpoint: z.string().url(), keys: z.object({ p256dh: z.string(), auth: z.string() }) }))
+      .mutation(async ({ ctx, input }) => {
+        await push?.subscribe(ctx.tenant.artisanId, input.endpoint, input.keys);
+        return { success: true };
+      }),
+
+    unsubscribe: protectedProcedure
+      .input(z.object({ endpoint: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        await push?.unsubscribe(ctx.tenant.artisanId, input.endpoint);
+        return { success: true };
+      }),
+
     list: protectedProcedure.input(listInput).query(({ ctx, input }) => listNotifications(repo, ctx.tenant, input)),
 
     getUnreadCount: protectedProcedure.query(({ ctx }) => compterNonLues(repo, ctx.tenant)),
