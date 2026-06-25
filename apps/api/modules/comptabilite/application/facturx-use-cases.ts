@@ -2,6 +2,7 @@ import { NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { PdfPort } from "../../../shared/ports/pdf";
 import { generateFacturXML } from "../../../shared/pdf/facturx";
+import { embedFacturXml } from "../../../shared/pdf/embed-facturx";
 
 /*
  * Factur-X (facturation électronique EN 16931) pour UNE facture (parité legacy `/api/comptabilite/
@@ -42,6 +43,8 @@ export async function getFacturxXml(deps: FacturxReaderDeps, ctx: TenantContext,
 
 export async function getFacturxPdf(deps: FacturxPdfDeps, ctx: TenantContext, factureId: number): Promise<{ buffer: Buffer; filename: string }> {
   const { facture, lignes, client, artisan } = await loadFacturxData(deps, ctx, factureId);
-  const buffer = await deps.pdf.render("facture", { facture: { ...facture, lignes }, artisan, client });
+  const pdfBuffer = await deps.pdf.render("facture", { facture: { ...facture, lignes }, artisan, client });
+  const xml = generateFacturXML({ ...facture, lignes } as never, artisan as never, client as never);
+  const buffer = await embedFacturXml(pdfBuffer, xml);
   return { buffer, filename: `Facture_${facture.numero}_FacturX.pdf` };
 }
