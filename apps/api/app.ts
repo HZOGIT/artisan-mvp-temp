@@ -721,6 +721,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const rapports = createRapportsModule({
     repository: deps.rapportRepo ?? new RapportRepositoryDrizzle(getDbHandle().db),
   });
+  const subscriptionReader = deps.subscriptionRepo ?? new SubscriptionReaderDrizzle(getDbHandle().db);
   /*
    * Gestion utilisateurs (SENSIBLE, gate `utilisateurs.gerer`) : repo HORS RLS scopé artisanId +
    * hasher bcrypt (parité hash legacy) + EmailPort legacy (invitation).
@@ -729,6 +730,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     repository: deps.utilisateurRepo ?? new UtilisateurRepositoryDrizzle(getDbHandle().db),
     hasher: new BcryptPasswordHasher(),
     email: emailAdapter,
+    subscriptionReader,
   });
   /** Comptabilité (SENSIBLE, gate `comptabilite.voir`) — lectures grand-livre/balance/journal/TVA. */
   const comptabiliteReader = deps.comptabiliteReader ?? new ComptabiliteReaderDrizzle(getDbHandle().db);
@@ -745,7 +747,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     resetRateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(5, 60 * 60 * 1000),
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
   });
-  const subscription = createSubscriptionModule(deps.subscriptionRepo ?? new SubscriptionReaderDrizzle(getDbHandle().db));
+  const subscription = createSubscriptionModule(subscriptionReader);
   /*
    * Signature électronique de devis (SENSIBLE) — surface ARTISAN protégée + surface PUBLIQUE par
    * token (portail de signature, RLS public-token sur `devis`). `signatures_devis` est HORS RLS :

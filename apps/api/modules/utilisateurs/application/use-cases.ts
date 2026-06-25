@@ -2,6 +2,7 @@ import { ConflictError, ForbiddenError, NotFoundError } from "../../../shared/er
 import type { EmailPort } from "../../../shared/ports/email";
 import type { PasswordHasher } from "../../../shared/ports/password-hasher";
 import type { TenantContext } from "../../../shared/tenant";
+import type { ISubscriptionReader } from "../../subscription/application/subscription-reader";
 import { ALL_PERMISSIONS, ROLE_TEMPLATES } from "../../../../../packages/contract/permissions";
 import type { CollaborateurRole, InviteInput, PermissionsInfo, UtilisateurListItem } from "../domain/utilisateur";
 import type { IUtilisateurRepository } from "./utilisateur-repository";
@@ -11,6 +12,7 @@ export interface UtilisateurDeps {
   readonly repo: IUtilisateurRepository;
   readonly hasher: PasswordHasher;
   readonly email: EmailPort;
+  readonly subscriptionReader: ISubscriptionReader;
   /** Génère le mot de passe temporaire (10 car. alphanum. via RNG crypto en prod ; déterministe en test). */
   readonly genTempPassword: () => string;
 }
@@ -45,6 +47,13 @@ export function listUtilisateurs(deps: UtilisateurDeps, ctx: TenantContext): Pro
 export async function inviterUtilisateur(deps: UtilisateurDeps, ctx: TenantContext, input: InviteInput): Promise<{ id: number; email: string | null; role: string }> {
   if (await deps.repo.emailExists(input.email)) {
     throw new ConflictError("Cet email est déjà utilisé");
+  }
+
+  const subscription = await deps.subscriptionReader.getSubscription(ctx);
+  const maxUsers = subscription?.maxUsers ?? 1;
+  const currentUsers = await deps.repo.list(ctx);
+  if (currentUsers.length >= maxUsers) {
+    throw new ConflictError(`Limite d'utilisateurs atteinte (${maxUsers})`);
   }
   const tempPassword = deps.genTempPassword();
   const passwordHash = await deps.hasher.hash(tempPassword);
