@@ -424,7 +424,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     void reply.code(status).send({ error: error.message ?? "Erreur serveur" });
   });
 
-  app.get("/health", async (req, reply) => {
+  app.get("/health", async (_req, reply) => {
     try {
       await getDbHandle().db.execute(sql`SELECT 1`);
       return { status: "ok" as const };
