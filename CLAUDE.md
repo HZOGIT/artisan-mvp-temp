@@ -89,7 +89,7 @@ eslint/
 
 > **⚠️ Répertoires INTERDITS à recréer** — le dossier `devtools/` a été dissout dans `scripts/` (commit `c1cb0b4f`). Ne jamais le recréer. Tout nouveau prompt va dans `scripts/prompts/`. Tout nouveau script va dans `scripts/`.
 
-> **⚠️ INTERDIT — variables d'environnement dans `.env.production`** — Ne jamais écrire une valeur d'env runtime (URL de backend, clé API, feature flag d'infra) dans `.env.production` committé. Ces variables se configurent **dans le dashboard du service de déploiement** (Cloudflare Pages : `wrangler pages secret put <KEY> --project-name <project>` ; Railway : dashboard env). `.env.production` ne contient que des constantes publiques non-sensibles (ex. titre de l'app, logo).
+> **⚠️ INTERDIT — variables d'environnement dans `.env.production`** — Ne jamais écrire une valeur d'env runtime (URL de backend, clé API, feature flag d'infra) dans `.env.production` committé. Ces variables se configurent **dans le dashboard du service de déploiement** (Cloudflare Pages : `wrangler pages secret put <KEY> --project-name <project>` ; backend : fichier `.env` sur le serveur ou variables d'env Docker). `.env.production` ne contient que des constantes publiques non-sensibles (ex. titre de l'app, logo).
 
 ## Environnements — déploiement
 
@@ -105,13 +105,13 @@ wrangler pages secret put VITE_STRIPE_PUBLISHABLE_KEY --project-name artisan-sta
 # (et non dans .env.production commité — la clé serait vide lors du build CF)
 ```
 
-### Backend (Railway / Docker)
+### Backend (Docker / CF Tunnel)
 
 ```bash
 ./scripts/deploy-backend.sh   # rebuild + smoke (health + auth)
 ```
 
-Variables runtime → Railway dashboard (jamais dans `.env.production`).
+Variables runtime → fichier `.env` sur le serveur ou variables d'env Docker (jamais dans `.env.production`).
 
 ## Règle commentaires
 
