@@ -996,7 +996,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   app.register(billingCronPlugin, { schedulerDeps: billingSchedulerDeps, db: getDbHandle().db });
 
   /** Cron CNIL — purge des positions GPS expirées toutes les 6 h (rétention 8 h par position). */
-  app.register(geoPurgeCronPlugin, { technicienRepo });
+  app.register(geoPurgeCronPlugin, { technicienRepo, db: getDbHandle().db });
 
   /** Upload/suppression du logo artisan `/api/upload-logo` (auth cookie JWT). Stocké en data-URL base64. */
   registerUploadLogoRoute(app, {
