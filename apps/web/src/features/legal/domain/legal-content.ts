@@ -142,6 +142,7 @@ export const CONFIDENTIALITE: LegalDoc = {
 <li><strong>Connexion</strong> : adresse IP, user-agent (navigateur, OS), horodatages.</li>
 <li><strong>Appareils enregistrés</strong> : empreinte technique (OS + navigateur), pour la limite multi-appareils.</li>
 <li><strong>Logs</strong> : actions effectuées (audit log), conservés 12 mois pour la sécurité.</li>
+<li><strong>Géolocalisation des techniciens</strong> : position GPS horodatée (latitude, longitude, précision, vitesse, cap, niveau batterie), collectée lors des interventions terrain via l'application mobile. Conservée <strong>8 heures</strong> puis supprimée automatiquement.</li>
 </ul>
 <h3>2.3 Données de paiement</h3>
 <p>Les paiements sont traités par <strong>Stripe</strong>. Operioz ne stocke AUCUNE donnée de carte bancaire. Stripe est certifié PCI-DSS niveau 1.</p>
@@ -151,6 +152,7 @@ export const CONFIDENTIALITE: LegalDoc = {
 <li><strong>Facturation et gestion comptable</strong> (obligation légale, art. 6.1.c)&nbsp;: conservation des factures émises pendant 10 ans (Code de commerce).</li>
 <li><strong>Sécurité</strong> (intérêt légitime, art. 6.1.f)&nbsp;: logs, détection d'anomalies, protection contre la fraude.</li>
 <li><strong>Communication produit</strong> (consentement, art. 6.1.a)&nbsp;: emails transactionnels (essai, paiement, rappels) — sans option de désinscription pour les emails service. Newsletters facultatives avec consentement explicite.</li>
+<li><strong>Géolocalisation des techniciens</strong> (intérêt légitime, art. 6.1.f)&nbsp;: suivi en temps réel des interventions terrain (optimisation de la planification, sécurité des techniciens). Les techniciens sont informés de la collecte via l'application mobile. Données supprimées automatiquement après <strong>8 heures</strong>.</li>
 </ul>
 <h2>4. Durées de conservation</h2>
 <ul>
@@ -159,6 +161,7 @@ export const CONFIDENTIALITE: LegalDoc = {
 <li><strong>Factures et documents fiscaux</strong> : les données nécessaires à l'intégrité comptable sont conservées 10 ans (obligation légale, Code de commerce art. L123-22). Les informations personnelles rattachées sont pseudonymisées lors de la suppression du compte.</li>
 <li><strong>Logs de sécurité</strong> : 12 mois.</li>
 <li><strong>Sessions actives</strong> : 7 jours glissants.</li>
+<li><strong>Positions GPS des techniciens</strong> : 8 heures (purge automatique horaire).</li>
 </ul>
 <h2>5. Destinataires des données</h2>
 <p>Vos données ne sont JAMAIS revendues. Elles sont partagées uniquement avec&nbsp;:</p>
