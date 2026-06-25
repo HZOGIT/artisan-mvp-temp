@@ -31,6 +31,9 @@ const updateSchema = z.object({
   slug: z.string().max(100).optional(),
   metier: z.string().max(50).optional(),
   franchiseTVA: z.boolean().optional(),
+  assuranceDecennaleNom: z.string().max(255).nullish(),
+  assuranceDecennalePolice: z.string().max(100).nullish(),
+  assuranceDecennaleGarantie: z.string().max(255).nullish(),
 });
 
 /*

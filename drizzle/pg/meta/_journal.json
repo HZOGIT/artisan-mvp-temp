@@ -169,6 +169,13 @@
       "when": 1782377993952,
       "tag": "0023_tricky_shard",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1782384799261,
+      "tag": "0024_secret_queen_noir",
+      "breakpoints": true
     }
   ]
 }

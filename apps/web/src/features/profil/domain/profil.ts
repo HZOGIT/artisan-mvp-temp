@@ -32,12 +32,14 @@ export type ProfilForm = {
   metier: string; telephone: string; email: string; adresse: string; codePostal: string; ville: string;
   tauxTVA: string; iban: string; formeJuridique: FormeJuridique | ""; capitalSocial: string;
   villeRCS: string; numeroRM: string; franchiseTVA: boolean;
+  assuranceDecennaleNom: string; assuranceDecennalePolice: string; assuranceDecennaleGarantie: string;
 };
 
 export function defaultProfilForm(): ProfilForm {
   return { nomEntreprise: "", siret: "", numeroTVA: "", codeAPE: "", specialite: "plomberie", metier: "",
     telephone: "", email: "", adresse: "", codePostal: "", ville: "", tauxTVA: "20", iban: "",
-    formeJuridique: "", capitalSocial: "", villeRCS: "", numeroRM: "", franchiseTVA: false };
+    formeJuridique: "", capitalSocial: "", villeRCS: "", numeroRM: "", franchiseTVA: false,
+    assuranceDecennaleNom: "", assuranceDecennalePolice: "", assuranceDecennaleGarantie: "" };
 }
 
 /** Remplit le formulaire depuis le profil (specialite hors-enum → "plomberie"). PUR. */
@@ -52,6 +54,9 @@ export function formFromArtisan(a: Artisan): ProfilForm {
     adresse: a.adresse || "", codePostal: a.codePostal || "", ville: a.ville || "", tauxTVA,
     iban: a.iban || "", formeJuridique: forme, capitalSocial: a.capitalSocial != null ? String(a.capitalSocial) : "",
     villeRCS: a.villeRCS || "", numeroRM: a.numeroRM || "", franchiseTVA: a.franchiseTVA ?? false,
+    assuranceDecennaleNom: a.assuranceDecennaleNom || "",
+    assuranceDecennalePolice: a.assuranceDecennalePolice || "",
+    assuranceDecennaleGarantie: a.assuranceDecennaleGarantie || "",
   };
 }
 
@@ -68,6 +73,9 @@ export function buildUpdatePayload(form: ProfilForm): UpdateProfileInput {
     formeJuridique: form.formeJuridique || undefined,
     capitalSocial: form.capitalSocial || undefined, villeRCS: form.villeRCS || undefined, numeroRM: form.numeroRM || undefined,
     franchiseTVA: form.franchiseTVA,
+    assuranceDecennaleNom: form.assuranceDecennaleNom || null,
+    assuranceDecennalePolice: form.assuranceDecennalePolice || null,
+    assuranceDecennaleGarantie: form.assuranceDecennaleGarantie || null,
   };
 }
 

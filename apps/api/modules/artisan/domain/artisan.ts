@@ -28,6 +28,9 @@ export interface ArtisanProfile {
   readonly plan: string | null;
   readonly onboardingCompleted: boolean | null;
   readonly franchiseTVA: boolean;
+  readonly assuranceDecennaleNom: string | null;
+  readonly assuranceDecennalePolice: string | null;
+  readonly assuranceDecennaleGarantie: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
@@ -57,4 +60,7 @@ export interface UpdateArtisanProfileInput {
   readonly slug?: string | null;
   readonly metier?: string | null;
   readonly franchiseTVA?: boolean;
+  readonly assuranceDecennaleNom?: string | null;
+  readonly assuranceDecennalePolice?: string | null;
+  readonly assuranceDecennaleGarantie?: string | null;
 }

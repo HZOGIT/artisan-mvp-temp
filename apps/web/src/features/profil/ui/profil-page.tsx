@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { Building, Phone, Mail, MapPin, Save, CreditCard, KeyRound, AlertTriangle, Trash2 } from "lucide-react";
+import { Building, Phone, Mail, MapPin, Save, CreditCard, KeyRound, AlertTriangle, Trash2, ShieldCheck } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -142,6 +142,20 @@ export default function ProfilPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2"><Label htmlFor="iban">{t("iban")}</Label><Input id="iban" value={form.iban} onChange={(e) => set("iban", e.target.value)} placeholder="FR76 1234 5678 9012 3456 7890 123" /></div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5" />{t("assuranceDecennale")}</CardTitle>
+            <CardDescription>{t("assuranceDecennaleDesc")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2"><Label htmlFor="assuranceDecennaleNom">{t("assureurDecennale")}</Label><Input id="assuranceDecennaleNom" value={form.assuranceDecennaleNom} onChange={(e) => set("assuranceDecennaleNom", e.target.value)} placeholder={t("assureurDecennalePlaceholder")} /></div>
+              <div className="space-y-2"><Label htmlFor="assuranceDecennalePolice">{t("policeDecennale")}</Label><Input id="assuranceDecennalePolice" value={form.assuranceDecennalePolice} onChange={(e) => set("assuranceDecennalePolice", e.target.value)} placeholder={t("policeDecennalePlaceholder")} /></div>
+            </div>
+            <div className="space-y-2"><Label htmlFor="assuranceDecennaleGarantie">{t("zoneGarantieDecennale")}</Label><Input id="assuranceDecennaleGarantie" value={form.assuranceDecennaleGarantie} onChange={(e) => set("assuranceDecennaleGarantie", e.target.value)} placeholder={t("zoneGarantieDecennalePlaceholder")} /></div>
           </CardContent>
         </Card>
 

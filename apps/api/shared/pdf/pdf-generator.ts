@@ -272,7 +272,7 @@ interface InfoBlock {
  * pour une société, forme juridique + capital + RCS (ville + SIREN dérivé du SIRET) ;
  * « RM … » si inscrit au Répertoire des Métiers. Rien d'imposé en plus pour un EI/micro.
  */
-function buildMentionsLegalesEmetteur(artisan: Artisan): string[] {
+export function buildMentionsLegalesEmetteur(artisan: Artisan): string[] {
   const lines: string[] = [];
   const SOCIETES = ["EURL", "SARL", "SAS", "SASU", "SA"];
   if (artisan.formeJuridique && SOCIETES.includes(artisan.formeJuridique)) {
@@ -285,6 +285,10 @@ function buildMentionsLegalesEmetteur(artisan: Artisan): string[] {
     if (line) lines.push(line);
   }
   if (artisan.numeroRM) lines.push(`Inscrit au Répertoire des Métiers — RM ${artisan.numeroRM}`);
+  if (artisan.assuranceDecennaleNom && artisan.assuranceDecennalePolice) {
+    const zone = artisan.assuranceDecennaleGarantie ? `, garantissant les travaux en ${artisan.assuranceDecennaleGarantie}` : "";
+    lines.push(`Assurance décennale : ${artisan.assuranceDecennaleNom} — Police n° ${artisan.assuranceDecennalePolice}${zone}`);
+  }
   return lines;
 }
 
