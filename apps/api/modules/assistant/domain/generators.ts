@@ -49,7 +49,7 @@ export function buildGenerateDevisPrompt(description: string, catalogue: string)
   return {
     system: `Tu es un assistant spécialisé dans la génération de devis pour artisans. Tu dois générer des lignes de devis au format JSON.
 Catalogue d'articles disponibles :\n${catalogue}\n\nRéponds UNIQUEMENT avec un tableau JSON (pas de texte autour) au format :
-[{"designation":"...","quantite":1,"unite":"u","prixUnitaireHT":0,"tauxTVA":20}]`,
+[{"designation":"...","quantite":1,"unite":"u","prixUnitaireHT":0,"tauxTVA":20,"tvaCategorieId":"FR_20"}]`,
     user: `Génère les lignes de devis pour : ${description}`,
     temperature: 0.3,
     maxOutputTokens: 2000,

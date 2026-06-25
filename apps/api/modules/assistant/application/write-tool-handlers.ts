@@ -1,4 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
+import { tauxStringToCategorie, TVA_CATEGORIES_MAP } from "../../../shared/tva/taux-tva-fr";
 import type { ToolHandler } from "./assistant-tool-registry";
 
 /*
@@ -65,6 +66,7 @@ export interface DevisLigneInput {
   readonly unite?: string;
   readonly prixUnitaireHT: string;
   readonly tauxTVA: string;
+  readonly tvaCategorieId?: string;
 }
 export interface DevisWriterForAgent {
   creer(ctx: TenantContext, input: { clientId: number; objet: string; notes?: string; dateValidite: Date }): Promise<{ id: number }>;
@@ -82,6 +84,7 @@ export interface FactureLigneInput {
   readonly unite?: string;
   readonly prixUnitaireHT: string;
   readonly tauxTVA: string;
+  readonly tvaCategorieId?: string;
 }
 export interface FactureWriterForAgent {
   creer(ctx: TenantContext, input: { clientId: number; objet: string; dateEcheance: Date }): Promise<{ id: number }>;
@@ -120,6 +123,7 @@ export interface CommandeLigneInput {
   readonly unite?: string;
   readonly prixUnitaire?: string;
   readonly tauxTVA?: string;
+  readonly tvaCategorieId?: string;
 }
 export interface CommandeWriterForAgent {
   creer(ctx: TenantContext, input: { fournisseurId: number; notes?: string; lignes: readonly CommandeLigneInput[] }): Promise<{ id: number; numero: string; totalTTC: string }>;
@@ -243,12 +247,14 @@ async function creerDevisOrchestration(
   const created = await devis.creer(ctx, { clientId, objet, notes: optStr(args.notes), dateValidite });
   for (const raw of lignes) {
     const l = (raw ?? {}) as Record<string, unknown>;
+    const catDevis = l.tvaCategorieId ? String(l.tvaCategorieId) : tauxStringToCategorie(String(l.tauxTVA ?? 20));
     await devis.ajouterLigne(ctx, created.id, {
       designation: String(l.designation ?? ""),
       quantite: String(Number(l.quantite) || 0),
       unite: optStr(l.unite) ?? "u",
       prixUnitaireHT: String(Number(l.prixUnitaireHT) || 0),
-      tauxTVA: String(Number(l.tauxTVA ?? 20)),
+      tauxTVA: TVA_CATEGORIES_MAP[catDevis].taux,
+      tvaCategorieId: catDevis,
     });
   }
   const full = await devis.getById(ctx, created.id);
@@ -324,12 +330,14 @@ function makeCreerFacture(facture: FactureWriterForAgent): ToolHandler {
         factureId = created.id;
         for (const raw of lignes) {
           const l = (raw ?? {}) as Record<string, unknown>;
+          const catFact = l.tvaCategorieId ? String(l.tvaCategorieId) : tauxStringToCategorie(String(l.tauxTVA ?? 20));
           await facture.ajouterLigne(ctx, factureId, {
             designation: String(l.designation ?? ""),
             quantite: String(Number(l.quantite) || 0),
             unite: optStr(l.unite) ?? "u",
             prixUnitaireHT: String(Number(l.prixUnitaireHT) || 0),
-            tauxTVA: String(Number(l.tauxTVA ?? 20)),
+            tauxTVA: TVA_CATEGORIES_MAP[catFact].taux,
+            tvaCategorieId: catFact,
           });
         }
       }
@@ -410,12 +418,14 @@ function makeCreerCommande(commandes: CommandeWriterForAgent): ToolHandler {
         notes,
         lignes: lignes.map((raw) => {
           const l = (raw ?? {}) as Record<string, unknown>;
+          const catCmd = l.tvaCategorieId ? String(l.tvaCategorieId) : tauxStringToCategorie(String(l.tauxTVA ?? 20));
           return {
             designation: String(l.designation ?? ""),
             quantite: String(Number(l.quantite) || 0),
             unite: optStr(l.unite) ?? "u",
             prixUnitaire: String(Number(l.prixUnitaireHT) || 0),
-            tauxTVA: String(Number(l.tauxTVA ?? 20)),
+            tauxTVA: TVA_CATEGORIES_MAP[catCmd].taux,
+            tvaCategorieId: catCmd,
           };
         }),
       });
