@@ -107,6 +107,7 @@ import { createSubscriptionModule } from "./modules/subscription/subscription.mo
 import { createBillingModule } from "./modules/billing/billing.module";
 import { BillingRepositoryDrizzle } from "./modules/billing/infra/billing-repository-drizzle";
 import { BillingAdapter } from "./shared/ports/billing-adapter";
+import { createPlatformAdminModule } from "./modules/platform-admin/platform-admin.module";
 import { SubscriptionReaderDrizzle } from "./modules/subscription/infra/subscription-reader-drizzle";
 import type { ISubscriptionRepository } from "./modules/subscription/application/subscription-reader";
 import { StripeAdapter } from "./shared/ports/stripe-adapter";
@@ -258,6 +259,7 @@ import { TresorerieReaderDrizzle } from "./modules/previsions-ca/infra/tresoreri
 import type { TresorerieReader } from "./modules/previsions-ca/application/tresorerie-reader";
 import type { IPrevisionCARepository } from "./modules/previsions-ca/application/prevision-ca-repository";
 import type { EmailPort, RateLimiterPort, LlmPort, VisionPort } from "./shared/ports";
+import type { EventBusPort } from "./shared/ports/event-bus";
 import { ResendEmailAdapter, SlidingWindowRateLimiter, GeminiLlmAdapter, GeminiVisionAdapter } from "./shared/ports";
 import { makeLlmUsageTracker } from "./shared/ports/llm-usage-tracker";
 import type { AppLogger } from "./shared/ports/logger";
@@ -334,6 +336,7 @@ export interface AppDeps extends ContextDeps {
   readonly stripeWebhookSecret?: string;
   readonly facturesCAReader?: FacturesCAReader;
   readonly tresorerieReader?: TresorerieReader;
+  readonly eventBus?: EventBusPort;
 }
 
 /** Construit l'instance Fastify : /health + tRPC monté sur /api/trpc. */
@@ -385,8 +388,16 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   app.register(cookie);
   app.register(fastifySchedule);
+  /*
+   * Origines CORS autorisées : CORS_ORIGIN (liste séparée par virgules) sinon APP_URL. Plusieurs
+   * fronts cross-origin partagent le backend (app artisan + SPA admin) → on parse en tableau.
+   */
+  const corsOriginEnv = process.env.CORS_ORIGIN ?? process.env.APP_URL;
+  const corsOrigins = corsOriginEnv
+    ? corsOriginEnv.split(",").map((o) => o.trim()).filter(Boolean)
+    : false;
   app.register(cors, {
-    origin: process.env.CORS_ORIGIN ?? process.env.APP_URL ?? false,
+    origin: corsOrigins,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   });
@@ -925,7 +936,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     deps: { repo: billingRepo, billing: new BillingAdapter(), stripe: deps.stripePort ?? new StripeAdapter() },
   });
 
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp, interventionsMobile, vitrine, clientPortal, integrationsComptables, devisIA, billing });
+  const platformAdmin = createPlatformAdminModule(getDbHandle().db);
+
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp, interventionsMobile, vitrine, clientPortal, integrationsComptables, devisIA, billing, platformAdmin });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",

@@ -1,6 +1,7 @@
 import { router, publicProcedure, protectedProcedure } from "./trpc";
 import { createVehiculesRouter } from "../../modules/vehicules/interface/trpc/vehicules.router";
 import type { IVehiculeRepository } from "../../modules/vehicules/application/vehicule-repository";
+import type { PlatformAdminModule } from "../../modules/platform-admin/platform-admin.module";
 import type { AvisModule } from "../../modules/avis/avis.module";
 import type { BadgesModule } from "../../modules/badges/badges.module";
 import type { TechniciensModule } from "../../modules/techniciens/techniciens.module";
@@ -121,6 +122,7 @@ export interface AppRouterDeps {
   readonly integrationsComptables: IntegrationsComptablesModule;
   readonly devisIA: DevisIAModule;
   readonly billing: BillingModule;
+  readonly platformAdmin: PlatformAdminModule;
 }
 
 /*
@@ -195,6 +197,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     integrationsComptables: deps.integrationsComptables.router,
     devisIA: deps.devisIA.router,
     billing: deps.billing.router,
+    platformAdmin: deps.platformAdmin.router,
   });
 }
 

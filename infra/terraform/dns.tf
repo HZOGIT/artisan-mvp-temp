@@ -27,6 +27,16 @@ resource "cloudflare_dns_record" "staging_backend" {
   ttl     = 1
 }
 
+# Admin front : admin-staging.operioz.com -> Cloudflare Pages (projet "artisan-admin-staging").
+resource "cloudflare_dns_record" "admin_staging" {
+  zone_id = cloudflare_zone.operioz.id
+  name    = "admin-staging"
+  type    = "CNAME"
+  content = "artisan-admin-staging.pages.dev"
+  proxied = true
+  ttl     = 1
+}
+
 resource "cloudflare_dns_record" "railway_verify_www" {
   zone_id = cloudflare_zone.operioz.id
   name    = "_railway-verify.www"

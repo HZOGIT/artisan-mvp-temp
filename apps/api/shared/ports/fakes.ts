@@ -5,6 +5,7 @@ import type { StoragePort, PutOptions } from "./storage";
 import type { PdfPort } from "./pdf";
 import type { RateLimiterPort } from "./rate-limiter";
 import type { LlmPort, LlmResult, LlmStreamChunk, LlmUsage } from "./llm";
+import type { EventBusPort, WorkerPort, DomainEvent } from "./event-bus";
 
 const FAKE_USAGE: LlmUsage = {
   model: "fake", durationMs: 0, finishReason: "STOP",
@@ -107,6 +108,41 @@ export class FakeLlmPort implements LlmPort {
  * Vision factice déterministe : renvoie une réponse scriptée et capture les requêtes (assertions).
  * Aucun appel réseau. `responses` = réponse fixe ou file (une par appel). `throwOn` force une erreur.
  */
+export class FakeEventBus implements EventBusPort {
+  readonly published: DomainEvent<unknown>[] = [];
+
+  async publish<T>(event: DomainEvent<T>): Promise<void> {
+    this.published.push(event as DomainEvent<unknown>);
+  }
+
+  async publishMany<T>(events: readonly DomainEvent<T>[]): Promise<void> {
+    for (const e of events) this.published.push(e as DomainEvent<unknown>);
+  }
+
+  getPublished<T>(type?: string): DomainEvent<T>[] {
+    const all = this.published as DomainEvent<T>[];
+    return type ? all.filter((e) => e.type === type) : all;
+  }
+}
+
+export class FakeWorkerPort implements WorkerPort {
+  private readonly handlers = new Map<string, (event: DomainEvent<unknown>) => Promise<void>>();
+
+  register<T>(type: string, handler: (event: DomainEvent<T>) => Promise<void>): void {
+    this.handlers.set(type, handler as (event: DomainEvent<unknown>) => Promise<void>);
+  }
+
+  async trigger<T>(type: string, event: DomainEvent<T>): Promise<void> {
+    const handler = this.handlers.get(type);
+    if (!handler) throw new Error(`Aucun handler enregistré pour le type "${type}"`);
+    await handler(event as DomainEvent<unknown>);
+  }
+
+  registeredTypes(): string[] {
+    return Array.from(this.handlers.keys());
+  }
+}
+
 export class FakeVisionPort implements VisionPort {
   readonly requests: VisionRequest[] = [];
   private readonly queue: string[];
