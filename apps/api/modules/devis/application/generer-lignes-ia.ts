@@ -26,6 +26,7 @@ export interface LigneDevisIa {
   readonly prixUnitaire: number;
   readonly tauxTva: number;
   readonly type: string;
+  readonly tvaCategorieId?: string;
 }
 
 export interface PropositionDevisIa {
@@ -47,6 +48,7 @@ function toLigne(l: Record<string, unknown>): LigneDevisIa {
     prixUnitaire: Number(l.prixUnitaire) || 0,
     tauxTva: Number(l.tauxTva) || 0,
     type: String(l.type ?? "fourniture").slice(0, 30),
+    tvaCategorieId: String(l.tvaCategorieId ?? "").slice(0, 20) || undefined,
   };
 }
 
@@ -73,7 +75,7 @@ ${input.budget ? `Budget client : ${input.budget} €` : ""}
 Génère les lignes détaillées d'un devis professionnel. Inclure main d'œuvre ET fournitures. Prix réalistes marché français.
 
 Réponds UNIQUEMENT en JSON pur :
-{"objet":"objet court","dureeEstimee":"X jours","lignes":[{"designation":"description","quantite":1,"unite":"u|m|m2|h|forfait","prixUnitaire":0,"tauxTva":10,"type":"fourniture|main_oeuvre|forfait"}],"notes":"remarques","conseilsArtisan":"conseils"}`;
+{"objet":"objet court","dureeEstimee":"X jours","lignes":[{"designation":"description","quantite":1,"unite":"u|m|m2|h|forfait","prixUnitaire":0,"tauxTva":20,"tvaCategorieId":"FR_20","type":"fourniture|main_oeuvre|forfait"}],"notes":"remarques","conseilsArtisan":"conseils"}`;
 
   let text: string;
   try {
