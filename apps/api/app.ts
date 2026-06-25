@@ -259,6 +259,7 @@ import { TresorerieReaderDrizzle } from "./modules/previsions-ca/infra/tresoreri
 import type { TresorerieReader } from "./modules/previsions-ca/application/tresorerie-reader";
 import type { IPrevisionCARepository } from "./modules/previsions-ca/application/prevision-ca-repository";
 import type { EmailPort, RateLimiterPort, LlmPort, VisionPort } from "./shared/ports";
+import type { EventBusPort } from "./shared/ports/event-bus";
 import { ResendEmailAdapter, SlidingWindowRateLimiter, GeminiLlmAdapter, GeminiVisionAdapter } from "./shared/ports";
 import { makeLlmUsageTracker } from "./shared/ports/llm-usage-tracker";
 import type { AppLogger } from "./shared/ports/logger";
@@ -335,6 +336,7 @@ export interface AppDeps extends ContextDeps {
   readonly stripeWebhookSecret?: string;
   readonly facturesCAReader?: FacturesCAReader;
   readonly tresorerieReader?: TresorerieReader;
+  readonly eventBus?: EventBusPort;
 }
 
 /** Construit l'instance Fastify : /health + tRPC monté sur /api/trpc. */
