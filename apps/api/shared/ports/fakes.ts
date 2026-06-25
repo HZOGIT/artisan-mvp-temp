@@ -88,7 +88,7 @@ export class FakeLlmPort implements LlmPort {
   }
   private next(): string {
     /** File à plusieurs entrées → consomme ; sinon réponse fixe réutilisée. */
-    return this.queue.length > 1 ? this.queue.shift()! : this.queue[0] ?? "";
+    return this.queue.length > 1 ? (this.queue.shift() ?? "") : this.queue[0] ?? "";
   }
   async complete(prompt: string): Promise<LlmResult> {
     this.prompts.push(prompt);
@@ -118,12 +118,12 @@ export class FakeVisionPort implements VisionPort {
   async analyzeImage(req: VisionRequest): Promise<string> {
     this.requests.push(req);
     if (this.err) throw this.err;
-    return this.queue.length > 1 ? this.queue.shift()! : this.queue[0] ?? "";
+    return this.queue.length > 1 ? (this.queue.shift() ?? "") : this.queue[0] ?? "";
   }
   readonly multiRequests: VisionMultiRequest[] = [];
   async analyzeImages(req: VisionMultiRequest): Promise<string> {
     this.multiRequests.push(req);
     if (this.err) throw this.err;
-    return this.queue.length > 1 ? this.queue.shift()! : this.queue[0] ?? "";
+    return this.queue.length > 1 ? (this.queue.shift() ?? "") : this.queue[0] ?? "";
   }
 }

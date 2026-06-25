@@ -20,17 +20,18 @@ interface AppLike {
 export interface InjectResult {
   statusCode: number;
   body: string;
-  json: () => any;
+  json: () => unknown;
 }
 
-function unwrap(raw: unknown): any {
-  let env: any = raw;
-  /** tolérant au format batch (1 appel) */
-  if (Array.isArray(env)) env = env[0];
-  if (env && typeof env === "object" && env.result && "data" in env.result) {
-    return { ...env, result: { ...env.result, data: superjson.deserialize(env.result.data) } };
+function unwrap(raw: unknown): unknown {
+  const env: unknown = Array.isArray(raw) ? raw[0] : raw;
+  if (env != null && typeof env === "object" && "result" in env) {
+    const typed = env as { result: Record<string, unknown> };
+    if ("data" in typed.result) {
+      const deserialized = superjson.deserialize(typed.result["data"] as Parameters<typeof superjson.deserialize>[0]);
+      return { ...typed, result: { ...typed.result, data: deserialized } };
+    }
   }
-  /** enveloppe d'erreur (ou forme inattendue) : passthrough */
   return env;
 }
 
