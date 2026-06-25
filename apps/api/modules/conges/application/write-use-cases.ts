@@ -49,6 +49,9 @@ export async function modifierConge(
   input: UpdateCongeInput,
 ): Promise<Conge> {
   assertDatesCoherentes(input.dateDebut, input.dateFin);
+  const existing = await repo.getById(ctx, id);
+  if (!existing) throw new NotFoundError("Demande de congé introuvable");
+  if (existing.statut !== "en_attente") throw new ConflictError("Impossible de modifier un congé " + existing.statut);
   const updated = await repo.update(ctx, id, input);
   if (!updated) throw new NotFoundError("Demande de congé introuvable");
   return updated;

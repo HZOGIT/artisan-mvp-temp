@@ -10,6 +10,7 @@ export type PermissionCode =
   | "rdv.gerer"
   | "interventions.voir" | "interventions.gerer"
   | "calendrier.voir"
+  | "conges.gerer"
   | "chantiers.voir" | "chantiers.gerer"
   | "techniciens.voir"
   | "geolocalisation.voir"
@@ -63,6 +64,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { code: "interventions.voir", label: "Voir les interventions" },
       { code: "interventions.gerer", label: "Créer et modifier des interventions" },
       { code: "calendrier.voir", label: "Voir le calendrier" },
+      { code: "conges.gerer", label: "Gérer les congés" },
       { code: "chantiers.voir", label: "Voir les chantiers" },
       { code: "chantiers.gerer", label: "Modifier les chantiers" },
       { code: "techniciens.voir", label: "Voir les techniciens" },

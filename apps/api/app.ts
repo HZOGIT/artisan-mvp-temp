@@ -444,9 +444,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       writer: new PublicAvisWriterDrizzle(getDbHandle().db),
     },
   });
-  const badges = createBadgesModule({
-    repository: deps.badgeRepo ?? new BadgeRepositoryDrizzle(getDbHandle().db),
-  });
+  const badgeRepo = deps.badgeRepo ?? new BadgeRepositoryDrizzle(getDbHandle().db);
+  const badges = createBadgesModule({ repository: badgeRepo });
   /*
    * Repo techniciens partagé : module techniciens + composé par interventions (getSuggestionsTechniciens :
    * positions GPS + dispo, scopé tenant). Hoisté avant interventions.
@@ -546,6 +545,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     repository: interventionRepo,
     congeRepository: congeRepo,
     technicienRepository: technicienRepo,
+    badgeRepository: badgeRepo,
   });
   const conges = createCongesModule({
     repository: congeRepo,

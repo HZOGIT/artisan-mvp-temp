@@ -23,6 +23,8 @@ import { assignerTechnicien } from "../../application/assigner-technicien";
 import { getSuggestionsTechniciens } from "../../application/suggestions-techniciens";
 import type { ICongeRepository } from "../../../conges/application/conge-repository";
 import type { ITechnicienRepository } from "../../../techniciens/application/technicien-repository";
+import type { IBadgeRepository } from "../../../badges/application/badge-repository";
+import { verifierBadges } from "../../../badges/application/write-use-cases";
 
 /*
  * Dates reçues en string ISO (sélecteur front) → `Date`, avec rejet propre des dates
@@ -69,7 +71,7 @@ const updateSchema = z.object({
  * les dates, délègue aux use-cases (scoping tenant + anti-IDOR-FK via ctx.tenant), laisse
  * remonter les Domain errors (NotFound→404, Validation→400). Repo injecté (DI).
  */
-export function createInterventionsRouter(repo: IInterventionRepository, congeRepo: ICongeRepository, technicienRepo: ITechnicienRepository) {
+export function createInterventionsRouter(repo: IInterventionRepository, congeRepo: ICongeRepository, technicienRepo: ITechnicienRepository, badgeRepo: IBadgeRepository) {
   return router({
     list: voir.query(({ ctx }) => listInterventions(repo, ctx.tenant)),
 
@@ -105,6 +107,11 @@ export function createInterventionsRouter(repo: IInterventionRepository, congeRe
         if (rest.statut) {
           const level = rest.statut === "annulee" ? "warn" : "info";
           ctx.log[level]({ event: "intervention_statut_changed", interventionId: id, newStatut: rest.statut }, `Intervention statut → ${rest.statut}`);
+          if (rest.statut === "terminee" && result.technicienId != null) {
+            void verifierBadges(badgeRepo, ctx.tenant, result.technicienId).catch((e) =>
+              ctx.log.warn({ err: e }, "verifierBadges failed"),
+            );
+          }
         }
         return result;
       }),

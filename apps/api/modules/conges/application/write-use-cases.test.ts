@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { FakeCongeRepository } from "../infra/conge-repository-fake";
-import { creerConge, modifierConge, supprimerConge } from "./write-use-cases";
-import { NotFoundError, ValidationError } from "../../../shared/errors";
+import { creerConge, modifierConge, supprimerConge, approuverConge } from "./write-use-cases";
+import { ConflictError, NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 
 const A: TenantContext = { artisanId: 1, userId: 10 };
@@ -43,6 +43,13 @@ describe("conges — use-cases d'écriture (create / update)", () => {
       ValidationError,
     );
     await expect(modifierConge(repo, B, c.id, { motif: "hack" })).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("modifierConge : statut != en_attente → ConflictError (OPE-497)", async () => {
+    const repo = repoAvecTechA();
+    const c = await creerConge(repo, A, base());
+    await approuverConge(repo, A, c.id);
+    await expect(modifierConge(repo, A, c.id, { motif: "trop tard" })).rejects.toBeInstanceOf(ConflictError);
   });
 
   it("supprimerConge OK / cross-tenant → NotFound", async () => {
