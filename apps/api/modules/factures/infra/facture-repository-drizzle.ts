@@ -140,6 +140,68 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
     });
   }
 
+  createWithLignes(ctx: TenantContext, header: CreateFactureInput, lignes: readonly CreateFactureLigneInput[]): Promise<Facture> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .insert(factures)
+        .values({
+          artisanId: ctx.artisanId,
+          clientId: header.clientId,
+          devisId: header.devisId ?? null,
+          numero: header.numero,
+          typeDocument: header.typeDocument ?? "facture",
+          factureOrigineId: header.factureOrigineId ?? null,
+          objet: header.objet ?? null,
+          referenceClient: header.referenceClient ?? null,
+          siretDestinataire: header.siretDestinataire ?? null,
+          conditionsPaiement: header.conditionsPaiement ?? null,
+          notes: header.notes ?? null,
+          dateEcheance: header.dateEcheance ?? null,
+          statut: "brouillon",
+          totalHT: "0.00",
+          totalTVA: "0.00",
+          totalTTC: "0.00",
+          montantPaye: "0.00",
+        })
+        .returning();
+      const insertedMontants: { montantHT: string; montantTVA: string; montantTTC: string }[] = [];
+      for (let i = 0; i < lignes.length; i++) {
+        const l = lignes[i];
+        const type = l.type ?? "produit";
+        const isDisplay = type === "section" || type === "note";
+        const quantite = isDisplay ? "0" : l.quantite ?? "1";
+        const prixUnitaireHT = isDisplay ? "0" : l.prixUnitaireHT;
+        const tauxTVA = isDisplay ? "0" : l.tauxTVA ?? "20.00";
+        const montants = calculerMontantsLigne(type, quantite, prixUnitaireHT, tauxTVA);
+        await tx.insert(facturesLignes).values({
+          factureId: row.id,
+          ordre: l.ordre ?? i,
+          reference: isDisplay ? null : l.reference ?? null,
+          designation: l.designation,
+          description: l.description ?? null,
+          quantite,
+          unite: isDisplay ? "unité" : l.unite ?? "unité",
+          prixUnitaireHT,
+          tauxTVA,
+          tvaCategorieId: isDisplay ? null : (l.tvaCategorieId ?? null),
+          montantHT: montants.montantHT,
+          montantTVA: montants.montantTVA,
+          montantTTC: montants.montantTTC,
+          type,
+        });
+        insertedMontants.push(montants);
+      }
+      if (insertedMontants.length === 0) return toFacture(row);
+      const totaux = calculerTotaux(insertedMontants);
+      const [updated] = await tx
+        .update(factures)
+        .set({ totalHT: totaux.totalHT, totalTVA: totaux.totalTVA, totalTTC: totaux.totalTTC, updatedAt: new Date() })
+        .where(eq(factures.id, row.id))
+        .returning();
+      return toFacture(updated);
+    });
+  }
+
   update(ctx: TenantContext, id: number, input: UpdateFactureInput): Promise<Facture | null> {
     return withTenant(this.db, ctx, async (tx) => {
       /** Métadonnées seulement (UpdateFactureInput exclut clientId/devisId/numero/statut/totaux). */
