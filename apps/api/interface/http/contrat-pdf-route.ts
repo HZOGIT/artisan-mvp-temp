@@ -21,12 +21,17 @@ export function registerContratPdfRoute(app: FastifyInstance, deps: ContratPdfRo
 
     try {
       const { buffer, filename } = await getContratPdf(deps, { artisanId: auth.artisanId, userId: auth.userId }, id);
+      req.log.info({ event: "contrat_pdf_generated", contratId: id, artisanId: auth.artisanId }, "PDF contrat généré");
       return reply
         .header("Content-Type", "application/pdf")
         .header("Content-Disposition", `inline; filename="${filename}"`)
         .send(buffer);
     } catch (e) {
-      if (e instanceof NotFoundError) return reply.code(404).send({ error: e.message });
+      if (e instanceof NotFoundError) {
+        req.log.warn({ event: "contrat_pdf_not_found", contratId: id, artisanId: auth.artisanId }, e.message);
+        return reply.code(404).send({ error: e.message });
+      }
+      req.log.error({ event: "contrat_pdf_error", contratId: id, artisanId: auth.artisanId, err: e instanceof Error ? e : new Error(String(e)) }, "Erreur génération PDF contrat");
       return reply.code(500).send({ error: "Erreur lors de la génération du PDF" });
     }
   });

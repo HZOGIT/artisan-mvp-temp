@@ -21,12 +21,17 @@ export function registerCommandePdfRoute(app: FastifyInstance, deps: CommandePdf
 
     try {
       const { buffer, filename } = await getBonCommandePdf(deps, { artisanId: auth.artisanId, userId: auth.userId }, id);
+      req.log.info({ event: "commande_pdf_generated", commandeId: id, artisanId: auth.artisanId }, "PDF commande généré");
       return reply
         .header("Content-Type", "application/pdf")
         .header("Content-Disposition", `inline; filename="${filename}"`)
         .send(buffer);
     } catch (e) {
-      if (e instanceof NotFoundError) return reply.code(404).send({ error: e.message });
+      if (e instanceof NotFoundError) {
+        req.log.warn({ event: "commande_pdf_not_found", commandeId: id, artisanId: auth.artisanId }, e.message);
+        return reply.code(404).send({ error: e.message });
+      }
+      req.log.error({ event: "commande_pdf_error", commandeId: id, artisanId: auth.artisanId, err: e instanceof Error ? e : new Error(String(e)) }, "Erreur génération PDF commande");
       return reply.code(500).send({ error: "Erreur lors de la génération du PDF" });
     }
   });
