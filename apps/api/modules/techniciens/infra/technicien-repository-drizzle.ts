@@ -82,6 +82,7 @@ function toTechnicien(r: TechnicienRow): Technicien {
     userId: r.userId ?? null,
     notes: r.notes ?? null,
     suiviActif: r.suiviActif ?? true,
+    typeContrat: (r.typeContrat ?? null) as Technicien["typeContrat"],
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };

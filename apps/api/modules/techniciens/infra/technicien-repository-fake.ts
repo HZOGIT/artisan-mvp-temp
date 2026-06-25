@@ -67,6 +67,7 @@ export class FakeTechnicienRepository implements ITechnicienRepository {
       userId: input.userId ?? null,
       notes: input.notes ?? null,
       suiviActif: true,
+      typeContrat: input.typeContrat ?? null,
       createdAt: now,
       updatedAt: now,
     };

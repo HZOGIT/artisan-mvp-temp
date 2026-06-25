@@ -7,6 +7,7 @@ import { creerTechnicien, modifierTechnicien, supprimerTechnicien, definirDispon
 const couleur = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal(""));
 const coutHoraire = z.string().regex(/^\d+(\.\d{1,2})?$/, "Coût horaire invalide").max(12);
 const statut = z.enum(["actif", "inactif", "conge"]);
+const typeContrat = z.enum(["cdi", "cdd", "interimaire", "sous_traitant"]);
 
 /** Bornes alignées sur la table `techniciens` (defense-in-depth). */
 const createSchema = z.object({
@@ -20,6 +21,7 @@ const createSchema = z.object({
   coutHoraire: coutHoraire.nullish(),
   userId: z.number().int().nullish(),
   notes: z.string().max(5000).nullish(),
+  typeContrat: typeContrat.nullish(),
 });
 
 const updateSchema = z.object({
@@ -33,6 +35,7 @@ const updateSchema = z.object({
   coutHoraire: coutHoraire.nullish(),
   userId: z.number().int().nullish(),
   notes: z.string().max(5000).nullish(),
+  typeContrat: typeContrat.nullish(),
 });
 
 /*
