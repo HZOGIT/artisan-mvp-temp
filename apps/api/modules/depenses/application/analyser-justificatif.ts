@@ -34,6 +34,7 @@ export interface AnalyserJustificatifResult {
 
 const OCR_PROMPT = `Analyse cette facture / note de frais. Extrais les informations en JSON :
 {"fournisseur":"nom","date":"YYYY-MM-DD","montantHT":0,"tauxTVA":20,"montantTTC":0,"categorie":"materiaux|carburant|outillage|repas|deplacement|telephone|sous-traitance|assurance|loyer|formation|bancaire|autre","description":"description courte","numeroFacture":"numero si visible"}
+Taux TVA légaux en France : 20 (standard), 10 (travaux, restauration), 5.5 (alimentation, rénovation énergétique), 2.1 (médicaments remboursés, presse). Extraire le taux réel visible sur la facture.
 Reponds UNIQUEMENT avec le JSON, pas de texte autour.`;
 
 function rateLimitKey(artisanId: number): string {
