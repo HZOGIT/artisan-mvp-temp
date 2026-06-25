@@ -19,19 +19,20 @@ COMPOSE="docker compose -f infra/docker-compose.yml --env-file .env.staging"
 NEWSTACK_URL="http://localhost:3010"
 
 echo "▶ Snapshot PostgreSQL avant déploiement…"
-BACKUP_DIR='/var/backups/pg'
-BACKUP_FILE="${BACKUP_DIR}/artisan_mvp_$(date +%Y%m%d_%H%M%S).dump"
-mkdir -p "$BACKUP_DIR"
+# Best-effort : un échec de snapshot ne DOIT JAMAIS bloquer le déploiement (set -e actif).
+# Défaut = répertoire inscriptible par l'utilisateur deploy ; override via PG_BACKUP_DIR (ex. /var/backups/pg).
+BACKUP_DIR="${PG_BACKUP_DIR:-$HOME/pg-backups}"
+mkdir -p "$BACKUP_DIR" 2>/dev/null || { echo "  [WARN] $BACKUP_DIR non créable — snapshot ignoré"; BACKUP_DIR=""; }
 
 PG_CONTAINER=$($COMPOSE ps -q postgres 2>/dev/null || true)
-if [ -n "$PG_CONTAINER" ]; then
+if [ -n "$BACKUP_DIR" ] && [ -n "$PG_CONTAINER" ]; then
+  BACKUP_FILE="${BACKUP_DIR}/artisan_mvp_$(date +%Y%m%d_%H%M%S).dump"
   echo "  Sauvegarde vers $BACKUP_FILE…"
   docker exec "$PG_CONTAINER" pg_dump -U artisan_user -Fc artisan_mvp > "$BACKUP_FILE" 2>/dev/null || echo "  [WARN] snapshot échoué — déploiement continue"
-
   ls -t "$BACKUP_DIR"/*.dump 2>/dev/null | tail -n +6 | xargs -r rm 2>/dev/null || true
-  echo "  Snapshot OK"
+  echo "  Snapshot terminé"
 else
-  echo "  [INFO] conteneur postgres non trouvé — snapshot ignoré (première exécution ?)"
+  echo "  [INFO] snapshot ignoré (répertoire indisponible ou conteneur postgres absent)"
 fi
 
 echo "▶ Rebuild + recreate du conteneur new-stack (docker compose --build)…"
