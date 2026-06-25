@@ -54,6 +54,6 @@ export default tseslint.config({
     "import-x/no-cycle": ["warn", { maxDepth: 5 }],
     "local/no-direct-env-access": "warn",
     "local/require-zod-input": "warn",
-    "local/require-llm-tracking": "warn",
+    "local/require-llm-tracking": "error",
   },
 });
