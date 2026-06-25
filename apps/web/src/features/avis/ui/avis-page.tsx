@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAvis } from "../application/use-avis";
-import { avisStatutKind, canReply, distributionPercent, nextModerationStatut, type Avis } from "../domain/avis";
+import { avisStatutKind, canReply, distributionPercent, type Avis } from "../domain/avis";
 import { Button } from "@/shared/ui/button";
 import { Textarea } from "@/shared/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
-import { Star, MessageSquare, Eye, EyeOff, Send, TrendingUp } from "lucide-react";
+import { Star, MessageSquare, Eye, Send, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 
 /*
@@ -151,27 +151,13 @@ export default function AvisPage() {
                           {t("repondre")}
                         </Button>
                       )}
-                      {a.statut === "publie" ? (
+                      {a.statut !== "publie" && (
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() =>
                             modererMutation.mutate(
-                              { avisId: a.id, statut: nextModerationStatut(a.statut) },
-                              { onSuccess: () => toast.success(t("toastModerated")), onError: (e) => toast.error(e.message) },
-                            )
-                          }
-                        >
-                          <EyeOff className="h-4 w-4 mr-1" />
-                          {t("masquer")}
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            modererMutation.mutate(
-                              { avisId: a.id, statut: nextModerationStatut(a.statut) },
+                              { avisId: a.id, statut: "publie" },
                               { onSuccess: () => toast.success(t("toastModerated")), onError: (e) => toast.error(e.message) },
                             )
                           }

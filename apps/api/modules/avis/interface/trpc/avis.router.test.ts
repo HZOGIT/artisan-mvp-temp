@@ -107,9 +107,10 @@ describe.skipIf(!URL)("avis.router e2e (HTTP → tRPC → use-case → repo → 
     expect((await callQuery(server, "avis.getById", { id: 999999999 }, tA)).statusCode).toBe(404);
   });
 
-  it("moderer avec statut hors union (en_attente) → 400 (zod, parité publie|masque)", async () => {
+  it("moderer avec statut hors enum → 400 (zod)", async () => {
     const tA = await token(UA);
     expect((await callMutation(server, "avis.moderer", { avisId: avisA, statut: "en_attente" }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "avis.moderer", { avisId: avisA, statut: "masque" }, tA)).statusCode).toBe(400);
   });
 
   it("repondre + moderer par le propriétaire", async () => {
@@ -132,7 +133,7 @@ describe.skipIf(!URL)("avis.router e2e (HTTP → tRPC → use-case → repo → 
     expect((listB.json().result.data as Array<{ id: number }>).some((a) => a.id === avisA)).toBe(false);
     // repondre / moderer → 404
     expect((await callMutation(server, "avis.repondre", { avisId: avisA, reponse: "hack" }, tB)).statusCode).toBe(404);
-    expect((await callMutation(server, "avis.moderer", { avisId: avisA, statut: "masque" }, tB)).statusCode).toBe(404);
+    expect((await callMutation(server, "avis.moderer", { avisId: avisA, statut: "publie" }, tB)).statusCode).toBe(404);
   });
 
   it("validation Zod : repondre avec réponse vide → 400", async () => {

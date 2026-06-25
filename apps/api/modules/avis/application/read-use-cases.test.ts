@@ -55,13 +55,13 @@ describe("avis — use-cases lecture (repo mocké)", () => {
     expect(await listAvisEnrichi(repo2, B)).toEqual([]);
   });
 
-  it("getAvisStats : agrégats scopés au tenant (publiés uniquement)", async () => {
+  it("getAvisStats : agrégats scopés au tenant (publie + masque comptés, en_attente exclu)", async () => {
     const stats = await getAvisStats(repo, A);
-    expect(stats.total).toBe(2); // l'avis masqué est exclu
+    expect(stats.total).toBe(3); // l'avis masqué EST compté — masquer ne doit pas gonfler la note
     expect(stats.distribution[5]).toBe(1);
     expect(stats.distribution[3]).toBe(1);
-    expect(stats.distribution[1]).toBe(0);
-    expect(stats.moyenne).toBe(4);
+    expect(stats.distribution[1]).toBe(1);
+    expect(stats.moyenne).toBe(3);
     // tenant B isolé
     expect((await getAvisStats(repo, B)).total).toBe(1);
   });

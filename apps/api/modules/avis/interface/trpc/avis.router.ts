@@ -13,7 +13,7 @@ import { getInfoDemandeAvis, soumettreAvisPublic, type AvisPublicDeps } from "..
 const idInput = z.object({ id: z.number().int() });
 /** Parité legacy avisRouter : input.avisId pour repondre/moderer. */
 const repondreSchema = z.object({ avisId: z.number().int(), reponse: z.string().min(1).max(5000) });
-const modererSchema = z.object({ avisId: z.number().int(), statut: z.enum(["publie", "masque"]) });
+const modererSchema = z.object({ avisId: z.number().int(), statut: z.enum(["publie"]) });
 
 /*
  * Routeur tRPC du domaine avis. Transport mince : valide les inputs (zod), délègue aux
