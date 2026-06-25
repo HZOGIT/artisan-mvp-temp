@@ -44,7 +44,7 @@ export class FakeUtilisateurRepository implements IUtilisateurRepository {
   }
   private ownsStrict(ctx: TenantContext, userId: number): boolean {
     const u = this.byId(userId);
-    return Boolean(u) && u!.artisanId === ctx.artisanId;
+    return u != null && u.artisanId === ctx.artisanId;
   }
 
   async list(ctx: TenantContext): Promise<UtilisateurListItem[]> {
@@ -65,14 +65,16 @@ export class FakeUtilisateurRepository implements IUtilisateurRepository {
 
   async updateRole(ctx: TenantContext, userId: number, role: CollaborateurRole): Promise<{ id: number; role: string } | null> {
     if (!this.ownsStrict(ctx, userId)) return null;
-    const u = this.byId(userId)!;
+    const u = this.byId(userId);
+    if (!u) return null;
     u.role = role;
     return { id: u.id, role: u.role };
   }
 
   async toggleActif(ctx: TenantContext, userId: number, actif: boolean): Promise<{ id: number; actif: boolean } | null> {
     if (!this.ownsStrict(ctx, userId)) return null;
-    const u = this.byId(userId)!;
+    const u = this.byId(userId);
+    if (!u) return null;
     u.actif = actif;
     return { id: u.id, actif: u.actif };
   }

@@ -10,9 +10,7 @@ export function generateFacturXML(
   artisan: Artisan,
   client: Client,
 ): string {
-  const a = artisan as any;
-
-  const dateStr = formatCIIDate(facture.dateFacture);
+  const dateStr = formatCIIDate(facture.dateFacture ?? "");
   const echeanceStr = facture.dateEcheance ? formatCIIDate(facture.dateEcheance) : null;
 
   const totalHT = parseFloat(facture.totalHT?.toString() || "0");
@@ -25,11 +23,11 @@ export function generateFacturXML(
    */
   const tvaByRate = new Map<number, { baseHT: number; montantTVA: number }>();
   for (const l of facture.lignes) {
-    const type = (l as any).type ?? "produit";
+    const type = String(l.type ?? "produit");
     if (type === "section" || type === "note") continue;
-    const taux = parseFloat(String((l as any).tauxTVA ?? "0")) || 0;
-    const ht = parseFloat(String((l as any).montantHT ?? "0")) || 0;
-    const tva = parseFloat(String((l as any).montantTVA ?? "0")) || 0;
+    const taux = parseFloat(String(l.tauxTVA ?? "0")) || 0;
+    const ht = parseFloat(String(l.montantHT ?? "0")) || 0;
+    const tva = parseFloat(String(l.montantTVA ?? "0")) || 0;
     const entry = tvaByRate.get(taux) ?? { baseHT: 0, montantTVA: 0 };
     entry.baseHT += ht;
     entry.montantTVA += tva;
@@ -44,14 +42,14 @@ export function generateFacturXML(
           baseHT: round2(v.baseHT),
           montantTVA: round2(v.montantTVA),
         }))
-      : [{ taux: parseFloat(a.tauxTVA?.toString() || "20"), baseHT: totalHT, montantTVA: totalTVA }];
+      : [{ taux: parseFloat(String(artisan.tauxTVA ?? "20")), baseHT: totalHT, montantTVA: totalTVA }];
 
   const sellerName = escXml(artisan.nomEntreprise || "Artisan");
   const sellerAddr = escXml(artisan.adresse || "");
   const sellerCP = escXml(artisan.codePostal || "");
   const sellerVille = escXml(artisan.ville || "");
   const sellerSiret = escXml(artisan.siret || "");
-  const sellerTVA = escXml(a.numeroTVA || "");
+  const sellerTVA = escXml(String(artisan.numeroTVA ?? ""));
 
   const buyerName = escXml(`${client.prenom || ""} ${client.nom}`.trim());
   const buyerAddr = escXml(client.adresse || "");
@@ -81,7 +79,7 @@ export function generateFacturXML(
     </ram:GuidelineSpecifiedDocumentContextParameter>
   </rsm:ExchangedDocumentContext>
   <rsm:ExchangedDocument>
-    <ram:ID>${escXml(facture.numero)}</ram:ID>
+    <ram:ID>${escXml(facture.numero ?? "")}</ram:ID>
     <ram:TypeCode>380</ram:TypeCode>
     <ram:IssueDateTime>
       <udt:DateTimeString format="102">${dateStr}</udt:DateTimeString>

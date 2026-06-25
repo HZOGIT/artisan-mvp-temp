@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { ChatDeps } from "../../application/use-cases";
 import {
@@ -20,17 +21,41 @@ const convIdInput = z.object({ conversationId: z.number().int() });
  */
 export function createChatRouter(deps: ChatDeps) {
   return router({
-    getConversations: protectedProcedure.query(({ ctx }) => getConversations(deps, ctx.tenant!)),
-    getMessages: protectedProcedure.input(convIdInput).query(({ ctx, input }) => getMessages(deps, ctx.tenant!, input.conversationId)),
+    getConversations: protectedProcedure.query(({ ctx }) => {
+      if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
+      return getConversations(deps, ctx.tenant);
+    }),
+    getMessages: protectedProcedure.input(convIdInput).query(({ ctx, input }) => {
+      if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
+      return getMessages(deps, ctx.tenant, input.conversationId);
+    }),
     sendMessage: protectedProcedure
       .input(z.object({ conversationId: z.number().int(), contenu: z.string().min(1).max(5000) }))
-      .mutation(({ ctx, input }) => sendMessage(deps, ctx.tenant!, input)),
+      .mutation(({ ctx, input }) => {
+        if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
+        return sendMessage(deps, ctx.tenant, input);
+      }),
     startConversation: protectedProcedure
       .input(z.object({ clientId: z.number().int(), sujet: z.string().max(255).optional(), premierMessage: z.string().max(5000).optional() }))
-      .mutation(({ ctx, input }) => startConversation(deps, ctx.tenant!, input)),
-    getUnreadCount: protectedProcedure.query(({ ctx }) => getUnreadCount(deps, ctx.tenant!)),
-    archiveConversation: protectedProcedure.input(convIdInput).mutation(({ ctx, input }) => archiveConversation(deps, ctx.tenant!, input.conversationId)),
-    closeConversation: protectedProcedure.input(convIdInput).mutation(({ ctx, input }) => closeConversation(deps, ctx.tenant!, input.conversationId)),
-    reopenConversation: protectedProcedure.input(convIdInput).mutation(({ ctx, input }) => reopenConversation(deps, ctx.tenant!, input.conversationId)),
+      .mutation(({ ctx, input }) => {
+        if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
+        return startConversation(deps, ctx.tenant, input);
+      }),
+    getUnreadCount: protectedProcedure.query(({ ctx }) => {
+      if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
+      return getUnreadCount(deps, ctx.tenant);
+    }),
+    archiveConversation: protectedProcedure.input(convIdInput).mutation(({ ctx, input }) => {
+      if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
+      return archiveConversation(deps, ctx.tenant, input.conversationId);
+    }),
+    closeConversation: protectedProcedure.input(convIdInput).mutation(({ ctx, input }) => {
+      if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
+      return closeConversation(deps, ctx.tenant, input.conversationId);
+    }),
+    reopenConversation: protectedProcedure.input(convIdInput).mutation(({ ctx, input }) => {
+      if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
+      return reopenConversation(deps, ctx.tenant, input.conversationId);
+    }),
   });
 }

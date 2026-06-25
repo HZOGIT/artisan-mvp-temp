@@ -14,7 +14,7 @@ interface State {
 
 function ErrorScreen({ error }: { error: Error | null }) {
   const { t } = useTranslation("errorBoundary");
-  const isProd = (import.meta as any).env?.PROD;
+  const isProd = import.meta.env.PROD;
   return (
     <div className="flex items-center justify-center min-h-screen p-4 bg-gradient-to-br from-slate-50 via-rose-50/20 to-orange-50/30">
       <div className="max-w-md w-full text-center">

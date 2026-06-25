@@ -1,5 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+interface SpeechRecognitionResult { isFinal: boolean; 0: { transcript: string } }
+interface SpeechRecognitionResultEvent { resultIndex: number; results: SpeechRecognitionResult[] & { length: number } }
+interface SpeechRecognitionErrorEvent { error?: string }
+interface SpeechRecognitionLike {
+  lang: string; continuous: boolean; interimResults: boolean; maxAlternatives: number;
+  onstart: (() => void) | null;
+  onresult: ((event: SpeechRecognitionResultEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start(): void; stop(): void; abort(): void;
+}
+type SpeechWindow = Window & { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike };
+
 interface UseSpeechRecognitionOptions {
   /** Locale BCP-47, défaut: fr-FR */
   lang?: string;
@@ -43,9 +56,9 @@ export function useSpeechRecognition(
 ): UseSpeechRecognitionReturn {
   const { lang = "fr-FR", silenceMs = DEFAULT_SILENCE_MS } = options;
 
-  const SpeechRecognitionCtor =
+  const SpeechRecognitionCtor: (new () => SpeechRecognitionLike) | undefined =
     typeof window !== "undefined"
-      ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+      ? (window as SpeechWindow).SpeechRecognition || (window as SpeechWindow).webkitSpeechRecognition
       : undefined;
 
   const isSupported = !!SpeechRecognitionCtor;
@@ -56,7 +69,7 @@ export function useSpeechRecognition(
   const [error, setError] = useState<string | null>(null);
   const [silenceCountdownMs, setSilenceCountdownMs] = useState<number | null>(null);
 
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const silenceArmedAtRef = useRef<number>(0);
   const tickIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -118,7 +131,7 @@ export function useSpeechRecognition(
       armSilenceTimer();
     };
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: SpeechRecognitionResultEvent) => {
       let interim = "";
       let final = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -137,7 +150,7 @@ export function useSpeechRecognition(
       armSilenceTimer();
     };
 
-    recognition.onerror = (event: any) => {
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       const code = event?.error || "unknown";
       let msg = "Erreur de reconnaissance vocale";
       if (code === "not-allowed" || code === "service-not-allowed") {
@@ -165,8 +178,8 @@ export function useSpeechRecognition(
     recognitionRef.current = recognition;
     try {
       recognition.start();
-    } catch (e: any) {
-      setError(e?.message || "Impossible de démarrer la dictée");
+    } catch (e: unknown) {
+      setError((e instanceof Error ? e.message : null) || "Impossible de démarrer la dictée");
       setIsListening(false);
       recognitionRef.current = null;
     }

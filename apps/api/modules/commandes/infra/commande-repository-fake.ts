@@ -166,7 +166,7 @@ export class FakeCommandeRepository implements ICommandeRepository {
     this.lignesStore = this.lignesStore.map((l) => {
       if (!recueParLigne.has(l.id)) return l;
       const max = Number(l.quantite);
-      const valeur = Math.max(0, Math.min(recueParLigne.get(l.id)!, max));
+      const valeur = Math.max(0, Math.min(recueParLigne.get(l.id) ?? 0, max));
       return { ...l, quantiteRecue: valeur.toFixed(2) };
     });
 

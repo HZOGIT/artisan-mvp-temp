@@ -27,13 +27,14 @@ export class WebAudioCapture implements AudioCapture {
           channelCount: 1,
         },
       });
-    } catch (e: any) {
-      vlog(`❌ getUserMedia FAILED: ${e?.name} ${e?.message}`);
+    } catch (e: unknown) {
+      const isErr = e instanceof Error;
+      vlog(`❌ getUserMedia FAILED: ${isErr ? e.name : ''} ${isErr ? e.message : String(e)}`);
       throw e;
     }
 
     const track = this._stream.getAudioTracks()[0];
-    const settings = (track?.getSettings?.() || {}) as any;
+    const settings = (track?.getSettings?.() || {}) as Record<string, unknown>;
     vlog(`getUserMedia OK — mic="${track?.label || '?'}" enabled=${track?.enabled} muted=${track?.muted} readyState=${track?.readyState} settings.sampleRate=${settings.sampleRate} channelCount=${settings.channelCount}`);
 
     /*
@@ -47,8 +48,8 @@ export class WebAudioCapture implements AudioCapture {
       /** Cache-bust: worklet JS is cached very aggressively; force a fresh fetch. */
       await this._ctx.audioWorklet.addModule(`/worklets/capture-processor.js?v=${Date.now()}`);
       vlog('capture worklet module loaded');
-    } catch (e: any) {
-      vlog(`❌ addModule(capture-processor) FAILED: ${e?.message}`);
+    } catch (e: unknown) {
+      vlog(`❌ addModule(capture-processor) FAILED: ${(e as { message?: string })?.message}`);
       throw e;
     }
 

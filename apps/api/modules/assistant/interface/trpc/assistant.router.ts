@@ -34,19 +34,37 @@ export function createAssistantRouter(
   agentDeps: AssistantAgentDeps,
 ) {
   return router({
-    getThreads: protectedProcedure.query(({ ctx }) => getThreads(threadsRepo, ctx.tenant!)),
+    getThreads: protectedProcedure.query(({ ctx }) => {
+      if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
+      return getThreads(threadsRepo, ctx.tenant);
+    }),
     getMessages: protectedProcedure
       .input(z.object({ threadId: z.number().int() }))
-      .query(({ ctx, input }) => getMessages(threadsRepo, ctx.tenant!, input.threadId)),
+      .query(({ ctx, input }) => {
+        if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
+        return getMessages(threadsRepo, ctx.tenant, input.threadId);
+      }),
 
-    suggestRelances: protectedProcedure.query(({ ctx }) => suggestRelances(generators, ctx.tenant!)),
+    suggestRelances: protectedProcedure.query(({ ctx }) => {
+      if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
+      return suggestRelances(generators, ctx.tenant);
+    }),
     generateDevis: protectedProcedure
       .input(z.object({ description: z.string().min(1) }))
-      .mutation(({ ctx, input }) => generateDevis(generators, ctx.tenant!, input)),
+      .mutation(({ ctx, input }) => {
+        if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
+        return generateDevis(generators, ctx.tenant, input);
+      }),
     analyseRentabilite: protectedProcedure
       .input(z.object({ devisId: z.number().int() }))
-      .query(({ ctx, input }) => analyseRentabilite(generators, ctx.tenant!, input)),
-    predictionTresorerie: protectedProcedure.query(({ ctx }) => predictionTresorerie(generators, ctx.tenant!)),
+      .query(({ ctx, input }) => {
+        if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
+        return analyseRentabilite(generators, ctx.tenant, input);
+      }),
+    predictionTresorerie: protectedProcedure.query(({ ctx }) => {
+      if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
+      return predictionTresorerie(generators, ctx.tenant);
+    }),
 
     /**
      * Chat IA en streaming agentique (function-calling, outils navigate/invalide/écriture).
@@ -62,11 +80,13 @@ export function createAssistantRouter(
         }),
       )
       .subscription(async function* ({ ctx, input }) {
+        if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
+        const tenant = ctx.tenant;
         const t0 = Date.now();
         let contentEvents = 0;
         let toolCalls = 0;
         try {
-          for await (const ev of runAssistantAgent(agentDeps, ctx.tenant!, input)) {
+          for await (const ev of runAssistantAgent(agentDeps, tenant, input)) {
             const validated = assistantStreamEventSchema.parse(ev);
             if ("content" in validated) contentEvents++;
             if ("toolStart" in validated) toolCalls++;

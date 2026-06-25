@@ -50,21 +50,24 @@ export function calculerPerformancesFournisseurs(
     }).length;
 
     /** Délai moyen (jours) sur les livrées datées. */
-    const livreesDatees = livrees.filter((c) => c.dateLivraisonReelle && c.createdAt);
+    const livreesDatees = livrees.filter((c): c is typeof c & { dateLivraisonReelle: Date } => c.dateLivraisonReelle != null);
     let delaiMoyenLivraison: number | null = null;
     if (livreesDatees.length > 0) {
       const somme = livreesDatees.reduce((s, c) => {
-        const d = (c.dateLivraisonReelle!.getTime() - c.createdAt.getTime()) / JOUR_MS;
+        const d = (c.dateLivraisonReelle.getTime() - c.createdAt.getTime()) / JOUR_MS;
         return s + Math.max(0, d);
       }, 0);
       delaiMoyenLivraison = Math.round(somme / livreesDatees.length);
     }
 
     /** Taux de fiabilité : % de commandes livrées « à temps ». */
-    const livreesAvecPrevu = livrees.filter((c) => c.dateLivraisonPrevue && c.dateLivraisonReelle);
+    const livreesAvecPrevu = livrees.filter(
+      (c): c is typeof c & { dateLivraisonPrevue: Date; dateLivraisonReelle: Date } =>
+        c.dateLivraisonPrevue != null && c.dateLivraisonReelle != null,
+    );
     let tauxFiabilite = 100;
     if (livreesAvecPrevu.length > 0) {
-      const aTemps = livreesAvecPrevu.filter((c) => c.dateLivraisonReelle!.getTime() <= c.dateLivraisonPrevue!.getTime()).length;
+      const aTemps = livreesAvecPrevu.filter((c) => c.dateLivraisonReelle.getTime() <= c.dateLivraisonPrevue.getTime()).length;
       tauxFiabilite = Math.round((aTemps / livreesAvecPrevu.length) * 100);
     }
 

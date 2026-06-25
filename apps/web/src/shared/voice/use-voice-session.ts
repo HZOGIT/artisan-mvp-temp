@@ -9,7 +9,7 @@ export interface UseVoiceSessionOptions {
   threadId?: number;
   onUserTranscript?: (text: string, isFinal: boolean) => void;
   onAssistantDelta?: (delta: string) => void;
-  onTurnComplete?: (user: string, assistant: string, metadata?: any) => void;
+  onTurnComplete?: (user: string, assistant: string, metadata?: Record<string, unknown>) => void;
   /** Called with the thread id the voice session uses (created if needed). */
   onThreadId?: (threadId: number) => void;
 }
@@ -120,9 +120,10 @@ export function useVoiceSession(options: UseVoiceSessionOptions = {}): UseVoiceS
           },
         },
       });
-    } catch (err: any) {
-      vlog(`❌ startVoice catch: ${err?.message}`);
-      setError(err.message || 'Erreur vocale');
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : 'Erreur vocale';
+      vlog(`❌ startVoice catch: ${errMsg}`);
+      setError(errMsg);
       setVoiceState('error');
     }
   }, [options.threadId, options.onUserTranscript, options.onAssistantDelta, options.onTurnComplete, options.onThreadId, stopVoice]);

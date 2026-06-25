@@ -48,7 +48,7 @@ declare namespace L {
     bindPopup(content: string): Marker;
     setPopupContent(content: string): Marker;
     openPopup(): Marker;
-    on(event: string, fn: (...args: any[]) => void): Marker;
+    on(event: string, fn: (...args: unknown[]) => void): Marker;
   }
 
   function map(element: HTMLElement, options?: MapOptions): Map;
