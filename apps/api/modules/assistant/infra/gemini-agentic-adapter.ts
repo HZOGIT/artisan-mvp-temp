@@ -107,7 +107,7 @@ export class GeminiAgenticAdapter implements LlmAgenticPort {
 
   async *streamTurn(input: AgenticTurnInput): AsyncIterable<AgenticEvent> {
     const ai = await this.getAi();
-    const model = input.model ?? process.env.GEMINI_TEXT_MODEL ?? "gemini-2.5-flash";
+    const model = input.model ?? process.env.GEMINI_TEXT_MODEL ?? "gemini-3-pro-preview";
     this.log.info({ event: "gemini_model_resolved", model }, "Modèle Gemini résolu");
     const tools = toGeminiTools(input.tools);
 
