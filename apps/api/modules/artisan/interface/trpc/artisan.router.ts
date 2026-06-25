@@ -2,7 +2,18 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IArtisanRepository } from "../../application/artisan-repository";
 import { getProfile, updateProfile } from "../../application/use-cases";
+import { UnauthorizedError, ValidationError } from "../../../../shared/errors";
+import type { IAuthRepository } from "../../../auth/application/auth-repository";
+import type { PasswordHasher } from "../../../../shared/ports/password-hasher";
+import type { EmailPort } from "../../../../shared/ports/email";
+import { ibanChangedEmail } from "../../application/emails";
 import { SiretSchema } from "../../../../../../packages/contract/validation";
+
+export interface ArtisanSecurityDeps {
+  readonly authRepo: IAuthRepository;
+  readonly hasher: PasswordHasher;
+  readonly email?: EmailPort;
+}
 
 const specialiteEnum = z.enum(["plomberie", "electricite", "chauffage", "multi-services"]);
 const formeJuridiqueEnum = z.enum(["EI", "micro", "EURL", "SARL", "SAS", "SASU", "SA", "autre"]);
@@ -10,6 +21,7 @@ const formeJuridiqueEnum = z.enum(["EI", "micro", "EURL", "SARL", "SAS", "SASU",
 /*
  * Bornes alignées sur le legacy `artisan.updateProfile` (defense-in-depth + DoS/stockage). `logo` =
  * data-URI base64 (vecteur volumineux) borné à ~3 Mo. IBAN/slug/metier traités au use-case.
+ * `currentPassword` : ré-auth obligatoire pour modifier l'IBAN (anti-redirection de virement).
  */
 const updateSchema = z.object({
   siret: SiretSchema,
@@ -35,28 +47,51 @@ const updateSchema = z.object({
   assuranceDecennaleNom: z.string().max(255).nullish(),
   assuranceDecennalePolice: z.string().max(100).nullish(),
   assuranceDecennaleGarantie: z.string().max(255).nullish(),
+  currentPassword: z.string().optional(),
 });
 
 /*
  * Routeur tRPC du profil artisan (entreprise du tenant). Transport mince ; le profil est toujours
  * celui du tenant courant (`ctx.tenant`). Domain errors → 404/400/409.
  */
-export function createArtisanRouter(repo: IArtisanRepository) {
+export function createArtisanRouter(repo: IArtisanRepository, security: ArtisanSecurityDeps) {
   return router({
     getProfile: protectedProcedure.query(({ ctx }) => getProfile(repo, ctx.tenant)),
 
     updateProfile: protectedProcedure
       .input(updateSchema)
       .mutation(async ({ ctx, input }) => {
-        const result = await updateProfile(repo, ctx.tenant, input);
-        const changedFields = Object.keys(input).filter((k) => input[k as keyof typeof input] !== undefined);
+        const { currentPassword, ...profileInput } = input;
+
+        if (profileInput.iban !== undefined) {
+          if (!currentPassword) {
+            throw new ValidationError("Mot de passe requis pour modifier l'IBAN");
+          }
+          const cred = await security.authRepo.findCredentialsById(ctx.tenant.userId);
+          if (!cred?.password || !(await security.hasher.verify(currentPassword, cred.password))) {
+            throw new UnauthorizedError("Mot de passe incorrect");
+          }
+        }
+
+        const result = await updateProfile(repo, ctx.tenant, profileInput);
+
+        if (profileInput.iban !== undefined && security.email) {
+          const user = await security.authRepo.getById(ctx.tenant.userId);
+          if (user?.email) {
+            try {
+              await security.email.send({ to: user.email, subject: "Votre IBAN de facturation a été modifié", body: ibanChangedEmail() });
+            } catch { /* best-effort */ }
+          }
+        }
+
+        const changedFields = Object.keys(profileInput).filter((k) => profileInput[k as keyof typeof profileInput] !== undefined);
         ctx.log.warn(
           {
             event: "artisan_profile_updated",
             changedFields,
-            siretChanged: "siret" in input && input.siret !== undefined,
-            ibanChanged: "iban" in input && input.iban !== undefined,
-            logoChanged: "logo" in input && input.logo !== undefined,
+            siretChanged: "siret" in profileInput && profileInput.siret !== undefined,
+            ibanChanged: "iban" in profileInput && profileInput.iban !== undefined,
+            logoChanged: "logo" in profileInput && profileInput.logo !== undefined,
           },
           `Profil artisan mis à jour : ${changedFields.filter((f) => f !== "logo").join(", ")}`,
         );

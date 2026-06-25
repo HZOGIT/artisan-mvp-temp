@@ -692,6 +692,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   });
   const artisan = createArtisanModule({
     repository: deps.artisanRepo ?? new ArtisanRepositoryDrizzle(getDbHandle().db),
+    authRepo: deps.authRepo ?? new AuthRepositoryDrizzle(getDbHandle().db),
+    hasher: new BcryptPasswordHasher(),
+    email: emailAdapter,
   });
   const devisOptions = createDevisOptionsModule({
     repository: deps.devisOptionRepo ?? new DevisOptionRepositoryDrizzle(getDbHandle().db),
