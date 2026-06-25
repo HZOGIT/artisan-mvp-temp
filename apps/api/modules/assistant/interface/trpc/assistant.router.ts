@@ -86,7 +86,10 @@ export function createAssistantRouter(
         let contentEvents = 0;
         let toolCalls = 0;
         try {
-          for await (const ev of runAssistantAgent(agentDeps, tenant, input)) {
+          const canWrite = ctx.role === "admin" || ctx.tenant?.isOwner === true;
+          const canDevis = canWrite || ctx.permissions.includes("devis.gerer");
+          const canFactures = canWrite || ctx.permissions.includes("factures.gerer");
+          for await (const ev of runAssistantAgent(agentDeps, tenant, { ...input, userCanWriteDevis: canDevis, userCanWriteFactures: canFactures })) {
             const validated = assistantStreamEventSchema.parse(ev);
             if ("content" in validated) contentEvents++;
             if ("toolStart" in validated) toolCalls++;

@@ -43,6 +43,8 @@ export interface AssistantAgentInput {
   readonly history?: { role: string; content: string }[];
   readonly pageContext?: string;
   readonly threadId?: number;
+  readonly userCanWriteDevis?: boolean;
+  readonly userCanWriteFactures?: boolean;
 }
 
 /** Évènements émis vers la couche transport (SSE). **Noms alignés sur le contrat client** (`useAssistantStream` */
@@ -114,7 +116,11 @@ export async function* runAssistantAgent(
     const calls: AgenticFunctionCall[] = [];
     let modelMessage: AgenticMessage | null = null;
 
-    for await (const ev of deps.llm.streamTurn({ system, tools: deps.registry.tools, messages })) {
+    for await (const ev of deps.llm.streamTurn({ system, tools: deps.registry.tools.filter(t =>
+      !isWriteTool(t.name) ||
+      (input.userCanWriteDevis !== false && ["creer_devis", "envoyer_devis", "creer_et_envoyer_devis"].includes(t.name)) ||
+      (input.userCanWriteFactures !== false && ["creer_facture", "envoyer_facture"].includes(t.name))
+    ), messages })) {
       if (ev.kind === "text") {
         if (ev.text) {
           full += ev.text;
