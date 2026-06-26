@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { INotificationRepository } from "../application/notification-repository";
 import type { Notification, ListNotificationsOptions } from "../domain/notification";
@@ -112,5 +113,9 @@ export class FakeNotificationRepository implements INotificationRepository {
     };
     this.store.push(n);
     return n;
+  }
+
+  withDb(_db: DbClient): FakeNotificationRepository {
+    return this;
   }
 }

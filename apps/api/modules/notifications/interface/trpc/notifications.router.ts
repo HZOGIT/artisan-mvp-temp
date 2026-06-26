@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { router, protectedProcedure, publicProcedure } from "../../../../interface/trpc/trpc";
+import type { DbClient } from "../../../../shared/db";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
+import { withOutbox } from "../../../../shared/events/with-outbox";
 import type { INotificationRepository } from "../../application/notification-repository";
 import type { PushPort } from "../../../../shared/push/web-push-adapter";
 import { listNotifications, compterNonLues } from "../../application/read-use-cases";
@@ -23,7 +26,7 @@ const idInput = z.object({ id: z.number().int() });
  * aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors
  * (NotFound→404). Repository injecté (DI) → testable. `delete` = alias d'`archive` (legacy).
  */
-export function createNotificationsRouter(repo: INotificationRepository, push?: PushPort) {
+export function createNotificationsRouter(repo: INotificationRepository, push?: PushPort, db?: DbClient) {
   return router({
     getVapidPublicKey: publicProcedure.query(() => ({ key: push?.getPublicKey() ?? null })),
 
@@ -48,8 +51,11 @@ export function createNotificationsRouter(repo: INotificationRepository, push?: 
     markAsRead: protectedProcedure
       .input(idInput)
       .mutation(async ({ ctx, input }) => {
-        await marquerLue(repo, ctx.tenant, input.id);
-        return { success: true };
+        return withOutbox(db, repo, async (r, tx) => {
+          await marquerLue(r, ctx.tenant, input.id);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "notification.lue", entityType: "notification", entityId: input.id, payload: { notificationId: input.id } });
+          return { success: true };
+        });
       }),
 
     markAllAsRead: protectedProcedure.mutation(async ({ ctx }) => {
@@ -60,16 +66,22 @@ export function createNotificationsRouter(repo: INotificationRepository, push?: 
     archive: protectedProcedure
       .input(idInput)
       .mutation(async ({ ctx, input }) => {
-        await archiver(repo, ctx.tenant, input.id);
-        return { success: true };
+        return withOutbox(db, repo, async (r, tx) => {
+          await archiver(r, ctx.tenant, input.id);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "notification.archivee", entityType: "notification", entityId: input.id, payload: { notificationId: input.id } });
+          return { success: true };
+        });
       }),
 
     /** Alias legacy : delete archive la notification (pas de suppression dure). */
     delete: protectedProcedure
       .input(idInput)
       .mutation(async ({ ctx, input }) => {
-        await archiver(repo, ctx.tenant, input.id);
-        return { success: true };
+        return withOutbox(db, repo, async (r, tx) => {
+          await archiver(r, ctx.tenant, input.id);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "notification.archivee", entityType: "notification", entityId: input.id, payload: { notificationId: input.id } });
+          return { success: true };
+        });
       }),
 
     /** Logique dérivée : génère les rappels pour les factures impayées en retard (idempotent). */

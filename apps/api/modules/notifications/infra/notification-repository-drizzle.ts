@@ -157,4 +157,8 @@ export class NotificationRepositoryDrizzle implements INotificationRepository {
       return toNotification(row);
     });
   }
+
+  withDb(db: DbClient): NotificationRepositoryDrizzle {
+    return new NotificationRepositoryDrizzle(db);
+  }
 }

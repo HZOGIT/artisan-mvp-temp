@@ -315,6 +315,8 @@ export interface AppDeps extends ContextDeps {
   /** Pool DB pour les transactions outbox du module techniciens (défaut : getDbHandle().db). */
   readonly techniciensDb?: DbClient;
   readonly notificationRepo?: INotificationRepository;
+  /** Pool DB pour les transactions outbox du module notifications (défaut : getDbHandle().db). */
+  readonly notificationsDb?: DbClient;
   readonly fournisseurRepo?: IFournisseurRepository;
   /** Pool DB pour les transactions outbox du module fournisseurs (défaut : getDbHandle().db). */
   readonly fournisseursDb?: DbClient;
@@ -536,6 +538,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const notifications = createNotificationsModule({
     repository: notificationRepo,
     push: pushAdapter,
+    db: deps.notificationsDb ?? getDbHandle().db,
   });
   /*
    * Repos partagés hoistés (évite les TDZ entre modules qui se composent mutuellement) :
