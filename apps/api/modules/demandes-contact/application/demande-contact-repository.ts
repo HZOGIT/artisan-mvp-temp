@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { CreateDemandeInput, DemandeContact, DemandeContactStatut, UpdateDemandeInput } from "../domain/demande-contact";
 
@@ -8,6 +9,7 @@ import type { CreateDemandeInput, DemandeContact, DemandeContactStatut, UpdateDe
  * via `ownsClient` (anti-IDOR-FK).
  */
 export interface IDemandeContactRepository {
+  withDb(db: DbClient): IDemandeContactRepository;
   list(ctx: TenantContext): Promise<DemandeContact[]>;
   /** Demandes du tenant filtrées par statut (scopé tenant ; [] si aucune). */
   listByStatut(ctx: TenantContext, statut: DemandeContactStatut): Promise<DemandeContact[]>;

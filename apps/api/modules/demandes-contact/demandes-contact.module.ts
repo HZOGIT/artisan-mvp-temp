@@ -1,3 +1,4 @@
+import type { DbClient } from "../../shared/db";
 import type { IDemandeContactRepository } from "./application/demande-contact-repository";
 import { createDemandesContactRouter } from "./interface/trpc/demandes-contact.router";
 
@@ -7,6 +8,7 @@ import { createDemandesContactRouter } from "./interface/trpc/demandes-contact.r
  */
 export interface DemandesContactModuleDeps {
   readonly repository: IDemandeContactRepository;
+  readonly db?: DbClient;
 }
 
 export interface DemandesContactModule {
@@ -15,5 +17,5 @@ export interface DemandesContactModule {
 }
 
 export function createDemandesContactModule(deps: DemandesContactModuleDeps): DemandesContactModule {
-  return { deps, router: createDemandesContactRouter(deps.repository) };
+  return { deps, router: createDemandesContactRouter(deps.repository, deps.db) };
 }
