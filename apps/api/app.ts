@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance, type FastifyError } from "fastify";
+import metrics from "fastify-metrics";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import { randomUUID } from "node:crypto";
@@ -370,6 +371,19 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     logger: buildFastifyLoggerConfig(),
     genReqId: (req) => (req.headers["x-request-id"] as string | undefined) ?? randomUUID().slice(0, 8),
     disableRequestLogging: true,
+  });
+
+  app.addHook("onRequest", (req, reply, done) => {
+    if ((req.url === "/metrics" || req.url?.startsWith("/metrics?")) && req.headers["cf-connecting-ip"]) {
+      reply.code(403).send();
+      return;
+    }
+    done();
+  });
+
+  app.register(metrics, {
+    endpoint: "/metrics",
+    routeMetrics: { enabled: true, registeredRoutesOnly: false },
   });
 
   /*
