@@ -1,3 +1,4 @@
+import type { DbClient } from "../../shared/db";
 import type { IDepenseRepository } from "./application/depense-repository";
 import type { ICategorieDepenseRepository } from "../categories-depenses/application/categorie-depense-repository";
 import type { IBudgetCategorieRepository } from "../budgets-categories/application/budget-categorie-repository";
@@ -22,6 +23,7 @@ export interface DepensesModuleDeps {
   readonly noteRepository: INoteDeFraisRepository;
   readonly transactionRepository: ITransactionBancaireRepository;
   readonly fecReader: FecReader;
+  readonly db?: DbClient;
   /*
    * Seam OCR (analyserJustificatif) : modèle vision + rate-limiter IA. Optionnel : sans lui, la
    * procédure renvoie une dégradation `{success:false}`.
@@ -45,6 +47,7 @@ export function createDepensesModule(deps: DepensesModuleDeps): DepensesModule {
       deps.noteRepository,
       deps.transactionRepository,
       deps.fecReader,
+      deps.db,
       deps.ocr,
     ),
   };

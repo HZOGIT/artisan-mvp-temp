@@ -361,4 +361,8 @@ export class DepenseRepositoryDrizzle implements IDepenseRepository {
         .where(and(eq(depenses.id, id), eq(depenses.artisan_id, ctx.artisanId)));
     });
   }
+
+  withDb(db: DbClient): DepenseRepositoryDrizzle {
+    return new DepenseRepositoryDrizzle(db);
+  }
 }

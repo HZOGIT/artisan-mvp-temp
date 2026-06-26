@@ -341,6 +341,8 @@ export interface AppDeps extends ContextDeps {
   /** Pool DB pour les transactions outbox events du module chantiers (défaut : getDbHandle().db). */
   readonly chantiersDb?: DbClient;
   readonly depenseRepo?: IDepenseRepository;
+  /** Pool DB pour les transactions outbox events du module depenses (défaut : getDbHandle().db). */
+  readonly depensesDb?: DbClient;
   readonly transactionBancaireRepo?: ITransactionBancaireRepository;
   readonly fecReader?: FecReader;
   readonly devisRepo?: IDevisRepository;
@@ -671,6 +673,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     noteRepository: noteDeFraisRepo,
     transactionRepository: deps.transactionBancaireRepo ?? new TransactionBancaireRepositoryDrizzle(getDbHandle().db),
     fecReader: deps.fecReader ?? new FecReaderDrizzle(getDbHandle().db),
+    db: deps.depensesDb ?? getDbHandle().db,
     /** OCR justificatif : Gemini vision + rate-limiter IA dédié (injectables en test : FakeVisionPort). */
     ocr: deps.ocrVision
       ? { vision: deps.ocrVision, rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000) }
