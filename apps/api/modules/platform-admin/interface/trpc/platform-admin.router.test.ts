@@ -16,6 +16,7 @@ const SECRET = "test-secret-at-least-32-characters-long-xxxx";
 const UID_USER = 9970001;
 const UID_ADMIN_STAFF = 9970002;
 const UID_ADMIN_TENANT = 9970003;
+const UID_ARTISAN_DISABLE = 9970004;
 
 async function signToken(userId: number, email: string): Promise<string> {
   return new SignJWT({ userId, email })
@@ -59,6 +60,10 @@ beforeAll(async () => {
   await purgeUser(UID_LLM_B);
   await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [UID_LLM_B, `u${UID_LLM_B}@t.fr`]);
   await admin.query('insert into artisans ("userId", "nomEntreprise") values ($1,$2)', [UID_LLM_B, "EntrepriseB"]);
+  await purgeUser(UID_ARTISAN_DISABLE);
+  await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [UID_ARTISAN_DISABLE, `u${UID_ARTISAN_DISABLE}@t.fr`]);
+  const disableArtisanRow = await admin.query<{ id: number }>('insert into artisans ("userId") values ($1) returning id', [UID_ARTISAN_DISABLE]);
+  await admin.query('update users set "artisanId" = $1 where id = $2', [disableArtisanRow.rows[0]!.id, UID_ARTISAN_DISABLE]);
   server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(appDb.db), roleReader: new DrizzleUserRoleReader(appDb.db) });
 });
 
@@ -67,7 +72,7 @@ afterAll(async () => {
   if (eventIds.length) await admin.query("delete from events where id = any($1)", [eventIds]);
   if (llmUsageIds.length) await admin.query("delete from llm_usage where id = any($1)", [llmUsageIds]);
   await server?.close();
-  for (const uid of [UID_USER, UID_ADMIN_STAFF, UID_ADMIN_TENANT, UID_LLM_A, UID_LLM_B]) await purgeUser(uid);
+  for (const uid of [UID_USER, UID_ADMIN_STAFF, UID_ADMIN_TENANT, UID_LLM_A, UID_LLM_B, UID_ARTISAN_DISABLE]) await purgeUser(uid);
   await appDb.close();
   await appPool.end();
   await admin.end();
@@ -167,5 +172,47 @@ describe.skipIf(!URL)("platformAdmin.events.list L2 — RLS events ouverte", () 
     const data = (res.json() as { result: { data: { items: { id: number }[]; total: number } } }).result.data;
     expect(data.items.length).toBeGreaterThanOrEqual(2);
     expect(data.total).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe.skipIf(!URL)("platformAdmin.artisans.disable / enable L3", () => {
+  it("disable → artisan is_active false + user actif false", async () => {
+    const tok = await signToken(UID_ADMIN_STAFF, `u${UID_ADMIN_STAFF}@t.fr`);
+    const artisanRow = await admin.query<{ id: number }>('select id from artisans where "userId" = $1', [UID_ARTISAN_DISABLE]);
+    const artisanId = artisanRow.rows[0]!.id;
+
+    const res = await injectTrpc(server, "POST", "platformAdmin.artisans.disable", { id: artisanId }, tok);
+    expect(res.statusCode).toBe(200);
+    const body = (res.json() as { result: { data: { id: number | null; isActive: boolean | null } } }).result.data;
+    expect(body.id).toBe(artisanId);
+    expect(body.isActive).toBe(false);
+
+    const u = await admin.query<{ actif: boolean }>('select actif from users where id = $1', [UID_ARTISAN_DISABLE]);
+    expect(u.rows[0]!.actif).toBe(false);
+  });
+
+  it("disable → signin refusé (401)", async () => {
+    const tok = await signToken(UID_ADMIN_STAFF, `u${UID_ADMIN_STAFF}@t.fr`);
+    const artisanRow = await admin.query<{ id: number }>('select id from artisans where "userId" = $1', [UID_ARTISAN_DISABLE]);
+    const artisanId = artisanRow.rows[0]!.id;
+    await injectTrpc(server, "POST", "platformAdmin.artisans.disable", { id: artisanId }, tok);
+
+    const signinRes = await injectTrpc(server, "POST", "auth.signin", { email: `u${UID_ARTISAN_DISABLE}@t.fr`, password: "x" });
+    expect(signinRes.statusCode).toBe(401);
+  });
+
+  it("enable → artisan is_active true + user actif true", async () => {
+    const tok = await signToken(UID_ADMIN_STAFF, `u${UID_ADMIN_STAFF}@t.fr`);
+    const artisanRow = await admin.query<{ id: number }>('select id from artisans where "userId" = $1', [UID_ARTISAN_DISABLE]);
+    const artisanId = artisanRow.rows[0]!.id;
+
+    const res = await injectTrpc(server, "POST", "platformAdmin.artisans.enable", { id: artisanId }, tok);
+    expect(res.statusCode).toBe(200);
+    const body = (res.json() as { result: { data: { id: number | null; isActive: boolean | null } } }).result.data;
+    expect(body.id).toBe(artisanId);
+    expect(body.isActive).toBe(true);
+
+    const u = await admin.query<{ actif: boolean }>('select actif from users where id = $1', [UID_ARTISAN_DISABLE]);
+    expect(u.rows[0]!.actif).toBe(true);
   });
 });

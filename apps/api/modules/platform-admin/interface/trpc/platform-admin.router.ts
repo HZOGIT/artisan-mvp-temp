@@ -21,6 +21,8 @@ export function createPlatformAdminRouter(db: DbClient) {
                 siret: artisans.siret,
                 email: users.email,
                 plan: artisans.plan,
+                isActive: artisans.isActive,
+                registrationIp: users.registrationIp,
                 createdAt: artisans.createdAt,
               })
               .from(artisans)
@@ -31,6 +33,22 @@ export function createPlatformAdminRouter(db: DbClient) {
             db.select({ total: count() }).from(artisans),
           ]);
           return { items, total: Number(totals[0]?.total ?? 0) };
+        }),
+
+      disable: platformAdminProcedure
+        .input(z.object({ id: z.number().int() }))
+        .mutation(async ({ input }) => {
+          const [updated] = await db.update(artisans).set({ isActive: false }).where(eq(artisans.id, input.id)).returning({ id: artisans.id, isActive: artisans.isActive });
+          await db.update(users).set({ actif: false }).where(eq(users.artisanId, input.id));
+          return { id: updated?.id ?? null, isActive: updated?.isActive ?? null };
+        }),
+
+      enable: platformAdminProcedure
+        .input(z.object({ id: z.number().int() }))
+        .mutation(async ({ input }) => {
+          const [updated] = await db.update(artisans).set({ isActive: true }).where(eq(artisans.id, input.id)).returning({ id: artisans.id, isActive: artisans.isActive });
+          await db.update(users).set({ actif: true }).where(eq(users.artisanId, input.id));
+          return { id: updated?.id ?? null, isActive: updated?.isActive ?? null };
         }),
     }),
     subscriptions: router({

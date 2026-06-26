@@ -32,7 +32,7 @@ export interface IAuthRepository {
   /** Set `passwordChangedAt = now()` — invalide tous les tokens JWT émis avant cet instant. */
   bumpPasswordChangedAt(userId: number): Promise<void>;
   /** Crée un utilisateur (signup) : email + hash + name, loginMethod 'email'. Renvoie l'identité. */
-  createUser(data: { email: string; passwordHash: string; name?: string | null }): Promise<{ id: number; email: string | null }>;
+  createUser(data: { email: string; passwordHash: string; name?: string | null; registrationIp?: string | null }): Promise<{ id: number; email: string | null }>;
   /*
    * Provisionne le compte propriétaire (idempotent, parité `bootstrapArtisanAccount`) : artisan + lien
    * `users.artisanId` + abonnement d'essai 14 j (si absent) + permissions owner = toutes (si absentes).

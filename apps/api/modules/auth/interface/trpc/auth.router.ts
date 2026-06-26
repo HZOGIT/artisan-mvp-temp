@@ -29,7 +29,7 @@ export function createAuthRouter(deps: AuthDeps) {
     signup: publicProcedure
       .input(z.object({ email: z.string().email(), password: z.string().min(6), name: z.string().optional() }))
       .mutation(async ({ ctx, input }) => {
-        const { user, token } = await signup(deps, input);
+        const { user, token } = await signup(deps, { ...input, registrationIp: ctx.clientIp ?? null });
         if (ctx.res) setAuthCookie(ctx.res, token);
         ctx.log.info({ event: "auth_signup", userEmail: maskEmail(input.email), userId: user.id }, "Inscription réussie");
         return { success: true as const, user };
