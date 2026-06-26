@@ -150,4 +150,8 @@ export class CategorieDepenseRepositoryDrizzle implements ICategorieDepenseRepos
       return deleted.length > 0;
     });
   }
+
+  withDb(db: DbClient): CategorieDepenseRepositoryDrizzle {
+    return new CategorieDepenseRepositoryDrizzle(db);
+  }
 }
