@@ -410,6 +410,7 @@ export interface AppDeps extends ContextDeps {
   readonly subscriptionRepo?: ISubscriptionRepository;
   readonly stripePort?: StripePort;
   readonly stripeWebhookSecret?: string;
+  readonly resendWebhookSecret?: string;
   readonly facturesCAReader?: FacturesCAReader;
   readonly tresorerieReader?: TresorerieReader;
   readonly eventBus?: EventBusPort;
@@ -1144,8 +1145,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     eventBus,
   });
 
-  if (process.env.RESEND_WEBHOOK_SECRET) {
-    registerResendWebhookRoute(app, { resendWebhookSecret: process.env.RESEND_WEBHOOK_SECRET });
+  const resendSecret = deps.resendWebhookSecret ?? process.env.RESEND_WEBHOOK_SECRET;
+  if (resendSecret) {
+    registerResendWebhookRoute(app, { resendWebhookSecret: resendSecret });
   }
 
   /** Scheduler billing maison — `POST /internal/billing/tick` sécurisé par x-scheduler-secret. */

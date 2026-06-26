@@ -18,7 +18,7 @@ function verifyResendSignature(
   const svixSignature = headers["svix-signature"] as string | undefined;
   if (!svixId || !svixTimestamp || !svixSignature) return false;
   const signedContent = `${svixId}.${svixTimestamp}.${rawBody.toString()}`;
-  const expected = createHmac("sha256", Buffer.from(secret, "base64"))
+  const expected = createHmac("sha256", Buffer.from(secret.replace(/^whsec_/, ""), "base64"))
     .update(signedContent)
     .digest("base64");
   const signatures = svixSignature.split(" ").map((s) => s.replace(/^v\d+,/, ""));
