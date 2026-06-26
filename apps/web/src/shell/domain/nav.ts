@@ -4,7 +4,7 @@ import {
   RefreshCw, Users, Upload, Star, Globe, MessageCircle, Clock, Calendar, CalendarDays, Wrench, MapPin,
   HardHat, Route, Truck, Car, Package, Boxes, ShoppingCart, Building2, Calculator, Bell, CalendarOff,
   Trophy, Medal, Wallet, PiggyBank, BarChart3, Wand2, Settings, BookOpen, HelpCircle, User, LayoutGrid,
-  Mail, Briefcase,
+  Mail, Briefcase, Activity,
 } from "lucide-react";
 
 /*
@@ -88,6 +88,7 @@ export const NAV_GROUPS: NavGroup[] = [
     { icon: Mail, label: "Modèles Email", path: "/modeles-email" },
     { icon: Mail, label: "Modèles Transactionnels", path: "/modeles-email-transactionnels" },
     { icon: History, label: "Historique emails", path: "/historique-emails" },
+    { icon: Activity, label: "Mes événements", path: "/events-admin" },
     { icon: Users, label: "Utilisateurs", path: "/utilisateurs" },
   ] },
 ];
@@ -112,7 +113,7 @@ export const pathPermissionMap: Record<string, string> = {
   "/devis-options": "devis.voir", "/classement": "techniciens.voir", "/analyses-photos": "devis.creer",
   "/depenses": "comptabilite.voir", "/depenses/nouvelle": "comptabilite.voir", "/notes-de-frais": "comptabilite.voir",
   "/budgets-depenses": "comptabilite.voir", "/import-releve": "comptabilite.voir", "/tableau-bord-depenses": "comptabilite.voir",
-  "/regles-depenses": "comptabilite.voir", "/modules": "", "/onboarding": "", "/import": "",
+  "/regles-depenses": "comptabilite.voir", "/modules": "", "/onboarding": "", "/import": "", "/events-admin": "",
 };
 
 /** Filtre les items d'un groupe selon les permissions. Vide → show-all. PUR. */
