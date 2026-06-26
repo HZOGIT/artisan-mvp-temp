@@ -293,6 +293,7 @@ export interface AppDeps extends ContextDeps {
    * (APP_DATABASE_URL → rôle app non-superuser soumis à la RLS).
    */
   readonly vehiculeRepo?: IVehiculeRepository;
+  readonly vehiculesDb?: DbClient;
   readonly avisRepo?: IAvisRepository;
   readonly avisDb?: DbClient;
   /** Dépendances du workflow demande d'avis (injectables en test : email/rate-limiter fakes). */
@@ -1070,7 +1071,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   const events = createEventsModule({ db: getDbHandle().db });
 
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp, interventionsMobile, vitrine, clientPortal, integrationsComptables, devisIA, billing, platformAdmin, events, einvoicing, feedback });
+  const appRouter = createAppRouter({ vehiculeRepo, vehiculesDb: deps.vehiculesDb ?? getDbHandle().db, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp, interventionsMobile, vitrine, clientPortal, integrationsComptables, devisIA, billing, platformAdmin, events, einvoicing, feedback });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",

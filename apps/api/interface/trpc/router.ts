@@ -1,6 +1,7 @@
 import { router, publicProcedure, protectedProcedure } from "./trpc";
 import { createVehiculesRouter } from "../../modules/vehicules/interface/trpc/vehicules.router";
 import type { IVehiculeRepository } from "../../modules/vehicules/application/vehicule-repository";
+import type { DbClient } from "../../shared/db";
 import type { PlatformAdminModule } from "../../modules/platform-admin/platform-admin.module";
 import type { EventsModule } from "../../modules/events/events.module";
 import type { AvisModule } from "../../modules/avis/avis.module";
@@ -66,6 +67,7 @@ import type { FeedbackModule } from "../../modules/feedback/feedback.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
+  readonly vehiculesDb?: DbClient;
   /** Modules déjà assemblés (router prêt) → découple la composition des détails du domaine. */
   readonly avis: AvisModule;
   readonly badges: BadgesModule;
@@ -143,7 +145,7 @@ export function createAppRouter(deps: AppRouterDeps) {
       userId: ctx.tenant.userId,
       role: ctx.tenant.role ?? null,
     })),
-    vehicules: createVehiculesRouter(deps.vehiculeRepo),
+    vehicules: createVehiculesRouter(deps.vehiculeRepo, deps.vehiculesDb),
     avis: deps.avis.router,
     badges: deps.badges.router,
     techniciens: deps.techniciens.router,

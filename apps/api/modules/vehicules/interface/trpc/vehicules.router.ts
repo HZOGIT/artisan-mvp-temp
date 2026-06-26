@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import type { DbClient } from "../../../../shared/db";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
+import { withOutbox } from "../../../../shared/events/with-outbox";
 import type { IVehiculeRepository } from "../../application/vehicule-repository";
 import { listVehicules, getVehiculeById } from "../../application/read-use-cases";
 import {
@@ -62,7 +65,7 @@ const vehiculeIdInput = z.object({ vehiculeId: z.number().int() });
  * Routeur tRPC du domaine vehicules. Toutes les procédures sont protégées (tenant requis) ;
  * les use-cases reçoivent ctx.tenant. Le repository est injecté (DI) → testable.
  */
-export function createVehiculesRouter(repo: IVehiculeRepository) {
+export function createVehiculesRouter(repo: IVehiculeRepository, db?: DbClient) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listVehicules(repo, ctx.tenant)),
 
@@ -73,26 +76,45 @@ export function createVehiculesRouter(repo: IVehiculeRepository) {
     create: protectedProcedure
       .input(createVehiculeSchema)
       .mutation(async ({ ctx, input }) => {
-        const result = await createVehicule(repo, ctx.tenant, input);
-        ctx.log.info({ event: "vehicule_cree", vehiculeId: result.id, typeCarburant: input.typeCarburant ?? null }, "Véhicule ajouté à la flotte");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await createVehicule(r, ctx.tenant, input);
+          ctx.log.info({ event: "vehicule_cree", vehiculeId: result.id, typeCarburant: input.typeCarburant ?? null }, "Véhicule ajouté à la flotte");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "vehicule.cree", entityType: "vehicule", entityId: result.id, payload: { vehiculeId: result.id, immatriculation: result.immatriculation, marque: result.marque } });
+          return result;
+        });
       }),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int(), data: createVehiculeSchema.partial() }))
-      .mutation(({ ctx, input }) => updateVehicule(repo, ctx.tenant, input.id, input.data)),
+      .mutation(async ({ ctx, input }) => {
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await updateVehicule(r, ctx.tenant, input.id, input.data);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "vehicule.modifie", entityType: "vehicule", entityId: input.id, payload: { vehiculeId: input.id } });
+          return result;
+        });
+      }),
 
     delete: protectedProcedure
       .input(idInput)
       .mutation(async ({ ctx, input }) => {
-        await deleteVehicule(repo, ctx.tenant, input.id);
-        ctx.log.warn({ event: "vehicule_supprime", vehiculeId: input.id }, "Véhicule retiré de la flotte");
-        return { success: true };
+        return withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          await deleteVehicule(r, ctx.tenant, input.id);
+          ctx.log.warn({ event: "vehicule_supprime", vehiculeId: input.id }, "Véhicule retiré de la flotte");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "vehicule.supprime", entityType: "vehicule", entityId: input.id, payload: { snapshot: { vehiculeId: input.id, immatriculation: before?.immatriculation } } });
+          return { success: true };
+        });
       }),
 
     updateKilometrage: protectedProcedure
       .input(z.object({ id: z.number().int(), kilometrage: z.number().int().min(0) }))
-      .mutation(({ ctx, input }) => enregistrerKilometrage(repo, ctx.tenant, input.id, input.kilometrage)),
+      .mutation(async ({ ctx, input }) => {
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await enregistrerKilometrage(r, ctx.tenant, input.id, input.kilometrage);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "vehicule.kilometrage_enregistre", entityType: "vehicule", entityId: input.id, payload: { vehiculeId: input.id, km: input.kilometrage } });
+          return result;
+        });
+      }),
 
     addKilometrage: protectedProcedure
       .input(
@@ -104,14 +126,18 @@ export function createVehiculesRouter(repo: IVehiculeRepository) {
           technicienId: z.number().int().nullish(),
         }),
       )
-      .mutation(({ ctx, input }) =>
-        enregistrerReleveKilometrage(repo, ctx.tenant, input.vehiculeId, {
-          kilometrage: input.kilometrage,
-          dateReleve: input.dateReleve,
-          motif: input.motif,
-          technicienId: input.technicienId,
-        }),
-      ),
+      .mutation(async ({ ctx, input }) => {
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await enregistrerReleveKilometrage(r, ctx.tenant, input.vehiculeId, {
+            kilometrage: input.kilometrage,
+            dateReleve: input.dateReleve,
+            motif: input.motif,
+            technicienId: input.technicienId,
+          });
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "vehicule.releve_km_enregistre", entityType: "vehicule", entityId: input.vehiculeId, payload: { vehiculeId: input.vehiculeId, km: input.kilometrage, date: input.dateReleve } });
+          return result;
+        });
+      }),
 
     getHistoriqueKilometrage: protectedProcedure
       .input(vehiculeIdInput)
@@ -126,9 +152,12 @@ export function createVehiculesRouter(repo: IVehiculeRepository) {
     addEntretien: protectedProcedure
       .input(z.object({ vehiculeId: z.number().int(), data: entretienSchema }))
       .mutation(async ({ ctx, input }) => {
-        const result = await ajouterEntretien(repo, ctx.tenant, input.vehiculeId, input.data);
-        ctx.log.info({ event: "vehicule_entretien_ajoute", vehiculeId: input.vehiculeId, type: input.data.type }, `Entretien véhicule enregistré : ${input.data.type}`);
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await ajouterEntretien(r, ctx.tenant, input.vehiculeId, input.data);
+          ctx.log.info({ event: "vehicule_entretien_ajoute", vehiculeId: input.vehiculeId, type: input.data.type }, `Entretien véhicule enregistré : ${input.data.type}`);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "vehicule.entretien_ajoute", entityType: "vehicule", entityId: input.vehiculeId, payload: { vehiculeId: input.vehiculeId, entretienId: result.id, type: result.type } });
+          return result;
+        });
       }),
 
     getEntretiensAVenir: protectedProcedure.query(({ ctx }) => repo.listEntretiensAVenir(ctx.tenant)),
@@ -140,10 +169,13 @@ export function createVehiculesRouter(repo: IVehiculeRepository) {
     addAssurance: protectedProcedure
       .input(z.object({ vehiculeId: z.number().int(), data: assuranceSchema }))
       .mutation(async ({ ctx, input }) => {
-        const result = await ajouterAssurance(repo, ctx.tenant, input.vehiculeId, input.data);
-        /** Assurance véhicule = conformité légale obligatoire — toute mise à jour doit être tracée. */
-        ctx.log.info({ event: "vehicule_assurance_ajoutee", vehiculeId: input.vehiculeId, typeAssurance: input.data.typeAssurance ?? null, dateFin: input.data.dateFin }, "Assurance véhicule enregistrée");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await ajouterAssurance(r, ctx.tenant, input.vehiculeId, input.data);
+          /** Assurance véhicule = conformité légale obligatoire — toute mise à jour doit être tracée. */
+          ctx.log.info({ event: "vehicule_assurance_ajoutee", vehiculeId: input.vehiculeId, typeAssurance: input.data.typeAssurance ?? null, dateFin: input.data.dateFin }, "Assurance véhicule enregistrée");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "vehicule.assurance_ajoutee", entityType: "vehicule", entityId: input.vehiculeId, payload: { vehiculeId: input.vehiculeId, assuranceId: result.id } });
+          return result;
+        });
       }),
 
     getAssurancesExpirant: protectedProcedure
