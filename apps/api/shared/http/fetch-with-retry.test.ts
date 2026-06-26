@@ -66,17 +66,14 @@ describe("fetchWithRetry", () => {
   });
 
   it("aborts on timeout", async () => {
-    vi.useFakeTimers();
+    const fetchMock = vi.fn(() => new Promise(() => {}));
+    vi.stubGlobal("fetch", fetchMock);
 
-    mockFetch.mockImplementation(() => new Promise(() => {}));
+    await expect(
+      fetchWithRetry("https://example.com", { method: "GET" }, { timeoutMs: 15, maxRetries: 0 }),
+    ).rejects.toThrow();
 
-    const promise = fetchWithRetry("https://example.com", {}, { timeoutMs: 20, maxRetries: 0 });
-
-    await vi.runAllTimersAsync();
-
-    await expect(promise).rejects.toThrow();
-
-    vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
   it("returns 4xx errors without retrying", async () => {
