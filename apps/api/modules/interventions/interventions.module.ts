@@ -1,3 +1,4 @@
+import type { DbClient } from "../../shared/db";
 import type { IInterventionRepository } from "./application/intervention-repository";
 import type { ICongeRepository } from "../conges/application/conge-repository";
 import type { ITechnicienRepository } from "../techniciens/application/technicien-repository";
@@ -14,6 +15,7 @@ export interface InterventionsModuleDeps {
   readonly congeRepository: ICongeRepository;
   readonly technicienRepository: ITechnicienRepository;
   readonly badgeRepository: IBadgeRepository;
+  readonly db?: DbClient;
 }
 
 export interface InterventionsModule {
@@ -22,5 +24,5 @@ export interface InterventionsModule {
 }
 
 export function createInterventionsModule(deps: InterventionsModuleDeps): InterventionsModule {
-  return { deps, router: createInterventionsRouter(deps.repository, deps.congeRepository, deps.technicienRepository, deps.badgeRepository) };
+  return { deps, router: createInterventionsRouter(deps.repository, deps.congeRepository, deps.technicienRepository, deps.badgeRepository, deps.db) };
 }

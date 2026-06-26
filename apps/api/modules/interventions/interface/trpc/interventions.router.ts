@@ -4,6 +4,9 @@ import { router, permissionProcedure } from "../../../../interface/trpc/trpc";
 const voir = permissionProcedure("interventions.voir");
 const gerer = permissionProcedure("interventions.gerer");
 import { ValidationError } from "../../../../shared/errors";
+import type { DbClient } from "../../../../shared/db";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
+import { withOutbox } from "../../../../shared/events/with-outbox";
 import type { IInterventionRepository } from "../../application/intervention-repository";
 import { listInterventions, getIntervention, listMesInterventions } from "../../application/read-use-cases";
 import {
@@ -71,7 +74,7 @@ const updateSchema = z.object({
  * les dates, délègue aux use-cases (scoping tenant + anti-IDOR-FK via ctx.tenant), laisse
  * remonter les Domain errors (NotFound→404, Validation→400). Repo injecté (DI).
  */
-export function createInterventionsRouter(repo: IInterventionRepository, congeRepo: ICongeRepository, technicienRepo: ITechnicienRepository, badgeRepo: IBadgeRepository) {
+export function createInterventionsRouter(repo: IInterventionRepository, congeRepo: ICongeRepository, technicienRepo: ITechnicienRepository, badgeRepo: IBadgeRepository, db?: DbClient) {
   return router({
     list: voir.query(({ ctx }) => listInterventions(repo, ctx.tenant)),
 
@@ -86,42 +89,52 @@ export function createInterventionsRouter(repo: IInterventionRepository, congeRe
       .input(createSchema)
       .mutation(async ({ ctx, input }) => {
         const { dateDebut, dateFin, ...rest } = input;
-        const result = await creerIntervention(repo, ctx.tenant, {
-          ...rest,
-          dateDebut: toDate(dateDebut, "Date de début"),
-          dateFin: dateFin != null ? toDate(dateFin, "Date de fin") : dateFin,
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await creerIntervention(r, ctx.tenant, {
+            ...rest,
+            dateDebut: toDate(dateDebut, "Date de début"),
+            dateFin: dateFin != null ? toDate(dateFin, "Date de fin") : dateFin,
+          });
+          ctx.log.info({ event: "intervention_created", interventionId: result.id, clientId: input.clientId, statut: input.statut ?? "planifiee" }, "Intervention créée");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "intervention.creee", entityType: "intervention", entityId: result.id, payload: { interventionId: result.id, clientId: result.clientId, dateDebut: result.dateDebut } });
+          return result;
         });
-        ctx.log.info({ event: "intervention_created", interventionId: result.id, clientId: input.clientId, statut: input.statut ?? "planifiee" }, "Intervention créée");
-        return result;
       }),
 
     update: gerer
       .input(z.object({ id: z.number().int() }).and(updateSchema))
       .mutation(async ({ ctx, input }) => {
         const { id, dateDebut, dateFin, ...rest } = input;
-        const result = await modifierIntervention(repo, ctx.tenant, id, {
-          ...rest,
-          dateDebut: dateDebut != null ? toDate(dateDebut, "Date de début") : undefined,
-          dateFin: dateFin != null ? toDate(dateFin, "Date de fin") : dateFin,
-        });
-        if (rest.statut) {
-          const level = rest.statut === "annulee" ? "warn" : "info";
-          ctx.log[level]({ event: "intervention_statut_changed", interventionId: id, newStatut: rest.statut }, `Intervention statut → ${rest.statut}`);
-          if (rest.statut === "terminee" && result.technicienId != null) {
-            void verifierBadges(badgeRepo, ctx.tenant, result.technicienId).catch((e) =>
-              ctx.log.warn({ err: e }, "verifierBadges failed"),
-            );
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await modifierIntervention(r, ctx.tenant, id, {
+            ...rest,
+            dateDebut: dateDebut != null ? toDate(dateDebut, "Date de début") : undefined,
+            dateFin: dateFin != null ? toDate(dateFin, "Date de fin") : dateFin,
+          });
+          if (rest.statut) {
+            const level = rest.statut === "annulee" ? "warn" : "info";
+            ctx.log[level]({ event: "intervention_statut_changed", interventionId: id, newStatut: rest.statut }, `Intervention statut → ${rest.statut}`);
+            if (rest.statut === "terminee" && result.technicienId != null) {
+              void verifierBadges(badgeRepo, ctx.tenant, result.technicienId).catch((e) =>
+                ctx.log.warn({ err: e }, "verifierBadges failed"),
+              );
+            }
           }
-        }
-        return result;
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "intervention.modifiee", entityType: "intervention", entityId: id, payload: { interventionId: id } });
+          return result;
+        });
       }),
 
     delete: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        await supprimerIntervention(repo, ctx.tenant, input.id);
-        ctx.log.warn({ event: "intervention_deleted", interventionId: input.id }, "Intervention supprimée");
-        return { success: true };
+        return withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          await supprimerIntervention(r, ctx.tenant, input.id);
+          ctx.log.warn({ event: "intervention_deleted", interventionId: input.id }, "Intervention supprimée");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "intervention.supprimee", entityType: "intervention", entityId: input.id, payload: { snapshot: { interventionId: input.id, clientId: before?.clientId } } });
+          return { success: true };
+        });
       }),
 
     /** ── Équipe d'intervention (sous-ressource ; anti-IDOR via intervention parente + technicien du tenant) ── */

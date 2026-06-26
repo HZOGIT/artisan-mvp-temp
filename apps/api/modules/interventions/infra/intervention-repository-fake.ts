@@ -159,4 +159,8 @@ export class FakeInterventionRepository implements IInterventionRepository {
     if (existing) existing.couleur = couleur;
     else this.couleurs.push({ artisanId: ctx.artisanId, interventionId, couleur });
   }
+
+  withDb(_db: unknown): this {
+    return this;
+  }
 }
