@@ -11,6 +11,10 @@ import {
 } from "drizzle-orm/pg-core";
 
 export const factureStatutEnum = pgEnum("facture_statut", ["brouillon", "validee", "envoyee", "payee", "en_retard", "annulee"]);
+export const cycleVieEnum = pgEnum("facture_cycle_vie", [
+  "non_soumise", "deposee", "emise", "recue", "mise_a_dispo", "prise_en_charge",
+  "approuvee", "en_litige", "refusee", "rejetee", "encaissee", "paiement_transmis",
+]);
 export const factureTypeDocumentEnum = pgEnum("facture_type_document", ["facture", "avoir"]);
 export const delaiPaiementTypeEnum = pgEnum("delai_paiement_type", ["net", "fin_de_mois"]);
 export const ligneTypeEnum = pgEnum("ligne_type", ["produit", "section", "note"]);
@@ -55,6 +59,10 @@ export const factures = pgTable("factures", {
   datePaiement: timestamp("datePaiement"),
   modePaiement: varchar("modePaiement", { length: 50 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+  statutCycleVie: cycleVieEnum("statutCycleVie").default("non_soumise"),
+  paId: varchar("paId", { length: 100 }),
+  paDocumentId: varchar("paDocumentId", { length: 100 }),
+  paFormat: varchar("paFormat", { length: 50 }),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 export type Facture = typeof factures.$inferSelect;
