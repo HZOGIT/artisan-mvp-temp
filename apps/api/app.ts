@@ -349,6 +349,8 @@ export interface AppDeps extends ContextDeps {
   readonly bibliothequeReader?: BibliothequeReader;
   readonly bibliothequeWriter?: BibliothequeWriter;
   readonly parametresRepo?: IParametresRepository;
+  /** Pool DB pour les transactions outbox events du module parametres (défaut : getDbHandle().db). */
+  readonly parametresDb?: DbClient;
   readonly modeleEmailRepo?: IModeleEmailRepository;
   /** Pool DB pour les transactions outbox events du module modeles-email (défaut : getDbHandle().db). */
   readonly modelesEmailDb?: DbClient;
@@ -741,6 +743,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   });
   const parametres = createParametresModule({
     repository: deps.parametresRepo ?? new ParametresRepositoryDrizzle(getDbHandle().db),
+    db: deps.parametresDb ?? getDbHandle().db,
   });
   const modelesEmail = createModelesEmailModule({
     repository: modeleEmailRepo,

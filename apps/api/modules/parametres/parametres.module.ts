@@ -1,3 +1,4 @@
+import type { DbClient } from "../../shared/db";
 import type { IParametresRepository } from "./application/parametres-repository";
 import { createParametresRouter } from "./interface/trpc/parametres.router";
 
@@ -7,6 +8,7 @@ import { createParametresRouter } from "./interface/trpc/parametres.router";
  */
 export interface ParametresModuleDeps {
   readonly repository: IParametresRepository;
+  readonly db?: DbClient;
 }
 
 export interface ParametresModule {
@@ -15,5 +17,5 @@ export interface ParametresModule {
 }
 
 export function createParametresModule(deps: ParametresModuleDeps): ParametresModule {
-  return { deps, router: createParametresRouter(deps.repository) };
+  return { deps, router: createParametresRouter(deps.repository, deps.db) };
 }

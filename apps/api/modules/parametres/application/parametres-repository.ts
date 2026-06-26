@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ParametresArtisan, UpdateParametresInput } from "../domain/parametres";
 
@@ -17,4 +18,5 @@ export interface IParametresRepository {
    * compteurs (inviolables via la config). Renvoie l'état résultant. Idempotent.
    */
   upsert(ctx: TenantContext, input: UpdateParametresInput): Promise<ParametresArtisan>;
+  withDb(db: DbClient): IParametresRepository;
 }

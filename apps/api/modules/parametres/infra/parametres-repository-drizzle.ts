@@ -87,6 +87,10 @@ export class ParametresRepositoryDrizzle implements IParametresRepository {
     });
   }
 
+  withDb(db: DbClient): ParametresRepositoryDrizzle {
+    return new ParametresRepositoryDrizzle(db);
+  }
+
   upsert(ctx: TenantContext, input: UpdateParametresInput): Promise<ParametresArtisan> {
     return withTenant(this.db, ctx, async (tx) => {
       const set = toConfigSet(input);

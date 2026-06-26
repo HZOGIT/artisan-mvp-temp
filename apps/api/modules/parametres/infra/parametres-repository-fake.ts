@@ -23,6 +23,11 @@ export class FakeParametresRepository implements IParametresRepository {
     return this.store.get(ctx.artisanId) ?? defaultParametres(ctx.artisanId);
   }
 
+  /* ponytail: withDb ignoré — fake in-memory, pas de transaction réelle */
+  withDb(_db: unknown): FakeParametresRepository {
+    return this;
+  }
+
   async upsert(ctx: TenantContext, input: UpdateParametresInput): Promise<ParametresArtisan> {
     const current = this.store.get(ctx.artisanId) ?? defaultParametres(ctx.artisanId);
     /** Fusionne uniquement les champs config fournis ; compteurs (et artisanId) préservés tels quels. */
