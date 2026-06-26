@@ -5,7 +5,14 @@ import { trpc } from "../shared/trpc";
 
 function ArtisansPage() {
   const navigate = useNavigate();
+  const utils = trpc.useUtils();
   const { data, isLoading, error } = trpc.platformAdmin.artisans.list.useQuery({ page: 1 });
+  const disable = trpc.platformAdmin.artisans.disable.useMutation({
+    onSuccess: () => utils.platformAdmin.artisans.list.invalidate(),
+  });
+  const enable = trpc.platformAdmin.artisans.enable.useMutation({
+    onSuccess: () => utils.platformAdmin.artisans.list.invalidate(),
+  });
 
   useEffect(() => {
     if (error?.data?.code === "UNAUTHORIZED") {
@@ -32,7 +39,10 @@ function ArtisansPage() {
             <th style={{ padding: "8px 12px", textAlign: "left", border: "1px solid #e2e8f0" }}>SIRET</th>
             <th style={{ padding: "8px 12px", textAlign: "left", border: "1px solid #e2e8f0" }}>Email</th>
             <th style={{ padding: "8px 12px", textAlign: "left", border: "1px solid #e2e8f0" }}>Plan</th>
+            <th style={{ padding: "8px 12px", textAlign: "left", border: "1px solid #e2e8f0" }}>IP inscription</th>
+            <th style={{ padding: "8px 12px", textAlign: "left", border: "1px solid #e2e8f0" }}>Statut</th>
             <th style={{ padding: "8px 12px", textAlign: "left", border: "1px solid #e2e8f0" }}>Créé le</th>
+            <th style={{ padding: "8px 12px", textAlign: "left", border: "1px solid #e2e8f0" }}>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -43,7 +53,43 @@ function ArtisansPage() {
               <td style={{ padding: "8px 12px", border: "1px solid #e2e8f0" }}>{a.siret ?? "—"}</td>
               <td style={{ padding: "8px 12px", border: "1px solid #e2e8f0" }}>{a.email ?? "—"}</td>
               <td style={{ padding: "8px 12px", border: "1px solid #e2e8f0" }}>{a.plan ?? "—"}</td>
+              <td style={{ padding: "8px 12px", border: "1px solid #e2e8f0", fontFamily: "monospace" }}>{a.ip ?? "—"}</td>
+              <td style={{ padding: "8px 12px", border: "1px solid #e2e8f0" }}>
+                <span style={{
+                  padding: "2px 8px",
+                  borderRadius: "4px",
+                  fontSize: "12px",
+                  fontWeight: "600",
+                  background: a.isActive ? "#dcfce7" : "#fee2e2",
+                  color: a.isActive ? "#15803d" : "#b91c1c",
+                }}>
+                  {a.isActive ? "Actif" : "Désactivé"}
+                </span>
+              </td>
               <td style={{ padding: "8px 12px", border: "1px solid #e2e8f0" }}>{a.createdAt ? new Date(a.createdAt).toLocaleDateString("fr-FR") : "—"}</td>
+              <td style={{ padding: "8px 12px", border: "1px solid #e2e8f0" }}>
+                {a.isActive ? (
+                  <button
+                    onClick={() => {
+                      if (confirm(`Désactiver l'artisan #${a.id} ?`)) {
+                        disable.mutate({ id: a.id });
+                      }
+                    }}
+                    disabled={disable.isPending}
+                    style={{ padding: "4px 10px", background: "#ef4444", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "12px" }}
+                  >
+                    Désactiver
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => enable.mutate({ id: a.id })}
+                    disabled={enable.isPending}
+                    style={{ padding: "4px 10px", background: "#22c55e", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "12px" }}
+                  >
+                    Réactiver
+                  </button>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>

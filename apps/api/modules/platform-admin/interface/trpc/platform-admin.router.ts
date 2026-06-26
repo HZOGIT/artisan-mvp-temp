@@ -21,6 +21,8 @@ export function createPlatformAdminRouter(db: DbClient) {
                 siret: artisans.siret,
                 email: users.email,
                 plan: artisans.plan,
+                isActive: artisans.isActive,
+                ip: users.ip,
                 createdAt: artisans.createdAt,
               })
               .from(artisans)
@@ -31,6 +33,18 @@ export function createPlatformAdminRouter(db: DbClient) {
             db.select({ total: count() }).from(artisans),
           ]);
           return { items, total: Number(totals[0]?.total ?? 0) };
+        }),
+
+      disable: platformAdminProcedure
+        .input(z.object({ id: z.number().int() }))
+        .mutation(async ({ input }) => {
+          await db.update(artisans).set({ isActive: false }).where(eq(artisans.id, input.id));
+        }),
+
+      enable: platformAdminProcedure
+        .input(z.object({ id: z.number().int() }))
+        .mutation(async ({ input }) => {
+          await db.update(artisans).set({ isActive: true }).where(eq(artisans.id, input.id));
         }),
     }),
     subscriptions: router({
