@@ -125,5 +125,8 @@ infra/terraform/terraform.tfvars
 # Bundle du nouveau stack (esbuild)
 dist-newstack
 
+# État du slot actif blue-green (généré par deploy-backend.sh, jamais commité)
+infra/upstream.conf
+
 # Wrangler local state (Cloudflare CLI artifacts)
 .wrangler/
