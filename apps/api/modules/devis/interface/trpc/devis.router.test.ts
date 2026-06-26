@@ -6,6 +6,8 @@ import { createDbClient } from "../../../../shared/db";
 import { DrizzleTenantResolver } from "../../../../shared/tenant/drizzle-tenant-resolver";
 import { DevisRepositoryDrizzle } from "../../infra/devis-repository-drizzle";
 import { injectTrpc } from "../../../../shared/testing/trpc-inject";
+import { withOutbox } from "../../../../shared/events/with-outbox";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
 
 const URL = process.env.DATABASE_URL;
 const APP_URL =
@@ -194,5 +196,26 @@ describe.skipIf(!URL)("devis.router e2e (HTTP → tRPC → use-case → repo →
     expect(row).toBeDefined();
     expect(row.userId).toBe(UA);
     expect(row.artisanId).toBe(artisanA);
+  });
+
+  it("outbox atomicité — rollback: throw après write devis → 0 devis ET 0 event_outbox persistés", async () => {
+    const ctx = { artisanId: artisanA, userId: UA, role: "artisan" as const, isOwner: true, franchiseTVA: false };
+    const repo = new DevisRepositoryDrizzle(app.db);
+    const devisBefore = Number((await admin.query('select count(*) from devis where "artisanId"=$1', [artisanA])).rows[0].count);
+    const outboxBefore = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+
+    await expect(
+      withOutbox(app.db, repo, async (r, tx) => {
+        const numero = await r.nextNumero(ctx);
+        await r.create(ctx, { clientId: clientA, numero });
+        if (tx) await outboxEvent(tx, ctx, { action: "devis.cree", entityType: "devis", entityId: 99999, payload: {} });
+        throw new Error("échec simulé post-write");
+      }),
+    ).rejects.toThrow("échec simulé post-write");
+
+    const devisAfter = Number((await admin.query('select count(*) from devis where "artisanId"=$1', [artisanA])).rows[0].count);
+    const outboxAfter = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+    expect(devisAfter).toBe(devisBefore);
+    expect(outboxAfter).toBe(outboxBefore);
   });
 });

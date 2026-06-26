@@ -1,10 +1,9 @@
 import type { DbClient } from "../db";
 
 /**
- * Exécute `fn` dans une transaction Drizzle (outerTx).
- * Le repo reçoit `repo.withDb(outerTx)` → ses queries font partie de la même tx.
- * outboxEvent(outerTx, ...) dans `fn` → atomicité mutation + outbox garantie.
- * Si `db` est absent : `fn` reçoit le repo original et `undefined` (dégradé, pas d'outbox).
+ * Invariant : mutation métier ET outbox sont soit **tous les deux commités, soit tous les deux rollbackés**.
+ * Si `fn` lance une erreur, `db.transaction()` fait un ROLLBACK complet — ni la mutation ni l'outbox ne persistent.
+ * Si `db` est absent : `fn` reçoit le repo original et `undefined` (mode dégradé sans outbox).
  */
 export function withOutbox<TRepo extends { withDb(db: DbClient): TRepo }, T>(
   db: DbClient | undefined,
