@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useCommandes } from "../application/use-commandes";
+import { apiUrl } from "@/shared/backend-url";
 import {
   filterCommandes,
   isCommandeStatut,
@@ -187,7 +188,7 @@ export default function CommandesPage() {
                           {t("modifier")}
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
-                          <a href={`/api/commandes-fournisseurs/${cmd.id}/pdf`} target="_blank" rel="noopener noreferrer">
+                          <a href={apiUrl(`/api/commandes-fournisseurs/${cmd.id}/pdf`)} target="_blank" rel="noopener noreferrer">
                             <Download className="h-4 w-4 mr-2" />
                             {t("downloadPdf")}
                           </a>

@@ -10,7 +10,7 @@ import { Textarea } from "@/shared/ui/textarea";
 import { Switch } from "@/shared/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 import { AbonnementSection } from "@/features/abonnement/ui/abonnement-section";
-import { BACKEND_URL } from "@/shared/backend-url";
+import { BACKEND_URL, apiUrl } from "@/shared/backend-url";
 import { useParametres } from "../application/use-parametres";
 import {
   parametresToForm, formToUpdateInput, buildIcalUrl, demandeStatutClass, FORM_DEFAULTS,
@@ -348,7 +348,7 @@ export default function ParametresPage() {
               <CardDescription>{t("rgpdDesc")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button type="button" variant="outline" onClick={() => { window.location.href = "/api/rgpd/export"; }}>
+              <Button type="button" variant="outline" onClick={() => { window.location.href = apiUrl("/api/rgpd/export"); }}>
                 <Download className="h-4 w-4 mr-2" />{t("rgpdExporter")}
               </Button>
               <p className="text-xs text-muted-foreground">{t("rgpdExporterHint")}</p>

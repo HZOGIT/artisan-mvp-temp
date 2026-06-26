@@ -11,19 +11,22 @@
 import { chromium } from 'playwright';
 
 const BASE = process.env.BASE || 'https://staging.operioz.com';
+/* Front et backend sont sur deux domaines : les appels /api/* visent le backend DIRECT (plus de proxy
+ * same-origin). Les pages (page.goto) restent sur BASE (le domaine front). Cf. shared/backend-url.ts. */
+const BACKEND = process.env.BACKEND || 'https://staging-backend.operioz.com';
 const EMAIL = process.env.E2E_EMAIL || 'dev@operioz.com';
 const PASS = process.env.E2E_PASS || '';
 const issues = [];
 
 const browser = await chromium.launch({ args: ['--no-sandbox'] });
 const ctx = await browser.newContext({ baseURL: BASE, ignoreHTTPSErrors: true });
-const signin = await ctx.request.post('/api/trpc/auth.signin?batch=1', {
+const signin = await ctx.request.post(`${BACKEND}/api/trpc/auth.signin?batch=1`, {
   headers: { 'content-type': 'application/json' }, data: { '0': { json: { email: EMAIL, password: PASS } } },
 });
 if (!signin.ok()) { console.log(JSON.stringify({ fatal: `login failed HTTP ${signin.status()}` })); await browser.close(); process.exit(2); }
 
 const trpcGet = async (path, input) => {
-  const r = await ctx.request.get(`/api/trpc/${path}?batch=1&input=` + encodeURIComponent(JSON.stringify({ 0: { json: input } })));
+  const r = await ctx.request.get(`${BACKEND}/api/trpc/${path}?batch=1&input=` + encodeURIComponent(JSON.stringify({ 0: { json: input } })));
   return (await r.json())[0]?.result?.data?.json;
 };
 
@@ -122,7 +125,7 @@ async function casBillingRender() {
 async function casBillingMutations() {
   casesRun++;
   const tag = 'billing.mutations-persist';
-  const trpcPost = async (proc, input) => ctx.request.post(`/api/trpc/${proc}?batch=1`, {
+  const trpcPost = async (proc, input) => ctx.request.post(`${BACKEND}/api/trpc/${proc}?batch=1`, {
     headers: { 'content-type': 'application/json' },
     data: { '0': { json: input } },
   });
@@ -173,7 +176,7 @@ async function casBillingMutations() {
 async function casBillingChangePlan() {
   casesRun++;
   const tag = 'billing.changePlan-persist';
-  const trpcPost = async (proc, input) => ctx.request.post(`/api/trpc/${proc}?batch=1`, {
+  const trpcPost = async (proc, input) => ctx.request.post(`${BACKEND}/api/trpc/${proc}?batch=1`, {
     headers: { 'content-type': 'application/json' },
     data: { '0': { json: input } },
   });
@@ -204,7 +207,7 @@ async function casBillingChangePlan() {
 async function casBillingCancelReactivate() {
   casesRun++;
   const tag = 'billing.cancelAtPeriodEnd+reactivate';
-  const trpcPost = async (proc, input) => ctx.request.post(`/api/trpc/${proc}?batch=1`, {
+  const trpcPost = async (proc, input) => ctx.request.post(`${BACKEND}/api/trpc/${proc}?batch=1`, {
     headers: { 'content-type': 'application/json' },
     data: { '0': { json: input } },
   });
@@ -301,7 +304,7 @@ async function casSignupNeufNoLoop() {
   page.on('pageerror', (e) => pageErrors.push(String(e).slice(0, 200)));
   let signedUp = false;
   try {
-    const res = await freshCtx.request.post('/api/trpc/auth.signup?batch=1', {
+    const res = await freshCtx.request.post(`${BACKEND}/api/trpc/auth.signup?batch=1`, {
       headers: { 'content-type': 'application/json' },
       data: { '0': { json: { email, password: 'Azerqsdf1234!', name: 'E2E Onboarding' } } },
     });
@@ -328,7 +331,7 @@ async function casSignupNeufNoLoop() {
   } finally {
     if (signedUp) {
       try {
-        await freshCtx.request.post('/api/trpc/auth.deleteAccount?batch=1', {
+        await freshCtx.request.post(`${BACKEND}/api/trpc/auth.deleteAccount?batch=1`, {
           headers: { 'content-type': 'application/json' }, data: { '0': { json: { confirmation: 'SUPPRIMER' } } },
         });
       } catch { /* nettoyage best-effort */ }
