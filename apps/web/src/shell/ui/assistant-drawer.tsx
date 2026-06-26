@@ -16,9 +16,11 @@ interface AssistantDrawerProps {
   onClose: () => void;
   panelSize: AssistantPanelSize;
   onPanelSizeChange: (size: AssistantPanelSize) => void;
+  preprompt?: string | null;
+  onPrepromptConsumed?: () => void;
 }
 
-export function AssistantDrawer({ open, onClose, panelSize, onPanelSizeChange }: AssistantDrawerProps) {
+export function AssistantDrawer({ open, onClose, panelSize, onPanelSizeChange, preprompt, onPrepromptConsumed }: AssistantDrawerProps) {
   const { t } = useTranslation("shell");
   const [, setLocation] = useLocation();
 
@@ -58,7 +60,7 @@ export function AssistantDrawer({ open, onClose, panelSize, onPanelSizeChange }:
               </div>
             </div>
             <div className="flex-1 min-h-0 overflow-hidden">
-              <AssistantPage embedded />
+              <AssistantPage embedded preprompt={preprompt} onPrepromptConsumed={onPrepromptConsumed} />
             </div>
           </motion.aside>
         </>

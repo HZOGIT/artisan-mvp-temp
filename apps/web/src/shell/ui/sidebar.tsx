@@ -1,8 +1,7 @@
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { AnimatePresence, motion } from "framer-motion";
 import { Sparkles, X, ChevronRight, User, Settings, LogOut, MessageSquarePlus } from "lucide-react";
-import { FeedbackDialog } from "./feedback-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar";
@@ -40,7 +39,6 @@ export interface SidebarProps {
 
 export function Sidebar(props: SidebarProps) {
   const { t } = useTranslation("shell");
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const { groups, openGroupId, activeGroupId, assistantOpen, logo, userInitial, userName, userEmail, isActivePath, onLogoClick, onRailGroupClick, onClosePanel, onNavigate, onProfil, onParametres, onLogout, railBadge, itemBadge } = props;
   const openGroup = groups.find((g) => g.id === openGroupId) ?? null;
 
@@ -74,7 +72,7 @@ export function Sidebar(props: SidebarProps) {
 
         <Tooltip delayDuration={0}>
           <TooltipTrigger asChild>
-            <button onClick={() => setFeedbackOpen(true)} aria-label={t("feedbackBtn")}
+            <button onClick={() => window.dispatchEvent(new CustomEvent("operioz:open-assistant", { detail: { preprompt: "Je veux signaler un bug ou faire une suggestion." } }))} aria-label={t("feedbackBtn")}
               className="h-10 w-10 inline-flex items-center justify-center rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring mb-1">
               <MessageSquarePlus className="h-5 w-5" />
             </button>
@@ -103,8 +101,6 @@ export function Sidebar(props: SidebarProps) {
           </DropdownMenuContent>
         </DropdownMenu>
       </nav>
-
-      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
 
       {/* ─── PANNEAU ÉTENDU (overlay desktop) ─── */}
       <AnimatePresence>

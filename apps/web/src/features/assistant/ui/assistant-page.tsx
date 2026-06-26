@@ -24,7 +24,7 @@ import { useAssistantStore } from "../application/assistant-store";
  * State (messages, threadId, isStreaming) géré dans useAssistantStore (Zustand + persist) pour survivre
  * aux navigations SPA.
  */
-export default function AssistantPage({ embedded = false }: { embedded?: boolean } = {}) {
+export default function AssistantPage({ embedded = false, preprompt, onPrepromptConsumed }: { embedded?: boolean; preprompt?: string | null; onPrepromptConsumed?: () => void } = {}) {
   const { t } = useTranslation("assistant");
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
@@ -121,6 +121,12 @@ export default function AssistantPage({ embedded = false }: { embedded?: boolean
       setMessages((prev) => { const u = [...prev]; if (u.length > 0 && u[u.length - 1].role === "assistant" && !u[u.length - 1].content) u.pop(); return u; });
     } finally { setIsStreaming(false); abortRef.current = null; }
   }, [isStreaming, messages, threadId, queryClient, t, streamMessage]);
+
+  useEffect(() => {
+    if (!preprompt) return;
+    sendMessage(preprompt);
+    onPrepromptConsumed?.();
+  }, [preprompt]);
 
   /** Compte à rebours d'envoi auto après dictée */
   useEffect(() => {
