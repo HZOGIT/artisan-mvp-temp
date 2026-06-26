@@ -66,6 +66,7 @@ export const contratsMaintenance = pgTable("contrats_maintenance", {
   dateFin: timestamp("dateFin"),
   reconduction: boolean("reconduction").default(true),
   preavisResiliation: integer("preavisResiliation").default(1),
+  alerteReconductionEnvoyeeLe: timestamp("alerteReconductionEnvoyeeLe"),
   prochainFacturation: timestamp("prochainFacturation"),
   prochainPassage: timestamp("prochainPassage"),
   conditionsParticulieres: text("conditionsParticulieres"),

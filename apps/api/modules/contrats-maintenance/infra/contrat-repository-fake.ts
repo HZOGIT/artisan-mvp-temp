@@ -63,6 +63,7 @@ export class FakeContratRepository implements IContratRepository {
       dateFin: input.dateFin ?? null,
       reconduction: input.reconduction ?? true,
       preavisResiliation: input.preavisResiliation ?? 1,
+      alerteReconductionEnvoyeeLe: null,
       prochainFacturation: input.prochainFacturation ?? null,
       prochainPassage: input.prochainPassage ?? null,
       conditionsParticulieres: input.conditionsParticulieres ?? null,
@@ -192,5 +193,25 @@ export class FakeContratRepository implements IContratRepository {
 
   async recordFactureRecurrente(_ctx: TenantContext, input: RecordFactureRecurrenteInput): Promise<void> {
     this.facturesRecurrentes.push({ ...input, genereeAutomatiquement: input.genereeAutomatiquement ?? false });
+  }
+
+  async listProchaineReconduction(ctx: TenantContext): Promise<Contrat[]> {
+    const now = new Date();
+    const in1Month = new Date(now.getTime() + 30 * 86_400_000);
+    const in3Months = new Date(now.getTime() + 90 * 86_400_000);
+    return this.scoped(ctx).filter(
+      (c) =>
+        c.statut === "actif" &&
+        c.reconduction === true &&
+        c.alerteReconductionEnvoyeeLe === null &&
+        c.dateFin !== null &&
+        c.dateFin >= in1Month &&
+        c.dateFin <= in3Months,
+    );
+  }
+
+  async markAlertReconductionSent(ctx: TenantContext, id: number): Promise<void> {
+    const idx = this.store.findIndex((c) => c.id === id && c.artisanId === ctx.artisanId);
+    if (idx !== -1) this.store[idx] = { ...this.store[idx], alerteReconductionEnvoyeeLe: new Date() };
   }
 }

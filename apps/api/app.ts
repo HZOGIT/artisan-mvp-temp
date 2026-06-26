@@ -164,6 +164,7 @@ import { notificationsCronPlugin } from "./shared/infra/notifications-cron";
 import { genererRappelsFacturesEnRetard } from "./modules/notifications/application/derived-use-cases";
 import { genererAlertesStock } from "./modules/stocks/application/alertes-use-cases";
 import { genererAlertesRetardLivraison } from "./modules/commandes/application/alertes-retard-use-cases";
+import { genererAlertesReconductionContrats } from "./modules/contrats-maintenance/application/alertes-reconduction-use-cases";
 import { artisans as artisansTable, paOutbox } from "../../drizzle/schema.pg";
 import { alertesPrevisionsCronPlugin } from "./shared/infra/alertes-previsions-cron";
 import { ensureStripeWebhookEndpoint } from "./shared/infra/stripe-webhook-setup";
@@ -717,8 +718,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const categoriesDepenses = createCategoriesDepensesModule({
     repository: categorieDepenseRepo,
   });
+  const contratRepo = deps.contratRepo ?? new ContratRepositoryDrizzle(getDbHandle().db);
   const contratsMaintenance = createContratsMaintenanceModule({
-    repository: deps.contratRepo ?? new ContratRepositoryDrizzle(getDbHandle().db),
+    repository: contratRepo,
     factureGenerator: new FacturesContratFactureGenerator(factureRepo),
     artisanRepo: deps.artisanRepo ?? new ArtisanRepositoryDrizzle(getDbHandle().db),
   });
@@ -1107,6 +1109,15 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
         }
         return { alertsCreated };
       },
+      generateAlertesReconduction: async () => {
+        const rows = await getDbHandle().db.select({ id: artisansTable.id }).from(artisansTable);
+        let alertsCreated = 0;
+        for (const { id: artisanId } of rows) {
+          const r = await genererAlertesReconductionContrats(contratRepo, notificationRepo, { artisanId, userId: 0 }).catch(() => ({ alertsCreated: 0 }));
+          alertsCreated += r.alertsCreated;
+        }
+        return { alertsCreated };
+      },
     },
   });
 
@@ -1207,7 +1218,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   registerContratPdfRoute(app, {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
-    contratRepo: deps.contratRepo ?? new ContratRepositoryDrizzle(getDbHandle().db),
+    contratRepo,
     clientReader: clientRepo,
     artisanReader: deps.artisanRepo ?? new ArtisanRepositoryDrizzle(getDbHandle().db),
     pdf: new JsPdfAdapter(),
