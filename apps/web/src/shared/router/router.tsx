@@ -388,7 +388,7 @@ const devisDetailRoute = createRoute({ getParentRoute: () => appShellRoute, path
 const factureDetailRoute = createRoute({ getParentRoute: () => appShellRoute, path: "/factures/$id", component: lazyRouteComponent(() => import("../../features/facture-detail/ui/facture-detail-page")) });
 const commandeNouvelleRoute = createRoute({ getParentRoute: () => appShellRoute, path: "/commandes/nouvelle", component: lazyRouteComponent(() => import("../../features/commande-form/ui/commande-form-page")) });
 const commandeModifierRoute = createRoute({ getParentRoute: () => appShellRoute, path: "/commandes/$id/modifier", component: lazyRouteComponent(() => import("../../features/commande-form/ui/commande-form-page")) });
-const eventsAdminRoute = createRoute({ getParentRoute: () => appShellRoute, path: "/admin/events", component: lazyRouteComponent(() => import("../../features/events-admin/ui/events-admin-page")) });
+const eventsAdminRoute = createRoute({ getParentRoute: () => appShellRoute, path: "/events-admin", component: lazyRouteComponent(() => import("../../features/events-admin/ui/events-admin-page")) });
 
 /** Flotte (vue d'ensemble du parc) — migration clean-archi de `pages/Flotte.tsx`. */
 const flotteRoute = createRoute({
