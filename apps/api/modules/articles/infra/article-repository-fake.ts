@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IArticleRepository } from "../application/article-repository";
 import type { Article, CreateArticleInput, UpdateArticleInput } from "../domain/article";
@@ -54,5 +55,10 @@ export class FakeArticleRepository implements IArticleRepository {
     if (!a) return false;
     this.store = this.store.filter((x) => x.id !== id);
     return true;
+  }
+
+  /* ponytail: withDb no-op sur le fake — la DB n'est pas utilisée en mémoire */
+  withDb(_db: DbClient): this {
+    return this;
   }
 }
