@@ -142,9 +142,9 @@ services:
     image: grafana/grafana:11.1.0
     restart: unless-stopped
     ports:
-      - "3200:3000"
+      - "127.0.0.1:3200:3000"
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?GRAFANA_PASSWORD required}
       GF_AUTH_ANONYMOUS_ENABLED: "false"
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
