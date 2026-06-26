@@ -120,4 +120,8 @@ export class ArticleRepositoryDrizzle implements IArticleRepository {
       return deleted.length > 0;
     });
   }
+
+  withDb(db: DbClient): ArticleRepositoryDrizzle {
+    return new ArticleRepositoryDrizzle(db);
+  }
 }

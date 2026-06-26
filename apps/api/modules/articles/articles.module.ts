@@ -1,3 +1,4 @@
+import type { DbClient } from "../../shared/db";
 import type { IArticleRepository } from "./application/article-repository";
 import type { ArticlesIaDeps } from "./application/suggerer-articles-ia";
 import type { BibliothequeReader } from "./application/bibliotheque-reader";
@@ -14,6 +15,7 @@ export interface ArticlesModuleDeps {
   readonly ia?: ArticlesIaDeps;
   readonly bibliotheque?: BibliothequeReader;
   readonly bibliothequeWriter?: BibliothequeWriter;
+  readonly db?: DbClient;
 }
 
 export interface ArticlesModule {
@@ -22,5 +24,5 @@ export interface ArticlesModule {
 }
 
 export function createArticlesModule(deps: ArticlesModuleDeps): ArticlesModule {
-  return { deps, router: createArticlesRouter(deps.repository, deps.ia, deps.bibliotheque, deps.bibliothequeWriter) };
+  return { deps, router: createArticlesRouter(deps.repository, deps.ia, deps.bibliotheque, deps.bibliothequeWriter, deps.db) };
 }

@@ -349,6 +349,8 @@ export interface AppDeps extends ContextDeps {
   readonly compta?: ComptaPort;
   readonly ecritureRepo?: IEcritureRepository;
   readonly articleRepo?: IArticleRepository;
+  /** Pool DB pour les transactions outbox du module articles (défaut : getDbHandle().db). */
+  readonly articlesDb?: DbClient;
   readonly bibliothequeReader?: BibliothequeReader;
   readonly bibliothequeWriter?: BibliothequeWriter;
   readonly parametresRepo?: IParametresRepository;
@@ -752,6 +754,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     bibliotheque: deps.bibliothequeReader ?? new BibliothequeReaderDrizzle(getDbHandle().db),
     /** Écritures catalogue : writer NON tenant, garde admin portée par la procédure tRPC. */
     bibliothequeWriter: deps.bibliothequeWriter ?? new BibliothequeWriterDrizzle(getDbHandle().db),
+    db: deps.articlesDb ?? getDbHandle().db,
   });
   const parametres = createParametresModule({
     repository: deps.parametresRepo ?? new ParametresRepositoryDrizzle(getDbHandle().db),

@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { router, protectedProcedure, publicProcedure, adminProcedure } from "../../../../interface/trpc/trpc";
+import type { DbClient } from "../../../../shared/db";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
+import { withOutbox } from "../../../../shared/events/with-outbox";
 import type { IArticleRepository } from "../../application/article-repository";
 import { listArticles, getArticle, articlesParCategorie } from "../../application/read-use-cases";
 import { creerArticle, modifierArticle, supprimerArticle } from "../../application/write-use-cases";
@@ -80,6 +83,7 @@ export function createArticlesRouter(
   ia?: ArticlesIaDeps,
   bibliotheque?: BibliothequeReader,
   bibliothequeWriter?: BibliothequeWriter,
+  db?: DbClient,
 ) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listArticles(repo, ctx.tenant)),
@@ -94,21 +98,35 @@ export function createArticlesRouter(
 
     create: protectedProcedure
       .input(createSchema)
-      .mutation(({ ctx, input }) => creerArticle(repo, ctx.tenant, input)),
+      .mutation(({ ctx, input }) =>
+        withOutbox(db, repo, async (r, tx) => {
+          const result = await creerArticle(r, ctx.tenant, input);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "article.cree", entityType: "article", entityId: result.id, payload: { articleId: result.id, reference: result.reference, designation: result.designation, prixUnitaire: result.prixUnitaireHT } });
+          return result;
+        }),
+      ),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
       .mutation(({ ctx, input }) => {
         const { id, ...data } = input;
-        return modifierArticle(repo, ctx.tenant, id, data);
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await modifierArticle(r, ctx.tenant, id, data);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "article.modifie", entityType: "article", entityId: id, payload: { articleId: id } });
+          return result;
+        });
       }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number().int() }))
-      .mutation(async ({ ctx, input }) => {
-        await supprimerArticle(repo, ctx.tenant, input.id);
-        return { success: true };
-      }),
+      .mutation(({ ctx, input }) =>
+        withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          await supprimerArticle(r, ctx.tenant, input.id);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "article.supprime", entityType: "article", entityId: input.id, payload: { snapshot: { articleId: input.id, reference: before?.reference, designation: before?.designation } } });
+          return { success: true };
+        }),
+      ),
 
     /*
      * ── Surface parité client : articles « artisan » (catalogue propre au tenant) ─────────────────
@@ -119,21 +137,35 @@ export function createArticlesRouter(
 
     createArtisanArticle: protectedProcedure
       .input(createSchema)
-      .mutation(({ ctx, input }) => creerArticle(repo, ctx.tenant, input)),
+      .mutation(({ ctx, input }) =>
+        withOutbox(db, repo, async (r, tx) => {
+          const result = await creerArticle(r, ctx.tenant, input);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "article.cree", entityType: "article", entityId: result.id, payload: { articleId: result.id, reference: result.reference, designation: result.designation, prixUnitaire: result.prixUnitaireHT } });
+          return result;
+        }),
+      ),
 
     updateArtisanArticle: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
       .mutation(({ ctx, input }) => {
         const { id, ...data } = input;
-        return modifierArticle(repo, ctx.tenant, id, data);
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await modifierArticle(r, ctx.tenant, id, data);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "article.modifie", entityType: "article", entityId: id, payload: { articleId: id } });
+          return result;
+        });
       }),
 
     deleteArtisanArticle: protectedProcedure
       .input(z.object({ id: z.number().int() }))
-      .mutation(async ({ ctx, input }) => {
-        await supprimerArticle(repo, ctx.tenant, input.id);
-        return { success: true };
-      }),
+      .mutation(({ ctx, input }) =>
+        withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          await supprimerArticle(r, ctx.tenant, input.id);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "article.supprime", entityType: "article", entityId: input.id, payload: { snapshot: { articleId: input.id, reference: before?.reference, designation: before?.designation } } });
+          return { success: true };
+        }),
+      ),
 
     /*
      * ── Suggestion IA d'articles (lecture seule, non persistée) ───────────────────────────────────
