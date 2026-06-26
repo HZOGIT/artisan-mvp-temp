@@ -1,3 +1,4 @@
+import type { DbClient } from "../../shared/db";
 import type { IConfigRelancesRepository } from "./application/config-relances-repository";
 import { createConfigRelancesRouter } from "./interface/trpc/config-relances.router";
 
@@ -7,6 +8,7 @@ import { createConfigRelancesRouter } from "./interface/trpc/config-relances.rou
  */
 export interface ConfigRelancesModuleDeps {
   readonly repository: IConfigRelancesRepository;
+  readonly db?: DbClient;
 }
 
 export interface ConfigRelancesModule {
@@ -15,5 +17,5 @@ export interface ConfigRelancesModule {
 }
 
 export function createConfigRelancesModule(deps: ConfigRelancesModuleDeps): ConfigRelancesModule {
-  return { deps, router: createConfigRelancesRouter(deps.repository) };
+  return { deps, router: createConfigRelancesRouter(deps.repository, deps.db) };
 }

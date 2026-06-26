@@ -360,6 +360,8 @@ export interface AppDeps extends ContextDeps {
   /** Pool DB pour les transactions outbox events du module modeles-devis (défaut : getDbHandle().db). */
   readonly modelesDevisDb?: DbClient;
   readonly configRelancesRepo?: IConfigRelancesRepository;
+  /** Pool DB pour les transactions outbox events du module config-relances (défaut : getDbHandle().db). */
+  readonly configRelancesDb?: DbClient;
   readonly rdvRepo?: IRdvRepository;
   /** Pool DB pour les transactions outbox events du module rdv-en-ligne (défaut : getDbHandle().db). */
   readonly rdvDb?: DbClient;
@@ -760,6 +762,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   });
   const configRelances = createConfigRelancesModule({
     repository: deps.configRelancesRepo ?? new ConfigRelancesRepositoryDrizzle(getDbHandle().db),
+    db: deps.configRelancesDb ?? getDbHandle().db,
   });
   const rdvEnLigne = createRdvEnLigneModule({
     repository: deps.rdvRepo ?? new RdvRepositoryDrizzle(getDbHandle().db),
