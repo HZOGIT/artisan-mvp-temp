@@ -15,7 +15,17 @@ export const METIERS: { key: string; labelKey: string; emoji: string }[] = [
   { key: "jardinier", labelKey: "metierJardinier", emoji: "🌿" }, { key: "cuisiniste", labelKey: "metierCuisiniste", emoji: "🍳" },
   { key: "menuisier", labelKey: "metierMenuisier", emoji: "🪑" }, { key: "peintre", labelKey: "metierPeintre", emoji: "🎨" },
   { key: "macon", labelKey: "metierMacon", emoji: "🏗️" }, { key: "terrassier", labelKey: "metierTerrassier", emoji: "🚜" },
-  { key: "domotique", labelKey: "metierDomotique", emoji: "🔌" }, { key: "autre", labelKey: "metierAutre", emoji: "✏️" },
+  { key: "domotique", labelKey: "metierDomotique", emoji: "🔌" },
+  { key: "architecte", labelKey: "metierArchitecte", emoji: "📐" },
+  { key: "avocat", labelKey: "metierAvocat", emoji: "⚖️" },
+  { key: "consultant", labelKey: "metierConsultant", emoji: "💼" },
+  { key: "coach", labelKey: "metierCoach", emoji: "🎯" },
+  { key: "photographe", labelKey: "metierPhotographe", emoji: "📷" },
+  { key: "graphiste", labelKey: "metierGraphiste", emoji: "🎨" },
+  { key: "informaticien", labelKey: "metierInformaticien", emoji: "💻" },
+  { key: "comptable", labelKey: "metierComptable", emoji: "📊" },
+  { key: "auto-entrepreneur", labelKey: "metierAutoEntrepreneur", emoji: "🚀" },
+  { key: "autre", labelKey: "metierAutre", emoji: "✏️" },
 ];
 
 export const MODULES_PAR_METIER: Record<string, string[]> = {
@@ -30,6 +40,15 @@ export const MODULES_PAR_METIER: Record<string, string[]> = {
   menuisier: ["devis", "factures", "clients", "stocks", "commandes", "signature"],
   terrassier: ["devis", "factures", "clients", "interventions", "commandes"],
   domotique: ["devis", "factures", "clients", "interventions", "signature", "assistant_ia"],
+  architecte: ["devis", "factures", "clients", "signature"],
+  avocat: ["devis", "factures", "clients", "signature"],
+  consultant: ["devis", "factures", "clients", "signature"],
+  comptable: ["devis", "factures", "clients", "signature"],
+  coach: ["devis", "factures", "clients", "rdv"],
+  photographe: ["devis", "factures", "clients", "rdv"],
+  graphiste: ["devis", "factures", "clients", "rdv"],
+  informaticien: ["devis", "factures", "clients", "rdv"],
+  "auto-entrepreneur": ["devis", "factures", "clients"],
   autre: ["devis", "factures", "clients", "interventions", "relances"],
 };
 

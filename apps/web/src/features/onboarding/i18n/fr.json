@@ -36,5 +36,9 @@
   "metierPlombier": "Plombier", "metierElectricien": "Électricien", "metierChauffagiste": "Chauffagiste",
   "metierClimatiseur": "Climatiseur", "metierJardinier": "Jardinier", "metierCuisiniste": "Cuisiniste",
   "metierMenuisier": "Menuisier", "metierPeintre": "Peintre", "metierMacon": "Maçon",
-  "metierTerrassier": "Terrassier", "metierDomotique": "Domotique", "metierAutre": "Autre"
+  "metierTerrassier": "Terrassier", "metierDomotique": "Domotique",
+  "metierArchitecte": "Architecte", "metierAvocat": "Avocat", "metierConsultant": "Consultant",
+  "metierCoach": "Coach", "metierPhotographe": "Photographe", "metierGraphiste": "Graphiste",
+  "metierInformaticien": "Informaticien / Dev", "metierComptable": "Comptable", "metierAutoEntrepreneur": "Auto-entrepreneur",
+  "metierAutre": "Autre"
 }
