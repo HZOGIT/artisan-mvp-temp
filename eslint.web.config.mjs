@@ -22,6 +22,10 @@ export default tseslint.config(
       "react-hooks": reactHooks,
       "import-x": importX,
     },
+    settings: {
+      /* read-excel-file v9 n'a pas d'export "." → le resolver import-x crashe ("node with invalid interface"). On l'ignore (cf. fix build import read-excel-file/browser). */
+      "import-x/ignore": ["read-excel-file"],
+    },
     rules: {
       "local/kebab-filename": "error",
       "local/no-trpc-in-ui": "error",
