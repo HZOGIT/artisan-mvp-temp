@@ -36,11 +36,27 @@ else
 fi
 
 echo "▶ Déploiement blue-green…"
-ACTIVE=$(cat /tmp/.active-slot 2>/dev/null || echo "blue")
+# $HOME/.active-slot survit aux reboots (contrairement à /tmp). Default = blue si absent.
+SLOT_FILE="$HOME/.active-slot"
+ACTIVE=$(cat "$SLOT_FILE" 2>/dev/null || echo "blue")
 NEXT=$([ "$ACTIVE" = "blue" ] && echo "green" || echo "blue")
 NEXT_EXT_PORT=$([ "$NEXT" = "blue" ] && echo "3011" || echo "3012")
 
 echo "  Slot actif : $ACTIVE → nouveau slot : $NEXT (port $NEXT_EXT_PORT)"
+
+# Générer infra/upstream.conf (gitignore) depuis le slot ACTIF avant tout démarrage.
+# Le proxy nginx monte ce fichier — ne jamais modifier nginx.conf directement.
+echo "upstream backend { server new-stack-$ACTIVE:3001; }" > infra/upstream.conf
+
+# Idempotence : si le proxy n'est pas déjà up (1er run après renommage new-stack→proxy,
+# ou restart serveur), démarrer tout le stack + purger les orphelins (ex. l'ancien
+# conteneur new-stack). Les runs suivants trouvent le proxy en place et sautent ce bloc.
+PROXY_ID=$($COMPOSE ps -q proxy 2>/dev/null || true)
+if [ -z "$PROXY_ID" ]; then
+  echo "  Proxy absent — démarrage complet du stack (--remove-orphans)…"
+  $COMPOSE up -d --remove-orphans
+fi
+
 $COMPOSE up -d --build "new-stack-$NEXT"
 
 echo "▶ Attente health du nouveau slot (new-stack-$NEXT)…"
@@ -59,14 +75,15 @@ for i in $(seq 1 30); do
 done
 
 echo "▶ Bascule nginx → new-stack-$NEXT…"
-sed -i "s/new-stack-$ACTIVE/new-stack-$NEXT/g" infra/nginx.conf
+# Réécriture complète d'upstream.conf (pas de sed sur fichier suivi git).
+echo "upstream backend { server new-stack-$NEXT:3001; }" > infra/upstream.conf
 docker exec "$($COMPOSE ps -q proxy)" nginx -s reload
 echo "  Nginx rechargé — trafic → new-stack-$NEXT"
 
 echo "▶ Grace period (5s) puis arrêt de new-stack-$ACTIVE…"
 sleep 5
 $COMPOSE stop "new-stack-$ACTIVE"
-echo "$NEXT" > /tmp/.active-slot
+echo "$NEXT" > "$SLOT_FILE"
 echo "  Slot actif mis à jour : $NEXT"
 
 # Domaines servis par le nouveau stack = DEFAULT_ENABLED de l'edge (source : src migrated-domains.ts
