@@ -32,3 +32,23 @@ groups:
         for: 0m
         annotations:
           summary: Plainte spam Resend — action immédiate requise
+
+  - name: security
+    rules:
+      - alert: BruteForceAuth
+        expr: rate(auth_failures_total[5m]) > 10
+        for: 2m
+        annotations:
+          summary: "> 10 échecs auth/min depuis 2 min — possible brute force"
+
+      - alert: RateLimitAbuse
+        expr: rate(rate_limit_hits_total[5m]) > 20
+        for: 1m
+        annotations:
+          summary: "Rate limit déclenché > 20 fois/min — abus d'API détecté"
+
+      - alert: AnomalousUnauthorized
+        expr: rate(http_request_duration_seconds_count{status_code="401"}[5m]) > 50
+        for: 3m
+        annotations:
+          summary: "Pic de 401 anormal — vérifier les tokens clients ou attaque en cours"
