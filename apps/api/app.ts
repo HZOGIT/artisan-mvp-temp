@@ -362,6 +362,7 @@ export interface AppDeps extends ContextDeps {
   readonly contratsMaintenanceDb?: DbClient;
   readonly demandeContactRepo?: IDemandeContactRepository;
   readonly budgetCategorieRepo?: IBudgetCategorieRepository;
+  readonly budgetsCategoriesDb?: DbClient;
   readonly regleCategorisationRepo?: IRegleCategorisationRepository;
   readonly previsionCARepo?: IPrevisionCARepository;
   readonly artisanRepo?: IArtisanRepository;
@@ -767,6 +768,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const demandesContact = createDemandesContactModule({ repository: demandeContactRepo });
   const budgetsCategories = createBudgetsCategoriesModule({
     repository: budgetCategorieRepo,
+    db: deps.budgetsCategoriesDb ?? getDbHandle().db,
   });
   const reglesCategorisation = createReglesCategorisationModule({
     repository: regleCategorisationRepo,

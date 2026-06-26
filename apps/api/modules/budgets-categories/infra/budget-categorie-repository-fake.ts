@@ -1,4 +1,5 @@
 import { ConflictError } from "../../../shared/errors";
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IBudgetCategorieRepository } from "../application/budget-categorie-repository";
 import type { BudgetCategorie, CreateBudgetInput, UpdateBudgetInput } from "../domain/budget-categorie";
@@ -62,5 +63,10 @@ export class FakeBudgetCategorieRepository implements IBudgetCategorieRepository
     if (idx === -1) return false;
     this.store.splice(idx, 1);
     return true;
+  }
+
+  /* ponytail: fake ne gère pas de connexion DB, on retourne this (même store partagé) */
+  withDb(_db: DbClient): this {
+    return this;
   }
 }

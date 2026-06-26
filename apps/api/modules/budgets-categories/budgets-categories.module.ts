@@ -1,3 +1,4 @@
+import type { DbClient } from "../../shared/db";
 import type { IBudgetCategorieRepository } from "./application/budget-categorie-repository";
 import { createBudgetsCategoriesRouter } from "./interface/trpc/budgets-categories.router";
 
@@ -7,6 +8,7 @@ import { createBudgetsCategoriesRouter } from "./interface/trpc/budgets-categori
  */
 export interface BudgetsCategoriesModuleDeps {
   readonly repository: IBudgetCategorieRepository;
+  readonly db?: DbClient;
 }
 
 export interface BudgetsCategoriesModule {
@@ -15,5 +17,5 @@ export interface BudgetsCategoriesModule {
 }
 
 export function createBudgetsCategoriesModule(deps: BudgetsCategoriesModuleDeps): BudgetsCategoriesModule {
-  return { deps, router: createBudgetsCategoriesRouter(deps.repository) };
+  return { deps, router: createBudgetsCategoriesRouter(deps.repository, deps.db) };
 }
