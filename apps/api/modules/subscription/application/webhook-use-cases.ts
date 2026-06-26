@@ -2,6 +2,7 @@ import type { StripePort } from "../../../shared/ports/stripe";
 import type { AppLogger } from "../../../shared/ports/logger";
 import type { WebhookPaymentWriter } from "./webhook-payment-writer";
 import type { SubscriptionEventNotifier } from "./subscription-event-notifier";
+import type { EventBusPort } from "../../../shared/ports/event-bus";
 import { subscriptionEmail } from "../domain/webhook";
 
 export interface StripeWebhookDeps {
@@ -28,6 +29,7 @@ export interface StripeWebhookDeps {
    * Best-effort : une erreur compta ne doit pas annuler le paiement déjà confirmé.
    */
   readonly genererEcrituresFacture?: (artisanId: number, factureId: number) => Promise<void>;
+  readonly eventBus?: EventBusPort;
 }
 
 export interface WebhookResult {
@@ -113,6 +115,7 @@ async function handleCheckoutCompleted(deps: StripeWebhookDeps, session: Record<
     stripePaymentIntentId: session.payment_intent ? String(session.payment_intent) : "",
   });
   await deps.genererEcrituresFacture?.(resolved.artisanId, resolved.factureId).catch(() => {});
+  await deps.eventBus?.publish({ type: "FACTURE_PAYEE", aggregateId: String(resolved.factureId), aggregateType: "facture", payload: { factureId: resolved.factureId, artisanId: resolved.artisanId }, occurredAt: new Date() }).catch(() => {});
   deps.log?.info({ event: "stripe_checkout_completed", artisanId: resolved.artisanId, factureId: resolved.factureId }, `Paiement portail complété (artisan ${resolved.artisanId})`);
   try {
     await deps.notifier.notifyArtisan(resolved.artisanId, {

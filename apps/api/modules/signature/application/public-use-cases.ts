@@ -8,6 +8,7 @@ import { buildSignedDevisArtisanEmail, buildRefusedDevisArtisanEmail } from "../
 import type { SignaturePublicReader, SignatureDevisView } from "./signature-public-reader";
 import type { SignaturePublicWriter } from "./signature-public-writer";
 import type { SignatureNotificationWriter } from "./signature-repository";
+import type { EventBusPort } from "../../../shared/ports/event-bus";
 
 /** Dépendances de la surface PUBLIQUE par token (portail de signature). */
 export interface SignaturePublicDeps {
@@ -17,6 +18,7 @@ export interface SignaturePublicDeps {
   readonly notifications: SignatureNotificationWriter;
   readonly email: EmailPort;
   readonly maintenant?: () => Date;
+  readonly eventBus?: EventBusPort;
 }
 
 const clientFullName = (client: { prenom: string | null; nom: string } | null): string =>
@@ -191,6 +193,8 @@ export async function signDevis(
     documentHashedAt,
   });
 
+  await deps.eventBus?.publish({ type: "SIGNATURE_COMPLETE", aggregateId: String(resolution.devisId), aggregateType: "devis", payload: { devisId: resolution.devisId, artisanId: resolution.artisanId }, occurredAt: new Date() }).catch(() => {});
+
   await notifyArtisanBestEffort(deps, ctx, resolution.devisId, async (view) => {
     await deps.notifications.notify(ctx, {
       type: "succes",
@@ -204,6 +208,7 @@ export async function signDevis(
         signataireName: input.signataireName,
         signataireEmail: input.signataireEmail,
       });
+      /* ponytail: double-send temporaire — workers pg-boss prendront le relais */
       await deps.email.send({ to: view.artisan.email, subject, body });
     }
   });

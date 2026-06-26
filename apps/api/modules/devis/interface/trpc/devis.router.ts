@@ -2,6 +2,7 @@ import { z } from "zod";
 import { router, protectedProcedure, permissionProcedure } from "../../../../interface/trpc/trpc";
 import { TVA_CATEGORIES_MAP } from "../../../../shared/tva/taux-tva-fr";
 import type { PushPort } from "../../../../shared/push/web-push-adapter";
+import type { EventBusPort } from "../../../../shared/ports/event-bus";
 /** Permissions (parité legacy) : actions sur lignes/envoi/duplication = `devis.creer` ; conversion en facture = `factures.creer`. */
 const devisCreer = permissionProcedure("devis.creer");
 const facturesCreer = permissionProcedure("factures.creer");
@@ -106,6 +107,7 @@ export function createDevisRouter(
   signatureReader: DevisSignatureReader,
   ia: DevisIaDeps,
   push?: PushPort,
+  eventBus?: EventBusPort,
 ) {
   /** Dépendances de relance (réutilise les readers/email/rate-limiter du mailing + le repo relances). */
   const relanceDeps = {
@@ -191,6 +193,7 @@ export function createDevisRouter(
       .mutation(async ({ ctx, input }) => {
         const result = await changerStatutDevis(repo, ctx.tenant, input.id, "accepte");
         ctx.log.info({ event: "devis_accepte", devisId: input.id }, "Devis accepté");
+        await eventBus?.publish({ type: "DEVIS_ACCEPTE", aggregateId: String(input.id), aggregateType: "devis", payload: { devisId: input.id, artisanId: ctx.tenant.artisanId }, occurredAt: new Date() }).catch(() => {});
         return result;
       }),
 

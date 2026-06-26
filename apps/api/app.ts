@@ -269,6 +269,7 @@ import type { TresorerieReader } from "./modules/previsions-ca/application/treso
 import type { IPrevisionCARepository } from "./modules/previsions-ca/application/prevision-ca-repository";
 import type { EmailPort, RateLimiterPort, LlmPort, VisionPort } from "./shared/ports";
 import type { EventBusPort } from "./shared/ports/event-bus";
+import { FakeEventBus } from "./shared/ports/fakes";
 import { ResendEmailAdapter, SlidingWindowRateLimiter, GeminiLlmAdapter, GeminiVisionAdapter } from "./shared/ports";
 import { makeLlmUsageTracker } from "./shared/ports/llm-usage-tracker";
 import type { AppLogger } from "./shared/ports/logger";
@@ -354,6 +355,8 @@ export interface AppDeps extends ContextDeps {
 
 /** Construit l'instance Fastify : /health + tRPC monté sur /api/trpc. */
 export function buildApp(deps: AppDeps = {}): FastifyInstance {
+  const eventBus: EventBusPort = deps.eventBus ?? new FakeEventBus();
+
   /*
    * ⚠️ maxParamLength : le client tRPC (`httpBatchLink`) concatène N procédures dans le segment
    * d'URL `/api/trpc/p1,p2,…,pN`. Le défaut find-my-way (100 car.) rejette tout batch un peu long
@@ -619,6 +622,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     /** genererLignesIA : LlmPort (Gemini) + rate-limiter IA dédié (budget horaire par artisan). */
     ia: { llm: deps.llm ?? new GeminiLlmAdapter(), trackLlm: makeLlmUsageTracker(getDbHandle().db), rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000) },
     push: pushAdapter,
+    eventBus,
   });
   /*
    * Génération FEC réelle : l'adapter ecritures implémente le seam `ComptaPort` des factures
@@ -799,6 +803,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(),
       notifications: signatureNotifications,
       email: signatureEmail,
+      eventBus,
     },
   });
   /*
@@ -1019,6 +1024,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       await compta.genererEcrituresVente({ artisanId, userId: 0 }, factureId);
       await compta.genererEcrituresEncaissement({ artisanId, userId: 0 }, factureId);
     },
+    eventBus,
   });
 
   /** Scheduler billing maison — `POST /internal/billing/tick` sécurisé par x-scheduler-secret. */
