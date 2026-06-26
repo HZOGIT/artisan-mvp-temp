@@ -283,6 +283,7 @@ describe("processStripeWebhook (fail-closed)", () => {
     await processStripeWebhook({ ...deps, eventBus: bus }, { rawBody: raw(event), signature: SIG });
     const published = bus.getPublished("FACTURE_PAYEE");
     expect(published).toHaveLength(1);
-    expect(published[0]?.payload).toEqual({ factureId: 42, artisanId: 3 });
+    expect(published[0]?.artisanId).toBe(3);
+    expect(published[0]?.payload).toEqual({ factureId: 42 });
   });
 });
