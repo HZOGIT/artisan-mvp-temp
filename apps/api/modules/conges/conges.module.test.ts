@@ -15,6 +15,9 @@ const stubRepo: ICongeRepository = {
   findTechnicienIdForUser: async () => null,
   setStatut: async () => null,
   ajusterSolde: async () => undefined,
+  getSolde: async () => [],
+  hasOverlap: async () => false,
+  withDb: () => stubRepo,
 };
 
 describe("conges.module", () => {
@@ -30,11 +33,14 @@ describe("conges.module", () => {
       "delete",
       "findTechnicienIdForUser",
       "getById",
+      "getSolde",
+      "hasOverlap",
       "list",
       "listEnAttente",
       "ownsTechnicien",
       "setStatut",
       "update",
+      "withDb",
     ]);
   });
 

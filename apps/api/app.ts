@@ -330,6 +330,8 @@ export interface AppDeps extends ContextDeps {
   readonly clientRepo?: IClientRepository;
   readonly interventionRepo?: IInterventionRepository;
   readonly congeRepo?: ICongeRepository;
+  /** Pool DB pour les transactions outbox events du module conges (défaut : getDbHandle().db). */
+  readonly congesDb?: DbClient;
   readonly noteDeFraisRepo?: INoteDeFraisRepository;
   /** Pool DB pour les transactions outbox events du module notes-de-frais (défaut : getDbHandle().db). */
   readonly notesDeFraisDb?: DbClient;
@@ -640,6 +642,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   });
   const conges = createCongesModule({
     repository: congeRepo,
+    db: deps.congesDb ?? getDbHandle().db,
   });
   /*
    * Repos partagés (catégories/budgets/règles de dépense + notes de frais) : les domaines dédiés ET le

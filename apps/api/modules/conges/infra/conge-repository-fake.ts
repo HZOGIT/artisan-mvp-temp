@@ -151,4 +151,8 @@ export class FakeCongeRepository implements ICongeRepository {
         (!excludeId || c.id !== excludeId),
     );
   }
+
+  withDb(_db: unknown): this {
+    return this;
+  }
 }

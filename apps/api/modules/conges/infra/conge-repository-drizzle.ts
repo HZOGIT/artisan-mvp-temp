@@ -213,6 +213,10 @@ export class CongeRepositoryDrizzle implements ICongeRepository {
     });
   }
 
+  withDb(db: DbClient): CongeRepositoryDrizzle {
+    return new CongeRepositoryDrizzle(db);
+  }
+
   hasOverlap(
     ctx: TenantContext,
     { technicienId, dateDebut, dateFin, excludeId }: { technicienId: number; dateDebut: string; dateFin: string; excludeId?: number },

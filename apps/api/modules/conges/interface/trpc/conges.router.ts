@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { router, protectedProcedure, permissionProcedure } from "../../../../interface/trpc/trpc";
+import type { DbClient } from "../../../../shared/db";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
+import { withOutbox } from "../../../../shared/events/with-outbox";
 import type { ICongeRepository } from "../../application/conge-repository";
 import { listConges, listCongesEnAttente, getConge, getSoldeConge } from "../../application/read-use-cases";
 import {
@@ -45,7 +48,7 @@ const gerer = permissionProcedure("conges.gerer");
  * use-cases (scoping tenant + anti-IDOR-FK via ctx.tenant), laisse remonter les Domain errors
  * (NotFound→404, Validation→400). Repo injecté (DI).
  */
-export function createCongesRouter(repo: ICongeRepository) {
+export function createCongesRouter(repo: ICongeRepository, db?: DbClient) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listConges(repo, ctx.tenant)),
 
@@ -59,49 +62,69 @@ export function createCongesRouter(repo: ICongeRepository) {
     create: protectedProcedure
       .input(createSchema)
       .mutation(async ({ ctx, input }) => {
-        const result = await creerConge(repo, ctx.tenant, input);
-        ctx.log.info({ event: "conge_demande", congeId: result.id, technicienId: input.technicienId, type: input.type, dateDebut: input.dateDebut, dateFin: input.dateFin }, "Congé demandé");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await creerConge(r, ctx.tenant, input);
+          ctx.log.info({ event: "conge_demande", congeId: result.id, technicienId: input.technicienId, type: input.type, dateDebut: input.dateDebut, dateFin: input.dateFin }, "Congé demandé");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "conge.cree", entityType: "conge", entityId: result.id, payload: { type: result.type, dateDebut: result.dateDebut, dateFin: result.dateFin, technicienId: result.technicienId } });
+          return result;
+        });
       }),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { id, ...data } = input;
-        return modifierConge(repo, ctx.tenant, id, data);
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await modifierConge(r, ctx.tenant, id, data);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "conge.modifie", entityType: "conge", entityId: id, payload: { congeId: id } });
+          return result;
+        });
       }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        await supprimerConge(repo, ctx.tenant, input.id);
-        ctx.log.warn({ event: "conge_supprime", congeId: input.id }, "Congé supprimé");
-        return { success: true };
+        return withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          await supprimerConge(r, ctx.tenant, input.id);
+          ctx.log.warn({ event: "conge_supprime", congeId: input.id }, "Congé supprimé");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "conge.supprime", entityType: "conge", entityId: input.id, payload: { snapshot: { type: before?.type, technicienId: before?.technicienId } } });
+          return { success: true };
+        });
       }),
 
     /** Workflow d'approbation. ⚠️ anti self-approbation porté par le use-case (403 si self). Gate : conges.gerer. */
     approuver: gerer
       .input(z.object({ id: z.number().int(), commentaire: z.string().max(2000).nullish() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await approuverConge(repo, ctx.tenant, input.id, input.commentaire);
-        ctx.log.info({ event: "conge_approuve", congeId: input.id }, "Congé approuvé");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await approuverConge(r, ctx.tenant, input.id, input.commentaire);
+          ctx.log.info({ event: "conge_approuve", congeId: input.id }, "Congé approuvé");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "conge.approuve", entityType: "conge", entityId: input.id, payload: { avant: { statut: "en_attente" }, apres: { statut: result.statut } } });
+          return result;
+        });
       }),
 
     refuser: gerer
       .input(z.object({ id: z.number().int(), commentaire: z.string().max(2000).nullish() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await refuserConge(repo, ctx.tenant, input.id, input.commentaire);
-        ctx.log.warn({ event: "conge_refuse", congeId: input.id }, "Congé refusé");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await refuserConge(r, ctx.tenant, input.id, input.commentaire);
+          ctx.log.warn({ event: "conge_refuse", congeId: input.id }, "Congé refusé");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "conge.refuse", entityType: "conge", entityId: input.id, payload: { avant: { statut: "en_attente" }, apres: { statut: result.statut }, motif: input.commentaire ?? null } });
+          return result;
+        });
       }),
 
     annuler: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await annulerConge(repo, ctx.tenant, input.id);
-        ctx.log.warn({ event: "conge_annule", congeId: input.id }, "Congé annulé");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await annulerConge(r, ctx.tenant, input.id);
+          ctx.log.warn({ event: "conge_annule", congeId: input.id }, "Congé annulé");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "conge.annule", entityType: "conge", entityId: input.id, payload: { avant: { statut: result.statut !== "annule" ? result.statut : undefined }, apres: { statut: "annule" } } });
+          return result;
+        });
       }),
 
     getSolde: protectedProcedure
