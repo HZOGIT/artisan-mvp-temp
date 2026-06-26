@@ -47,6 +47,11 @@ alter table "billing_invoices" force row level security;
 drop policy if exists tenant_isolation on "billing_invoices";
 create policy tenant_isolation on "billing_invoices" using ("artisan_id" = nullif(current_setting('app.tenant', true), '')::int) with check ("artisan_id" = nullif(current_setting('app.tenant', true), '')::int);
 
+alter table "billing_payment_methods" enable row level security;
+alter table "billing_payment_methods" force row level security;
+drop policy if exists tenant_isolation on "billing_payment_methods";
+create policy tenant_isolation on "billing_payment_methods" using ("artisan_id" = nullif(current_setting('app.tenant', true), '')::int) with check ("artisan_id" = nullif(current_setting('app.tenant', true), '')::int);
+
 alter table "budgets_categories" enable row level security;
 alter table "budgets_categories" force row level security;
 drop policy if exists tenant_isolation on "budgets_categories";
@@ -166,6 +171,11 @@ alter table "factures_cycle_vie_events" enable row level security;
 alter table "factures_cycle_vie_events" force row level security;
 drop policy if exists tenant_isolation on "factures_cycle_vie_events";
 create policy tenant_isolation on "factures_cycle_vie_events" using ("artisanId" = nullif(current_setting('app.tenant', true), '')::int) with check ("artisanId" = nullif(current_setting('app.tenant', true), '')::int);
+
+alter table "files" enable row level security;
+alter table "files" force row level security;
+drop policy if exists tenant_isolation on "files";
+create policy tenant_isolation on "files" using ("artisan_id" = nullif(current_setting('app.tenant', true), '')::int) with check ("artisan_id" = nullif(current_setting('app.tenant', true), '')::int);
 
 alter table "fournisseurs" enable row level security;
 alter table "fournisseurs" force row level security;
@@ -330,10 +340,6 @@ create policy tenant_isolation on "vehicules" using ("artisanId" = nullif(curren
 drop policy if exists tenant_isolation on "active_sessions";
 alter table "active_sessions" no force row level security;
 alter table "active_sessions" disable row level security;
-
-drop policy if exists tenant_isolation on "billing_payment_methods";
-alter table "billing_payment_methods" no force row level security;
-alter table "billing_payment_methods" disable row level security;
 
 drop policy if exists tenant_isolation on "billing_subscriptions";
 alter table "billing_subscriptions" no force row level security;

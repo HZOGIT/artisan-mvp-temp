@@ -6,6 +6,7 @@ import type { DbClient } from "../db/client";
 import { withTenant } from "../db/with-tenant";
 import type { TenantContext } from "../tenant";
 import { files } from "../../../../drizzle/schema/files";
+import { outboxEvent } from "../events/outbox-event";
 
 /*
  * Adapter OVH Object Storage (S3-compatible, région GRA — Gravelines).
@@ -80,6 +81,16 @@ export class OvhS3Adapter implements StoragePort {
           bucket: this.bucket,
         })
         .returning();
+
+      if (ctx) {
+        await outboxEvent(db, ctx, {
+          action: "fichier.importe",
+          entityType: "fichier",
+          entityId: row.id,
+          payload: { key, purpose, size: row.sizeBytes, mimetype: row.mimeType, sha256: row.sha256 },
+        });
+      }
+
       return row;
     };
 

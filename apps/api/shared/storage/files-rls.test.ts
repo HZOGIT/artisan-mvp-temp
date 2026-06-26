@@ -5,7 +5,6 @@ import { createDbClient } from "../db/client";
 import { withTenant } from "../db/with-tenant";
 import { outboxEvent } from "../events/outbox-event";
 import { files } from "../../../../drizzle/schema/files";
-import { eventOutbox } from "../../../../drizzle/schema/users";
 import type { TenantContext } from "../tenant";
 
 const URL = process.env.DATABASE_URL;
@@ -22,7 +21,7 @@ describe.skipIf(!URL)("files — RLS tenant + atomicité outbox", () => {
 
   afterAll(async () => {
     await admin.query("delete from files where storage_key like 'test-rls/%'").catch(() => {});
-    await admin.query("delete from event_outbox where entity_type = 'fichier' and payload->>'key' like 'test-rls/%'").catch(() => {});
+    await admin.query("delete from event_outbox where \"entityType\" = 'fichier' and payload->>'key' like 'test-rls/%'").catch(() => {});
     if (artisanA) await admin.query("delete from artisans where id = $1", [artisanA]).catch(() => {});
     if (artisanB) await admin.query("delete from artisans where id = $1", [artisanB]).catch(() => {});
     await app.close().catch(() => {});
@@ -62,7 +61,7 @@ describe.skipIf(!URL)("files — RLS tenant + atomicité outbox", () => {
   it("atomicité : throw dans la tx rollback files ET outbox", async () => {
     const key = `test-rls/${Date.now()}-atomic.pdf`;
     const filesBefore = (await admin.query("select count(*)::int as n from files where storage_key = $1", [key])).rows[0].n as number;
-    const outboxBefore = (await admin.query("select count(*)::int as n from event_outbox where action = 'fichier.importe'")).rows[0].n as number;
+    const outboxBefore = (await admin.query("select count(*)::int as n from event_outbox where \"action\" = 'fichier.importe'")).rows[0].n as number;
 
     await expect(
       withTenant(app.db, ctx(artisanA), async (tx) => {
@@ -81,7 +80,7 @@ describe.skipIf(!URL)("files — RLS tenant + atomicité outbox", () => {
     ).rejects.toThrow("rollback forcé");
 
     const filesAfter = (await admin.query("select count(*)::int as n from files where storage_key = $1", [key])).rows[0].n as number;
-    const outboxAfter = (await admin.query("select count(*)::int as n from event_outbox where action = 'fichier.importe'")).rows[0].n as number;
+    const outboxAfter = (await admin.query("select count(*)::int as n from event_outbox where \"action\" = 'fichier.importe'")).rows[0].n as number;
 
     expect(filesAfter).toBe(filesBefore);
     expect(outboxAfter).toBe(outboxBefore);
@@ -108,8 +107,8 @@ describe.skipIf(!URL)("files — RLS tenant + atomicité outbox", () => {
     expect(fileRow).toBeDefined();
     expect(file.id).toBe(fileRow.id);
 
-    const outboxRow = (await admin.query("select * from event_outbox where action = 'fichier.importe' and entity_id = $1", [file.id])).rows[0];
+    const outboxRow = (await admin.query("select * from event_outbox where \"action\" = 'fichier.importe' and \"entityId\" = $1", [file.id])).rows[0];
     expect(outboxRow).toBeDefined();
-    expect(outboxRow.artisan_id).toBe(artisanA);
+    expect(outboxRow.artisanId).toBe(artisanA);
   });
 });
