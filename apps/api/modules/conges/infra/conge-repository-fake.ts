@@ -136,4 +136,19 @@ export class FakeCongeRepository implements ICongeRepository {
     }
     return results;
   }
+
+  async hasOverlap(
+    ctx: TenantContext,
+    { technicienId, dateDebut, dateFin, excludeId }: { technicienId: number; dateDebut: string; dateFin: string; excludeId?: number },
+  ): Promise<boolean> {
+    return this.store.some(
+      (c) =>
+        c.artisanId === ctx.artisanId &&
+        c.technicienId === technicienId &&
+        !["annule", "refuse"].includes(c.statut) &&
+        c.dateDebut <= dateFin &&
+        c.dateFin >= dateDebut &&
+        (!excludeId || c.id !== excludeId),
+    );
+  }
 }

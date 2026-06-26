@@ -52,6 +52,19 @@ describe("conges — use-cases d'écriture (create / update)", () => {
     await expect(modifierConge(repo, A, c.id, { motif: "trop tard" })).rejects.toBeInstanceOf(ConflictError);
   });
 
+  it("creerConge : ConflictError si chevauchement avec une demande existante", async () => {
+    const repo = repoAvecTechA();
+    await creerConge(repo, A, base({ dateDebut: "2026-07-01", dateFin: "2026-07-05" }));
+    /* chevauchement partiel (2026-07-03 ∈ [01,05]) */
+    await expect(creerConge(repo, A, base({ dateDebut: "2026-07-03", dateFin: "2026-07-08" }))).rejects.toBeInstanceOf(ConflictError);
+    /* adjacent sans recouvrement → accepté */
+    await expect(creerConge(repo, A, base({ dateDebut: "2026-07-06", dateFin: "2026-07-10" }))).resolves.toBeDefined();
+    /* autre technicien sur les mêmes dates → accepté */
+    const repo2 = new FakeCongeRepository();
+    repo2.registerTechnicien(1, 501);
+    await expect(creerConge(repo2, A, base({ technicienId: 501, dateDebut: "2026-07-01", dateFin: "2026-07-05" }))).resolves.toBeDefined();
+  });
+
   it("supprimerConge OK / cross-tenant → NotFound", async () => {
     const repo = repoAvecTechA();
     const c = await creerConge(repo, A, base());

@@ -136,7 +136,7 @@ describe.skipIf(!URL)("conges.router e2e (HTTP → tRPC → use-case → repo �
 
   it("update partiel + delete OK propriétaire", async () => {
     const tA = await token(UA);
-    const id = (await callMutation(server, "conges.create", { technicienId: techA, type: "formation", dateDebut: "2026-09-01", dateFin: "2026-09-03", motif: "Avant" }, tA)).json().result.data.id as number;
+    const id = (await callMutation(server, "conges.create", { technicienId: techA, type: "formation", dateDebut: "2026-10-01", dateFin: "2026-10-03", motif: "Avant" }, tA)).json().result.data.id as number;
     const maj = await callMutation(server, "conges.update", { id, motif: "Après" }, tA);
     expect(maj.json().result.data.motif).toBe("Après");
     expect(maj.json().result.data.statut).toBe("en_attente"); // workflow non touché

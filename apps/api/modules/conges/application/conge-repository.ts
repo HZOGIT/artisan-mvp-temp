@@ -72,4 +72,12 @@ export interface ICongeRepository {
    */
   ajusterSolde(ctx: TenantContext, ajustement: AjustementSolde): Promise<void>;
   getSolde(ctx: TenantContext, technicienId: number, annee: number): Promise<SoldeResult[]>;
+  /*
+   * Vérifie si le technicien a déjà un congé (en_attente ou approuvé) dont la période
+   * chevauche [dateDebut, dateFin]. `excludeId` exclut la demande elle-même (modification).
+   */
+  hasOverlap(
+    ctx: TenantContext,
+    opts: { technicienId: number; dateDebut: string; dateFin: string; excludeId?: number },
+  ): Promise<boolean>;
 }
