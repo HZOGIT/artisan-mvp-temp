@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation } from "@/shared/router/navigation";
-import { Outlet } from "@tanstack/react-router";
+import { Outlet, useNavigate } from "@tanstack/react-router";
 import { Search } from "lucide-react";
 import { trpc } from "@/shared/trpc";
 import { useShell } from "../application/use-shell";
@@ -33,11 +33,12 @@ export function DashboardLayoutMount() {
    * Gate onboarding (relocalisé d'App.tsx au shell,/F1) : un artisan dont l'onboarding n'est pas
    * terminé est redirigé vers /onboarding (sauf routes bypass). /onboarding est hors shell (route dédiée).
    */
+  const tsNavigate = useNavigate();
   const { data: onboardingStatus, isLoading: onbLoading } = trpc.modules.getOnboardingStatus.useQuery();
   useEffect(() => {
     if (onbLoading || !onboardingStatus) return;
-    if (!onboardingStatus.onboardingCompleted && !ONBOARDING_BYPASS.has(location)) setLocation("/onboarding");
-  }, [onboardingStatus, onbLoading, location, setLocation]);
+    if (!onboardingStatus.onboardingCompleted && !ONBOARDING_BYPASS.has(location)) void tsNavigate({ to: "/onboarding", replace: true });
+  }, [onboardingStatus, onbLoading, location, tsNavigate]);
   const [searchOpen, setSearchOpen] = useState(false);
   /** Auto-open du panneau assistant sur desktop large (port du comportement legacy). */
   const [assistantOpen, setAssistantOpen] = useState(initialAssistantOpen);

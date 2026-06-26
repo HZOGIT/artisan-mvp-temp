@@ -56,7 +56,7 @@ const queryClient = new QueryClient({
   queryCache: new QueryCache({
     onError: (error: unknown) => {
       if ((error as { data?: { code?: string } })?.data?.code === 'UNAUTHORIZED') {
-        window.location.href = '/login'
+        window.location.href = '/signin'
       }
     },
   }),
