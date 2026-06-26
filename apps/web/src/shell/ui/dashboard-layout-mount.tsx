@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation } from "@/shared/router/navigation";
-import { Outlet, useNavigate } from "@tanstack/react-router";
+import { Outlet } from "@tanstack/react-router";
 import { Search } from "lucide-react";
 import { trpc } from "@/shared/trpc";
 import { useShell } from "../application/use-shell";
@@ -31,14 +31,20 @@ export function DashboardLayoutMount() {
   const { data: sub } = trpc.subscription.getCurrent.useQuery(undefined, { staleTime: 60 * 1000 });
   /*
    * Gate onboarding (relocalisé d'App.tsx au shell,/F1) : un artisan dont l'onboarding n'est pas
-   * terminé est redirigé vers /onboarding (sauf routes bypass). /onboarding est hors shell (route dédiée).
+   * terminé est redirigé vers /onboarding (sauf routes bypass). /onboarding est HORS du sous-arbre du
+   * shell (route dédiée sous la racine). On y va par une VRAIE navigation (`window.location.replace`),
+   * comme la redirection sœur /home→/dashboard (cf. home-page) : un `tsNavigate` in-router fait franchir
+   * deux arbres de routes et entre en collision avec la ré-assertion d'historique de TanStack → boucle
+   * /dashboard↔/onboarding. Une navigation pleine page recharge OnboardingPage proprement.
    */
-  const tsNavigate = useNavigate();
   const { data: onboardingStatus, isLoading: onbLoading } = trpc.modules.getOnboardingStatus.useQuery();
   useEffect(() => {
     if (onbLoading || !onboardingStatus) return;
-    if (!onboardingStatus.onboardingCompleted && !ONBOARDING_BYPASS.has(location)) void tsNavigate({ to: "/onboarding", search: (prev) => ({ plan: prev.plan }), replace: true });
-  }, [onboardingStatus, onbLoading, location, tsNavigate]);
+    if (!onboardingStatus.onboardingCompleted && !ONBOARDING_BYPASS.has(location)) {
+      const plan = new URLSearchParams(window.location.search).get("plan");
+      window.location.replace(plan ? `/onboarding?plan=${encodeURIComponent(plan)}` : "/onboarding");
+    }
+  }, [onboardingStatus, onbLoading, location]);
   const [searchOpen, setSearchOpen] = useState(false);
   /** Auto-open du panneau assistant sur desktop large (port du comportement legacy). */
   const [assistantOpen, setAssistantOpen] = useState(initialAssistantOpen);

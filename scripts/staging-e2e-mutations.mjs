@@ -11,6 +11,7 @@
 import { chromium } from 'playwright';
 
 const BASE = process.env.BASE || 'https://staging.operioz.com';
+const BACKEND = process.env.BACKEND || 'https://staging-backend.operioz.com';
 const EMAIL = process.env.E2E_EMAIL || 'dev@operioz.com';
 const PASS = process.env.E2E_PASS || '';
 const issues = [];
@@ -284,6 +285,47 @@ async function casSignupRoutingStable() {
 }
 
 await casSignupRoutingStable();
+
+// ── CAS 7b — Anti-régression OPE-642 : compte NEUF (onboardingCompleted=false) → PAS de boucle ──────
+// CAS 7 utilise dev@operioz.com (onboardingCompleted=true) → le gate onboarding ne se déclenche JAMAIS,
+// donc il NE COUVRE PAS la boucle. Seul un compte fraîchement créé (onboardingCompleted=false) déclenche
+// le gate. Bug OPE-642 : le gate faisait `tsNavigate('/onboarding')` (route HORS du sous-arbre shell) →
+// collision avec la ré-assertion d'historique TanStack → 29-32 transitions /dashboard↔/onboarding.
+// Fix : navigation pleine page (`window.location.replace('/onboarding')`), comme home→/dashboard.
+async function casSignupNeufNoLoop() {
+  casesRun++;
+  const tag = 'routing.signup-neuf-no-loop';
+  const freshCtx = await browser.newContext({ baseURL: BASE, ignoreHTTPSErrors: true });
+  try {
+    const email = `e2e642+${Date.now()}@operioz.com`;
+    const su = await freshCtx.request.post(`${BACKEND}/api/trpc/auth.signup?batch=1`, {
+      headers: { 'content-type': 'application/json' },
+      data: { '0': { json: { email, password: PASS || 'Azerqsdf1234!', name: 'E2E 642' } } },
+    });
+    if (!su.ok()) { issues.push({ tag, step: 'signup', error: `HTTP ${su.status()}` }); return; }
+    const page = await freshCtx.newPage();
+    let navCount = 0;
+    page.on('framenavigated', (f) => { if (f === page.mainFrame()) navCount++; });
+    try {
+      await page.goto('/', { waitUntil: 'load', timeout: 20000 });
+      await page.waitForTimeout(6000);
+      const finalUrl = new URL(page.url()).pathname;
+      if (navCount > 8) {
+        issues.push({ tag, error: `boucle onboarding détectée : ${navCount} navigations`, finalUrl });
+      } else if (finalUrl !== '/onboarding') {
+        issues.push({ tag, error: `compte neuf attendu sur /onboarding, obtenu ${finalUrl}`, navCount });
+      }
+    } finally {
+      await page.close();
+    }
+  } catch (e) {
+    issues.push({ tag, error: String(e).slice(0, 200) });
+  } finally {
+    await freshCtx.close();
+  }
+}
+
+await casSignupNeufNoLoop();
 // ── (Ajouter ici les cas factures/contrats et tout futur bug d'intégration front↔tRPC) ─────────────
 
 console.log('=== E2E MUTATIONS RESULT ===');
