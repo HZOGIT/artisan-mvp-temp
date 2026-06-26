@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import type { DbClient } from "../../../../shared/db";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
+import { withOutbox } from "../../../../shared/events/with-outbox";
 import type { IDemandeContactRepository } from "../../application/demande-contact-repository";
 import { listDemandes, demandesParStatut, getDemande } from "../../application/read-use-cases";
 import { creerDemande, modifierDemande, supprimerDemande } from "../../application/write-use-cases";
@@ -33,7 +36,7 @@ const updateSchema = z.object({
  * (NotFound→404, Validation→400, Conflict→409). ⚠️ Les transitions de statut (marquerContacte/
  * convertir/marquerPerdu) seront exposées en 7/9. Repo injecté.
  */
-export function createDemandesContactRouter(repo: IDemandeContactRepository) {
+export function createDemandesContactRouter(repo: IDemandeContactRepository, db?: DbClient) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listDemandes(repo, ctx.tenant)),
 
@@ -47,20 +50,34 @@ export function createDemandesContactRouter(repo: IDemandeContactRepository) {
 
     create: protectedProcedure
       .input(createSchema)
-      .mutation(({ ctx, input }) => creerDemande(repo, ctx.tenant, input)),
+      .mutation(async ({ ctx, input }) => {
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await creerDemande(r, ctx.tenant, input);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "demande_contact.creee", entityType: "demande_contact", entityId: result.id, payload: { demandeId: result.id, nom: result.nom, email: result.email } });
+          return result;
+        });
+      }),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { id, ...data } = input;
-        return modifierDemande(repo, ctx.tenant, id, data);
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await modifierDemande(r, ctx.tenant, id, data);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "demande_contact.modifiee", entityType: "demande_contact", entityId: id, payload: { demandeId: id } });
+          return result;
+        });
       }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        await supprimerDemande(repo, ctx.tenant, input.id);
-        return { success: true };
+        return withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          await supprimerDemande(r, ctx.tenant, input.id);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "demande_contact.supprimee", entityType: "demande_contact", entityId: input.id, payload: { snapshot: { demandeId: input.id, nom: before?.nom, message: before?.message } } });
+          return { success: true };
+        });
       }),
 
     /** Transitions de statut (état machine) — chacune valide la légalité depuis le statut courant. */

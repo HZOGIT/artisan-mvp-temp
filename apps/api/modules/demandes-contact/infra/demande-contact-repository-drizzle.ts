@@ -33,6 +33,10 @@ function toDemande(r: DemandeRow): DemandeContact {
 export class DemandeContactRepositoryDrizzle implements IDemandeContactRepository {
   constructor(private readonly db: DbClient) {}
 
+  withDb(db: DbClient): DemandeContactRepositoryDrizzle {
+    return new DemandeContactRepositoryDrizzle(db);
+  }
+
   list(ctx: TenantContext): Promise<DemandeContact[]> {
     return withTenant(this.db, ctx, async (tx) => {
       const rows = await tx

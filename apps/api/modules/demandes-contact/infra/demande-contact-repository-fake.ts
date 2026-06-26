@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IDemandeContactRepository } from "../application/demande-contact-repository";
 import type { CreateDemandeInput, DemandeContact, DemandeContactStatut, UpdateDemandeInput } from "../domain/demande-contact";
@@ -12,6 +13,11 @@ export class FakeDemandeContactRepository implements IDemandeContactRepository {
   private readonly store: DemandeContact[] = [];
   private seq = 0;
   private readonly clientsByArtisan = new Map<number, Set<number>>();
+
+  /* ponytail: withDb no-op pour satisfaire l'interface outbox ; le fake est en-mémoire */
+  withDb(_db: DbClient): FakeDemandeContactRepository {
+    return this;
+  }
 
   seedClient(artisanId: number, clientId: number): void {
     if (!this.clientsByArtisan.has(artisanId)) this.clientsByArtisan.set(artisanId, new Set());
