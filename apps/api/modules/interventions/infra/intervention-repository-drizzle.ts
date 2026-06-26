@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, lte, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, gte, lte, ne, sql } from "drizzle-orm";
 import { interventions, interventionsMobile, clients, techniciens, devis, factures, interventionsTechniciens, couleursInterventions } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
@@ -49,7 +49,7 @@ export class InterventionRepositoryDrizzle implements IInterventionRepository {
   list(ctx: TenantContext): Promise<Intervention[]> {
     return withTenant(this.db, ctx, async (tx) => {
       const rows = await tx
-        .select({ ...interventions, heureArrivee: interventionsMobile.heureArrivee, heureDepart: interventionsMobile.heureDepart })
+        .select({ ...getTableColumns(interventions), heureArrivee: interventionsMobile.heureArrivee, heureDepart: interventionsMobile.heureDepart })
         .from(interventions)
         .leftJoin(interventionsMobile, and(eq(interventionsMobile.interventionId, interventions.id), eq(interventionsMobile.artisanId, ctx.artisanId)))
         .where(eq(interventions.artisanId, ctx.artisanId))
@@ -61,7 +61,7 @@ export class InterventionRepositoryDrizzle implements IInterventionRepository {
   getById(ctx: TenantContext, id: number): Promise<Intervention | null> {
     return withTenant(this.db, ctx, async (tx) => {
       const [row] = await tx
-        .select({ ...interventions, heureArrivee: interventionsMobile.heureArrivee, heureDepart: interventionsMobile.heureDepart })
+        .select({ ...getTableColumns(interventions), heureArrivee: interventionsMobile.heureArrivee, heureDepart: interventionsMobile.heureDepart })
         .from(interventions)
         .leftJoin(interventionsMobile, and(eq(interventionsMobile.interventionId, interventions.id), eq(interventionsMobile.artisanId, ctx.artisanId)))
         .where(and(eq(interventions.id, id), eq(interventions.artisanId, ctx.artisanId)))

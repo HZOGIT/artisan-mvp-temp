@@ -26,6 +26,7 @@ describe.skipIf(!URL)("InterventionRepositoryDrizzle (PG, RLS + scope tenant)", 
   const cleanup = async () => {
     await admin.query('delete from couleurs_interventions where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from interventions_techniciens where "artisanId" in ($1,$2)', [A, B]);
+    await admin.query('delete from interventions_mobile where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from interventions where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from techniciens where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from clients where "artisanId" in ($1,$2)', [A, B]);
@@ -121,6 +122,28 @@ describe.skipIf(!URL)("InterventionRepositoryDrizzle (PG, RLS + scope tenant)", 
     expect(await repo.listEquipe(ctx(A), i.id)).toHaveLength(1);
     await repo.removeMembreEquipe(ctx(A), m.id);
     expect(await repo.listEquipe(ctx(A), i.id)).toHaveLength(0);
+  });
+
+  it("heureArrivee/heureDepart exposés via LEFT JOIN interventions_mobile", async () => {
+    const i = await repo.create(ctx(A), { clientId: clientA, titre: "Pointage mobile", dateDebut: new Date("2026-06-20T08:00:00Z") });
+    const arr = new Date("2026-06-20T08:00:00Z");
+    const dep = new Date("2026-06-20T09:30:00Z");
+    await admin.query(
+      'insert into interventions_mobile ("interventionId","artisanId","heureArrivee","heureDepart") values ($1,$2,$3,$4)',
+      [i.id, A, arr, dep],
+    );
+    const listed = (await repo.list(ctx(A))).find((x) => x.id === i.id);
+    expect(listed?.heureArrivee).toEqual(arr);
+    expect(listed?.heureDepart).toEqual(dep);
+    /* LEFT JOIN sans match → null */
+    const noMobile = await repo.create(ctx(A), { clientId: clientA, titre: "Sans pointage", dateDebut: new Date("2026-06-21T08:00:00Z") });
+    const listNoMobile = (await repo.list(ctx(A))).find((x) => x.id === noMobile.id);
+    expect(listNoMobile?.heureArrivee).toBeNull();
+    expect(listNoMobile?.heureDepart).toBeNull();
+    /* getById aussi */
+    const byId = await repo.getById(ctx(A), i.id);
+    expect(byId?.heureArrivee).toEqual(arr);
+    expect(byId?.heureDepart).toEqual(dep);
   });
 
   it("couleurs : setCouleur upsert (PK artisanId+interventionId) + listCouleurs scopé tenant", async () => {

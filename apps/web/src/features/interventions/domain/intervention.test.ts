@@ -7,6 +7,7 @@ import {
   availableTechniciens,
   buildAdresse,
   dureeDescriptor,
+  dureeReelleMinutes,
   STATUT_KEYS,
   type Intervention,
   type Technicien,
@@ -83,6 +84,20 @@ describe("buildAdresse", () => {
     expect(buildAdresse({ adresse: "1 rue A", codePostal: null, ville: null })).toBe("1 rue A");
     expect(buildAdresse({ adresse: null, codePostal: "75001", ville: "Paris" })).toBe("");
     expect(buildAdresse(undefined)).toBe("");
+  });
+});
+
+describe("dureeReelleMinutes", () => {
+  const base = mkI({ id: 1 });
+  it("calcule la durée entre arrivée et départ", () => {
+    expect(dureeReelleMinutes({ ...base, heureArrivee: new Date("2026-06-01T14:00:00Z"), heureDepart: new Date("2026-06-01T14:45:00Z") } as unknown as Intervention)).toBe(45);
+  });
+  it("retourne null si arrivée ou départ manquant", () => {
+    expect(dureeReelleMinutes({ ...base, heureArrivee: null, heureDepart: new Date("2026-06-01T14:45:00Z") } as unknown as Intervention)).toBeNull();
+    expect(dureeReelleMinutes({ ...base, heureArrivee: new Date("2026-06-01T14:00:00Z"), heureDepart: null } as unknown as Intervention)).toBeNull();
+  });
+  it("retourne null si départ avant arrivée (horloge incohérente)", () => {
+    expect(dureeReelleMinutes({ ...base, heureArrivee: new Date("2026-06-01T15:00:00Z"), heureDepart: new Date("2026-06-01T14:00:00Z") } as unknown as Intervention)).toBeNull();
   });
 });
 
