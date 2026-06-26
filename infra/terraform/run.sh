@@ -7,17 +7,15 @@ CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
 
 # ─── Paths ───────────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="$SCRIPT_DIR/../../.env"
 
-# ─── Load .env ───────────────────────────────────────────────────────────────
-if [[ ! -f "$ENV_FILE" ]]; then
-  echo -e "${RED}ERROR:${RESET} .env file not found at $ENV_FILE"
+# ─── Vars : terraform.tfvars (source UNIQUE, gitignoré) ───────────────────────
+# Plus de dépendance à .env : tous les creds Terraform (cloudflare/betterstack/ovh)
+# vivent dans infra/terraform/terraform.tfvars, chargé automatiquement par Terraform.
+if [[ ! -f "$SCRIPT_DIR/terraform.tfvars" ]]; then
+  echo -e "${RED}ERROR:${RESET} terraform.tfvars introuvable dans $SCRIPT_DIR"
+  echo -e "${YELLOW}    Renseigne les creds (cloudflare_api_token, cloudflare_account_id, betterstack_api_token, ovh_*) dans ce fichier (gitignoré).${RESET}"
   exit 1
 fi
-set -a; source "$ENV_FILE"; set +a
-
-export TF_VAR_cloudflare_api_token="$CLOUDFLARE_API_TOKEN"
-export TF_VAR_cloudflare_account_id="$CLOUDFLARE_ACCOUNT_ID"
 
 # ─── Security scan ───────────────────────────────────────────────────────────
 run_tfsec() {

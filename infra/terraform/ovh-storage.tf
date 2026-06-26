@@ -34,8 +34,8 @@ resource "ovh_cloud_project_user_s3_policy" "staging" {
   user_id      = ovh_cloud_project_user.s3_staging.id
   policy = jsonencode({
     Statement = [{
-      Effect   = "Allow"
-      Action   = ["s3:*"]
+      Effect = "Allow"
+      Action = ["s3:*"]
       Resource = [
         "arn:aws:s3:::operioz-staging",
         "arn:aws:s3:::operioz-staging/*",
