@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type {
   Contrat,
@@ -83,4 +84,6 @@ export interface IContratRepository {
   listProchaineReconduction(ctx: TenantContext): Promise<Contrat[]>;
   /** Horodate l'envoi de l'alerte Chatel (idempotent — IS NULL filtré en amont). */
   markAlertReconductionSent(ctx: TenantContext, id: number): Promise<void>;
+  /** Retourne un repo lié à un client DB spécifique (pour `withOutbox`). */
+  withDb(db: DbClient): IContratRepository;
 }

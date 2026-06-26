@@ -3,6 +3,9 @@ import { router, permissionProcedure } from "../../../../interface/trpc/trpc";
 /** Lecture = `contrats.voir`, écriture/transitions/facturation = `contrats.gerer` (parité legacy). */
 const voir = permissionProcedure("contrats.voir");
 const gerer = permissionProcedure("contrats.gerer");
+import type { DbClient } from "../../../../shared/db";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
+import { withOutbox } from "../../../../shared/events/with-outbox";
 import type { IContratRepository } from "../../application/contrat-repository";
 import type { ContratFactureGenerator } from "../../application/contrat-facture-generator";
 import type { IArtisanRepository } from "../../../artisan/application/artisan-repository";
@@ -64,7 +67,7 @@ const updateSchema = z.object({
  * laisse remonter les Domain errors (NotFound→404, Validation→400, Conflict→409). ⚠️ Les transitions
  * de statut (suspendre/reactiver/terminer/annuler) seront exposées en 7/9. Repo injecté.
  */
-export function createContratsMaintenanceRouter(repo: IContratRepository, factureGen: ContratFactureGenerator, artisanRepo?: IArtisanRepository) {
+export function createContratsMaintenanceRouter(repo: IContratRepository, factureGen: ContratFactureGenerator, artisanRepo?: IArtisanRepository, db?: DbClient) {
   return router({
     list: voir.query(({ ctx }) => listContrats(repo, ctx.tenant)),
 
@@ -75,57 +78,84 @@ export function createContratsMaintenanceRouter(repo: IContratRepository, factur
     create: gerer
       .input(createSchema)
       .mutation(async ({ ctx, input }) => {
-        const result = await creerContrat(repo, ctx.tenant, input);
-        ctx.log.info({ event: "contrat_cree", contratId: result.id, clientId: input.clientId, montantHT: Number(input.montantHT), periodicite: input.periodicite }, "Contrat maintenance créé");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await creerContrat(r, ctx.tenant, input);
+          ctx.log.info({ event: "contrat_cree", contratId: result.id, clientId: input.clientId, montantHT: Number(input.montantHT), periodicite: input.periodicite }, "Contrat maintenance créé");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "contrat.cree", entityType: "contrat", entityId: result.id, payload: { clientId: result.clientId, typeContrat: result.type, montantAnnuel: result.montantHT, dateDebut: result.dateDebut } });
+          return result;
+        });
       }),
 
     update: gerer
       .input(z.object({ id: z.number().int() }).and(updateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { id, ...data } = input;
-        return modifierContrat(repo, ctx.tenant, id, data);
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await modifierContrat(r, ctx.tenant, id, data);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "contrat.modifie", entityType: "contrat", entityId: id, payload: { champsModifies: Object.keys(data).filter((k) => (data as Record<string, unknown>)[k] !== undefined) } });
+          return result;
+        });
       }),
 
     delete: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        await supprimerContrat(repo, ctx.tenant, input.id);
-        ctx.log.warn({ event: "contrat_supprime", contratId: input.id }, "Contrat maintenance supprimé");
-        return { success: true };
+        return withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          await supprimerContrat(r, ctx.tenant, input.id);
+          ctx.log.warn({ event: "contrat_supprime", contratId: input.id }, "Contrat maintenance supprimé");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "contrat.supprime", entityType: "contrat", entityId: input.id, payload: { snapshot: { clientId: before?.clientId, statut: before?.statut, montantAnnuel: before?.montantHT } } });
+          return { success: true };
+        });
       }),
 
     /** Transitions de statut (état machine) — chacune valide la légalité depuis le statut courant. */
     suspendre: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await suspendreContrat(repo, ctx.tenant, input.id);
-        ctx.log.warn({ event: "contrat_suspendu", contratId: input.id }, "Contrat maintenance suspendu");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          const result = await suspendreContrat(r, ctx.tenant, input.id);
+          ctx.log.warn({ event: "contrat_suspendu", contratId: input.id }, "Contrat maintenance suspendu");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "contrat.suspendu", entityType: "contrat", entityId: input.id, payload: { statutAvant: before?.statut, statutApres: result.statut } });
+          return result;
+        });
       }),
 
     reactiver: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await reactiverContrat(repo, ctx.tenant, input.id);
-        ctx.log.info({ event: "contrat_reactive", contratId: input.id }, "Contrat maintenance réactivé");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          const result = await reactiverContrat(r, ctx.tenant, input.id);
+          ctx.log.info({ event: "contrat_reactive", contratId: input.id }, "Contrat maintenance réactivé");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "contrat.reactive", entityType: "contrat", entityId: input.id, payload: { statutAvant: before?.statut, statutApres: result.statut } });
+          return result;
+        });
       }),
 
     terminer: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await terminerContrat(repo, ctx.tenant, input.id);
-        ctx.log.warn({ event: "contrat_termine", contratId: input.id }, "Contrat maintenance terminé");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          const result = await terminerContrat(r, ctx.tenant, input.id);
+          ctx.log.warn({ event: "contrat_termine", contratId: input.id }, "Contrat maintenance terminé");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "contrat.termine", entityType: "contrat", entityId: input.id, payload: { dateFin: result.dateFin, statutAvant: before?.statut } });
+          return result;
+        });
       }),
 
     annuler: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await annulerContrat(repo, ctx.tenant, input.id);
-        ctx.log.warn({ event: "contrat_annule", contratId: input.id }, "Contrat maintenance annulé — churn signal");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          const result = await annulerContrat(r, ctx.tenant, input.id);
+          ctx.log.warn({ event: "contrat_annule", contratId: input.id }, "Contrat maintenance annulé — churn signal");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "contrat.annule", entityType: "contrat", entityId: input.id, payload: { statutAvant: before?.statut } });
+          return result;
+        });
       }),
 
     /** Contrats arrivés à échéance de facturation (enrichis client/TTC/retard) — parité `getAFacturer`. */

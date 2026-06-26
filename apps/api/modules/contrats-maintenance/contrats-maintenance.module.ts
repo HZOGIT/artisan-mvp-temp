@@ -1,3 +1,4 @@
+import type { DbClient } from "../../shared/db";
 import type { IContratRepository } from "./application/contrat-repository";
 import type { ContratFactureGenerator } from "./application/contrat-facture-generator";
 import type { IArtisanRepository } from "../artisan/application/artisan-repository";
@@ -7,6 +8,7 @@ export interface ContratsMaintenanceModuleDeps {
   readonly repository: IContratRepository;
   readonly factureGenerator: ContratFactureGenerator;
   readonly artisanRepo?: IArtisanRepository;
+  readonly db?: DbClient;
 }
 
 export interface ContratsMaintenanceModule {
@@ -15,5 +17,5 @@ export interface ContratsMaintenanceModule {
 }
 
 export function createContratsMaintenanceModule(deps: ContratsMaintenanceModuleDeps): ContratsMaintenanceModule {
-  return { deps, router: createContratsMaintenanceRouter(deps.repository, deps.factureGenerator, deps.artisanRepo) };
+  return { deps, router: createContratsMaintenanceRouter(deps.repository, deps.factureGenerator, deps.artisanRepo, deps.db) };
 }
