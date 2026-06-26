@@ -252,6 +252,7 @@ describe("factures — use-cases d'écriture", () => {
       lignes: [{ designation: "Produit", prixUnitaireHT: "100.00", quantite: "1", remise: "10", tauxTVA: "20" }],
     });
     /* avoir d'une ligne 100 × 1 × (1-10%) = 90 → montantHT = -90 */
-    expect(avoir.lignes[0]?.montantHT).toBe("-90.00");
+    const lignes = await repo.listLignes(A, avoir.id);
+    expect(lignes[0]?.montantHT).toBe("-90.00");
   });
 });
