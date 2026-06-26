@@ -27,7 +27,11 @@ describe("devis-nouveau — domain pur", () => {
     expect(iaTotals(prop.lignes)).toEqual({ ht: 200, ttc: 240 });
   });
   it("buildAddLignePayload / buildModeleLignePayload", () => {
-    expect(buildAddLignePayload(7, ligne({ description: "L", quantite: 3, prixUnitaireHT: 10, tvaCategorieId: "FR_20" }))).toEqual({ devisId: 7, designation: "L", quantite: "3", prixUnitaireHT: "10", tvaCategorieId: "FR_20" });
-    expect(buildModeleLignePayload(5, ligne({ description: "L", quantite: 3, prixUnitaireHT: 10, tvaCategorieId: "FR_20", unite: "u" }))).toEqual({ modeleId: 5, designation: "L", quantite: 3, prixUnitaireHT: 10, tauxTVA: 20, tvaCategorieId: "FR_20", unite: "u" });
+    expect(buildAddLignePayload(7, ligne({ description: "L", quantite: 3, prixUnitaireHT: 10, tvaCategorieId: "FR_20" }))).toEqual({ devisId: 7, designation: "L", quantite: "3", prixUnitaireHT: "10", tvaCategorieId: "FR_20", remise: 0 });
+    expect(buildModeleLignePayload(5, ligne({ description: "L", quantite: 3, prixUnitaireHT: 10, tvaCategorieId: "FR_20", unite: "u" }))).toEqual({ modeleId: 5, designation: "L", quantite: 3, prixUnitaireHT: 10, tauxTVA: 20, remise: 0, tvaCategorieId: "FR_20", unite: "u" });
+  });
+  it("buildAddLignePayload préserve remise", () => {
+    expect(buildAddLignePayload(7, ligne({ description: "L", prixUnitaireHT: 100, remise: 10 }))).toMatchObject({ remise: 10 });
+    expect(buildModeleLignePayload(5, ligne({ description: "L", prixUnitaireHT: 100, remise: 15, unite: "u" }))).toMatchObject({ remise: 15 });
   });
 });

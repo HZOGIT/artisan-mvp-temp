@@ -18,6 +18,7 @@ const ligneSchema = z.object({
   unite: z.string().max(20).optional(),
   prixUnitaireHT: decimal.optional(),
   tauxTVA: decimal.optional(),
+  remise: decimal.optional(),
   ordre: z.number().int().optional(),
 });
 

@@ -18,7 +18,7 @@ export type AddLigneModeleInput = RouterInputs["devis"]["addLigneToModele"];
 /** Article renvoyé par `articles.search` (tRPC, camelCase — catalogue bibliothèque partagée). */
 export type ArticleSearchResult = RouterOutputs["articles"]["search"][number];
 
-export type LigneDevis = { id: string; description: string; quantite: number; prixUnitaireHT: number; tvaCategorieId: TvaCategorieId; unite: string };
+export type LigneDevis = { id: string; description: string; quantite: number; prixUnitaireHT: number; tvaCategorieId: TvaCategorieId; unite: string; remise: number };
 
 export function formatCurrency(value: number | string | null | undefined): string {
   const num = typeof value === "string" ? parseFloat(value) : value;
@@ -27,7 +27,7 @@ export function formatCurrency(value: number | string | null | undefined): strin
 }
 
 export function emptyLigne(): LigneDevis {
-  return { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, description: "", quantite: 1, prixUnitaireHT: 0, tvaCategorieId: "FR_20", unite: "unité" };
+  return { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, description: "", quantite: 1, prixUnitaireHT: 0, tvaCategorieId: "FR_20", unite: "unité", remise: 0 };
 }
 
 function tauxStringToCategorie(taux: string | number | null | undefined): TvaCategorieId {
@@ -72,6 +72,7 @@ export function iaToLignes(proposition: IAProposition): LigneDevis[] {
     prixUnitaireHT: Number(l.prixUnitaire) || 0,
     tvaCategorieId: (l.tvaCategorieId as TvaCategorieId | undefined) ?? tauxStringToCategorie(l.tauxTva),
     unite: l.unite || "u",
+    remise: 0,
   }));
 }
 
@@ -87,10 +88,10 @@ export function buildCreatePayload(clientId: number, objet: string, referenceCli
 }
 
 export function buildAddLignePayload(devisId: number, ligne: LigneDevis): AddLigneInput {
-  return { devisId, designation: ligne.description, quantite: String(ligne.quantite), prixUnitaireHT: String(ligne.prixUnitaireHT), tvaCategorieId: ligne.tvaCategorieId };
+  return { devisId, designation: ligne.description, quantite: String(ligne.quantite), prixUnitaireHT: String(ligne.prixUnitaireHT), tvaCategorieId: ligne.tvaCategorieId, remise: ligne.remise };
 }
 
 export function buildModeleLignePayload(modeleId: number, ligne: LigneDevis): AddLigneModeleInput {
   const taux = parseFloat(TVA_CATEGORIES_MAP[ligne.tvaCategorieId]?.taux ?? "20") || 20;
-  return { modeleId, designation: ligne.description, quantite: ligne.quantite, prixUnitaireHT: ligne.prixUnitaireHT, tauxTVA: taux, tvaCategorieId: ligne.tvaCategorieId, unite: ligne.unite || "unité" };
+  return { modeleId, designation: ligne.description, quantite: ligne.quantite, prixUnitaireHT: ligne.prixUnitaireHT, tauxTVA: taux, remise: ligne.remise, tvaCategorieId: ligne.tvaCategorieId, unite: ligne.unite || "unité" };
 }

@@ -234,6 +234,7 @@ export function createDevisRouter(
           unite: z.string().max(20).default("unité"),
           prixUnitaireHT: z.number().default(0),
           tauxTVA: z.number().min(0).max(100).default(20),
+          remise: z.number().min(0).max(100).default(0),
           tvaCategorieId: z.string().max(30).optional(),
         }),
       )
@@ -246,6 +247,7 @@ export function createDevisRouter(
           unite: input.unite,
           prixUnitaireHT: String(input.prixUnitaireHT),
           tauxTVA: String(input.tauxTVA),
+          remise: String(input.remise),
           tvaCategorieId: input.tvaCategorieId ?? null,
         }),
       ),
