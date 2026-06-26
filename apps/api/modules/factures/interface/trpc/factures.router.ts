@@ -155,7 +155,6 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
         ctx.log.info({ event: "facture_created", factureId: result.id, clientId: rest.clientId }, "Facture créée");
         push?.sendToUser(ctx.tenant.artisanId, { title: "Operioz", body: `Nouvelle facture créée (brouillon)` }).catch(() => undefined);
         if (eventBus) {
-          /* TODO: migrer vers withOutbox + outboxEvent (OPE-647 fan-out) */
           /* eslint-disable-next-line local/events-outbox-convention */
           emitEvent(eventBus, ctx.tenant, { type: "facture.creee", entityType: "facture", entityId: result.id, payload: { clientId: rest.clientId, numero: result.numero ?? null } });
         }
@@ -210,7 +209,6 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
         const result = await changerStatutFacture(repo, ctx.tenant, input.id, "envoyee", compta, mailing.artisanReader, outboxInTx);
         ctx.log.info({ event: "facture_envoyee", factureId: input.id }, "Facture envoyée au client");
         if (eventBus) {
-          /* TODO: migrer vers withOutbox + outboxEvent (OPE-647 fan-out) */
           /* eslint-disable-next-line local/events-outbox-convention */
           emitEvent(eventBus, ctx.tenant, { type: "facture.envoyee", entityType: "facture", entityId: input.id });
         }
@@ -255,7 +253,6 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
         );
         ctx.log.info({ event: "facture_paiement_enregistre", factureId: input.id, montant: Number(input.montant), mode: input.mode ?? null }, "Paiement facture enregistré");
         if (eventBus) {
-          /* TODO: migrer vers withOutbox + outboxEvent (OPE-647 fan-out) */
           /* eslint-disable-next-line local/events-outbox-convention */
           emitEvent(eventBus, ctx.tenant, { type: "facture.paiement_enregistre", entityType: "facture", entityId: input.id, payload: { montant: input.montant, mode: input.mode ?? null } });
         }
@@ -272,7 +269,6 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
         const result = await enregistrerPaiementFacture(repo, ctx.tenant, input.id, { montant: input.montantPaye, date: toDate(input.datePaiement) }, compta);
         ctx.log.info({ event: "facture_paiement_enregistre", factureId: input.id, montant: Number(input.montantPaye) }, "Paiement facture enregistré");
         if (eventBus) {
-          /* TODO: migrer vers withOutbox + outboxEvent (OPE-647 fan-out) */
           /* eslint-disable-next-line local/events-outbox-convention */
           emitEvent(eventBus, ctx.tenant, { type: "facture.paiement_enregistre", entityType: "facture", entityId: input.id, payload: { montant: input.montantPaye } });
         }
