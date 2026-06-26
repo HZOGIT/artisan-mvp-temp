@@ -240,7 +240,7 @@ export default function PortailClientPage() {
                           <span className="font-bold text-lg text-gray-900 whitespace-nowrap">{formatCurrency(d.totalTTC)}</span>
                           <div className="flex gap-2">
                             <Button size="sm" variant="outline" asChild>
-                              <a href={`/api/portail/${token}/devis/${d.id}/pdf`} target="_blank" rel="noopener noreferrer"><Download className="h-4 w-4 mr-1" />{t("pdf")}</a>
+                              <a href={`${BACKEND_URL}/api/portail/${token}/devis/${d.id}/pdf`} target="_blank" rel="noopener noreferrer"><Download className="h-4 w-4 mr-1" />{t("pdf")}</a>
                             </Button>
                             {d.tokenSignature && d.statut === "envoye" && (
                               <Button size="sm" asChild>
@@ -282,7 +282,7 @@ export default function PortailClientPage() {
                           <span className="font-bold text-lg text-gray-900 whitespace-nowrap">{formatCurrency(f.totalTTC)}</span>
                           <div className="flex gap-2">
                             <Button size="sm" variant="outline" asChild>
-                              <a href={`/api/portail/${token}/factures/${f.id}/pdf`} target="_blank" rel="noopener noreferrer"><Download className="h-4 w-4 mr-1" />{t("pdf")}</a>
+                              <a href={`${BACKEND_URL}/api/portail/${token}/factures/${f.id}/pdf`} target="_blank" rel="noopener noreferrer"><Download className="h-4 w-4 mr-1" />{t("pdf")}</a>
                             </Button>
                             {isFacturePayable(f.statut || "") && (
                               <Button size="sm" onClick={() => handlePayerEnLigne(f.id)} disabled={payingFactureId === f.id} className="bg-green-600 hover:bg-green-700">
