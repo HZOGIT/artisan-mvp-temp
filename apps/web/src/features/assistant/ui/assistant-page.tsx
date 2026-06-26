@@ -108,7 +108,7 @@ export default function AssistantPage({ embedded = false }: { embedded?: boolean
       const history = sliceHistory(messages);
       await streamMessage({ message: text.trim(), history, threadId }, (ev) => {
         if (ev.threadId && !threadId) { setThreadId(ev.threadId); navigate(`/assistant?thread=${ev.threadId}`, { replace: true }); }
-        if (ev.content) setMessages((prev) => { const u = [...prev]; const last = u[u.length - 1]; if (last.role === "assistant") u[u.length - 1] = { ...last, content: last.content + ev.content }; return u; });
+        if (ev.content) { const c = ev.content; setMessages((prev) => { const u = [...prev]; const last = u[u.length - 1]; if (!last || last.role !== "assistant") return [...u, { role: "assistant", content: c }]; u[u.length - 1] = { ...last, content: last.content + c }; return u; }); }
         if (ev.error) toast.error(ev.error);
         if (ev.navigate) { navigate(navigateTarget(ev.navigate, ev.filtre)); try { window.dispatchEvent(new CustomEvent("operioz:open-assistant")); } catch { /* ignore */ } }
         if (ev.invalidate) for (const key of ev.invalidate) queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && q.queryKey.some((k) => typeof k === "string" && k.includes(key)) });
