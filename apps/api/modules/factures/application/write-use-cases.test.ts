@@ -240,4 +240,18 @@ describe("factures — use-cases d'écriture", () => {
     const id = await factureEmise(repo); // 120.00 TTC
     await expect(creerAvoir(repo, A, id, { lignes: [{ designation: "Excessif", quantite: "1", prixUnitaireHT: "200.00", tauxTVA: "20" }] })).rejects.toBeInstanceOf(ValidationError);
   });
+
+  it("creerAvoir total sur facture remisée — montantHT = prixUnitaireHT × q × (1 - remise/100)", async () => {
+    const repo = repoWithClient(A, 100);
+    const f = await creerFacture(repo, A, {
+      clientId: 100,
+      lignes: [{ designation: "Produit", prixUnitaireHT: "100.00", quantite: "1", remise: "10", tauxTVA: "20" }],
+    });
+    await changerStatutFacture(repo, A, f.id, "envoyee", undefined, fakeArtisanReader);
+    const avoir = await creerAvoir(repo, A, f.id, {
+      lignes: [{ designation: "Produit", prixUnitaireHT: "100.00", quantite: "1", remise: "10", tauxTVA: "20" }],
+    });
+    /* avoir d'une ligne 100 × 1 × (1-10%) = 90 → montantHT = -90 */
+    expect(avoir.lignes[0]?.montantHT).toBe("-90.00");
+  });
 });

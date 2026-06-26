@@ -108,6 +108,15 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
     expect((await callQuery(server, "factures.getLignes", { factureId: id }, tA)).json().result.data.length).toBe(2);
   });
 
+  it("addLigne avec remise 15% : montantHT = pu × q × 0.85", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "factures.create", { clientId: clientA }, tA)).json().result.data.id as number;
+    const l = await callMutation(server, "factures.addLigne", { factureId: id, designation: "Service remisé", quantite: "2", prixUnitaireHT: "100.00", tauxTVA: "20", remise: "15" }, tA);
+    expect(l.json().result.data.montantHT).toBe("170.00"); /* 2 × 100 × 0.85 */
+    expect(l.json().result.data.montantTTC).toBe("204.00"); /* 170 × 1.2 */
+    expect((await callQuery(server, "factures.getById", { id }, tA)).json().result.data.totalHT).toBe("170.00");
+  });
+
   it("isolation cross-tenant : B ne voit/modifie/supprime pas la facture de A", async () => {
     const tA = await token(UA);
     const tB = await token(UB);
