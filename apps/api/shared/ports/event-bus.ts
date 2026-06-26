@@ -1,16 +1,18 @@
-export interface DomainEvent<T = unknown> {
+export interface DomainEvent {
   readonly type: string;
-  readonly aggregateId: string;
   readonly aggregateType: string;
-  readonly payload: T;
+  readonly aggregateId: number;
+  readonly artisanId: number;
+  readonly userId?: number | null;
   readonly occurredAt: Date;
+  readonly payload?: Record<string, unknown>;
 }
 
 export interface EventBusPort {
-  publish<T>(event: DomainEvent<T>): Promise<void>;
-  publishMany<T>(events: readonly DomainEvent<T>[]): Promise<void>;
+  publish(event: DomainEvent): Promise<void>;
+  publishMany(events: readonly DomainEvent[]): Promise<void>;
 }
 
 export interface WorkerPort {
-  register<T>(type: string, handler: (event: DomainEvent<T>) => Promise<void>): void;
+  register(type: string, handler: (event: DomainEvent) => Promise<void>): void;
 }

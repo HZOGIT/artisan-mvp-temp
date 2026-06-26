@@ -9,6 +9,7 @@ import type { SignaturePublicReader, SignatureDevisView } from "./signature-publ
 import type { SignaturePublicWriter } from "./signature-public-writer";
 import type { SignatureNotificationWriter } from "./signature-repository";
 import type { EventBusPort } from "../../../shared/ports/event-bus";
+import { emitEvent } from "../../../shared/events/emit-event";
 
 /** Dépendances de la surface PUBLIQUE par token (portail de signature). */
 export interface SignaturePublicDeps {
@@ -193,7 +194,7 @@ export async function signDevis(
     documentHashedAt,
   });
 
-  await deps.eventBus?.publish({ type: "SIGNATURE_COMPLETE", aggregateId: String(resolution.devisId), aggregateType: "devis", payload: { devisId: resolution.devisId, artisanId: resolution.artisanId }, occurredAt: new Date() }).catch(() => {});
+  if (deps.eventBus) emitEvent(deps.eventBus, ctx, { type: "SIGNATURE_COMPLETE", entityType: "devis", entityId: resolution.devisId, payload: { devisId: resolution.devisId } });
 
   await notifyArtisanBestEffort(deps, ctx, resolution.devisId, async (view) => {
     await deps.notifications.notify(ctx, {

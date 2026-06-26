@@ -3,6 +3,7 @@ import { router, protectedProcedure, permissionProcedure } from "../../../../int
 import { TVA_CATEGORIES_MAP } from "../../../../shared/tva/taux-tva-fr";
 import type { PushPort } from "../../../../shared/push/web-push-adapter";
 import type { EventBusPort } from "../../../../shared/ports/event-bus";
+import { emitEvent } from "../../../../shared/events/emit-event";
 /** Permissions (parité legacy) : actions sur lignes/envoi/duplication = `devis.creer` ; conversion en facture = `factures.creer`. */
 const devisCreer = permissionProcedure("devis.creer");
 const facturesCreer = permissionProcedure("factures.creer");
@@ -195,7 +196,7 @@ export function createDevisRouter(
       .mutation(async ({ ctx, input }) => {
         const result = await changerStatutDevis(repo, ctx.tenant, input.id, "accepte");
         ctx.log.info({ event: "devis_accepte", devisId: input.id }, "Devis accepté");
-        await eventBus?.publish({ type: "DEVIS_ACCEPTE", aggregateId: String(input.id), aggregateType: "devis", payload: { devisId: input.id, artisanId: ctx.tenant.artisanId }, occurredAt: new Date() }).catch(() => {});
+        if (eventBus) emitEvent(eventBus, ctx.tenant, { type: "DEVIS_ACCEPTE", entityType: "devis", entityId: input.id, payload: { devisId: input.id } });
         return result;
       }),
 

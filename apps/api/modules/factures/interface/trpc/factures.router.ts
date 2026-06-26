@@ -8,6 +8,7 @@ import type { FactureMailingDeps } from "../../application/envoyer-facture-email
 import type { PushPort } from "../../../../shared/push/web-push-adapter";
 import type { DbClient } from "../../../../shared/db";
 import type { EventBusPort } from "../../../../shared/ports/event-bus";
+import { emitEvent } from "../../../../shared/events/emit-event";
 import { envoyerFactureParEmail } from "../../application/envoyer-facture-email";
 import { listFactures, getFactureDetail, listLignesFacture, getAvoirsFacture, getAuditLogFacture } from "../../application/read-use-cases";
 import {
@@ -153,7 +154,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
         const result = await creerFacture(repo, ctx.tenant, { ...rest, dateEcheance: toDate(rest.dateEcheance), lignes });
         ctx.log.info({ event: "facture_created", factureId: result.id, clientId: rest.clientId }, "Facture créée");
         push?.sendToUser(ctx.tenant.artisanId, { title: "Operioz", body: `Nouvelle facture créée (brouillon)` }).catch(() => undefined);
-        eventBus?.publish({ type: "FACTURE_CREEE", aggregateType: "facture", aggregateId: String(result.id), payload: { artisanId: ctx.tenant.artisanId, clientId: rest.clientId, numero: result.numero ?? null }, occurredAt: new Date() }).catch(() => undefined);
+        if (eventBus) emitEvent(eventBus, ctx.tenant, { type: "FACTURE_CREEE", entityType: "facture", entityId: result.id, payload: { clientId: rest.clientId, numero: result.numero ?? null } });
         return result;
       }),
 
@@ -204,7 +205,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
       .mutation(async ({ ctx, input }) => {
         const result = await changerStatutFacture(repo, ctx.tenant, input.id, "envoyee", compta, mailing.artisanReader, outboxInTx);
         ctx.log.info({ event: "facture_envoyee", factureId: input.id }, "Facture envoyée au client");
-        eventBus?.publish({ type: "FACTURE_ENVOYEE", aggregateType: "facture", aggregateId: String(input.id), payload: { artisanId: ctx.tenant.artisanId }, occurredAt: new Date() }).catch(() => undefined);
+        if (eventBus) emitEvent(eventBus, ctx.tenant, { type: "FACTURE_ENVOYEE", entityType: "facture", entityId: input.id });
         return result;
       }),
 
@@ -245,7 +246,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
           compta,
         );
         ctx.log.info({ event: "facture_paiement_enregistre", factureId: input.id, montant: Number(input.montant), mode: input.mode ?? null }, "Paiement facture enregistré");
-        eventBus?.publish({ type: "PAIEMENT_ENREGISTRE", aggregateType: "facture", aggregateId: String(input.id), payload: { artisanId: ctx.tenant.artisanId, montant: input.montant, mode: input.mode ?? null }, occurredAt: new Date() }).catch(() => undefined);
+        if (eventBus) emitEvent(eventBus, ctx.tenant, { type: "PAIEMENT_ENREGISTRE", entityType: "facture", entityId: input.id, payload: { montant: input.montant, mode: input.mode ?? null } });
         return result;
       }),
 
@@ -258,7 +259,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
       .mutation(async ({ ctx, input }) => {
         const result = await enregistrerPaiementFacture(repo, ctx.tenant, input.id, { montant: input.montantPaye, date: toDate(input.datePaiement) }, compta);
         ctx.log.info({ event: "facture_paiement_enregistre", factureId: input.id, montant: Number(input.montantPaye) }, "Paiement facture enregistré");
-        eventBus?.publish({ type: "PAIEMENT_ENREGISTRE", aggregateType: "facture", aggregateId: String(input.id), payload: { artisanId: ctx.tenant.artisanId, montant: input.montantPaye }, occurredAt: new Date() }).catch(() => undefined);
+        if (eventBus) emitEvent(eventBus, ctx.tenant, { type: "PAIEMENT_ENREGISTRE", entityType: "facture", entityId: input.id, payload: { montant: input.montantPaye } });
         return result;
       }),
 
