@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { ConflictError, UnauthorizedError, ValidationError } from "../../../shared/errors";
+import { ConflictError, ForbiddenError, UnauthorizedError, ValidationError } from "../../../shared/errors";
 import type { EmailPort } from "../../../shared/ports/email";
 import type { PasswordHasher } from "../../../shared/ports/password-hasher";
 import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
@@ -45,11 +45,14 @@ export async function me(repo: IAuthRepository, claims: TokenClaims | null, perm
  */
 export async function signin(deps: AuthDeps, input: { email: string; password: string }): Promise<{ user: AuthUser; token: string }> {
   const cred = await deps.repo.findCredentials(input.email);
-  if (!cred || !cred.password || cred.actif === false) {
+  if (!cred || !cred.password) {
     throw new UnauthorizedError("Invalid email or password");
   }
   if (!(await deps.hasher.verify(input.password, cred.password))) {
     throw new UnauthorizedError("Invalid email or password");
+  }
+  if (cred.actif === false) {
+    throw new ForbiddenError("Votre compte a été désactivé. Contactez le support.");
   }
   await deps.repo.touchLastSignedIn(cred.id);
   const token = await signAuthToken({ userId: cred.id, email: cred.email ?? "" }, deps.jwtSecret, deps.tokenTtl ?? "7d");

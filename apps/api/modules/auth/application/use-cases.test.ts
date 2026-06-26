@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ConflictError, UnauthorizedError, ValidationError } from "../../../shared/errors";
+import { ConflictError, ForbiddenError, UnauthorizedError, ValidationError } from "../../../shared/errors";
 import { FakeEmailPort } from "../../../shared/ports/fakes";
 import { FakePasswordHasher } from "../../../shared/ports/password-hasher-bcrypt";
 import { verifyAuthToken } from "../../../shared/tenant/jwt";
@@ -43,6 +43,26 @@ describe("auth use-cases", () => {
     await expect(signin(deps, { email: "ok@t.fr", password: "mauvais" })).rejects.toBeInstanceOf(UnauthorizedError);
     await expect(signin(deps, { email: "oauth@t.fr", password: "x" })).rejects.toBeInstanceOf(UnauthorizedError);
     expect(repo.touched).toEqual([]); // aucun login réussi
+  });
+
+  it("signin : compte désactivé (actif===false) + BON mot de passe → ForbiddenError (message explicite)", async () => {
+    const repo = new FakeAuthRepository();
+    repo.seed({ id: 9, email: "disabled@t.fr", password: "hashed:secret", actif: false });
+    const deps = makeDeps(repo);
+    const error = await signin(deps, { email: "disabled@t.fr", password: "secret" }).catch((e) => e);
+    expect(error).toBeInstanceOf(ForbiddenError);
+    expect(error.message).toBe("Votre compte a été désactivé. Contactez le support.");
+    expect(repo.touched).toEqual([]); // pas de lastSignedIn touché
+  });
+
+  it("signin : compte désactivé + MAUVAIS mot de passe → UnauthorizedError (anti-énumération)", async () => {
+    const repo = new FakeAuthRepository();
+    repo.seed({ id: 10, email: "disabled2@t.fr", password: "hashed:secret", actif: false });
+    const deps = makeDeps(repo);
+    const error = await signin(deps, { email: "disabled2@t.fr", password: "mauvais" }).catch((e) => e);
+    expect(error).toBeInstanceOf(UnauthorizedError);
+    expect(error.message).toBe("Invalid email or password");
+    expect(repo.touched).toEqual([]); // pas de lastSignedIn touché
   });
 
   it("signup : email libre → crée user + bootstrap + JWT + email bienvenue ; email pris → ConflictError", async () => {
