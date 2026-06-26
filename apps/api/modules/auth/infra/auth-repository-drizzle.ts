@@ -97,24 +97,28 @@ export class AuthRepositoryDrizzle implements IAuthRepository {
     await this.db.update(users).set({ artisanId }).where(eq(users.id, userId));
     /** 3. Abonnement d'essai (billing maison, si absent) — best-effort. */
     try {
-      const [existing] = await this.db.select({ id: billingSubscriptions.id }).from(billingSubscriptions).where(eq(billingSubscriptions.artisan_id, artisanId)).limit(1);
-      if (!existing) {
-        const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
-        const [newSub] = await this.db
-          .insert(billingSubscriptions)
-          .values({ artisan_id: artisanId, plan_id: "starter", billing_mode: "maison", status: "trialing", trial_ends_at: trialEndsAt })
-          .onConflictDoNothing({ target: billingSubscriptions.artisan_id })
-          .returning({ id: billingSubscriptions.id });
-        if (newSub) {
-          await this.db.insert(billingEvents).values({
-            entity_type: "billing_subscription",
-            entity_id: newSub.id,
-            event_type: "subscription.created",
-            payload: { artisanId, planId: "starter", billingMode: "maison", status: "trialing", trialEndsAt: trialEndsAt.toISOString() },
-            actor: "system:registration",
-          });
+      await this.db.transaction(async (tx) => {
+        /** billing_subscriptions a forcerowsecurity=on → poser le tenant avant SELECT/INSERT. */
+        await tx.execute(sql`SELECT set_config('app.tenant', ${String(artisanId)}, true)`);
+        const [existing] = await tx.select({ id: billingSubscriptions.id }).from(billingSubscriptions).where(eq(billingSubscriptions.artisan_id, artisanId)).limit(1);
+        if (!existing) {
+          const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+          const [newSub] = await tx
+            .insert(billingSubscriptions)
+            .values({ artisan_id: artisanId, plan_id: "starter", billing_mode: "maison", status: "trialing", trial_ends_at: trialEndsAt })
+            .onConflictDoNothing({ target: billingSubscriptions.artisan_id })
+            .returning({ id: billingSubscriptions.id });
+          if (newSub) {
+            await tx.insert(billingEvents).values({
+              entity_type: "billing_subscription",
+              entity_id: newSub.id,
+              event_type: "subscription.created",
+              payload: { artisanId, planId: "starter", billingMode: "maison", status: "trialing", trialEndsAt: trialEndsAt.toISOString() },
+              actor: "system:registration",
+            });
+          }
         }
-      }
+      });
     } catch {
       /* best-effort */
     }
