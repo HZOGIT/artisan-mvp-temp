@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { Article, CreateArticleInput, UpdateArticleInput } from "../domain/article";
 
@@ -16,4 +17,5 @@ export interface IArticleRepository {
   update(ctx: TenantContext, id: number, input: UpdateArticleInput): Promise<Article | null>;
   /** false si l'article n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
+  withDb(db: DbClient): IArticleRepository;
 }
