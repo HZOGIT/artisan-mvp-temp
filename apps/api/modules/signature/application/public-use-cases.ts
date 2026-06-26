@@ -194,7 +194,7 @@ export async function signDevis(
     documentHashedAt,
   });
 
-  if (deps.eventBus) emitEvent(deps.eventBus, ctx, { type: "SIGNATURE_COMPLETE", entityType: "devis", entityId: resolution.devisId, payload: { devisId: resolution.devisId } });
+  if (deps.eventBus) emitEvent(deps.eventBus, ctx, { type: "devis.signe", entityType: "devis", entityId: resolution.devisId, payload: { devisId: resolution.devisId } });
 
   await notifyArtisanBestEffort(deps, ctx, resolution.devisId, async (view) => {
     await deps.notifications.notify(ctx, {
