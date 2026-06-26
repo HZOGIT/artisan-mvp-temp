@@ -72,6 +72,7 @@ export function iaToLignes(proposition: IAProposition): LigneDevis[] {
     prixUnitaireHT: Number(l.prixUnitaire) || 0,
     tvaCategorieId: (l.tvaCategorieId as TvaCategorieId | undefined) ?? tauxStringToCategorie(l.tauxTva),
     unite: l.unite || "u",
+    remise: 0,
   }));
 }
 
