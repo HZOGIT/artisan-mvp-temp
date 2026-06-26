@@ -330,6 +330,13 @@
       "when": 1782479386069,
       "tag": "0046_event-outbox",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1782479962983,
+      "tag": "0047_event-outbox-rls-off",
+      "breakpoints": true
     }
   ]
 }
