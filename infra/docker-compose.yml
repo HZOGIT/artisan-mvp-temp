@@ -139,7 +139,7 @@ services:
       - /dev/kmsg
 
   postgres-exporter:
-    image: prometheuscommunity/postgres-exporter:v0.15.0
+    image: prometheuscommunity/postgres-exporter:v0.17.1
     restart: unless-stopped
     environment:
       DATA_SOURCE_NAME: postgres://artisan_user:${POSTGRES_PASSWORD:-artisan_password}@postgres:5432/artisan_mvp?sslmode=disable
