@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { randomUUID } from "crypto";
-import { eq, and, inArray } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IAssistantThreadsRepository } from "../../application/assistant-threads-repository";
@@ -16,6 +16,7 @@ import { runAssistantAgent, type AssistantAgentDeps } from "../../application/as
 import { ValidationError, TooManyRequestsError } from "../../../../shared/errors";
 import type { StoragePort } from "../../../../shared/ports/storage";
 import type { DbClient } from "../../../../shared/db";
+import { withTenant } from "../../../../shared/db";
 import { files } from "../../../../../../drizzle/schema/files";
 import { messageFiles } from "../../../../../../drizzle/schema/message-files";
 
@@ -38,6 +39,7 @@ const MIME_TO_EXT: Record<string, string> = {
   "image/heic": "heic", "image/gif": "gif", "application/pdf": "pdf",
   "text/plain": "txt", "text/csv": "csv",
 };
+const ALLOWED_MIMES = new Set(Object.keys(MIME_TO_EXT));
 
 /** Routeur tRPC assistant : lectures + générateurs IA + upload + subscription de chat en streaming agentique. */
 export function createAssistantRouter(
@@ -91,7 +93,8 @@ export function createAssistantRouter(
         const raw = input.base64.replace(/^data:[^,]+,/, "");
         const buf = Buffer.from(raw, "base64");
         if (buf.byteLength > 20 * 1024 * 1024) throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Fichier trop volumineux (max 20 Mo)" });
-        const ext = MIME_TO_EXT[input.mimeType] ?? "bin";
+        if (!ALLOWED_MIMES.has(input.mimeType)) throw new TRPCError({ code: "BAD_REQUEST", message: `Type de fichier non supporté : ${input.mimeType}` });
+        const ext = MIME_TO_EXT[input.mimeType]!;
         const key = `chat/${ctx.tenant.artisanId}/${randomUUID()}.${ext}`;
         const stored = await storage.upload(key, buf, {
           contentType: input.mimeType,
@@ -129,10 +132,11 @@ export function createAssistantRouter(
 
           let attachments: Array<{ data: Buffer; mimeType: string }> | undefined;
           if (input.fileIds?.length) {
-            const rows = await db
-              .select({ id: files.id, storageKey: files.storageKey, mimeType: files.mimeType, artisanId: files.artisanId })
-              .from(files)
-              .where(and(inArray(files.id, input.fileIds), eq(files.artisanId, tenant.artisanId)));
+            const rows = await withTenant(db, tenant, (tx) =>
+              tx.select({ storageKey: files.storageKey, mimeType: files.mimeType })
+                .from(files)
+                .where(inArray(files.id, input.fileIds!)),
+            );
             const fetched = await Promise.all(
               rows.map(async (r) => {
                 const data = await storage.get(r.storageKey);
@@ -147,15 +151,18 @@ export function createAssistantRouter(
             const validated = assistantStreamEventSchema.parse(ev);
             if ("threadId" in validated) {
               resolvedThreadId = validated.threadId;
-              if (input.fileIds?.length && resolvedThreadId) {
-                await db.insert(messageFiles).values(
-                  input.fileIds.map((fileId) => ({
-                    conversationId: resolvedThreadId!.toString(),
-                    messageIndex: 0,
-                    fileId,
-                    artisanId: tenant.artisanId,
-                  })),
-                ).onConflictDoNothing().catch(() => { /* best-effort */ });
+              const tid = resolvedThreadId;
+              if (input.fileIds?.length && tid) {
+                await withTenant(db, tenant, (tx) =>
+                  tx.insert(messageFiles).values(
+                    input.fileIds!.map((fileId) => ({
+                      conversationId: tid.toString(),
+                      messageIndex: 0,
+                      fileId,
+                      artisanId: tenant.artisanId,
+                    })),
+                  ).onConflictDoNothing(),
+                ).catch(() => { /* best-effort */ });
               }
             }
             if ("content" in validated) contentEvents++;

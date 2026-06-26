@@ -277,7 +277,7 @@ import type { TresorerieReader } from "./modules/previsions-ca/application/treso
 import type { IPrevisionCARepository } from "./modules/previsions-ca/application/prevision-ca-repository";
 import type { EmailPort, RateLimiterPort, LlmPort, VisionPort } from "./shared/ports";
 import type { EventBusPort } from "./shared/ports/event-bus";
-import { FakeEventBus, InMemoryStoragePort } from "./shared/ports/fakes";
+import { FakeEventBus } from "./shared/ports/fakes";
 import { ResendEmailAdapter, SlidingWindowRateLimiter, GeminiLlmAdapter, GeminiVisionAdapter } from "./shared/ports";
 import type { StoragePort } from "./shared/ports/storage";
 import { OvhS3Adapter } from "./shared/storage/ovh-s3-adapter";
