@@ -11,5 +11,18 @@
   "date": "Date",
   "entity": "Entité",
   "payload": "Détails",
-  "page": "Page {{page}} / {{totalPages}}"
+  "page": "Page {{page}} / {{totalPages}}",
+  "facture.created": "Facture créée",
+  "facture.updated": "Facture modifiée",
+  "facture.paid": "Facture payée",
+  "facture.cancelled": "Facture annulée",
+  "devis.created": "Devis créé",
+  "devis.updated": "Devis modifié",
+  "devis.accepted": "Devis accepté",
+  "devis.declined": "Devis refusé",
+  "commande.created": "Commande créée",
+  "commande.updated": "Commande modifiée",
+  "intervention.created": "Intervention créée",
+  "intervention.updated": "Intervention modifiée",
+  "intervention.completed": "Intervention complétée"
 }

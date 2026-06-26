@@ -8,19 +8,6 @@ import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 
-const ACTION_LABELS: Record<string, string> = {
-  created: "Création",
-  updated: "Modification",
-  deleted: "Suppression",
-  status_changed: "Changement statut",
-  sent: "Envoi",
-  signed: "Signé",
-  paid: "Paiement",
-  cancelled: "Annulation",
-};
-
-const actionLabel = (action: string) => ACTION_LABELS[action] ?? action;
-
 function formatDate(value: Date | string | null | undefined): string {
   if (!value) return "—";
   const d = typeof value === "string" ? new Date(value) : value;
@@ -105,7 +92,9 @@ export default function EventsAdminPage() {
                         {formatDate(row.occurredAt ?? row.createdAt)}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="font-mono text-xs">{actionLabel(row.action)}</Badge>
+                        <Badge variant="outline" className="font-mono text-xs">
+                          {t(row.action, { defaultValue: row.action })}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-sm">
                         <span className="text-muted-foreground">{row.entityType}</span>
