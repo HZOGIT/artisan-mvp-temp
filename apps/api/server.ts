@@ -4,6 +4,7 @@ import { buildApp } from "./app";
 import { getDbHandle } from "./shared/db/client";
 import { provisionDatabase, assertAppRoleExistsAndRestricted } from "./shared/db/provision-database";
 import { PgBossEventBus } from "./shared/queue/pg-boss-event-bus";
+import { LoggingEventBus } from "./shared/queue/logging-event-bus";
 import { PgBossWorkerAdapter } from "./shared/queue/pg-boss-worker-adapter";
 import { registerWorkers } from "./shared/queue/workers";
 import { ResendEmailAdapter } from "./shared/email/resend-email-adapter";
@@ -25,7 +26,7 @@ async function main(): Promise<void> {
     throw new Error(`Impossible de démarrer pg-boss : ${String(err)}`);
   });
 
-  const eventBus = new PgBossEventBus(boss);
+  const eventBus = new LoggingEventBus(new PgBossEventBus(boss), getDbHandle().db);
   registerWorkers(new PgBossWorkerAdapter(boss), { email: new ResendEmailAdapter(), db: getDbHandle().db });
 
   const app = buildApp({ eventBus });

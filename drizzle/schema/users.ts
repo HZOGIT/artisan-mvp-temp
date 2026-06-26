@@ -53,18 +53,20 @@ export const sessions = pgTable("sessions", {
 export type Session = typeof sessions.$inferSelect;
 export type InsertSession = typeof sessions.$inferInsert;
 
-export const auditLog = pgTable("audit_log", {
+export const eventLog = pgTable("events", {
   id: serial("id").primaryKey(),
-  artisanId: integer("artisanId").notNull(),
-  userId: integer("userId").notNull(),
-  entityType: varchar("entityType", { length: 50 }).notNull(),
+  artisanId: integer("artisanId"),
+  userId: integer("userId"),
+  entityType: varchar("entityType", { length: 100 }).notNull(),
   entityId: integer("entityId").notNull(),
-  action: varchar("action", { length: 50 }).notNull(),
+  action: varchar("action", { length: 100 }).notNull(),
   details: text("details"),
+  payload: jsonb("payload"),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
-export type AuditLog = typeof auditLog.$inferSelect;
-export type InsertAuditLog = typeof auditLog.$inferInsert;
+export type EventLog = typeof eventLog.$inferSelect;
+export type InsertEventLog = typeof eventLog.$inferInsert;
 
 export const activeSessions = pgTable("active_sessions", {
   id: serial("id").primaryKey(),

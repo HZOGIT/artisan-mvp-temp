@@ -274,6 +274,20 @@
       "when": 1782452733885,
       "tag": "0038_pa-outbox-fk-cascade",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1782453678452,
+      "tag": "0039_rename-audit-log-to-events",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1782453695329,
+      "tag": "0040_events-rls-open",
+      "breakpoints": true
     }
   ]
 }

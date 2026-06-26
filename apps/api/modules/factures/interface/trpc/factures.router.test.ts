@@ -42,7 +42,7 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
   let server: ReturnType<typeof buildApp>;
 
   const purge = async (uid: number) => {
-    await admin.query('delete from audit_log where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
+    await admin.query('delete from events where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from ecritures_comptables where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from factures_lignes where "factureId" in (select id from factures where "artisanId" in (select id from artisans where "userId"=$1))', [uid]);
     await admin.query('delete from factures where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
@@ -315,7 +315,7 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
     expect((await callQuery(server, "factures.getAuditLog", { factureId: id })).statusCode).toBe(401);
     // seed 2 entrées d'audit (la 2e plus récente)
     await admin.query(
-      `insert into audit_log ("artisanId","userId","entityType","entityId",action,"createdAt") values ($1,$2,'facture',$3,'created', now() - interval '1 minute'),($1,$2,'facture',$3,'sent', now())`,
+      `insert into events ("artisanId","userId","entityType","entityId",action,"createdAt") values ($1,$2,'facture',$3,'created', now() - interval '1 minute'),($1,$2,'facture',$3,'sent', now())`,
       [artisanA, UA, id],
     );
     const log = (await callQuery(server, "factures.getAuditLog", { factureId: id }, tA)).json().result.data as Array<{ action: string }>;
