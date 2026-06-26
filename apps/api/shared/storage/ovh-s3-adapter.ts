@@ -1,5 +1,9 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
-import type { StoragePort, PutOptions } from "../ports/storage";
+import { createHash } from "crypto";
+import { eq, and } from "drizzle-orm";
+import type { StoragePort, StoredFile, UploadOptions } from "../ports/storage";
+import type { DbClient } from "../db/client";
+import { files } from "../../../../drizzle/schema/files";
 
 /*
  * Adapter OVH Object Storage (S3-compatible, région GRA — Gravelines).
@@ -22,8 +26,10 @@ export class OvhS3Adapter implements StoragePort {
   private readonly client: S3Client;
   private readonly bucket: string;
   private readonly publicBaseUrl: string;
+  private readonly db: DbClient;
 
-  constructor() {
+  constructor(db: DbClient) {
+    this.db = db;
     this.bucket = process.env.OVH_S3_BUCKET ?? "operioz-staging";
     this.publicBaseUrl = (process.env.OVH_S3_PUBLIC_BASE_URL ?? "").replace(/\/$/, "");
     this.client = new S3Client({
@@ -38,15 +44,44 @@ export class OvhS3Adapter implements StoragePort {
     });
   }
 
-  async put(key: string, body: Buffer, opts?: PutOptions): Promise<void> {
+  async upload(key: string, body: Buffer, opts?: UploadOptions): Promise<StoredFile> {
+    const sha256 = createHash("sha256").update(body).digest("hex");
+    const purpose = opts?.purpose ?? "unknown";
+    const contentType = opts?.contentType ?? "application/octet-stream";
+
+    /* Dédup : même hash + même artisanId + même purpose → réutiliser l'entrée existante */
+    if (opts?.artisanId !== undefined) {
+      const [existing] = await this.db
+        .select()
+        .from(files)
+        .where(and(eq(files.sha256, sha256), eq(files.artisanId, opts.artisanId), eq(files.purpose, purpose)))
+        .limit(1);
+      if (existing) return existing;
+    }
+
     await this.client.send(
       new PutObjectCommand({
         Bucket: this.bucket,
         Key: key,
         Body: body,
-        ContentType: opts?.contentType,
+        ContentType: contentType,
       }),
     );
+
+    const [row] = await this.db
+      .insert(files)
+      .values({
+        artisanId: opts?.artisanId ?? null,
+        storageKey: key,
+        filename: opts?.filename ?? null,
+        mimeType: contentType,
+        sizeBytes: body.byteLength,
+        sha256,
+        purpose,
+        bucket: this.bucket,
+      })
+      .returning();
+    return row;
   }
 
   async get(key: string): Promise<Buffer | null> {

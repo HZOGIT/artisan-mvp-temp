@@ -9,3 +9,4 @@ export * from "./comptabilite";
 export * from "./rh";
 export * from "./divers";
 export * from "./einvoicing";
+export * from "./files";
