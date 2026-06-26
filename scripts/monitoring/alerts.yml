@@ -18,3 +18,17 @@ groups:
         for: 1m
         annotations:
           summary: Backend new-stack inaccessible depuis 1 min
+
+  - name: email
+    rules:
+      - alert: EmailBounceRateHigh
+        expr: rate(resend_webhook_total{type="email.bounced"}[1h]) / rate(resend_webhook_total{type="email.sent"}[1h]) > 0.05
+        for: 30m
+        annotations:
+          summary: Bounce rate emails > 5% — risque de blacklistage domaine
+
+      - alert: EmailSpamComplaint
+        expr: increase(resend_webhook_total{type="email.complained"}[1h]) > 0
+        for: 0m
+        annotations:
+          summary: Plainte spam Resend — action immédiate requise

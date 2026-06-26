@@ -155,6 +155,7 @@ import { ChatClientNotifierDrizzle } from "./modules/chat/infra/chat-client-noti
 import { registerIcalRoute } from "./interface/http/ical-route";
 import { IcalPublicReaderDrizzle } from "./modules/calendrier/infra/ical-public-reader-drizzle";
 import { registerStripeWebhookRoute } from "./interface/http/stripe-webhook-route";
+import { registerResendWebhookRoute } from "./interface/http/resend-webhook-route";
 import { registerBillingSchedulerRoute } from "./interface/http/billing-scheduler-route";
 import { handleBillingWebhookEvent } from "./modules/billing/interface/http/billing-webhook-handler";
 import fastifySchedule from "@fastify/schedule";
@@ -409,6 +410,7 @@ export interface AppDeps extends ContextDeps {
   readonly subscriptionRepo?: ISubscriptionRepository;
   readonly stripePort?: StripePort;
   readonly stripeWebhookSecret?: string;
+  readonly resendWebhookSecret?: string;
   readonly facturesCAReader?: FacturesCAReader;
   readonly tresorerieReader?: TresorerieReader;
   readonly eventBus?: EventBusPort;
@@ -1142,6 +1144,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     },
     eventBus,
   });
+
+  const resendSecret = deps.resendWebhookSecret ?? process.env.RESEND_WEBHOOK_SECRET;
+  if (resendSecret) {
+    registerResendWebhookRoute(app, { resendWebhookSecret: resendSecret });
+  }
 
   /** Scheduler billing maison — `POST /internal/billing/tick` sécurisé par x-scheduler-secret. */
   const billingNotifier = new SubscriptionEventNotifierDrizzle(getDbHandle().db, emailAdapter);
