@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { and, count, desc, eq, gte, lte } from "drizzle-orm";
+import { and, count, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { platformAdminProcedure, router } from "../../../../interface/trpc/trpc";
-import { artisans, subscriptions, users, eventLog } from "../../../../../../drizzle/schema.pg";
+import { artisans, subscriptions, users, eventLog, llmUsage } from "../../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../../shared/db";
 
 const PAGE_SIZE = 50;
@@ -81,6 +81,26 @@ export function createPlatformAdminRouter(db: DbClient) {
             db.select({ total: count() }).from(eventLog).where(filters),
           ]);
           return { items, total: Number(totals[0]?.total ?? 0) };
+        }),
+    }),
+    llmUsage: router({
+      summary: platformAdminProcedure
+        .input(z.object({}))
+        .query(async () => {
+          const rows = await db
+            .select({
+              artisanId: llmUsage.artisanId,
+              nomEntreprise: artisans.nomEntreprise,
+              totalTokens: sql<number>`sum(${llmUsage.totalTokens})`,
+              promptTokens: sql<number>`sum(${llmUsage.promptTokens})`,
+              responseTokens: sql<number>`sum(${llmUsage.responseTokens})`,
+              callCount: sql<number>`count(*)`,
+            })
+            .from(llmUsage)
+            .leftJoin(artisans, eq(artisans.id, llmUsage.artisanId))
+            .groupBy(llmUsage.artisanId, artisans.nomEntreprise)
+            .orderBy(desc(sql`sum(${llmUsage.totalTokens})`));
+          return rows;
         }),
     }),
   });

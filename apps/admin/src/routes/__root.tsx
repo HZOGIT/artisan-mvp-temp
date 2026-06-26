@@ -19,6 +19,7 @@ export const rootRoute = createRootRoute({
             Abonnements
           </Link>
           <Link to="/events" style={{ color: "#94a3b8", textDecoration: "none" }}>Événements</Link>
+          <Link to="/llm-usage" style={{ color: "#94a3b8", textDecoration: "none" }}>LLM</Link>
           <button
             onClick={() => logout.mutate()}
             style={{ marginLeft: "auto", padding: "4px 12px", background: "transparent", color: "#94a3b8", border: "1px solid #334155", borderRadius: "4px", cursor: "pointer", fontSize: "13px" }}

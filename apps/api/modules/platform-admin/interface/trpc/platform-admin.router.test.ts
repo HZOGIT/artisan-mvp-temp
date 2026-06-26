@@ -34,6 +34,10 @@ const appDb = createDbClient(APP_URL!);
 const appPool = new Pool({ connectionString: APP_URL });
 let server: ReturnType<typeof buildApp>;
 const eventIds: number[] = [];
+const llmUsageIds: number[] = [];
+
+const UID_LLM_A = 9970010;
+const UID_LLM_B = 9970011;
 
 const purgeUser = async (uid: number) => {
   await admin.query('delete from artisans where "userId" = $1', [uid]);
@@ -49,14 +53,21 @@ beforeAll(async () => {
   await purgeUser(UID_ADMIN_TENANT);
   await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','admin')", [UID_ADMIN_TENANT, `u${UID_ADMIN_TENANT}@t.fr`]);
   await admin.query('insert into artisans ("userId") values ($1)', [UID_ADMIN_TENANT]);
+  await purgeUser(UID_LLM_A);
+  await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [UID_LLM_A, `u${UID_LLM_A}@t.fr`]);
+  await admin.query('insert into artisans ("userId", "nomEntreprise") values ($1,$2)', [UID_LLM_A, "EntrepriseA"]);
+  await purgeUser(UID_LLM_B);
+  await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [UID_LLM_B, `u${UID_LLM_B}@t.fr`]);
+  await admin.query('insert into artisans ("userId", "nomEntreprise") values ($1,$2)', [UID_LLM_B, "EntrepriseB"]);
   server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(appDb.db), roleReader: new DrizzleUserRoleReader(appDb.db) });
 });
 
 afterAll(async () => {
   if (!URL) return;
   if (eventIds.length) await admin.query("delete from events where id = any($1)", [eventIds]);
+  if (llmUsageIds.length) await admin.query("delete from llm_usage where id = any($1)", [llmUsageIds]);
   await server?.close();
-  for (const uid of [UID_USER, UID_ADMIN_STAFF, UID_ADMIN_TENANT]) await purgeUser(uid);
+  for (const uid of [UID_USER, UID_ADMIN_STAFF, UID_ADMIN_TENANT, UID_LLM_A, UID_LLM_B]) await purgeUser(uid);
   await appDb.close();
   await appPool.end();
   await admin.end();
@@ -92,6 +103,48 @@ describe.skipIf(!URL)("platformAdmin.artisans.list L3", () => {
     expect(artisanId).toBeDefined();
     expect(data.items.some((a) => a.id === artisanId)).toBe(true);
     expect(data.total).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe.skipIf(!URL)("platformAdmin.llmUsage.summary L2+L3 — RLS llm_usage ouverte (0044)", () => {
+  it("L2 — app_tenant voit les lignes cross-tenant (RLS désactivée)", async () => {
+    const artisanA = await admin.query<{ id: number }>('select id from artisans where "userId" = $1', [UID_LLM_A]);
+    const artisanB = await admin.query<{ id: number }>('select id from artisans where "userId" = $1', [UID_LLM_B]);
+    const idA = artisanA.rows[0]!.id;
+    const idB = artisanB.rows[0]!.id;
+
+    const rA = await admin.query<{ id: number }>(
+      "insert into llm_usage (artisan_id, use_case, model, prompt_tokens, response_tokens, total_tokens, duration_ms, finish_reason) values ($1,'test','claude-sonnet-4-6',100,50,150,200,'stop') returning id",
+      [idA],
+    );
+    const rB = await admin.query<{ id: number }>(
+      "insert into llm_usage (artisan_id, use_case, model, prompt_tokens, response_tokens, total_tokens, duration_ms, finish_reason) values ($1,'test','claude-sonnet-4-6',200,80,280,300,'stop') returning id",
+      [idB],
+    );
+    llmUsageIds.push(rA.rows[0]!.id, rB.rows[0]!.id);
+
+    const rows = await appPool.query<{ artisan_id: number; total_tokens: string }>(
+      "select artisan_id, sum(total_tokens) as total_tokens from llm_usage where artisan_id = any($1) group by artisan_id",
+      [[idA, idB]],
+    );
+    expect(rows.rows).toHaveLength(2);
+    const totals = rows.rows.map((r) => Number(r.total_tokens));
+    expect(totals).toContain(150);
+    expect(totals).toContain(280);
+  });
+
+  it("L3 — staff admin voit le summary cross-tenant (les 2 artisans agrégés)", async () => {
+    const tok = await signToken(UID_ADMIN_STAFF, `u${UID_ADMIN_STAFF}@t.fr`);
+    const res = await injectTrpc(server, "GET", "platformAdmin.llmUsage.summary", {}, tok);
+    expect(res.statusCode).toBe(200);
+    const data = (res.json() as { result: { data: { artisanId: number }[] } }).result.data;
+    expect(Array.isArray(data)).toBe(true);
+    const artisanA = await admin.query<{ id: number }>('select id from artisans where "userId" = $1', [UID_LLM_A]);
+    const artisanB = await admin.query<{ id: number }>('select id from artisans where "userId" = $1', [UID_LLM_B]);
+    const idA = artisanA.rows[0]!.id;
+    const idB = artisanB.rows[0]!.id;
+    expect(data.some((r) => r.artisanId === idA)).toBe(true);
+    expect(data.some((r) => r.artisanId === idB)).toBe(true);
   });
 });
 
