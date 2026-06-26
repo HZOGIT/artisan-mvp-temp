@@ -75,4 +75,12 @@ export interface IContratRepository {
    * contrat est vérifié par le use-case ; le repo écrit le lien scopé tenant.
    */
   recordFactureRecurrente(ctx: TenantContext, input: RecordFactureRecurrenteInput): Promise<void>;
+
+  /*
+   * Contrats actifs à reconduction tacite dont l'alerte Chatel n'a pas encore été envoyée
+   * et dont `dateFin` est dans la fenêtre légale 1–3 mois.
+   */
+  listProchaineReconduction(ctx: TenantContext): Promise<Contrat[]>;
+  /** Horodate l'envoi de l'alerte Chatel (idempotent — IS NULL filtré en amont). */
+  markAlertReconductionSent(ctx: TenantContext, id: number): Promise<void>;
 }

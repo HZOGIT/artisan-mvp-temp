@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lte, sql } from "drizzle-orm";
 import { contratsMaintenance, clients, interventionsContrat, facturesRecurrentes } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
@@ -54,6 +54,7 @@ function toContrat(r: ContratRow): Contrat {
     dateFin: r.dateFin ?? null,
     reconduction: r.reconduction ?? true,
     preavisResiliation: r.preavisResiliation ?? 1,
+    alerteReconductionEnvoyeeLe: r.alerteReconductionEnvoyeeLe ?? null,
     prochainFacturation: r.prochainFacturation ?? null,
     prochainPassage: r.prochainPassage ?? null,
     conditionsParticulieres: r.conditionsParticulieres ?? null,
@@ -307,6 +308,37 @@ export class ContratRepositoryDrizzle implements IContratRepository {
         periodeFin: input.periodeFin,
         genereeAutomatiquement: input.genereeAutomatiquement ?? false,
       });
+    });
+  }
+
+  listProchaineReconduction(ctx: TenantContext): Promise<Contrat[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const now = new Date();
+      const in1Month = new Date(now.getTime() + 30 * 86_400_000);
+      const in3Months = new Date(now.getTime() + 90 * 86_400_000);
+      const rows = await tx
+        .select()
+        .from(contratsMaintenance)
+        .where(
+          and(
+            eq(contratsMaintenance.artisanId, ctx.artisanId),
+            eq(contratsMaintenance.statut, "actif"),
+            eq(contratsMaintenance.reconduction, true),
+            isNull(contratsMaintenance.alerteReconductionEnvoyeeLe),
+            gte(contratsMaintenance.dateFin, in1Month),
+            lte(contratsMaintenance.dateFin, in3Months),
+          ),
+        );
+      return rows.map(toContrat);
+    });
+  }
+
+  markAlertReconductionSent(ctx: TenantContext, id: number): Promise<void> {
+    return withTenant(this.db, ctx, async (tx) => {
+      await tx
+        .update(contratsMaintenance)
+        .set({ alerteReconductionEnvoyeeLe: new Date() })
+        .where(and(eq(contratsMaintenance.id, id), eq(contratsMaintenance.artisanId, ctx.artisanId)));
     });
   }
 }

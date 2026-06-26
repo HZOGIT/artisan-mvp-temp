@@ -11,6 +11,8 @@ export interface NotificationsCronDeps {
   readonly generateAlerts: () => Promise<{ alertsCreated: number }>;
   /** Génère alertes retard de livraison commandes fournisseurs pour TOUS les artisans. */
   readonly generateCommandeRetardAlerts: () => Promise<{ alertsCreated: number }>;
+  /** Génère alertes reconduction tacite contrats maintenance (loi Chatel) pour TOUS les artisans. */
+  readonly generateAlertesReconduction: () => Promise<{ alertsCreated: number }>;
 }
 
 export interface NotificationsCronOptions {
@@ -40,10 +42,11 @@ export const notificationsCronPlugin = fp(
             return;
           }
 
-          const [reminders, alerts, commandeRetardAlerts] = await Promise.allSettled([
+          const [reminders, alerts, commandeRetardAlerts, reconductionAlerts] = await Promise.allSettled([
             opts.deps.generateOverdueReminders(),
             opts.deps.generateAlerts(),
             opts.deps.generateCommandeRetardAlerts(),
+            opts.deps.generateAlertesReconduction(),
           ]);
           if (reminders.status === "rejected") {
             app.log.error({ event: "notifications_tick_reminders_error", error: reminders.reason instanceof Error ? reminders.reason.message : String(reminders.reason) }, "Rappels factures tick échoué");
@@ -54,12 +57,16 @@ export const notificationsCronPlugin = fp(
           if (commandeRetardAlerts.status === "rejected") {
             app.log.error({ event: "notifications_tick_commande_retard_error", error: commandeRetardAlerts.reason instanceof Error ? commandeRetardAlerts.reason.message : String(commandeRetardAlerts.reason) }, "Alertes retard commandes tick échoué");
           }
+          if (reconductionAlerts.status === "rejected") {
+            app.log.error({ event: "notifications_tick_reconduction_error", error: reconductionAlerts.reason instanceof Error ? reconductionAlerts.reason.message : String(reconductionAlerts.reason) }, "Alertes reconduction Chatel tick échoué");
+          }
           app.log.info(
             {
               event: "notifications_tick_done",
               rappelsCreated: reminders.status === "fulfilled" ? reminders.value.rappelsCreated : 0,
               alertsCreated: alerts.status === "fulfilled" ? alerts.value.alertsCreated : 0,
               commandeRetardAlertsCreated: commandeRetardAlerts.status === "fulfilled" ? commandeRetardAlerts.value.alertsCreated : 0,
+              reconductionAlertsCreated: reconductionAlerts.status === "fulfilled" ? reconductionAlerts.value.alertsCreated : 0,
             },
             "Notifications tick terminé",
           );

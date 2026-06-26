@@ -25,6 +25,7 @@ export interface Contrat {
   readonly dateFin: Date | null;
   readonly reconduction: boolean;
   readonly preavisResiliation: number;
+  readonly alerteReconductionEnvoyeeLe: Date | null;
   readonly prochainFacturation: Date | null;
   readonly prochainPassage: Date | null;
   readonly conditionsParticulieres: string | null;
