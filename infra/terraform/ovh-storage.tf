@@ -1,20 +1,14 @@
 /*
- * Bucket OVH S3 — la création du bucket lui-même passe par la CLI AWS (le provider ovh/ovh
- * ne crée pas encore de bucket S3 directement). Bootstrap à exécuter une seule fois :
+ * Bucket OVH S3 — le provider ovh/ovh crée l'utilisateur + credentials + policy ci-dessous,
+ * mais PAS le bucket lui-même. Bootstrap MANUEL one-time par environnement, APRÈS terraform apply
+ * (qui génère les creds OVH_S3_* à poser dans l'env runtime backend) :
  *
- *   aws s3api create-bucket \
- *     --endpoint-url https://s3.gra.io.cloud.ovh.net \
- *     --bucket operioz-staging \
- *     --region gra
+ *   node scripts/bootstrap-ovh-bucket.mjs --env-file .env.staging          # crée le bucket (idempotent)
+ *   node scripts/bootstrap-ovh-bucket.mjs --env-file .env.production       # idem pour la prod
+ *   node scripts/bootstrap-ovh-bucket.mjs --env-file .env.staging --public # bucket public-read (logos)
  *
- * Pour rendre le bucket public-read (logos artisan) :
- *
- *   aws s3api put-bucket-acl \
- *     --endpoint-url https://s3.gra.io.cloud.ovh.net \
- *     --bucket operioz-staging \
- *     --acl public-read
- *
- * Région GRA (Gravelines, France) — endpoint : s3.gra.io.cloud.ovh.net
+ * Le script utilise @aws-sdk/client-s3 (pas besoin de l'AWS CLI) et lit OVH_S3_ENDPOINT/ACCESS_KEY/
+ * SECRET_KEY/BUCKET (REGION optionnelle, def. gra). Région GRA (Gravelines) — s3.gra.io.cloud.ovh.net.
  * Staging = 1-AZ (SLA 99,9 %) ; prod devra passer en 3-AZ (~16 $/To).
  */
 
