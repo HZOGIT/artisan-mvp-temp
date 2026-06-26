@@ -129,6 +129,7 @@ import { AssistantThreadsRepositoryDrizzle } from "./modules/assistant/infra/ass
 import { AssistantDataReaderDrizzle } from "./modules/assistant/infra/assistant-data-reader-drizzle";
 import { createChatModule } from "./modules/chat/chat.module";
 import { createSupportModule } from "./modules/support/support.module";
+import { createFeedbackModule } from "./modules/feedback/feedback.module";
 import { createDevicesModule } from "./modules/devices/devices.module";
 import { DeviceRepositoryDrizzle } from "./modules/devices/infra/device-repository-drizzle";
 import { createAlertesPrevisionsModule } from "./modules/alertes-previsions/alertes-previsions.module";
@@ -918,6 +919,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     rateLimiter: new SlidingWindowRateLimiter(5, 15 * 60 * 1000),
     destinataire: process.env.SUPPORT_EMAIL ?? "support@operioz.com",
   });
+
+  const feedback = createFeedbackModule({
+    notionToken: process.env.NOTION_TOKEN,
+    notionDatabaseId: process.env.NOTION_DATABASE_ID,
+  });
   /** Module `devices` (appareils/sessions de l'utilisateur). Table HORS RLS scopée par userId. */
   const devices = createDevicesModule({ repo: new DeviceRepositoryDrizzle(getDbHandle().db) });
   /** Module `alertesPrevisions` (alertes du prévisionnel de trésorerie). Tables SOUS RLS (artisanId). */
@@ -1001,7 +1007,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   const events = createEventsModule({ db: getDbHandle().db });
 
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp, interventionsMobile, vitrine, clientPortal, integrationsComptables, devisIA, billing, platformAdmin, events, einvoicing });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp, interventionsMobile, vitrine, clientPortal, integrationsComptables, devisIA, billing, platformAdmin, events, einvoicing, feedback });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
