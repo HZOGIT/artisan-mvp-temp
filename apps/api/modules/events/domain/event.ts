@@ -1,1 +1,1 @@
-export type { EventLog } from "../../../../../../drizzle/schema.pg";
+export type { EventLog } from "../../../../../drizzle/schema.pg";
