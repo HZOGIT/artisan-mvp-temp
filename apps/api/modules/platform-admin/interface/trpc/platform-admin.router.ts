@@ -38,19 +38,17 @@ export function createPlatformAdminRouter(db: DbClient) {
       disable: platformAdminProcedure
         .input(z.object({ id: z.number().int() }))
         .mutation(async ({ input }) => {
-          await Promise.all([
-            db.update(artisans).set({ isActive: false }).where(eq(artisans.id, input.id)),
-            db.update(users).set({ actif: false }).where(eq(users.artisanId, input.id)),
-          ]);
+          const [updated] = await db.update(artisans).set({ isActive: false }).where(eq(artisans.id, input.id)).returning({ id: artisans.id, isActive: artisans.isActive });
+          await db.update(users).set({ actif: false }).where(eq(users.artisanId, input.id));
+          return { id: updated?.id ?? null, isActive: updated?.isActive ?? null };
         }),
 
       enable: platformAdminProcedure
         .input(z.object({ id: z.number().int() }))
         .mutation(async ({ input }) => {
-          await Promise.all([
-            db.update(artisans).set({ isActive: true }).where(eq(artisans.id, input.id)),
-            db.update(users).set({ actif: true }).where(eq(users.artisanId, input.id)),
-          ]);
+          const [updated] = await db.update(artisans).set({ isActive: true }).where(eq(artisans.id, input.id)).returning({ id: artisans.id, isActive: artisans.isActive });
+          await db.update(users).set({ actif: true }).where(eq(users.artisanId, input.id));
+          return { id: updated?.id ?? null, isActive: updated?.isActive ?? null };
         }),
     }),
     subscriptions: router({

@@ -62,7 +62,8 @@ beforeAll(async () => {
   await admin.query('insert into artisans ("userId", "nomEntreprise") values ($1,$2)', [UID_LLM_B, "EntrepriseB"]);
   await purgeUser(UID_ARTISAN_DISABLE);
   await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [UID_ARTISAN_DISABLE, `u${UID_ARTISAN_DISABLE}@t.fr`]);
-  await admin.query('insert into artisans ("userId") values ($1)', [UID_ARTISAN_DISABLE]);
+  const disableArtisanRow = await admin.query<{ id: number }>('insert into artisans ("userId") values ($1) returning id', [UID_ARTISAN_DISABLE]);
+  await admin.query('update users set "artisanId" = $1 where id = $2', [disableArtisanRow.rows[0]!.id, UID_ARTISAN_DISABLE]);
   server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(appDb.db), roleReader: new DrizzleUserRoleReader(appDb.db) });
 });
 
@@ -182,9 +183,10 @@ describe.skipIf(!URL)("platformAdmin.artisans.disable / enable L3", () => {
 
     const res = await injectTrpc(server, "POST", "platformAdmin.artisans.disable", { id: artisanId }, tok);
     expect(res.statusCode).toBe(200);
+    const body = (res.json() as { result: { data: { id: number | null; isActive: boolean | null } } }).result.data;
+    expect(body.id).toBe(artisanId);
+    expect(body.isActive).toBe(false);
 
-    const a = await admin.query<{ is_active: boolean }>('select is_active from artisans where id = $1', [artisanId]);
-    expect(a.rows[0]!.is_active).toBe(false);
     const u = await admin.query<{ actif: boolean }>('select actif from users where id = $1', [UID_ARTISAN_DISABLE]);
     expect(u.rows[0]!.actif).toBe(false);
   });
@@ -206,9 +208,10 @@ describe.skipIf(!URL)("platformAdmin.artisans.disable / enable L3", () => {
 
     const res = await injectTrpc(server, "POST", "platformAdmin.artisans.enable", { id: artisanId }, tok);
     expect(res.statusCode).toBe(200);
+    const body = (res.json() as { result: { data: { id: number | null; isActive: boolean | null } } }).result.data;
+    expect(body.id).toBe(artisanId);
+    expect(body.isActive).toBe(true);
 
-    const a = await admin.query<{ is_active: boolean }>('select is_active from artisans where id = $1', [artisanId]);
-    expect(a.rows[0]!.is_active).toBe(true);
     const u = await admin.query<{ actif: boolean }>('select actif from users where id = $1', [UID_ARTISAN_DISABLE]);
     expect(u.rows[0]!.actif).toBe(true);
   });
