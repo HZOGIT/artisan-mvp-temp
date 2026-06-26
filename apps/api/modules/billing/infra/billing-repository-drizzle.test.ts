@@ -14,9 +14,8 @@ const A = 997901;
 const B = 997902;
 const ctx = (artisanId: number): TenantContext => ({ artisanId, userId: 1 });
 
-// ⚠️ Les tables billing_* sont HORS RLS → scope EXPLICITE par artisan_id dans le repo.
-// Ce test vérifie que le scope est bien appliqué (isolation cross-tenant) via app_tenant.
-describe.skipIf(!URL)("BillingRepositoryDrizzle (PG, scope explicite artisan_id)", () => {
+// billing_payment_methods + billing_subscriptions : HORS RLS → scope EXPLICITE par artisan_id dans le repo.
+describe.skipIf(!URL)("BillingRepositoryDrizzle (PG, HORS RLS — scope explicite artisan_id)", () => {
   const admin = new Pool({ connectionString: URL });
   const app = createDbClient(APP_URL!);
   const repo = new BillingRepositoryDrizzle(app.db);

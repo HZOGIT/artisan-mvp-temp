@@ -48,7 +48,7 @@ function toLegacySubscriptionRow(r: LegacyRow): SubscriptionRow {
   };
 }
 
-/** Lit depuis `billing_subscriptions` (billing maison), avec fallback sur `subscriptions` (legacy). HORS RLS → scope explicite par `artisan_id`. */
+/** Lit depuis `billing_subscriptions` (billing maison — HORS RLS, scope explicite artisan_id), avec fallback sur `subscriptions` (legacy). */
 export class SubscriptionReaderDrizzle implements ISubscriptionReader {
   constructor(private readonly db: DbClient) {}
 

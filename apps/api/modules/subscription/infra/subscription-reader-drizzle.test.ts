@@ -52,3 +52,39 @@ describe.skipIf(!URL)("SubscriptionReaderDrizzle (PG : subscriptions HORS RLS, s
     expect((await getCurrent(reader, ctx(9944999))).plan).toBe("trial");
   });
 });
+
+describe.skipIf(!URL)("SubscriptionReaderDrizzle — billing_subscriptions HORS RLS (OPE-645)", () => {
+  const C = 9944003;
+  const admin = new Pool({ connectionString: URL });
+  const app = createDbClient(APP_URL!);
+  const reader = new SubscriptionReaderDrizzle(app.db);
+
+  afterAll(async () => {
+    await admin.query(
+      "update billing_subscriptions set status='trialing', payment_method_id=null where artisan_id=$1",
+      [C],
+    );
+    await admin.query("delete from billing_subscriptions where artisan_id=$1", [C]);
+    await app.close();
+    await admin.end();
+  });
+
+  it("getSubscription retourne la ligne billing_subscriptions via app_tenant (DISABLE RLS — pas de 42501)", async () => {
+    await admin.query(
+      `insert into billing_subscriptions (artisan_id, plan_id, billing_mode, status, trial_ends_at)
+       values ($1, 'pro', 'maison', 'trialing', now() + interval '14 days')
+       on conflict (artisan_id) do update set plan_id = 'pro', status = 'trialing'`,
+      [C],
+    );
+    const sub = await reader.getSubscription(ctx(C));
+    expect(sub).not.toBeNull();
+    expect(sub?.artisanId).toBe(C);
+    expect(sub?.plan).toBe("pro");
+  });
+
+  it("getCurrent : paywall correct depuis billing_subscriptions (scope explicite artisan_id)", async () => {
+    const cur = await getCurrent(reader, ctx(C));
+    expect(cur.plan).toBe("pro");
+    expect(cur.isTrialing).toBe(true);
+  });
+});

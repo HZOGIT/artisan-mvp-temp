@@ -12,6 +12,7 @@ import {
 } from "../../../../../drizzle/schema.pg";
 import type { BillingPaymentMethod, BillingSubscription, BillingCycle, BillingInvoice, BillingEvent, BillingChargeAttempt } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
+import { withTenant } from "../../../shared/db/with-tenant";
 import type { TenantContext } from "../../../shared/tenant";
 import type {
   IBillingRepository,
@@ -26,79 +27,88 @@ import type {
   CreateInvoiceForCycleParams,
 } from "../application/billing-repository";
 
-/** ⚠️ Les tables billing_* sont HORS RLS → scope EXPLICITE par artisan_id. */
+/** billing_payment_methods : RLS tenant — accès via withTenant (UI uniquement).
+ *  billing_subscriptions / billing_invoices : HORS RLS — scope explicite artisan_id. */
 export class BillingRepositoryDrizzle implements IBillingRepository {
   constructor(private readonly db: DbClient) {}
 
 
   async listPaymentMethods(ctx: TenantContext): Promise<BillingPaymentMethod[]> {
-    return this.db
-      .select()
-      .from(billingPaymentMethods)
-      .where(and(eq(billingPaymentMethods.artisan_id, ctx.artisanId), isNull(billingPaymentMethods.revoked_at)))
-      .orderBy(desc(billingPaymentMethods.is_default), desc(billingPaymentMethods.created_at));
+    return withTenant(this.db, ctx, (tx) =>
+      tx
+        .select()
+        .from(billingPaymentMethods)
+        .where(and(eq(billingPaymentMethods.artisan_id, ctx.artisanId), isNull(billingPaymentMethods.revoked_at)))
+        .orderBy(desc(billingPaymentMethods.is_default), desc(billingPaymentMethods.created_at)),
+    );
   }
 
   async findPaymentMethodById(ctx: TenantContext, id: number): Promise<BillingPaymentMethod | null> {
-    const [row] = await this.db
-      .select()
-      .from(billingPaymentMethods)
-      .where(and(eq(billingPaymentMethods.id, id), eq(billingPaymentMethods.artisan_id, ctx.artisanId)))
-      .limit(1);
+    const [row] = await withTenant(this.db, ctx, (tx) =>
+      tx
+        .select()
+        .from(billingPaymentMethods)
+        .where(and(eq(billingPaymentMethods.id, id), eq(billingPaymentMethods.artisan_id, ctx.artisanId)))
+        .limit(1),
+    );
     return row ?? null;
   }
 
   async findDefaultPaymentMethod(ctx: TenantContext): Promise<BillingPaymentMethod | null> {
-    const [row] = await this.db
-      .select()
-      .from(billingPaymentMethods)
-      .where(
-        and(
-          eq(billingPaymentMethods.artisan_id, ctx.artisanId),
-          eq(billingPaymentMethods.is_default, true),
-          isNull(billingPaymentMethods.revoked_at),
-        ),
-      )
-      .limit(1);
+    const [row] = await withTenant(this.db, ctx, (tx) =>
+      tx
+        .select()
+        .from(billingPaymentMethods)
+        .where(
+          and(
+            eq(billingPaymentMethods.artisan_id, ctx.artisanId),
+            eq(billingPaymentMethods.is_default, true),
+            isNull(billingPaymentMethods.revoked_at),
+          ),
+        )
+        .limit(1),
+    );
     return row ?? null;
   }
 
   async savePaymentMethod(params: SavePaymentMethodParams): Promise<BillingPaymentMethod> {
-    const [row] = await this.db
-      .insert(billingPaymentMethods)
-      .values({
-        artisan_id: params.artisanId,
-        stripe_customer_id: params.stripeCustomerId,
-        stripe_payment_method_id: params.stripePaymentMethodId,
-        brand: params.brand,
-        last4: params.last4,
-        exp_month: params.expMonth,
-        exp_year: params.expYear,
-        is_default: false,
-        consented_at: params.consentedAt,
-      })
-      .returning();
+    const ctx: TenantContext = { artisanId: params.artisanId, userId: 0 };
+    const [row] = await withTenant(this.db, ctx, (tx) =>
+      tx
+        .insert(billingPaymentMethods)
+        .values({
+          artisan_id: params.artisanId,
+          stripe_customer_id: params.stripeCustomerId,
+          stripe_payment_method_id: params.stripePaymentMethodId,
+          brand: params.brand,
+          last4: params.last4,
+          exp_month: params.expMonth,
+          exp_year: params.expYear,
+          is_default: false,
+          consented_at: params.consentedAt,
+        })
+        .returning(),
+    );
     if (!row) throw new Error("DB insert returned no row");
     return row;
   }
 
   async setDefaultPaymentMethod(ctx: TenantContext, id: number): Promise<void> {
-    /*
-     * Atomique : un seul UPDATE évite la fenêtre où toutes les cartes sont is_default=false
-     * (le scheduler appelant findDefaultPaymentMethod entre les deux anciens UPDATEs
-     * aurait vu null → délai 24h injuste sur le cycle en cours).
-     */
-    await this.db
-      .update(billingPaymentMethods)
-      .set({ is_default: sql<boolean>`(${billingPaymentMethods.id} = ${id})` })
-      .where(eq(billingPaymentMethods.artisan_id, ctx.artisanId));
+    await withTenant(this.db, ctx, (tx) =>
+      tx
+        .update(billingPaymentMethods)
+        .set({ is_default: sql<boolean>`(${billingPaymentMethods.id} = ${id})` })
+        .where(eq(billingPaymentMethods.artisan_id, ctx.artisanId)),
+    );
   }
 
   async revokePaymentMethod(ctx: TenantContext, id: number): Promise<void> {
-    await this.db
-      .update(billingPaymentMethods)
-      .set({ is_default: false, revoked_at: new Date() })
-      .where(and(eq(billingPaymentMethods.id, id), eq(billingPaymentMethods.artisan_id, ctx.artisanId)));
+    await withTenant(this.db, ctx, (tx) =>
+      tx
+        .update(billingPaymentMethods)
+        .set({ is_default: false, revoked_at: new Date() })
+        .where(and(eq(billingPaymentMethods.id, id), eq(billingPaymentMethods.artisan_id, ctx.artisanId))),
+    );
   }
 
 
@@ -482,12 +492,15 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
 
 
   async findStripeCustomerId(artisanId: number): Promise<string | null> {
-    const [pm] = await this.db
-      .select({ cid: billingPaymentMethods.stripe_customer_id })
-      .from(billingPaymentMethods)
-      .where(eq(billingPaymentMethods.artisan_id, artisanId))
-      .orderBy(desc(billingPaymentMethods.created_at))
-      .limit(1);
+    const ctx: TenantContext = { artisanId, userId: 0 };
+    const [pm] = await withTenant(this.db, ctx, (tx) =>
+      tx
+        .select({ cid: billingPaymentMethods.stripe_customer_id })
+        .from(billingPaymentMethods)
+        .where(eq(billingPaymentMethods.artisan_id, artisanId))
+        .orderBy(desc(billingPaymentMethods.created_at))
+        .limit(1),
+    );
     if (pm?.cid) return pm.cid;
     const legacy = await this.db.execute(
       sql`SELECT stripe_customer_id FROM subscriptions WHERE artisan_id = ${artisanId} AND stripe_customer_id IS NOT NULL LIMIT 1`,
