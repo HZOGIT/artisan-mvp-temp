@@ -10,6 +10,8 @@ const SECRET = "test-secret-at-least-32-characters-long-xxxx";
 const UID = 9940111;
 const EMAIL = `u${UID}@t.fr`;
 const PASSWORD = "Secret123!";
+const ADMIN_UID = 9940112;
+const ADMIN_EMAIL = `admin${ADMIN_UID}@t.fr`;
 
 const jwt = (userId: number) =>
   new SignJWT({ userId, email: EMAIL }).setProtectedHeader({ alg: "HS256" }).setExpirationTime("1h").sign(new TextEncoder().encode(SECRET));
@@ -20,13 +22,14 @@ describe.skipIf(!URL)("auth.router e2e (session + gardes)", () => {
   let app: ReturnType<typeof buildApp>;
 
   const cleanup = async () => {
-    await admin.query("delete from users where id=$1 or email=$2", [UID, EMAIL]);
+    await admin.query("delete from users where id=any($1) or email=any($2)", [[UID, ADMIN_UID], [EMAIL, ADMIN_EMAIL]]);
   };
 
   beforeAll(async () => {
     await cleanup();
     const hash = await new BcryptPasswordHasher().hash(PASSWORD);
     await admin.query("insert into users (id, email, password, role) values ($1,$2,$3,'artisan')", [UID, EMAIL, hash]);
+    await admin.query("insert into users (id, email, password, role) values ($1,$2,$3,'admin')", [ADMIN_UID, ADMIN_EMAIL, hash]);
     app = buildApp({ jwtSecret: SECRET });
   });
 
@@ -68,5 +71,29 @@ describe.skipIf(!URL)("auth.router e2e (session + gardes)", () => {
   it("updateEmail sans cookie → 401 (procédure protégée)", async () => {
     const res = await injectTrpc(app, "POST", "auth.updateEmail", { newEmail: "x@y.fr", currentPassword: "any" });
     expect(res.statusCode).toBe(401);
+  });
+
+  it("signin artisan → succès (rôle artisan accepté)", async () => {
+    const res = await injectTrpc(app, "POST", "auth.signin", { email: EMAIL, password: PASSWORD });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().result.data.success).toBe(true);
+  });
+
+  it("signin admin → 403 'portail administrateur'", async () => {
+    const res = await injectTrpc(app, "POST", "auth.signin", { email: ADMIN_EMAIL, password: PASSWORD });
+    expect(res.statusCode).toBe(403);
+    expect(res.json().error.message).toContain("portail administrateur");
+  });
+
+  it("adminSignin admin → succès", async () => {
+    const res = await injectTrpc(app, "POST", "auth.adminSignin", { email: ADMIN_EMAIL, password: PASSWORD });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().result.data.success).toBe(true);
+  });
+
+  it("adminSignin artisan → 403 'Accès réservé'", async () => {
+    const res = await injectTrpc(app, "POST", "auth.adminSignin", { email: EMAIL, password: PASSWORD });
+    expect(res.statusCode).toBe(403);
+    expect(res.json().error.message).toContain("Accès réservé");
   });
 });

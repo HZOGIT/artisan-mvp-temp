@@ -4,6 +4,7 @@ import { clearAuthCookie, setAuthCookie } from "../../../../interface/http/auth-
 import type { AuthDeps } from "../../application/use-cases";
 import { deleteAccount, forgotPassword, logoutEverywhere, me, resetPassword, signin, signup, updateEmail, updatePassword } from "../../application/use-cases";
 import { maskEmail } from "../../../../shared/mask-email";
+import { ForbiddenError } from "../../../../shared/errors";
 
 /*
  * Routeur tRPC `auth` (slice session : me/signin/logout — publics). Le cookie `token` est posé/effacé
@@ -15,13 +16,25 @@ export function createAuthRouter(deps: AuthDeps) {
     /** Utilisateur courant (null si non authentifié / inactif). Public (pas d'exigence de tenant). */
     me: publicProcedure.query(({ ctx }) => me(deps.repo, ctx.claims, ctx.permissions)),
 
-    /** Login : vérifie le mot de passe (bcrypt), émet le JWT et pose le cookie httpOnly. */
+    /** Login artisan : rejette les comptes admin (→ portail administrateur). */
     signin: publicProcedure
       .input(z.object({ email: z.string().email(), password: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const { user, token } = await signin(deps, input);
+        if (user.role === "admin") throw new ForbiddenError("Utilisez le portail administrateur.");
         if (ctx.res) setAuthCookie(ctx.res, token);
         ctx.log.info({ event: "auth_login", userEmail: maskEmail(input.email), userId: user.id }, "Connexion réussie");
+        return { success: true as const, user };
+      }),
+
+    /** Login admin : rejette les comptes non-admin. */
+    adminSignin: publicProcedure
+      .input(z.object({ email: z.string().email(), password: z.string().min(1) }))
+      .mutation(async ({ ctx, input }) => {
+        const { user, token } = await signin(deps, input);
+        if (user.role !== "admin") throw new ForbiddenError("Accès réservé aux administrateurs.");
+        if (ctx.res) setAuthCookie(ctx.res, token);
+        ctx.log.info({ event: "auth_admin_login", userEmail: maskEmail(input.email), userId: user.id }, "Connexion admin réussie");
         return { success: true as const, user };
       }),
 

@@ -17,7 +17,7 @@ function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const signin = trpc.auth.signin.useMutation({
+  const signin = trpc.auth.adminSignin.useMutation({
     onSuccess: () => {
       void navigate({ to: "/artisans" });
     },
@@ -58,7 +58,7 @@ function LoginPage() {
         </label>
         {signin.error ? (
           <p style={{ color: "#dc2626", fontSize: "13px", marginTop: "12px" }}>
-            {signin.error.data?.code === "UNAUTHORIZED" ? "Email ou mot de passe incorrect." : signin.error.message}
+            {signin.error.data?.code === "UNAUTHORIZED" ? "Email ou mot de passe incorrect." : signin.error.data?.code === "FORBIDDEN" ? "Accès réservé aux administrateurs." : signin.error.message}
           </p>
         ) : null}
         <button
