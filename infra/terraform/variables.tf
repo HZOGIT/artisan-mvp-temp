@@ -14,3 +14,9 @@ variable "access_allowed_emails" {
   type        = list(string)
   default     = ["dev@operioz.com"]
 }
+
+variable "betterstack_api_token" {
+  description = "BetterStack global API token (Settings → API tokens)"
+  type        = string
+  sensitive   = true
+}

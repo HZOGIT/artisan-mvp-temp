@@ -8,7 +8,15 @@ terraform {
       source  = "hashicorp/random"
       version = "~> 3.0"
     }
+    betteruptime = {
+      source  = "BetterStackHQ/better-uptime"
+      version = "~> 0.0"
+    }
   }
+}
+
+provider "betteruptime" {
+  api_token = var.betterstack_api_token
 }
 
 provider "cloudflare" {
