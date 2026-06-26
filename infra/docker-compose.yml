@@ -63,9 +63,18 @@ services:
     restart: unless-stopped
     volumes:
       - ../scripts/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../scripts/monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus_data:/prometheus
     depends_on:
       - new-stack
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    restart: unless-stopped
+    volumes:
+      - ../scripts/monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    depends_on:
+      - prometheus
 
   cloudflared:
     image: cloudflare/cloudflared:latest
