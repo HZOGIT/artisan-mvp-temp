@@ -3,6 +3,7 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IDepenseRepository, DepenseRefKind } from "./depense-repository";
 import type { Depense, CreateDepenseInput, UpdateDepenseInput } from "../domain/depense";
 import { calculerTva } from "./tva";
+import { round2 } from "../../../shared/money";
 
 /*
  * Use-cases d'écriture — purs, repository injecté. ⚠️ Domaine sensible (compta) :
@@ -140,7 +141,7 @@ export async function creerIndemniteKm(repo: IDepenseRepository, ctx: TenantCont
   if (!(input.kilometres > 0)) throw new ValidationError("Le kilométrage doit être positif");
   const tarif = input.tarifKm ?? 0.529;
   if (!(tarif > 0)) throw new ValidationError("Le tarif kilométrique doit être positif");
-  const montant = (Math.round(input.kilometres * tarif * 100) / 100).toFixed(2);
+  const montant = round2(input.kilometres * tarif).toFixed(2);
   return creerDepense(repo, ctx, {
     dateDepense: input.dateDepense,
     fournisseur: "Indemnités kilométriques",

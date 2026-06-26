@@ -1,4 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
+import { round2 } from "../../../shared/money";
 import type { ICommandeRepository, ReceptionLigne } from "../application/commande-repository";
 import type {
   Commande,
@@ -16,11 +17,12 @@ function calculerTotaux(lignes: readonly CreateLigneInput[]): { totalHT: number;
   const lignesHT: number[] = [];
   for (const l of lignes) {
     const ligneHT = Number(l.quantite) * Number(l.prixUnitaire ?? 0);
+    const ligneTVA = round2(ligneHT * (Number(l.tauxTVA ?? "20") / 100));
     lignesHT.push(ligneHT);
     totalHT += ligneHT;
-    totalTVA += ligneHT * (Number(l.tauxTVA ?? "20") / 100);
+    totalTVA += ligneTVA;
   }
-  return { totalHT, totalTVA, lignesHT };
+  return { totalHT: round2(totalHT), totalTVA: round2(totalTVA), lignesHT };
 }
 
 /*
@@ -80,8 +82,8 @@ export class FakeCommandeRepository implements ICommandeRepository {
       statut: "brouillon",
       totalHT: totalHT.toFixed(2),
       totalTVA: totalTVA.toFixed(2),
-      totalTTC: (totalHT + totalTVA).toFixed(2),
-      montantTotal: (totalHT + totalTVA).toFixed(2),
+      totalTTC: round2(totalHT + totalTVA).toFixed(2),
+      montantTotal: round2(totalHT + totalTVA).toFixed(2),
       adresseLivraison: input.adresseLivraison ?? null,
       notes: input.notes ?? null,
       statutFacturation: "a_facturer",

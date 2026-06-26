@@ -7,6 +7,7 @@ import type { TransactionBancaire, ImportReleveResult, ReleveItem } from "../dom
 import type { Depense } from "../domain/depense";
 import type { RegleCategorisation } from "../../regles-categorisation/domain/regle-categorisation";
 import { parseReleveCsv } from "./parse-releve-csv";
+import { round2 } from "../../../shared/money";
 
 /*
  * Use-cases « transactions bancaires » : lecture, ignorer, import de relevé, conversion en dépense.
@@ -89,8 +90,8 @@ export async function convertirTransaction(
 
   const montantTtc = Math.abs(Number(t.montant) || 0);
   const tauxTva = input.tauxTva ?? 20;
-  const montantHt = Math.round((montantTtc / (1 + tauxTva / 100)) * 100) / 100;
-  const montantTva = Math.round((montantTtc - montantHt) * 100) / 100;
+  const montantHt = round2(montantTtc / (1 + tauxTva / 100));
+  const montantTva = round2(montantTtc - montantHt);
   const libelle = String(t.libelle || "").slice(0, 200);
 
   const numero = await deps.depenseRepo.nextNumero(ctx);

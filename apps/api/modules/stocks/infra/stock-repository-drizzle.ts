@@ -3,6 +3,7 @@ import { stocks, mouvementsStock, commandesFournisseurs, lignesCommandesFourniss
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
+import { round2 } from "../../../shared/money";
 import type { IStockRepository, AdjustStockResult } from "../application/stock-repository";
 import type {
   Stock,
@@ -153,7 +154,7 @@ export class StockRepositoryDrizzle implements IStockRepository {
       const apresNum = input.type === "sortie" ? avant - delta : avant + delta;
       /** Invariant : la quantité physique ne peut jamais devenir négative (sortie refusée). */
       if (apresNum < 0) return { status: "insufficient_stock", disponible: avant.toFixed(2) };
-      const apres = apresNum.toFixed(2);
+      const apres = round2(apresNum).toFixed(2);
 
       await tx
         .update(stocks)

@@ -4,6 +4,8 @@
  * (jamais acceptés du client) → pas de TTC falsifiable. Arrondi à 2 décimales (centimes).
  */
 
+import { round2 } from "../../../shared/money";
+
 export interface MontantsTva {
   readonly montantTva: string;
   readonly montantTtc: string;
@@ -12,8 +14,7 @@ export interface MontantsTva {
 export function calculerTva(montantHt: string, tauxTva: string): MontantsTva {
   const ht = Number(montantHt) || 0;
   const taux = Number(tauxTva) || 0;
-  /** `+(ht * (taux/100)).toFixed(2)` (parité legacy) : TVA arrondie au centime. */
-  const tva = Number((ht * (taux / 100)).toFixed(2));
-  const ttc = Number((ht + tva).toFixed(2));
+  const tva = round2(ht * (taux / 100));
+  const ttc = round2(ht + tva);
   return { montantTva: tva.toFixed(2), montantTtc: ttc.toFixed(2) };
 }

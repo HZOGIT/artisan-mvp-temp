@@ -1,5 +1,6 @@
 import { NotFoundError, ConflictError } from "../../../shared/errors";
 import { tauxStringToCategorie } from "../../../shared/tva/taux-tva-fr";
+import { round2 } from "../../../shared/money";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IContratRepository } from "./contrat-repository";
 import type { ContratFactureGenerator, FactureGenereeRef } from "./contrat-facture-generator";
@@ -33,8 +34,8 @@ export async function listContratsAFacturer(
   return rows.map((c) => {
     const montantHT = parseFloat(c.montantHT || "0") || 0;
     const tauxTVA = parseFloat(c.tauxTVA || "0") || 0;
-    const montantTVA = Math.round((montantHT * tauxTVA / 100) * 100) / 100;
-    const montantTTC = Math.round((montantHT + montantTVA) * 100) / 100;
+    const montantTVA = round2(montantHT * tauxTVA / 100);
+    const montantTTC = round2(montantHT + montantTVA);
     const joursRetard = c.prochainFacturation
       ? Math.max(0, Math.floor((now - c.prochainFacturation.getTime()) / 86_400_000))
       : 0;

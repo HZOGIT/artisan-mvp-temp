@@ -1,5 +1,6 @@
 import type { TenantContext } from "../../../shared/tenant";
 import { tauxStringToCategorie } from "../../../shared/tva/taux-tva-fr";
+import { round2 } from "../../../shared/money";
 import type { IImportErpRepository } from "./import-erp-repository";
 import { pickField, findClientByName, emptyResult, type ImportRow, type ImportMapping, type ImportResult } from "../domain/import";
 
@@ -146,9 +147,9 @@ export async function importFactures(repo: IImportErpRepository, ctx: TenantCont
       if (totalHTStr) {
         totalHT = parseFloat(totalHTStr);
       } else {
-        totalHT = parseFloat((totalTTC / (1 + tauxTVA / 100)).toFixed(2));
+        totalHT = round2(totalTTC / (1 + tauxTVA / 100));
       }
-      const montantTVA = parseFloat((totalTTC - totalHT).toFixed(2));
+      const montantTVA = round2(totalTTC - totalHT);
       const tvaCategorieId = tauxStringToCategorie(tauxTVA);
       const lignes = [
         {
