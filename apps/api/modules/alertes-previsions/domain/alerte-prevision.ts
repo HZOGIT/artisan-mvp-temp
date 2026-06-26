@@ -1,3 +1,5 @@
+import { round2 } from "../../../shared/money";
+
 /*
  * Domaine « alertes du prévisionnel de trésorerie » (parité legacy `alertesPrevisions`). Compare le
  * CA réalisé du mois au CA prévisionnel ; au-delà d'un seuil (+/-), enregistre une alerte d'historique.
@@ -52,7 +54,7 @@ export interface AlerteHistorique {
 
 /** Écart en % du réalisé vs prévisionnel (parité legacy). PUR. */
 export function calculerEcartPct(caReel: number, caPrev: number): number {
-  return ((caReel - caPrev) / caPrev) * 100;
+  return round2(((caReel - caPrev) / caPrev) * 100);
 }
 
 /*

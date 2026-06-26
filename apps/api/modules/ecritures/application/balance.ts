@@ -1,3 +1,4 @@
+import { round2 } from "../../../shared/money";
 import type { EcritureComptable } from "../domain/ecriture";
 
 /** Agrégats comptables de lecture — PURS, testables sans DB sur un `EcritureComptable[]`. */
@@ -30,7 +31,7 @@ export function calculerBalance(ecritures: readonly EcritureComptable[]): LigneB
       libelleCompte: v.lib,
       totalDebit: v.debit.toFixed(2),
       totalCredit: v.credit.toFixed(2),
-      solde: (v.debit - v.credit).toFixed(2),
+      solde: round2(v.debit - v.credit).toFixed(2),
     }))
     .sort((a, b) => a.numeroCompte.localeCompare(b.numeroCompte));
 }

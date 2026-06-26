@@ -1,4 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
+import { round2 } from "../../../shared/money";
 import type { IStockRepository, AdjustStockResult } from "../application/stock-repository";
 import type {
   Stock,
@@ -86,7 +87,7 @@ export class FakeStockRepository implements IStockRepository {
     const delta = Number(input.quantite);
     const apresNum = input.type === "sortie" ? avant - delta : avant + delta;
     if (apresNum < 0) return { status: "insufficient_stock", disponible: avant.toFixed(2) };
-    const apres = apresNum.toFixed(2);
+    const apres = round2(apresNum).toFixed(2);
     const updated: Stock = { ...s, quantiteEnStock: apres, updatedAt: new Date() };
     this.store = this.store.map((x) => (x.id === stockId ? updated : x));
     this.mouvements.push({

@@ -293,7 +293,7 @@ export class CommandeRepositoryDrizzle implements ICommandeRepository {
             .limit(1);
           if (stock) {
             const avant = Number(stock.q ?? 0);
-            const apres = avant + delta;
+            const apres = round2(avant + delta);
             await tx.update(stocks).set({ quantiteEnStock: apres.toFixed(2), updatedAt: new Date() }).where(eq(stocks.id, stock.id));
             await tx.insert(mouvementsStock).values({
               stockId: stock.id,

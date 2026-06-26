@@ -1,7 +1,9 @@
+import { round2 } from "../../../shared/money";
+
 /*
  * Calcul de l'encours client (reste dû des factures émises non soldées) — PUR, testable
  * sans DB. ⚠️ Domaine sensible (montants) : parité stricte avec le legacy.
- * 
+ *
  * Règles (parité legacy) :
  * - seules les factures `envoyee`/`en_retard` comptent (pas brouillon/validee = pas encore
  *   une créance ; pas payee/annulee = soldée/sans effet) ;
@@ -51,9 +53,9 @@ export function calculerEncours(rows: readonly FactureEncoursLigne[], now: numbe
     const estEchue = f.statut === "en_retard" || (!Number.isNaN(echeance) && echeance < now);
     if (estEchue) echu += reste;
   }
-  encoursTotal = Math.max(0, encoursTotal - creditAvoirs);
+  encoursTotal = Math.max(0, round2(encoursTotal - creditAvoirs));
   echu = Math.min(echu, encoursTotal);
-  return { encoursTotal: encoursTotal.toFixed(2), echu: echu.toFixed(2), nbFacturesImpayees: nb };
+  return { encoursTotal: round2(encoursTotal).toFixed(2), echu: round2(echu).toFixed(2), nbFacturesImpayees: nb };
 }
 
 /*

@@ -3,6 +3,7 @@ import { clients as clientsTable, devis as devisTable, factures as facturesTable
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
+import { round2 } from "../../../shared/money";
 import { ClientRepositoryDrizzle } from "../../clients/infra/client-repository-drizzle";
 import { DevisRepositoryDrizzle } from "../../devis/infra/devis-repository-drizzle";
 import { FactureRepositoryDrizzle } from "../../factures/infra/facture-repository-drizzle";
@@ -89,7 +90,7 @@ export class ImportErpRepositoryDrizzle implements IImportErpRepository {
       }).returning();
       if (data.lignes && data.lignes.length > 0) {
         for (const ligne of data.lignes) {
-          const montantTTC = (parseFloat(ligne.montantHT) + parseFloat(ligne.montantTVA)).toFixed(2);
+          const montantTTC = round2(parseFloat(ligne.montantHT) + parseFloat(ligne.montantTVA)).toFixed(2);
           await tx.insert(facturesLignesTable).values({
             factureId: facture.id,
             ordre: 0,

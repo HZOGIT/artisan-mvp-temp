@@ -264,7 +264,7 @@ export function computeAlerts(factures: readonly DashFacture[], devis: readonly 
 
   const facturesRetard = factures.filter((f) => f.statut !== "payee" && f.statut !== "annulee" && f.typeDocument !== "avoir" && days(f.createdAt) > 30);
   if (facturesRetard.length > 0) {
-    const total = facturesRetard.reduce((s, f) => s + num(f.totalTTC), 0);
+    const total = round2(facturesRetard.reduce((s, f) => s + num(f.totalTTC), 0));
     alerts.push({ type: "danger", titre: `${facturesRetard.length} facture(s) en retard de +30 jours`, message: `Montant total : ${total.toFixed(2)} EUR`, lien: "/factures" });
   }
 
