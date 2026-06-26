@@ -14,6 +14,7 @@ import {
   changePlan,
   cancelAtPeriodEnd,
   reactivateSubscription,
+  activateOnboardingSubscription,
   NotFoundError,
   InvalidPlanError,
 } from "./application/billing-use-cases";
@@ -1587,5 +1588,50 @@ describe("FIX-CDF — webhook payment_intent.succeeded : cycle créé avant upda
     /* La sub garde son period_end initial — period update échoué */
     const updatedSub = repo.subs.find(s => s.id === sub.id)!;
     expect(updatedSub.current_period_end).toEqual(new Date("2026-07-01")); /* inchangé */
+  });
+});
+
+describe("activateOnboardingSubscription", () => {
+  async function makeSetup() {
+    const deps = makeDeps();
+    const pm = await deps.repo.savePaymentMethod({ artisanId: A.artisanId, stripeCustomerId: "cus_t", stripePaymentMethodId: "pm_t", brand: "visa", last4: "4242", expMonth: 12, expYear: 2030, consentedAt: new Date() });
+    return { deps, pm };
+  }
+
+  it("crée un abonnement trialing avec planId et trial_ends_at ≈ now+15j", async () => {
+    const { deps, pm } = await makeSetup();
+    const before = Date.now();
+    const result = await activateOnboardingSubscription(deps, A, { planId: "pro", paymentMethodId: pm.id });
+    const sub = await deps.repo.findSubscription(A);
+    expect(sub).not.toBeNull();
+    expect(result.subscriptionId).toBe(sub!.id);
+    expect(sub!.status).toBe("trialing");
+    expect(sub!.plan_id).toBe("pro");
+    const expectedEnd = before + 15 * 24 * 3600_000;
+    expect(sub!.trial_ends_at!.getTime()).toBeGreaterThanOrEqual(expectedEnd - 2000);
+    expect(sub!.trial_ends_at!.getTime()).toBeLessThanOrEqual(expectedEnd + 2000);
+  });
+
+  it("trace un événement subscription.onboarding_activated avec planId et trialEndsAt", async () => {
+    const { deps, pm } = await makeSetup();
+    await activateOnboardingSubscription(deps, A, { planId: "starter", paymentMethodId: pm.id });
+    const ev = deps.repo.events.find(e => e.event_type === "subscription.onboarding_activated");
+    expect(ev).toBeDefined();
+    expect(ev!.payload).toMatchObject({ artisanId: A.artisanId, planId: "starter" });
+    expect(typeof (ev!.payload as Record<string, unknown>)["trialEndsAt"]).toBe("string");
+    expect(ev!.actor).toBe(`user:${A.userId}`);
+  });
+
+  it("idempotent : retourne l'id de la sub existante non-annulée sans en créer une nouvelle", async () => {
+    const { deps, pm } = await makeSetup();
+    const first = await activateOnboardingSubscription(deps, A, { planId: "pro", paymentMethodId: pm.id });
+    const second = await activateOnboardingSubscription(deps, A, { planId: "pro", paymentMethodId: pm.id });
+    expect(second.subscriptionId).toBe(first.subscriptionId);
+    expect(deps.repo.subs.filter(s => s.artisan_id === A.artisanId)).toHaveLength(1);
+  });
+
+  it("NotFoundError si le paymentMethodId est inconnu", async () => {
+    const { deps } = await makeSetup();
+    await expect(activateOnboardingSubscription(deps, A, { planId: "pro", paymentMethodId: 9999 })).rejects.toBeInstanceOf(NotFoundError);
   });
 });

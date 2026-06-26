@@ -31,14 +31,8 @@ function isValidPlanId(p: string | undefined): p is OnboardingPlanId {
   return VALID_PLAN_IDS.includes(p as OnboardingPlanId);
 }
 
-interface PaymentFormProps {
-  stripeCustomerId: string;
-  plan: OnboardingPlanId;
-  onSuccess: () => void;
-  t: (key: string) => string;
-}
-
-function PaymentForm({ stripeCustomerId, plan, onSuccess, t }: PaymentFormProps) {
+function PaymentForm({ stripeCustomerId, plan, onSuccess }: { stripeCustomerId: string; plan: OnboardingPlanId; onSuccess: () => void }) {
+  const { t } = useTranslation("onboarding");
   const stripe = useStripe();
   const elements = useElements();
   const confirmPM = trpc.billing.confirmPaymentMethod.useMutation();
@@ -65,11 +59,7 @@ function PaymentForm({ stripeCustomerId, plan, onSuccess, t }: PaymentFormProps)
         toast.error(t("paiementErreurPM"));
         return;
       }
-      const confirmed = await confirmPM.mutateAsync({
-        stripePaymentMethodId: pmStripeId,
-        stripeCustomerId,
-        setAsDefault: true,
-      });
+      const confirmed = await confirmPM.mutateAsync({ stripePaymentMethodId: pmStripeId, stripeCustomerId, setAsDefault: true });
       await activateSub.mutateAsync({ planId: plan, paymentMethodId: confirmed.paymentMethod.id });
       onSuccess();
     } catch {
@@ -79,38 +69,28 @@ function PaymentForm({ stripeCustomerId, plan, onSuccess, t }: PaymentFormProps)
     }
   };
 
-  const disabled = busy || !stripe || !elements;
-
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <PaymentElement />
-      <Button type="submit" size="lg" disabled={disabled} className="w-full bg-white text-slate-900 hover:bg-blue-50">
+      <Button type="submit" size="lg" disabled={busy || !stripe || !elements} className="w-full bg-white text-slate-900 hover:bg-blue-50">
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : t("paiementEnregistrer")}
       </Button>
     </form>
   );
 }
 
-interface PaymentStepProps {
-  plan: OnboardingPlanId;
-  onSuccess: () => void;
-  onBack: () => void;
-  t: (key: string) => string;
-}
-
-function PaymentStep({ plan, onSuccess, onBack, t }: PaymentStepProps) {
+function PaymentStep({ plan, onSuccess, onBack }: { plan: OnboardingPlanId; onSuccess: () => void; onBack: () => void }) {
+  const { t } = useTranslation("onboarding");
   const setupIntentMut = trpc.billing.createSetupIntent.useMutation();
   const [setup, setSetup] = useState<{ clientSecret: string; stripeCustomerId: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    void setupIntentMut.mutateAsync(undefined).then((data) => {
-      if (!cancelled) setSetup({ clientSecret: data.clientSecret, stripeCustomerId: data.stripeCustomerId });
-    }).catch(() => {
-      if (!cancelled) toast.error(t("paiementErreurInit"));
-    });
+    void setupIntentMut.mutateAsync(undefined)
+      .then((data) => { if (!cancelled) setSetup({ clientSecret: data.clientSecret, stripeCustomerId: data.stripeCustomerId }); })
+      .catch(() => { if (!cancelled) toast.error(t("paiementErreurInit")); });
     return () => { cancelled = true; };
-  }, []); /* ponytail: run once on mount */
+  }, []);
 
   const trialEndDate = new Date(Date.now() + 15 * 24 * 3600_000).toLocaleDateString("fr-FR");
 
@@ -130,7 +110,7 @@ function PaymentStep({ plan, onSuccess, onBack, t }: PaymentStepProps) {
           </div>
         ) : (
           <Elements stripe={stripePromise} options={{ clientSecret: setup.clientSecret, appearance: { theme: "night" } }}>
-            <PaymentForm stripeCustomerId={setup.stripeCustomerId} plan={plan} onSuccess={onSuccess} t={t} />
+            <PaymentForm stripeCustomerId={setup.stripeCustomerId} plan={plan} onSuccess={onSuccess} />
           </Elements>
         )}
       </div>
@@ -150,7 +130,7 @@ function PaymentStep({ plan, onSuccess, onBack, t }: PaymentStepProps) {
 export default function OnboardingPage() {
   const { t } = useTranslation("onboarding");
   const { modules, complete, skip } = useOnboarding();
-  const [step, setStep] = useState<Step>(1);
+  const [step, setStep] = useState<Step | 5>(1);
   const [metierKey, setMetierKey] = useState<string | null>(null);
   const [metierAutre, setMetierAutre] = useState("");
   const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
@@ -176,8 +156,7 @@ export default function OnboardingPage() {
 
   const totalSteps = hasPlan ? 5 : 4;
   const stepProgress = (step / totalSteps) * 100;
-
-  const finalStep = hasPlan ? 5 : 4;
+  const finalStep: Step | 5 = hasPlan ? 5 : 4;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white relative overflow-hidden">
@@ -263,13 +242,7 @@ export default function OnboardingPage() {
           )}
 
           {step === 4 && hasPlan && planId && (
-            <PaymentStep
-              key="step4"
-              plan={planId}
-              onSuccess={() => setStep(5)}
-              onBack={() => setStep(3)}
-              t={t}
-            />
+            <PaymentStep key="step4" plan={planId} onSuccess={() => setStep(5)} onBack={() => setStep(3)} />
           )}
 
           {step === finalStep && (
