@@ -110,66 +110,78 @@ export class GeminiAgenticAdapter implements LlmAgenticPort {
     const model = input.model ?? process.env.GEMINI_TEXT_MODEL ?? "gemini-3-pro-preview";
     this.log.info({ event: "gemini_model_resolved", model }, "Modèle Gemini résolu");
     const tools = toGeminiTools(input.tools);
-
-    const stream = await ai.models.generateContentStream({
-      model,
-      contents: toGeminiContents(input.messages),
-      config: {
-        systemInstruction: input.system,
-        ...(tools.length ? { tools } : {}),
-        maxOutputTokens: 2000,
-        temperature: 0.7,
-      },
-    });
-
-    /** Parts BRUTES du tour `model` (texte + functionCall avec thoughtSignature) à réinjecter tel quel. */
-    const rawFunctionCallParts: unknown[] = [];
-    const functionCalls: AgenticFunctionCall[] = [];
-    let textBuffer = "";
-    let lastMeta: GenAiUsageMeta | undefined;
-    let finishReason = "STOP";
     const t0 = Date.now();
 
-    for await (const chunk of stream) {
-      const parts = chunk.candidates?.[0]?.content?.parts ?? [];
-      if (chunk.candidates?.[0]?.finishReason) finishReason = chunk.candidates[0].finishReason;
-      if (chunk.usageMetadata) lastMeta = chunk.usageMetadata;
-      for (const part of parts) {
-        if (typeof part.text === "string" && part.text) {
-          textBuffer += part.text;
-          yield { kind: "text", text: part.text };
-        }
-        if (part.functionCall) {
-          functionCalls.push({ name: part.functionCall.name ?? "", args: part.functionCall.args ?? {} });
-          /** brute (incl. thoughtSignature) */
-          rawFunctionCallParts.push(part);
+    try {
+      this.log.info({ event: "llm_agentic_turn_start", model }, "Début turn agentique");
+      const stream = await ai.models.generateContentStream({
+        model,
+        contents: toGeminiContents(input.messages),
+        config: {
+          systemInstruction: input.system,
+          ...(tools.length ? { tools } : {}),
+          maxOutputTokens: 2000,
+          temperature: 0.7,
+        },
+      });
+
+      /** Parts BRUTES du tour `model` (texte + functionCall avec thoughtSignature) à réinjecter tel quel. */
+      const rawFunctionCallParts: unknown[] = [];
+      const functionCalls: AgenticFunctionCall[] = [];
+      let textBuffer = "";
+      let lastMeta: GenAiUsageMeta | undefined;
+      let finishReason = "STOP";
+
+      for await (const chunk of stream) {
+        const parts = chunk.candidates?.[0]?.content?.parts ?? [];
+        if (chunk.candidates?.[0]?.finishReason) finishReason = chunk.candidates[0].finishReason;
+        if (chunk.usageMetadata) lastMeta = chunk.usageMetadata;
+        for (const part of parts) {
+          if (typeof part.text === "string" && part.text) {
+            textBuffer += part.text;
+            yield { kind: "text", text: part.text };
+          }
+          if (part.functionCall) {
+            functionCalls.push({ name: part.functionCall.name ?? "", args: part.functionCall.args ?? {} });
+            rawFunctionCallParts.push(part);
+          }
         }
       }
+
+      const modelParts: unknown[] = [];
+      if (textBuffer) modelParts.push({ text: textBuffer });
+      for (const p of rawFunctionCallParts) modelParts.push(p);
+      const modelMessage: AgenticMessage = { role: "model", content: { kind: "raw", parts: modelParts } };
+
+      const mt = (arr: { modality?: string; tokenCount?: number }[] | undefined, m: string) =>
+        arr?.find((d) => d.modality === m)?.tokenCount ?? 0;
+      const durationMs = Date.now() - t0;
+      const usage: LlmUsage = {
+        model, durationMs, finishReason,
+        promptTokens:    lastMeta?.promptTokenCount         ?? 0,
+        responseTokens:  lastMeta?.responseTokenCount ?? lastMeta?.candidatesTokenCount ?? 0,
+        thinkingTokens:  lastMeta?.thoughtsTokenCount        ?? 0,
+        cachedTokens:    lastMeta?.cachedContentTokenCount   ?? 0,
+        toolUseTokens:   lastMeta?.toolUsePromptTokenCount   ?? 0,
+        totalTokens:     lastMeta?.totalTokenCount           ?? 0,
+        textInputTokens:  mt(lastMeta?.promptTokensDetails,  "TEXT"),
+        audioInputTokens: mt(lastMeta?.promptTokensDetails,  "AUDIO"),
+        imageInputTokens: mt(lastMeta?.promptTokensDetails,  "IMAGE"),
+        videoInputTokens: mt(lastMeta?.promptTokensDetails,  "VIDEO"),
+        textOutputTokens:  mt(lastMeta?.responseTokensDetails, "TEXT"),
+        audioOutputTokens: mt(lastMeta?.responseTokensDetails, "AUDIO"),
+        trafficType: lastMeta?.trafficType ?? null,
+      };
+      this.log.info({ event: "llm_agentic_turn_complete", model, durationMs, promptTokens: usage.promptTokens, responseTokens: usage.responseTokens, finishReason }, "Turn agentique terminé");
+      yield { kind: "turn-complete", modelMessage, functionCalls, usage };
+    } catch (err) {
+      const durationMs = Date.now() - t0;
+      if ((err as { status?: number }).status === 429) {
+        this.log.warn({ event: "llm_rate_limit", model, durationMs, err }, "Rate limit Gemini");
+      } else {
+        this.log.error({ event: "llm_agentic_turn_error", model, durationMs, err }, "Erreur turn agentique");
+      }
+      throw err;
     }
-
-    const modelParts: unknown[] = [];
-    if (textBuffer) modelParts.push({ text: textBuffer });
-    for (const p of rawFunctionCallParts) modelParts.push(p);
-    const modelMessage: AgenticMessage = { role: "model", content: { kind: "raw", parts: modelParts } };
-
-    const mt = (arr: { modality?: string; tokenCount?: number }[] | undefined, m: string) =>
-      arr?.find((d) => d.modality === m)?.tokenCount ?? 0;
-    const usage: LlmUsage = {
-      model, durationMs: Date.now() - t0, finishReason,
-      promptTokens:    lastMeta?.promptTokenCount         ?? 0,
-      responseTokens:  lastMeta?.responseTokenCount ?? lastMeta?.candidatesTokenCount ?? 0,
-      thinkingTokens:  lastMeta?.thoughtsTokenCount        ?? 0,
-      cachedTokens:    lastMeta?.cachedContentTokenCount   ?? 0,
-      toolUseTokens:   lastMeta?.toolUsePromptTokenCount   ?? 0,
-      totalTokens:     lastMeta?.totalTokenCount           ?? 0,
-      textInputTokens:  mt(lastMeta?.promptTokensDetails,  "TEXT"),
-      audioInputTokens: mt(lastMeta?.promptTokensDetails,  "AUDIO"),
-      imageInputTokens: mt(lastMeta?.promptTokensDetails,  "IMAGE"),
-      videoInputTokens: mt(lastMeta?.promptTokensDetails,  "VIDEO"),
-      textOutputTokens:  mt(lastMeta?.responseTokensDetails, "TEXT"),
-      audioOutputTokens: mt(lastMeta?.responseTokensDetails, "AUDIO"),
-      trafficType: lastMeta?.trafficType ?? null,
-    };
-    yield { kind: "turn-complete", modelMessage, functionCalls, usage };
   }
 }
