@@ -186,6 +186,10 @@ export class FournisseurRepositoryDrizzle implements IFournisseurRepository {
     return Boolean(row);
   }
 
+  withDb(db: DbClient): FournisseurRepositoryDrizzle {
+    return new FournisseurRepositoryDrizzle(db);
+  }
+
   /** Le fournisseur appartient-il au tenant ? (RLS + filtre artisanId) */
   private async ownsFournisseur(tx: DbClient, ctx: TenantContext, fournisseurId: number): Promise<boolean> {
     const [row] = await tx

@@ -316,6 +316,8 @@ export interface AppDeps extends ContextDeps {
   readonly techniciensDb?: DbClient;
   readonly notificationRepo?: INotificationRepository;
   readonly fournisseurRepo?: IFournisseurRepository;
+  /** Pool DB pour les transactions outbox du module fournisseurs (défaut : getDbHandle().db). */
+  readonly fournisseursDb?: DbClient;
   readonly commandeRepo?: ICommandeRepository;
   /** Pool DB pour les transactions outbox du module commandes (défaut : getDbHandle().db). */
   readonly commandesDb?: DbClient;
@@ -552,6 +554,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const relanceDevisRepo = deps.relanceDevisRepo ?? new RelanceDevisRepositoryDrizzle(getDbHandle().db);
   const fournisseurs = createFournisseursModule({
     repository: fournisseurRepo,
+    db: deps.fournisseursDb ?? getDbHandle().db,
   });
   const commandeRepo = deps.commandeRepo ?? new CommandeRepositoryDrizzle(getDbHandle().db);
   const commandes = createCommandesModule({

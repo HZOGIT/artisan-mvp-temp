@@ -1,3 +1,4 @@
+import type { DbClient } from "../../shared/db";
 import type { IFournisseurRepository } from "./application/fournisseur-repository";
 import { createFournisseursRouter } from "./interface/trpc/fournisseurs.router";
 
@@ -7,6 +8,7 @@ import { createFournisseursRouter } from "./interface/trpc/fournisseurs.router";
  */
 export interface FournisseursModuleDeps {
   readonly repository: IFournisseurRepository;
+  readonly db?: DbClient;
 }
 
 export interface FournisseursModule {
@@ -15,5 +17,5 @@ export interface FournisseursModule {
 }
 
 export function createFournisseursModule(deps: FournisseursModuleDeps): FournisseursModule {
-  return { deps, router: createFournisseursRouter(deps.repository) };
+  return { deps, router: createFournisseursRouter(deps.repository, deps.db) };
 }

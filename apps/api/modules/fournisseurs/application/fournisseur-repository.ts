@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { Fournisseur, CreateFournisseurInput, UpdateFournisseurInput } from "../domain/fournisseur";
 import type { ArticleFournisseur, AjouterAssociationInput } from "../domain/article-fournisseur";
@@ -28,4 +29,6 @@ export interface IFournisseurRepository {
   ajouterAssociation(ctx: TenantContext, input: AjouterAssociationInput): Promise<ArticleFournisseur | null>;
   /** false si l'association ne relève pas d'un fournisseur du tenant. */
   supprimerAssociation(ctx: TenantContext, id: number): Promise<boolean>;
+
+  withDb(db: DbClient): IFournisseurRepository;
 }

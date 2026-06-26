@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import type { DbClient } from "../../../../shared/db";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
+import { withOutbox } from "../../../../shared/events/with-outbox";
 import type { IFournisseurRepository } from "../../application/fournisseur-repository";
 import { listFournisseurs, getFournisseur } from "../../application/read-use-cases";
 import { creerFournisseur, modifierFournisseur, supprimerFournisseur } from "../../application/write-use-cases";
@@ -38,7 +41,7 @@ const updateSchema = z.object({
  * aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors
  * (NotFound→404, Validation→400). Repository injecté (DI) → testable.
  */
-export function createFournisseursRouter(repo: IFournisseurRepository) {
+export function createFournisseursRouter(repo: IFournisseurRepository, db?: DbClient) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listFournisseurs(repo, ctx.tenant)),
 
@@ -49,24 +52,35 @@ export function createFournisseursRouter(repo: IFournisseurRepository) {
     create: protectedProcedure
       .input(createSchema)
       .mutation(async ({ ctx, input }) => {
-        const result = await creerFournisseur(repo, ctx.tenant, input);
-        ctx.log.info({ event: "fournisseur_cree", fournisseurId: result.id, hasEmail: input.email != null }, "Fournisseur créé");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await creerFournisseur(r, ctx.tenant, input);
+          ctx.log.info({ event: "fournisseur_cree", fournisseurId: result.id, hasEmail: input.email != null }, "Fournisseur créé");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "fournisseur.cree", entityType: "fournisseur", entityId: result.id, payload: { nom: result.nom } });
+          return result;
+        });
       }),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { id, ...data } = input;
-        return modifierFournisseur(repo, ctx.tenant, id, data);
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await modifierFournisseur(r, ctx.tenant, id, data);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "fournisseur.modifie", entityType: "fournisseur", entityId: id, payload: { nom: result.nom } });
+          return result;
+        });
       }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        await supprimerFournisseur(repo, ctx.tenant, input.id);
-        ctx.log.warn({ event: "fournisseur_supprime", fournisseurId: input.id }, "Fournisseur supprimé — commandes liées potentiellement orphelines");
-        return { success: true };
+        return withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          await supprimerFournisseur(r, ctx.tenant, input.id);
+          ctx.log.warn({ event: "fournisseur_supprime", fournisseurId: input.id }, "Fournisseur supprimé — commandes liées potentiellement orphelines");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "fournisseur.supprime", entityType: "fournisseur", entityId: input.id, payload: { snapshot: { fournisseurId: input.id, nom: before?.nom ?? null } } });
+          return { success: true };
+        });
       }),
 
     /** ── Associations article↔fournisseur (prix d'achat, données tenant-privées) ── */
