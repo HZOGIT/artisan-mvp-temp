@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { Badge, BadgeTechnicien, CreateBadgeInput, ObjectifTechnicien, UpdateBadgeInput } from "../domain/badge";
 import type { ClassementEntry, PeriodeClassement } from "../domain/classement";
@@ -11,6 +12,7 @@ import type { ClassementEntry, PeriodeClassement } from "../domain/classement";
  *    doit échouer (null) — anti-IDOR.
  */
 export interface IBadgeRepository {
+  withDb(db: DbClient): IBadgeRepository;
   list(ctx: TenantContext): Promise<Badge[]>;
   getById(ctx: TenantContext, id: number): Promise<Badge | null>;
   create(ctx: TenantContext, input: CreateBadgeInput): Promise<Badge>;

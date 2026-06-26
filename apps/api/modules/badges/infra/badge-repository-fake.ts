@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IBadgeRepository } from "../application/badge-repository";
 import type { Badge, BadgeTechnicien, CreateBadgeInput, ObjectifTechnicien, UpdateBadgeInput } from "../domain/badge";
@@ -40,6 +41,9 @@ export class FakeBadgeRepository implements IBadgeRepository {
   seedProgress(technicienId: number, p: { interventions: number; avisPositifs: number }): void {
     this.progress.set(technicienId, p);
   }
+
+  /* ponytail: withDb no-op en fake (pas de transaction) */
+  withDb(_db: DbClient): this { return this; }
 
   private ownsTechnicien(ctx: TenantContext, technicienId: number): boolean {
     return this.techniciens.some((t) => t.id === technicienId && t.artisanId === ctx.artisanId);
