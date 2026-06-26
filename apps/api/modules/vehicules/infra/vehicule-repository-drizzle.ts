@@ -338,6 +338,10 @@ export class VehiculeRepositoryDrizzle implements IVehiculeRepository {
     });
   }
 
+  withDb(db: DbClient): VehiculeRepositoryDrizzle {
+    return new VehiculeRepositoryDrizzle(db);
+  }
+
   /** Vérifie que le véhicule appartient au tenant (RLS + filtre artisanId). */
   private async ownsVehicule(tx: DbClient, ctx: TenantContext, vehiculeId: number): Promise<boolean> {
     const [row] = await tx

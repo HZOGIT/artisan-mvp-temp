@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IVehiculeRepository } from "../application/vehicule-repository";
 import type {
@@ -172,6 +173,10 @@ export class FakeVehiculeRepository implements IVehiculeRepository {
     return this.relevesStore
       .filter((r) => r.vehiculeId === vehiculeId)
       .sort((a, b) => b.dateReleve.localeCompare(a.dateReleve) || b.id - a.id);
+  }
+
+  withDb(_db: DbClient): FakeVehiculeRepository {
+    return this;
   }
 
   async getStatistiquesFlotte(ctx: TenantContext): Promise<StatistiquesFlotte> {

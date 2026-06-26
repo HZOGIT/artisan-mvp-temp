@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type {
   Vehicule,
@@ -52,4 +53,6 @@ export interface IVehiculeRepository {
 
   /** Statistiques agrégées de la flotte du tenant. */
   getStatistiquesFlotte(ctx: TenantContext): Promise<StatistiquesFlotte>;
+
+  withDb(db: DbClient): IVehiculeRepository;
 }
