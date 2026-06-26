@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import { round2 } from "../../../shared/money";
 import type { ICommandeRepository, ReceptionLigne } from "../application/commande-repository";
@@ -221,5 +222,9 @@ export class FakeCommandeRepository implements ICommandeRepository {
     const updated: Commande = { ...c, statutFacturation, depenseId: lien, updatedAt: new Date() };
     this.store = this.store.map((x) => (x.id === id ? updated : x));
     return updated;
+  }
+
+  withDb(_db: DbClient): FakeCommandeRepository {
+    return this;
   }
 }

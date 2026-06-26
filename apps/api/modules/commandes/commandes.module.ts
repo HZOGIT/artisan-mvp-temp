@@ -4,6 +4,7 @@ import type { IDevisRepository } from "../devis/application/devis-repository";
 import type { IClientRepository } from "../clients/application/client-repository";
 import type { CommandeMailingDeps } from "./application/envoyer-commande-email";
 import type { CommandeIaDeps } from "./application/generer-depuis-devis-ia";
+import type { DbClient } from "../../shared/db";
 import { createCommandesRouter } from "./interface/trpc/commandes.router";
 
 /*
@@ -19,6 +20,7 @@ export interface CommandesModuleDeps {
   readonly clientRepository: IClientRepository;
   readonly mailing: CommandeMailingDeps;
   readonly ia: CommandeIaDeps;
+  readonly db?: DbClient;
 }
 
 export interface CommandesModule {
@@ -29,6 +31,6 @@ export interface CommandesModule {
 export function createCommandesModule(deps: CommandesModuleDeps): CommandesModule {
   return {
     deps,
-    router: createCommandesRouter(deps.repository, deps.fournisseurRepository, deps.devisRepository, deps.clientRepository, deps.mailing, deps.ia),
+    router: createCommandesRouter(deps.repository, deps.fournisseurRepository, deps.devisRepository, deps.clientRepository, deps.mailing, deps.ia, deps.db),
   };
 }

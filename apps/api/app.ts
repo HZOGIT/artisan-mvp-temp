@@ -309,6 +309,8 @@ export interface AppDeps extends ContextDeps {
   readonly notificationRepo?: INotificationRepository;
   readonly fournisseurRepo?: IFournisseurRepository;
   readonly commandeRepo?: ICommandeRepository;
+  /** Pool DB pour les transactions outbox du module commandes (défaut : getDbHandle().db). */
+  readonly commandesDb?: DbClient;
   readonly stockRepo?: IStockRepository;
   readonly clientRepo?: IClientRepository;
   readonly interventionRepo?: IInterventionRepository;
@@ -561,6 +563,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       trackLlm: makeLlmUsageTracker(getDbHandle().db),
       rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
     },
+    db: deps.commandesDb ?? getDbHandle().db,
   });
   const stocks = createStocksModule({
     repository: stockRepo,

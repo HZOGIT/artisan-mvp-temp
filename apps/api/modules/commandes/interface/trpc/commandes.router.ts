@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import type { DbClient } from "../../../../shared/db";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
+import { withOutbox } from "../../../../shared/events/with-outbox";
 import type { ICommandeRepository } from "../../application/commande-repository";
 import type { IFournisseurRepository } from "../../../fournisseurs/application/fournisseur-repository";
 import type { IDevisRepository } from "../../../devis/application/devis-repository";
@@ -71,6 +74,7 @@ export function createCommandesRouter(
   clientRepo: IClientRepository,
   mailing: CommandeMailingDeps,
   ia: CommandeIaDeps,
+  db?: DbClient,
 ) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listCommandes(repo, ctx.tenant)),
@@ -86,48 +90,63 @@ export function createCommandesRouter(
     create: protectedProcedure
       .input(createSchema)
       .mutation(async ({ ctx, input }) => {
-        const result = await creerCommande(repo, ctx.tenant, {
-          fournisseurId: input.fournisseurId,
-          reference: input.reference ?? null,
-          dateLivraisonPrevue: input.dateLivraisonPrevue ? new Date(input.dateLivraisonPrevue) : null,
-          adresseLivraison: input.adresseLivraison ?? null,
-          notes: input.notes ?? null,
-          lignes: toCreateLignes(input.lignes),
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await creerCommande(r, ctx.tenant, {
+            fournisseurId: input.fournisseurId,
+            reference: input.reference ?? null,
+            dateLivraisonPrevue: input.dateLivraisonPrevue ? new Date(input.dateLivraisonPrevue) : null,
+            adresseLivraison: input.adresseLivraison ?? null,
+            notes: input.notes ?? null,
+            lignes: toCreateLignes(input.lignes),
+          });
+          ctx.log.info({ event: "commande_creee", commandeId: result.id, fournisseurId: input.fournisseurId, nbLignes: input.lignes.length }, "Commande fournisseur créée");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "commande.creee", entityType: "commande", entityId: result.id, payload: { fournisseurId: result.fournisseurId, numero: result.numero, totalTTC: result.totalTTC, statut: result.statut, nbLignes: input.lignes.length } });
+          return result;
         });
-        ctx.log.info({ event: "commande_creee", commandeId: result.id, fournisseurId: input.fournisseurId, nbLignes: input.lignes.length }, "Commande fournisseur créée");
-        return result;
       }),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { id, dateLivraisonPrevue, ...rest } = input;
         const dlp = typeof dateLivraisonPrevue === "string" ? new Date(dateLivraisonPrevue) : dateLivraisonPrevue;
-        return modifierCommande(repo, ctx.tenant, id, { ...rest, dateLivraisonPrevue: dlp });
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await modifierCommande(r, ctx.tenant, id, { ...rest, dateLivraisonPrevue: dlp });
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "commande.modifiee", entityType: "commande", entityId: id, payload: { reference: result.reference, notes: result.notes } });
+          return result;
+        });
       }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        await supprimerCommande(repo, ctx.tenant, input.id);
-        ctx.log.warn({ event: "commande_supprimee", commandeId: input.id }, "Commande fournisseur supprimée");
-        return { success: true };
+        return withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          await supprimerCommande(r, ctx.tenant, input.id);
+          ctx.log.warn({ event: "commande_supprimee", commandeId: input.id }, "Commande fournisseur supprimée");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "commande.supprimee", entityType: "commande", entityId: input.id, payload: { snapshot: { numero: before?.numero, fournisseurId: before?.fournisseurId, totalTTC: before?.totalTTC, statut: before?.statut } } });
+          return { success: true };
+        });
       }),
 
     /** ── Transitions de statut + indicateur retard ── */
     updateStatut: protectedProcedure
       .input(z.object({ id: z.number().int(), statut: statutEnum, dateLivraisonReelle: z.string().datetime().nullish() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await changerStatutCommande(
-          repo,
-          ctx.tenant,
-          input.id,
-          input.statut,
-          input.dateLivraisonReelle ? new Date(input.dateLivraisonReelle) : undefined,
-        );
-        const level = input.statut === "annulee" ? "warn" : "info";
-        ctx.log[level]({ event: "commande_statut_changed", commandeId: input.id, newStatut: input.statut }, `Commande statut → ${input.statut}`);
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          const result = await changerStatutCommande(
+            r,
+            ctx.tenant,
+            input.id,
+            input.statut,
+            input.dateLivraisonReelle ? new Date(input.dateLivraisonReelle) : undefined,
+          );
+          const level = input.statut === "annulee" ? "warn" : "info";
+          ctx.log[level]({ event: "commande_statut_changed", commandeId: input.id, newStatut: input.statut }, `Commande statut → ${input.statut}`);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "commande.statut_modifie", entityType: "commande", entityId: input.id, payload: { avant: { statut: before?.statut }, apres: { statut: result.statut }, totalTTC: result.totalTTC } });
+          return result;
+        });
       }),
 
     getEnRetard: protectedProcedure.query(({ ctx }) => listerCommandesEnRetard(repo, ctx.tenant)),
@@ -154,14 +173,17 @@ export function createCommandesRouter(
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        const result = await recevoirCommande(
-          repo,
-          ctx.tenant,
-          input.id,
-          input.lignes.map((l) => ({ ligneId: l.ligneId, quantiteRecue: l.quantiteRecue })),
-        );
-        ctx.log.info({ event: "commande_recue", commandeId: input.id, nbLignesRecues: input.lignes.length }, "Réception commande fournisseur enregistrée");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await recevoirCommande(
+            r,
+            ctx.tenant,
+            input.id,
+            input.lignes.map((l) => ({ ligneId: l.ligneId, quantiteRecue: l.quantiteRecue })),
+          );
+          ctx.log.info({ event: "commande_recue", commandeId: input.id, nbLignesRecues: input.lignes.length }, "Réception commande fournisseur enregistrée");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "commande.recue", entityType: "commande", entityId: input.id, payload: { nbLignes: input.lignes.length, statut: result.statut } });
+          return result;
+        });
       }),
 
     setStatutFacturation: protectedProcedure
@@ -172,9 +194,13 @@ export function createCommandesRouter(
           depenseId: z.number().int().nullish(),
         }),
       )
-      .mutation(({ ctx, input }) =>
-        definirStatutFacturation(repo, ctx.tenant, input.id, input.statutFacturation, input.depenseId ?? null),
-      ),
+      .mutation(async ({ ctx, input }) => {
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await definirStatutFacturation(r, ctx.tenant, input.id, input.statutFacturation, input.depenseId ?? null);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "commande.facturation_definie", entityType: "commande", entityId: input.id, payload: { statutFacturation: input.statutFacturation, depenseId: input.depenseId ?? null } });
+          return result;
+        });
+      }),
 
     /*
      * Envoi du bon de commande au fournisseur par email (PDF en PJ) — parité `sendEmail`.

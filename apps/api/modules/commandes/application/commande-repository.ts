@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type {
   Commande,
@@ -65,6 +66,7 @@ export interface ICommandeRepository {
     statutFacturation: CommandeStatutFacturation,
     depenseId?: number | null,
   ): Promise<Commande | null>;
+  withDb(db: DbClient): ICommandeRepository;
 }
 
 export interface ReceptionLigne {
