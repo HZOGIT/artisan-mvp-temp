@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type {
   Intervention,
@@ -66,4 +67,5 @@ export interface IInterventionRepository {
   listCouleurs(ctx: TenantContext): Promise<Array<{ interventionId: number; couleur: string }>>;
   /** Upsert de la couleur d'une intervention (scopé `ctx.artisanId` par la PK) — idempotent. */
   setCouleur(ctx: TenantContext, interventionId: number, couleur: string): Promise<void>;
+  withDb(db: DbClient): IInterventionRepository;
 }

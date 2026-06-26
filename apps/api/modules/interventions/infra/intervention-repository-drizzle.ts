@@ -277,4 +277,8 @@ export class InterventionRepositoryDrizzle implements IInterventionRepository {
         .onConflictDoUpdate({ target: [couleursInterventions.artisanId, couleursInterventions.interventionId], set: { couleur } });
     });
   }
+
+  withDb(db: DbClient): InterventionRepositoryDrizzle {
+    return new InterventionRepositoryDrizzle(db);
+  }
 }
