@@ -1,7 +1,7 @@
 receivers:
   - name: ntfy
     webhook_configs:
-      - url: https://ntfy.sh/${TOPIC}
+      - url: https://ntfy.sh/operioz-claude-code-2026
         send_resolved: true
 
 route:

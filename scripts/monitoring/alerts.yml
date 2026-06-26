@@ -2,7 +2,7 @@ groups:
   - name: backend
     rules:
       - alert: HighErrorRate
-        expr: rate(http_requests_total{status_code=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.01
+        expr: rate(http_request_duration_seconds_count{status_code=~"5.."}[5m]) / rate(http_request_duration_seconds_count[5m]) > 0.01
         for: 3m
         annotations:
           summary: Taux d erreur 5xx > 1% depuis 3 min
