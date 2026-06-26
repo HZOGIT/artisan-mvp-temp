@@ -2,6 +2,7 @@
 import type { EmailPort, EmailMessage } from "./email";
 import type { SmsPort, SmsMessage } from "./sms";
 import type { StoragePort, StoredFile, UploadOptions } from "./storage";
+import type { DbClient } from "../db";
 import { createHash } from "crypto";
 import type { PdfPort } from "./pdf";
 import type { RateLimiterPort } from "./rate-limiter";
@@ -57,6 +58,8 @@ export class FakeSmsPort implements SmsPort {
 export class InMemoryStoragePort implements StoragePort {
   private readonly store = new Map<string, { body: Buffer; contentType?: string }>();
   private nextId = 1;
+
+  withDb(_db: DbClient): InMemoryStoragePort { return this; }
 
   async upload(key: string, body: Buffer, opts?: UploadOptions): Promise<StoredFile> {
     this.store.set(key, { body, contentType: opts?.contentType });

@@ -1,3 +1,6 @@
+import type { DbClient } from "../db";
+import type { TenantContext } from "../tenant";
+
 /** Résultat d'un upload : entrée dans la table `files`. */
 export interface StoredFile {
   readonly id: number;
@@ -16,7 +19,9 @@ export interface UploadOptions {
 
 /** Port de stockage d'objets (justificatifs, photos, PDF générés…). */
 export interface StoragePort {
-  upload(key: string, body: Buffer, opts?: UploadOptions): Promise<StoredFile>;
+  upload(key: string, body: Buffer, opts?: UploadOptions, ctx?: TenantContext): Promise<StoredFile>;
+  /** Retourne une instance utilisant `db` (pool ou tx) — pour atomicité outbox via withOutbox. */
+  withDb(db: DbClient): StoragePort;
   get(key: string): Promise<Buffer | null>;
   delete(key: string): Promise<void>;
   url(key: string): Promise<string>;
