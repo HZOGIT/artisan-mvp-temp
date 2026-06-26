@@ -1,3 +1,4 @@
+import type { DbClient } from "../../shared/db";
 import type { IStockRepository } from "./application/stock-repository";
 import type { INotificationRepository } from "../notifications/application/notification-repository";
 import type { IFournisseurRepository } from "../fournisseurs/application/fournisseur-repository";
@@ -13,6 +14,7 @@ export interface StocksModuleDeps {
   readonly repository: IStockRepository;
   readonly notificationRepository: INotificationRepository;
   readonly fournisseurRepository: IFournisseurRepository;
+  readonly db?: DbClient;
 }
 
 export interface StocksModule {
@@ -23,6 +25,6 @@ export interface StocksModule {
 export function createStocksModule(deps: StocksModuleDeps): StocksModule {
   return {
     deps,
-    router: createStocksRouter(deps.repository, deps.notificationRepository, deps.fournisseurRepository),
+    router: createStocksRouter(deps.repository, deps.notificationRepository, deps.fournisseurRepository, deps.db),
   };
 }

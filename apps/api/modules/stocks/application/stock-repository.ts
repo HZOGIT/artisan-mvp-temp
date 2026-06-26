@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type {
   Stock,
@@ -56,4 +57,5 @@ export interface IStockRepository {
    * legacy `getStockEntrantByArtisan`. N'inclut que les `stockId` avec un entrant strictement > 0.
    */
   listEntrant(ctx: TenantContext): Promise<StockEntrant[]>;
+  withDb(db: DbClient): IStockRepository;
 }

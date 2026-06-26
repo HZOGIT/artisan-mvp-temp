@@ -125,4 +125,8 @@ export class FakeStockRepository implements IStockRepository {
   async listEntrant(ctx: TenantContext): Promise<StockEntrant[]> {
     return (this.entrants.get(ctx.artisanId) ?? []).filter((e) => e.entrant > 0);
   }
+
+  withDb(_db: unknown): this {
+    return this;
+  }
 }

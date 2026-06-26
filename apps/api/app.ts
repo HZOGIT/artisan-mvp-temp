@@ -322,6 +322,8 @@ export interface AppDeps extends ContextDeps {
   /** Pool DB pour les transactions outbox du module commandes (défaut : getDbHandle().db). */
   readonly commandesDb?: DbClient;
   readonly stockRepo?: IStockRepository;
+  /** Pool DB pour les transactions outbox du module stocks (défaut : getDbHandle().db). */
+  readonly stocksDb?: DbClient;
   readonly clientRepo?: IClientRepository;
   readonly interventionRepo?: IInterventionRepository;
   readonly congeRepo?: ICongeRepository;
@@ -597,6 +599,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     repository: stockRepo,
     notificationRepository: notificationRepo,
     fournisseurRepository: fournisseurRepo,
+    db: deps.stocksDb ?? getDbHandle().db,
   });
   const clients = createClientsModule({
     repository: clientRepo,

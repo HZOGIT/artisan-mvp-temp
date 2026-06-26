@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import type { DbClient } from "../../../../shared/db";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
+import { withOutbox } from "../../../../shared/events/with-outbox";
 import type { IStockRepository } from "../../application/stock-repository";
 import type { INotificationRepository } from "../../../notifications/application/notification-repository";
 import type { IFournisseurRepository } from "../../../fournisseurs/application/fournisseur-repository";
@@ -61,6 +64,7 @@ export function createStocksRouter(
   repo: IStockRepository,
   notificationRepo: INotificationRepository,
   fournisseurRepo: IFournisseurRepository,
+  db?: DbClient,
 ) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listStocks(repo, ctx.tenant)),
@@ -71,20 +75,34 @@ export function createStocksRouter(
 
     create: protectedProcedure
       .input(createSchema)
-      .mutation(({ ctx, input }) => creerStock(repo, ctx.tenant, input)),
+      .mutation(async ({ ctx, input }) => {
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await creerStock(r, ctx.tenant, input);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "stock.cree", entityType: "stock", entityId: result.id, payload: { stockId: result.id, reference: result.reference, designation: result.designation, quantite: result.quantiteEnStock } });
+          return result;
+        });
+      }),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { id, ...data } = input;
-        return modifierStock(repo, ctx.tenant, id, data);
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await modifierStock(r, ctx.tenant, id, data);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "stock.modifie", entityType: "stock", entityId: id, payload: { stockId: id } });
+          return result;
+        });
       }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        await supprimerStock(repo, ctx.tenant, input.id);
-        return { success: true };
+        return withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          await supprimerStock(r, ctx.tenant, input.id);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "stock.supprime", entityType: "stock", entityId: input.id, payload: { snapshot: { stockId: input.id, reference: before?.reference, designation: before?.designation } } });
+          return { success: true };
+        });
       }),
 
     /** ⚠️ L'UNIQUE voie de modification de la quantité : un mouvement tracé (audit). */
@@ -100,14 +118,17 @@ export function createStocksRouter(
       )
       .mutation(async ({ ctx, input }) => {
         const { stockId, ...mouvement } = input;
-        const result = await ajusterQuantiteStock(repo, ctx.tenant, stockId, mouvement);
-        /** ajustement = correction manuelle sans mouvement physique → plus risqué que entree/sortie. */
-        const level = input.type === "ajustement" ? "warn" : "info";
-        ctx.log[level](
-          { event: "stock_mouvement", stockId, type: input.type, quantite: Number(input.quantite), motif: input.motif ?? null },
-          `Mouvement stock : ${input.type} de ${input.quantite}`,
-        );
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const avant = await r.getById(ctx.tenant, stockId);
+          const result = await ajusterQuantiteStock(r, ctx.tenant, stockId, mouvement);
+          const level = input.type === "ajustement" ? "warn" : "info";
+          ctx.log[level](
+            { event: "stock_mouvement", stockId, type: input.type, quantite: Number(input.quantite), motif: input.motif ?? null },
+            `Mouvement stock : ${input.type} de ${input.quantite}`,
+          );
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "stock.quantite_ajustee", entityType: "stock", entityId: stockId, payload: { stockId, ancienneQuantite: avant?.quantiteEnStock ?? "0.00", nouvelleQuantite: result.quantiteEnStock, delta: input.quantite, motif: input.motif ?? null } });
+          return result;
+        });
       }),
 
     getMouvements: protectedProcedure
