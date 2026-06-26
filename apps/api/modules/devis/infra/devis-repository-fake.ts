@@ -207,6 +207,10 @@ export class FakeDevisRepository implements IDevisRepository {
     return true;
   }
 
+  withDb(_db: unknown): FakeDevisRepository {
+    return this;
+  }
+
   private recalculerTotaux(devisId: number): void {
     const lignes = this.lignesStore.filter((l) => l.devisId === devisId);
     const totaux = calculerTotaux(lignes);

@@ -331,4 +331,8 @@ export class DevisRepositoryDrizzle implements IDevisRepository {
       .limit(1);
     return Boolean(row);
   }
+
+  withDb(db: DbClient): DevisRepositoryDrizzle {
+    return new DevisRepositoryDrizzle(db);
+  }
 }

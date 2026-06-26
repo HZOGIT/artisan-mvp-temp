@@ -1,9 +1,11 @@
 import { z } from "zod";
 import { router, protectedProcedure, permissionProcedure } from "../../../../interface/trpc/trpc";
 import { TVA_CATEGORIES_MAP } from "../../../../shared/tva/taux-tva-fr";
+import type { DbClient } from "../../../../shared/db";
 import type { PushPort } from "../../../../shared/push/web-push-adapter";
 import type { EventBusPort } from "../../../../shared/ports/event-bus";
-import { emitEvent } from "../../../../shared/events/emit-event";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
+import { withOutbox } from "../../../../shared/events/with-outbox";
 /** Permissions (parité legacy) : actions sur lignes/envoi/duplication = `devis.creer` ; conversion en facture = `factures.creer`. */
 const devisCreer = permissionProcedure("devis.creer");
 const facturesCreer = permissionProcedure("factures.creer");
@@ -110,7 +112,8 @@ export function createDevisRouter(
   signatureReader: DevisSignatureReader,
   ia: DevisIaDeps,
   push?: PushPort,
-  eventBus?: EventBusPort,
+  _eventBus?: EventBusPort,
+  db?: DbClient,
 ) {
   /** Dépendances de relance (réutilise les readers/email/rate-limiter du mailing + le repo relances). */
   const relanceDeps = {
@@ -138,79 +141,116 @@ export function createDevisRouter(
     create: protectedProcedure
       .input(createSchema)
       .mutation(async ({ ctx, input }) => {
-        const result = await creerDevis(repo, ctx.tenant, { ...input, dateValidite: toDate(input.dateValidite) });
-        ctx.log.info({ event: "devis_created", devisId: result.id, clientId: input.clientId }, "Devis créé");
-        push?.sendToUser(ctx.tenant.artisanId, { title: "Operioz", body: `Nouveau devis ${result.numero} créé` }).catch(() => undefined);
-        return result;
+        const parsed = { ...input, dateValidite: toDate(input.dateValidite) };
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await creerDevis(r, ctx.tenant, parsed);
+          ctx.log.info({ event: "devis_created", devisId: result.id, clientId: input.clientId }, "Devis créé");
+          push?.sendToUser(ctx.tenant.artisanId, { title: "Operioz", body: `Nouveau devis ${result.numero} créé` }).catch(() => undefined);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "devis.cree", entityType: "devis", entityId: result.id, payload: { numero: result.numero, clientId: result.clientId, totalTTC: result.totalTTC, statut: result.statut } });
+          return result;
+        });
       }),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { id, dateValidite, ...data } = input;
-        return modifierDevis(repo, ctx.tenant, id, { ...data, dateValidite: toDate(dateValidite) });
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await modifierDevis(r, ctx.tenant, id, { ...data, dateValidite: toDate(dateValidite) });
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "devis.modifie", entityType: "devis", entityId: id, payload: { objet: result.objet, referenceClient: result.referenceClient } });
+          return result;
+        });
       }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        await supprimerDevis(repo, ctx.tenant, input.id);
-        return { success: true };
+        return withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          await supprimerDevis(r, ctx.tenant, input.id);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "devis.supprime", entityType: "devis", entityId: input.id, payload: { snapshot: { numero: before?.numero, totalTTC: before?.totalTTC, statut: before?.statut, clientId: before?.clientId } } });
+          return { success: true };
+        });
       }),
 
     addLigne: devisCreer
       .input(z.object({ devisId: z.number().int() }).and(ligneCreateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { devisId, tvaCategorieId, remise: remiseNum, ...data } = input;
         const effectiveCategorieId = ctx.tenant.franchiseTVA && (!tvaCategorieId || tvaCategorieId === "FR_20") ? "FR_FRANCHISE" : (tvaCategorieId ?? "FR_20");
         const tauxTVA = TVA_CATEGORIES_MAP[effectiveCategorieId].taux;
-        return ajouterLigneDevis(repo, ctx.tenant, devisId, { ...data, tauxTVA, tvaCategorieId: effectiveCategorieId, remise: String(remiseNum ?? 0) });
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await ajouterLigneDevis(r, ctx.tenant, devisId, { ...data, tauxTVA, tvaCategorieId: effectiveCategorieId, remise: String(remiseNum ?? 0) });
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "devis.ligne_ajoutee", entityType: "devis", entityId: devisId, payload: { ligneId: result.id, designation: result.designation, prixUnitaireHT: result.prixUnitaireHT } });
+          return result;
+        });
       }),
 
     updateLigne: devisCreer
       .input(z.object({ id: z.number().int(), devisId: z.number().int() }).and(ligneUpdateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { id, devisId, tvaCategorieId, remise: remiseNum, ...data } = input;
         const tauxTVA = tvaCategorieId ? TVA_CATEGORIES_MAP[tvaCategorieId].taux : undefined;
-        return modifierLigneDevis(repo, ctx.tenant, devisId, id, { ...data, ...(tauxTVA !== undefined && { tauxTVA }), ...(tvaCategorieId !== undefined && { tvaCategorieId }), ...(remiseNum !== undefined && { remise: String(remiseNum) }) });
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await modifierLigneDevis(r, ctx.tenant, devisId, id, { ...data, ...(tauxTVA !== undefined && { tauxTVA }), ...(tvaCategorieId !== undefined && { tvaCategorieId }), ...(remiseNum !== undefined && { remise: String(remiseNum) }) });
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "devis.ligne_modifiee", entityType: "devis", entityId: devisId, payload: { ligneId: id, designation: result.designation, prixUnitaireHT: result.prixUnitaireHT } });
+          return result;
+        });
       }),
 
     deleteLigne: devisCreer
       .input(z.object({ id: z.number().int(), devisId: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        await supprimerLigneDevis(repo, ctx.tenant, input.devisId, input.id);
-        return { success: true };
+        return withOutbox(db, repo, async (r, tx) => {
+          await supprimerLigneDevis(r, ctx.tenant, input.devisId, input.id);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "devis.ligne_supprimee", entityType: "devis", entityId: input.devisId, payload: { ligneId: input.id } });
+          return { success: true };
+        });
       }),
 
     /** Transitions de statut (machine à états dans le use-case : Conflict→409 si invalide). */
     envoyer: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await changerStatutDevis(repo, ctx.tenant, input.id, "envoye", mailing.artisanReader);
-        ctx.log.info({ event: "devis_envoye", devisId: input.id }, "Devis envoyé au client");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await changerStatutDevis(r, ctx.tenant, input.id, "envoye", mailing.artisanReader);
+          ctx.log.info({ event: "devis_envoye", devisId: input.id }, "Devis envoyé au client");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "devis.envoye", entityType: "devis", entityId: input.id, payload: { totalTTC: result.totalTTC, numero: result.numero } });
+          return result;
+        });
       }),
 
     accepter: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await changerStatutDevis(repo, ctx.tenant, input.id, "accepte");
-        ctx.log.info({ event: "devis_accepte", devisId: input.id }, "Devis accepté");
-        if (eventBus) emitEvent(eventBus, ctx.tenant, { type: "DEVIS_ACCEPTE", entityType: "devis", entityId: input.id, payload: { devisId: input.id } });
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await changerStatutDevis(r, ctx.tenant, input.id, "accepte");
+          ctx.log.info({ event: "devis_accepte", devisId: input.id }, "Devis accepté");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "devis.accepte", entityType: "devis", entityId: input.id, payload: { totalTTC: result.totalTTC, numero: result.numero } });
+          return result;
+        });
       }),
 
     refuser: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await changerStatutDevis(repo, ctx.tenant, input.id, "refuse");
-        ctx.log.warn({ event: "devis_refuse", devisId: input.id }, "Devis refusé");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await changerStatutDevis(r, ctx.tenant, input.id, "refuse");
+          ctx.log.warn({ event: "devis_refuse", devisId: input.id }, "Devis refusé");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "devis.refuse", entityType: "devis", entityId: input.id, payload: { totalTTC: result.totalTTC } });
+          return result;
+        });
       }),
 
     expirer: protectedProcedure
       .input(z.object({ id: z.number().int() }))
-      .mutation(({ ctx, input }) => changerStatutDevis(repo, ctx.tenant, input.id, "expire")),
+      .mutation(async ({ ctx, input }) => {
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await changerStatutDevis(r, ctx.tenant, input.id, "expire");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "devis.expire", entityType: "devis", entityId: input.id, payload: { totalTTC: result.totalTTC } });
+          return result;
+        });
+      }),
 
     /** ── Modèles de devis (gabarits réutilisables) exposés sous `devis.*` (parité client) ────────── */
     getModeles: protectedProcedure.query(({ ctx }) => listModelesDevis(modeleRepo, ctx.tenant)),
@@ -283,7 +323,13 @@ export function createDevisRouter(
     /** Duplique un devis (nouveau brouillon, numéro serveur, lignes copiées) — parité `duplicate`. */
     duplicate: devisCreer
       .input(z.object({ devisId: z.number().int() }))
-      .mutation(({ ctx, input }) => dupliquerDevis(repo, ctx.tenant, input.devisId)),
+      .mutation(async ({ ctx, input }) => {
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await dupliquerDevis(r, ctx.tenant, input.devisId);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "devis.duplique", entityType: "devis", entityId: result.id, payload: { sourceId: input.devisId, numero: result.numero } });
+          return result;
+        });
+      }),
 
     /*
      * Envoi du devis par email (PDF en PJ) — parité client `trpc.devis.sendByEmail`.

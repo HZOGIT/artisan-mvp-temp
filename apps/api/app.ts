@@ -8,7 +8,7 @@ import { buildFastifyLoggerConfig } from "./shared/ports/logger-fastify";
 import { fastifyTRPCPlugin } from "@trpc/server/adapters/fastify";
 import { createAppRouter } from "./interface/trpc/router";
 import { makeCreateContext, type ContextDeps } from "./interface/trpc/context";
-import { getDbHandle } from "./shared/db";
+import { getDbHandle, type DbClient } from "./shared/db";
 import { DrizzleTenantResolver } from "./shared/tenant/drizzle-tenant-resolver";
 import { DrizzleUserRoleReader } from "./shared/tenant/role-reader";
 import { DrizzlePermissionsReader } from "./shared/tenant/permissions-reader";
@@ -319,6 +319,8 @@ export interface AppDeps extends ContextDeps {
   readonly transactionBancaireRepo?: ITransactionBancaireRepository;
   readonly fecReader?: FecReader;
   readonly devisRepo?: IDevisRepository;
+  /** Pool DB pour les transactions outbox du module devis (défaut : getDbHandle().db). */
+  readonly devisDb?: DbClient;
   readonly factureRepo?: IFactureRepository;
   readonly devisReader?: IDevisReader;
   readonly compta?: ComptaPort;
@@ -645,6 +647,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     ia: { llm: deps.llm ?? new GeminiLlmAdapter(app.log), trackLlm: makeLlmUsageTracker(getDbHandle().db), rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000) },
     push: pushAdapter,
     eventBus,
+    db: deps.devisDb,
   });
   /*
    * Génération FEC réelle : l'adapter ecritures implémente le seam `ComptaPort` des factures

@@ -1,3 +1,4 @@
+import type { DbClient } from "../../shared/db";
 import type { IDevisRepository } from "./application/devis-repository";
 import type { DevisMailingDeps } from "./application/envoyer-devis-email";
 import type { DevisToFactureConverter } from "./application/devis-to-facture-converter";
@@ -27,6 +28,8 @@ export interface DevisModuleDeps {
   readonly ia: DevisIaDeps;
   readonly push?: PushPort;
   readonly eventBus?: EventBusPort;
+  /** Pool ou client DB — pour les transactions outbox dans le routeur. */
+  readonly db?: DbClient;
 }
 
 export interface DevisModule {
@@ -47,6 +50,7 @@ export function createDevisModule(deps: DevisModuleDeps): DevisModule {
       deps.ia,
       deps.push,
       deps.eventBus,
+      deps.db,
     ),
   };
 }
