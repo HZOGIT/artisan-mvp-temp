@@ -323,6 +323,13 @@
       "when": 1782469340145,
       "tag": "0045_simple_glorian",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1782479386069,
+      "tag": "0046_event-outbox",
+      "breakpoints": true
     }
   ]
 }

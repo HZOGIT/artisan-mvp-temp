@@ -69,6 +69,19 @@ export const eventLog = pgTable("events", {
 export type EventLog = typeof eventLog.$inferSelect;
 export type InsertEventLog = typeof eventLog.$inferInsert;
 
+export const eventOutbox = pgTable("event_outbox", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  userId: integer("userId"),
+  entityType: varchar("entityType", { length: 64 }).notNull(),
+  entityId: integer("entityId").notNull(),
+  action: varchar("action", { length: 128 }).notNull(),
+  payload: jsonb("payload"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type EventOutbox = typeof eventOutbox.$inferSelect;
+export type InsertEventOutbox = typeof eventOutbox.$inferInsert;
+
 export const activeSessions = pgTable("active_sessions", {
   id: serial("id").primaryKey(),
   user_id: integer("user_id").notNull(),
