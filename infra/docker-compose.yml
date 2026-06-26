@@ -138,6 +138,14 @@ services:
     devices:
       - /dev/kmsg
 
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: ${DATABASE_URL}
+    depends_on:
+      - postgres
+
   grafana:
     image: grafana/grafana:11.1.0
     restart: unless-stopped
