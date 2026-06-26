@@ -34,13 +34,11 @@ function PayloadCell({ payload }: { payload: unknown }) {
 
 export default function EventsAdminPage() {
   const [page, setPage] = useState(1);
-  const [artisanIdInput, setArtisanIdInput] = useState("");
   const [typeInput, setTypeInput] = useState("");
 
-  const artisanId = artisanIdInput ? parseInt(artisanIdInput, 10) : undefined;
   const type = typeInput.trim() || undefined;
 
-  const { data, isLoading, isFetching, refetch } = trpc.platformAdmin.events.list.useQuery({ page, artisanId, type });
+  const { data, isLoading, isFetching, refetch } = trpc.events.list.useQuery({ page, type });
 
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
@@ -55,10 +53,6 @@ export default function EventsAdminPage() {
       </div>
 
       <div className="flex flex-wrap gap-3 items-end">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground">Artisan ID</label>
-          <Input className="w-28" value={artisanIdInput} onChange={(e) => { setArtisanIdInput(e.target.value); setPage(1); }} placeholder="ex. 42" />
-        </div>
         <div className="flex flex-col gap-1">
           <label className="text-xs text-muted-foreground">Type</label>
           <Input className="w-52" value={typeInput} onChange={(e) => { setTypeInput(e.target.value); setPage(1); }} placeholder="ex. FACTURE_PAYEE" />
@@ -86,7 +80,6 @@ export default function EventsAdminPage() {
                     <TableHead className="whitespace-nowrap">Date</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Entity</TableHead>
-                    <TableHead>Artisan</TableHead>
                     <TableHead>Payload</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -103,7 +96,6 @@ export default function EventsAdminPage() {
                         <span className="text-muted-foreground">{row.entityType}</span>
                         {" #"}{row.entityId}
                       </TableCell>
-                      <TableCell className="text-sm">{row.artisanId ?? "—"}</TableCell>
                       <TableCell><PayloadCell payload={row.payload} /></TableCell>
                     </TableRow>
                   ))}
