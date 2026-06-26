@@ -324,6 +324,8 @@ export interface AppDeps extends ContextDeps {
   readonly congeRepo?: ICongeRepository;
   readonly noteDeFraisRepo?: INoteDeFraisRepository;
   readonly chantierRepo?: IChantierRepository;
+  /** Pool DB pour les transactions outbox events du module chantiers (défaut : getDbHandle().db). */
+  readonly chantiersDb?: DbClient;
   readonly depenseRepo?: IDepenseRepository;
   readonly transactionBancaireRepo?: ITransactionBancaireRepository;
   readonly fecReader?: FecReader;
@@ -621,6 +623,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   });
   const chantiers = createChantiersModule({
     repository: deps.chantierRepo ?? new ChantierRepositoryDrizzle(getDbHandle().db),
+    db: deps.chantiersDb ?? getDbHandle().db,
   });
   const depenses = createDepensesModule({
     repository: deps.depenseRepo ?? new DepenseRepositoryDrizzle(getDbHandle().db),

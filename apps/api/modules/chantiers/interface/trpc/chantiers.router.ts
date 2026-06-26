@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import type { DbClient } from "../../../../shared/db";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
+import { withOutbox } from "../../../../shared/events/with-outbox";
 import type { IChantierRepository } from "../../application/chantier-repository";
 import { listChantiers, getChantier } from "../../application/read-use-cases";
 import { creerChantier, modifierChantier, supprimerChantier } from "../../application/write-use-cases";
@@ -68,7 +71,7 @@ const updateSchema = z.object({
  * use-cases (scoping tenant + anti-IDOR-FK via ctx.tenant), laisse remonter les Domain errors
  * (NotFound→404, Validation→400). Repo injecté (DI).
  */
-export function createChantiersRouter(repo: IChantierRepository) {
+export function createChantiersRouter(repo: IChantierRepository, db?: DbClient) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listChantiers(repo, ctx.tenant)),
 
@@ -79,29 +82,39 @@ export function createChantiersRouter(repo: IChantierRepository) {
     create: protectedProcedure
       .input(createSchema)
       .mutation(async ({ ctx, input }) => {
-        const result = await creerChantier(repo, ctx.tenant, input);
-        ctx.log.info({ event: "chantier_created", chantierId: result.id, clientId: input.clientId ?? null, statut: input.statut ?? "planifie" }, "Chantier créé");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await creerChantier(r, ctx.tenant, input);
+          ctx.log.info({ event: "chantier_created", chantierId: result.id, clientId: input.clientId ?? null, statut: input.statut ?? "planifie" }, "Chantier créé");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "chantier.cree", entityType: "chantier", entityId: result.id, payload: { clientId: result.clientId, adresse: result.adresse, dateDebut: result.dateDebut } });
+          return result;
+        });
       }),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
       .mutation(async ({ ctx, input }) => {
         const { id, ...data } = input;
-        const result = await modifierChantier(repo, ctx.tenant, id, data);
-        if (data.statut) {
-          const level = data.statut === "annule" ? "warn" : "info";
-          ctx.log[level]({ event: "chantier_statut_changed", chantierId: id, newStatut: data.statut }, `Chantier statut → ${data.statut}`);
-        }
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await modifierChantier(r, ctx.tenant, id, data);
+          if (data.statut) {
+            const level = data.statut === "annule" ? "warn" : "info";
+            ctx.log[level]({ event: "chantier_statut_changed", chantierId: id, newStatut: data.statut }, `Chantier statut → ${data.statut}`);
+          }
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "chantier.modifie", entityType: "chantier", entityId: id, payload: { statut: data.statut ?? null, nom: data.nom ?? null, adresse: data.adresse ?? null } });
+          return result;
+        });
       }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        await supprimerChantier(repo, ctx.tenant, input.id);
-        ctx.log.warn({ event: "chantier_deleted", chantierId: input.id }, "Chantier supprimé");
-        return { success: true };
+        return withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          await supprimerChantier(r, ctx.tenant, input.id);
+          ctx.log.warn({ event: "chantier_deleted", chantierId: input.id }, "Chantier supprimé");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "chantier.supprime", entityType: "chantier", entityId: input.id, payload: { snapshot: { clientId: before?.clientId, adresse: before?.adresse } } });
+          return { success: true };
+        });
       }),
 
     /** ── Pointages (saisie de temps) — sous-ressource scopée via le chantier parent ──────────────── */

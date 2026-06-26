@@ -352,4 +352,8 @@ export class FakeChantierRepository implements IChantierRepository {
     if (idx === -1) return;
     this.store[idx] = { ...this.store[idx], avancement, updatedAt: new Date() };
   }
+
+  withDb(_db: unknown): this {
+    return this;
+  }
 }
