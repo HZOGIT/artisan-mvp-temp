@@ -43,6 +43,7 @@ const ligneCreateSchema = z.object({
   description: z.string().max(5000).nullish(),
   ordre: z.number().int().optional(),
   type: ligneTypeEnum.optional(),
+  remise: z.number().min(0).max(100).default(0),
 });
 
 /*
@@ -85,6 +86,7 @@ const ligneUpdateSchema = z.object({
   description: z.string().max(5000).nullish(),
   ordre: z.number().int().optional(),
   type: ligneTypeEnum.optional(),
+  remise: z.number().min(0).max(100).optional(),
 });
 
 /** Schéma d'avoir partagé par `creerAvoir` et son alias client `createAvoir` (même use-case). */
@@ -142,9 +144,9 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
       .input(createSchema)
       .mutation(async ({ ctx, input }) => {
         const { lignes: rawLignes, ...rest } = input;
-        const lignes = rawLignes?.map(({ tvaCategorieId, ...l }) => {
+        const lignes = rawLignes?.map(({ tvaCategorieId, remise: remiseNum, ...l }) => {
           const categorieId = tvaCategorieId ?? "FR_20";
-          return { ...l, tauxTVA: TVA_CATEGORIES_MAP[categorieId].taux, tvaCategorieId: categorieId };
+          return { ...l, tauxTVA: TVA_CATEGORIES_MAP[categorieId].taux, tvaCategorieId: categorieId, remise: String(remiseNum ?? 0) };
         });
         const result = await creerFacture(repo, ctx.tenant, { ...rest, dateEcheance: toDate(rest.dateEcheance), lignes });
         ctx.log.info({ event: "facture_created", factureId: result.id, clientId: rest.clientId }, "Facture créée");
@@ -169,18 +171,18 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
     addLigne: protectedProcedure
       .input(z.object({ factureId: z.number().int() }).and(ligneCreateSchema))
       .mutation(({ ctx, input }) => {
-        const { factureId, tvaCategorieId, ...data } = input;
+        const { factureId, tvaCategorieId, remise: remiseNum, ...data } = input;
         const effectiveCategorieId = ctx.tenant.franchiseTVA && (!tvaCategorieId || tvaCategorieId === "FR_20") ? "FR_FRANCHISE" : (tvaCategorieId ?? "FR_20");
         const tauxTVA = TVA_CATEGORIES_MAP[effectiveCategorieId].taux;
-        return ajouterLigneFacture(repo, ctx.tenant, factureId, { ...data, tauxTVA, tvaCategorieId: effectiveCategorieId });
+        return ajouterLigneFacture(repo, ctx.tenant, factureId, { ...data, tauxTVA, tvaCategorieId: effectiveCategorieId, remise: String(remiseNum ?? 0) });
       }),
 
     updateLigne: protectedProcedure
       .input(z.object({ id: z.number().int(), factureId: z.number().int() }).and(ligneUpdateSchema))
       .mutation(({ ctx, input }) => {
-        const { id, factureId, tvaCategorieId, ...data } = input;
+        const { id, factureId, tvaCategorieId, remise: remiseNum, ...data } = input;
         const tauxTVA = tvaCategorieId ? TVA_CATEGORIES_MAP[tvaCategorieId].taux : undefined;
-        return modifierLigneFacture(repo, ctx.tenant, factureId, id, { ...data, ...(tauxTVA !== undefined && { tauxTVA }), ...(tvaCategorieId !== undefined && { tvaCategorieId }) });
+        return modifierLigneFacture(repo, ctx.tenant, factureId, id, { ...data, ...(tauxTVA !== undefined && { tauxTVA }), ...(tvaCategorieId !== undefined && { tvaCategorieId }), ...(remiseNum !== undefined && { remise: String(remiseNum) }) });
       }),
 
     deleteLigne: protectedProcedure

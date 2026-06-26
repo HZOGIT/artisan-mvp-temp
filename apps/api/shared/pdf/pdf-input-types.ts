@@ -16,6 +16,7 @@ export interface DevisLigne {
   prixUnitaire?: number | string | null;
   tauxTVA?: number | string | null;
   tvaCategorieId?: string | null;
+  remise?: number | string | null;
   montantHT?: number | string | null;
   montantTVA?: number | string | null;
   type?: string | null;

@@ -79,6 +79,7 @@ const ligneCreateSchema = z.object({
   description: z.string().max(5000).nullish(),
   ordre: z.number().int().optional(),
   type: ligneTypeEnum.optional(),
+  remise: z.number().min(0).max(100).default(0),
 });
 
 const ligneUpdateSchema = z.object({
@@ -91,6 +92,7 @@ const ligneUpdateSchema = z.object({
   description: z.string().max(5000).nullish(),
   ordre: z.number().int().optional(),
   type: ligneTypeEnum.optional(),
+  remise: z.number().min(0).max(100).optional(),
 });
 
 /*
@@ -158,18 +160,18 @@ export function createDevisRouter(
     addLigne: devisCreer
       .input(z.object({ devisId: z.number().int() }).and(ligneCreateSchema))
       .mutation(({ ctx, input }) => {
-        const { devisId, tvaCategorieId, ...data } = input;
+        const { devisId, tvaCategorieId, remise: remiseNum, ...data } = input;
         const effectiveCategorieId = ctx.tenant.franchiseTVA && (!tvaCategorieId || tvaCategorieId === "FR_20") ? "FR_FRANCHISE" : (tvaCategorieId ?? "FR_20");
         const tauxTVA = TVA_CATEGORIES_MAP[effectiveCategorieId].taux;
-        return ajouterLigneDevis(repo, ctx.tenant, devisId, { ...data, tauxTVA, tvaCategorieId: effectiveCategorieId });
+        return ajouterLigneDevis(repo, ctx.tenant, devisId, { ...data, tauxTVA, tvaCategorieId: effectiveCategorieId, remise: String(remiseNum ?? 0) });
       }),
 
     updateLigne: devisCreer
       .input(z.object({ id: z.number().int(), devisId: z.number().int() }).and(ligneUpdateSchema))
       .mutation(({ ctx, input }) => {
-        const { id, devisId, tvaCategorieId, ...data } = input;
+        const { id, devisId, tvaCategorieId, remise: remiseNum, ...data } = input;
         const tauxTVA = tvaCategorieId ? TVA_CATEGORIES_MAP[tvaCategorieId].taux : undefined;
-        return modifierLigneDevis(repo, ctx.tenant, devisId, id, { ...data, ...(tauxTVA !== undefined && { tauxTVA }), ...(tvaCategorieId !== undefined && { tvaCategorieId }) });
+        return modifierLigneDevis(repo, ctx.tenant, devisId, id, { ...data, ...(tauxTVA !== undefined && { tauxTVA }), ...(tvaCategorieId !== undefined && { tvaCategorieId }), ...(remiseNum !== undefined && { remise: String(remiseNum) }) });
       }),
 
     deleteLigne: devisCreer

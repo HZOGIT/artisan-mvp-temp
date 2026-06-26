@@ -32,6 +32,7 @@ export interface DevisLigneReadModel {
   readonly unite: string;
   readonly prixUnitaireHT: string;
   readonly tauxTVA: string;
+  readonly remise?: string;
   readonly tvaCategorieId?: string | null;
   readonly montantHT: string;
   readonly montantTVA: string;

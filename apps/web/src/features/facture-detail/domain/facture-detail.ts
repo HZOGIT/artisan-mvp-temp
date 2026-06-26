@@ -70,9 +70,9 @@ export function buildAvoirTotalLignes(lignes: readonly Ligne[]): AvoirInput["lig
     .map((l) => ({ designation: l.designation, quantite: String(l.quantite ?? "1"), prixUnitaireHT: String(l.prixUnitaireHT ?? "0"), tvaCategorieId: (l.tvaCategorieId as TvaCategorieId | null | undefined) ?? "FR_20", unite: l.unite || "unité" }));
 }
 
-export type PdfLigne = { designation: string; description: string | null; quantite: number; unite: string | null; prixUnitaire: number; tauxTva: number; type: string | null; tvaCategorieId?: string | null };
+export type PdfLigne = { designation: string; description: string | null; quantite: number; unite: string | null; prixUnitaire: number; tauxTva: number; type: string | null; tvaCategorieId?: string | null; remise: number };
 export function pdfLignes(lignes: readonly Ligne[]): PdfLigne[] {
-  return lignes.map((l) => ({ designation: l.designation, description: l.description, quantite: n(l.quantite) || 1, unite: l.unite, prixUnitaire: n(l.prixUnitaireHT), tauxTva: n(l.tauxTVA) || 20, type: l.type, tvaCategorieId: (l as { tvaCategorieId?: string | null }).tvaCategorieId ?? null }));
+  return lignes.map((l) => ({ designation: l.designation, description: l.description, quantite: n(l.quantite) || 1, unite: l.unite, prixUnitaire: n(l.prixUnitaireHT), tauxTva: n(l.tauxTVA) || 20, type: l.type, tvaCategorieId: (l as { tvaCategorieId?: string | null }).tvaCategorieId ?? null, remise: n((l as { remise?: string | null }).remise ?? "0") }));
 }
 
 export function activitesForFacture(activites: readonly Activite[], factureId: number): Activite[] {

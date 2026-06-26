@@ -357,6 +357,7 @@ export async function convertirDevisEnFacture(
     unite: l.unite,
     prixUnitaireHT: l.prixUnitaireHT,
     tauxTVA: l.tauxTVA,
+    remise: l.remise ?? "0",
     tvaCategorieId: l.tvaCategorieId ?? null,
     montantHT: l.montantHT,
     montantTVA: l.montantTVA,

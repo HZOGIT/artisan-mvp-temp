@@ -546,6 +546,8 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   const blocksEndY = renderInfoBlocks(doc, primary, buildArtisanBlock(artisan), buildClientBlock(client));
 
   /** Tableau des lignes */
+  const hasRemiseD = devis.lignes.some((l) => Number(l.remise) > 0);
+  const colSpanD = hasRemiseD ? 5 : 4;
   const tableData = devis.lignes.map((ligne) => {
     /*
      * Section (en-tête de lot, gras) / note (texte libre, italique) en
@@ -553,33 +555,35 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
      */
     const type = ligne.type ?? "produit";
     if (type === "section") {
-      return [{ content: ligne.designation ?? "", colSpan: 4, styles: { fontStyle: "bold" as const, fillColor: [226, 232, 240] as [number, number, number], textColor: [30, 41, 59] as [number, number, number] } }];
+      return [{ content: ligne.designation ?? "", colSpan: colSpanD, styles: { fontStyle: "bold" as const, fillColor: [226, 232, 240] as [number, number, number], textColor: [30, 41, 59] as [number, number, number] } }];
     }
     if (type === "note") {
-      return [{ content: ligne.designation ?? "", colSpan: 4, styles: { fontStyle: "italic" as const, textColor: [100, 100, 100] as [number, number, number] } }];
+      return [{ content: ligne.designation ?? "", colSpan: colSpanD, styles: { fontStyle: "italic" as const, textColor: [100, 100, 100] as [number, number, number] } }];
     }
     const quantite = Number(ligne.quantite) || 0;
     const prixUnitaire = Number(ligne.prixUnitaireHT) || 0;
     const montantHT = ligne.montantHT != null ? Number(ligne.montantHT) : prixUnitaire * quantite;
-    return [
+    const row: (string | number)[] = [
       ligne.designation ?? "",
       quantite.toString(),
       `${prixUnitaire.toFixed(2)} €`,
-      `${montantHT.toFixed(2)} €`,
     ];
+    if (hasRemiseD) row.push(Number(ligne.remise) > 0 ? `${Number(ligne.remise).toFixed(0)}%` : "");
+    row.push(`${montantHT.toFixed(2)} €`);
+    return row;
   });
 
+  const headD = hasRemiseD
+    ? [["Désignation", "Quantité", "P.U. HT", "Rem.%", "Total HT"]]
+    : [["Désignation", "Quantité", "P.U. HT", "Total HT"]];
   autoTable(doc, {
-    head: [["Désignation", "Quantité", "P.U. HT", "Total HT"]],
+    head: headD,
     body: tableData,
     startY: blocksEndY + 8,
     ...TABLE_THEME,
-    columnStyles: {
-      0: { halign: "left" },
-      1: { halign: "center", cellWidth: 25 },
-      2: { halign: "right", cellWidth: 30 },
-      3: { halign: "right", cellWidth: 30 },
-    },
+    columnStyles: hasRemiseD
+      ? { 0: { halign: "left" }, 1: { halign: "center", cellWidth: 25 }, 2: { halign: "right", cellWidth: 25 }, 3: { halign: "center", cellWidth: 18 }, 4: { halign: "right", cellWidth: 25 } }
+      : { 0: { halign: "left" }, 1: { halign: "center", cellWidth: 25 }, 2: { halign: "right", cellWidth: 30 }, 3: { halign: "right", cellWidth: 30 } },
     margin: { left: MARGIN, right: MARGIN },
   });
 
@@ -730,6 +734,8 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   const blocksEndY = renderInfoBlocks(doc, primary, buildArtisanBlock(artisan), buildClientBlock(client));
 
   /** Tableau des lignes */
+  const hasRemiseF = facture.lignes.some((l) => Number(l.remise) > 0);
+  const colSpanF = hasRemiseF ? 5 : 4;
   const tableData = facture.lignes.map((ligne) => {
     /*
      * OPE-168 (volet 2) — section (en-tête de lot, gras) / note (texte libre, italique)
@@ -737,33 +743,35 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
      */
     const type = ligne.type ?? "produit";
     if (type === "section") {
-      return [{ content: ligne.designation ?? "", colSpan: 4, styles: { fontStyle: "bold" as const, fillColor: [226, 232, 240] as [number, number, number], textColor: [30, 41, 59] as [number, number, number] } }];
+      return [{ content: ligne.designation ?? "", colSpan: colSpanF, styles: { fontStyle: "bold" as const, fillColor: [226, 232, 240] as [number, number, number], textColor: [30, 41, 59] as [number, number, number] } }];
     }
     if (type === "note") {
-      return [{ content: ligne.designation ?? "", colSpan: 4, styles: { fontStyle: "italic" as const, textColor: [100, 100, 100] as [number, number, number] } }];
+      return [{ content: ligne.designation ?? "", colSpan: colSpanF, styles: { fontStyle: "italic" as const, textColor: [100, 100, 100] as [number, number, number] } }];
     }
     const quantite = Number(ligne.quantite) || 0;
     const prixUnitaire = Number(ligne.prixUnitaireHT) || 0;
     const montantHT = ligne.montantHT != null ? Number(ligne.montantHT) : prixUnitaire * quantite;
-    return [
+    const row: (string | number)[] = [
       ligne.designation ?? "",
       quantite.toString(),
       `${prixUnitaire.toFixed(2)} €`,
-      `${montantHT.toFixed(2)} €`,
     ];
+    if (hasRemiseF) row.push(Number(ligne.remise) > 0 ? `${Number(ligne.remise).toFixed(0)}%` : "");
+    row.push(`${montantHT.toFixed(2)} €`);
+    return row;
   });
 
+  const headF = hasRemiseF
+    ? [["Désignation", "Quantité", "P.U. HT", "Rem.%", "Total HT"]]
+    : [["Désignation", "Quantité", "P.U. HT", "Total HT"]];
   autoTable(doc, {
-    head: [["Désignation", "Quantité", "P.U. HT", "Total HT"]],
+    head: headF,
     body: tableData,
     startY: blocksEndY + 8,
     ...TABLE_THEME,
-    columnStyles: {
-      0: { halign: "left" },
-      1: { halign: "center", cellWidth: 25 },
-      2: { halign: "right", cellWidth: 30 },
-      3: { halign: "right", cellWidth: 30 },
-    },
+    columnStyles: hasRemiseF
+      ? { 0: { halign: "left" }, 1: { halign: "center", cellWidth: 25 }, 2: { halign: "right", cellWidth: 25 }, 3: { halign: "center", cellWidth: 18 }, 4: { halign: "right", cellWidth: 25 } }
+      : { 0: { halign: "left" }, 1: { halign: "center", cellWidth: 25 }, 2: { halign: "right", cellWidth: 30 }, 3: { halign: "right", cellWidth: 30 } },
     margin: { left: MARGIN, right: MARGIN },
   });
 
