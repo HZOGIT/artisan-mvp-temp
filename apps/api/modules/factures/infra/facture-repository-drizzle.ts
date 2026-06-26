@@ -23,7 +23,7 @@ type AuditRow = typeof eventLog.$inferSelect;
 function toAuditEntry(r: AuditRow): AuditLogEntry {
   return {
     id: r.id,
-    userId: r.userId,
+    userId: r.userId ?? 0,
     entityType: r.entityType,
     entityId: r.entityId,
     action: r.action,

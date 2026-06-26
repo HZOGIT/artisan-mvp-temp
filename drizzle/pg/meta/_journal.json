@@ -274,6 +274,13 @@
       "when": 1782451609568,
       "tag": "0038_rename-audit-log-to-events",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1782452488290,
+      "tag": "0039_events-rls-open",
+      "breakpoints": true
     }
   ]
 }
