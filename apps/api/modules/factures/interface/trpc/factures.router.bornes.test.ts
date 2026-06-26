@@ -113,8 +113,8 @@ describe.skipIf(!URL)("factures.router e2e — bornes & invariants transport", (
       tA,
     );
     expect(res.statusCode).toBe(200);
-    const f = res.json().result.data as { numero: string; statut: string; totalTTC: string; montantPaye: string };
-    expect(f.numero).toMatch(/^FAC-\d{5}$/); // numéro serveur, pas "HACK-999"
+    const f = res.json().result.data as { numero: string | null; statut: string; totalTTC: string; montantPaye: string };
+    expect(f.numero).toBeNull(); /* numéro assigné à l'émission, pas au create — "HACK-999" ignoré */
     expect(f.statut).toBe("brouillon"); // pas "payee"
     expect(f.totalTTC).toBe("0.00"); // dérivé des lignes
     expect(f.montantPaye).toBe("0.00"); // paiement = use-case dédié, pas falsifiable
@@ -123,7 +123,7 @@ describe.skipIf(!URL)("factures.router e2e — bornes & invariants transport", (
   it("INVARIANT transport : numero/statut/totaux/montantPaye envoyés au update sont IGNORÉS", async () => {
     const tA = await token(UA);
     const id = await createFacture(tA, { objet: "Avant" });
-    const numAvant = (await callQuery(server, "factures.getById", { id }, tA)).json().result.data.numero as string;
+    const numAvant = (await callQuery(server, "factures.getById", { id }, tA)).json().result.data.numero as string | null;
     const res = await callMutation(
       server,
       "factures.update",
@@ -131,7 +131,7 @@ describe.skipIf(!URL)("factures.router e2e — bornes & invariants transport", (
       tA,
     );
     expect(res.statusCode).toBe(200);
-    const f = res.json().result.data as { numero: string; statut: string; totalTTC: string; montantPaye: string; objet: string };
+    const f = res.json().result.data as { numero: string | null; statut: string; totalTTC: string; montantPaye: string; objet: string };
     expect(f.objet).toBe("Après");
     expect(f.numero).toBe(numAvant); // immuable
     expect(f.statut).toBe("brouillon"); // non modifiable via update
