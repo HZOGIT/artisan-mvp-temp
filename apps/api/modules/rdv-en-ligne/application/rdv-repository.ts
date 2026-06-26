@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { CreateRdvInput, Rdv, RdvStatut, UpdateRdvInput } from "../domain/rdv";
 
@@ -29,4 +30,5 @@ export interface IRdvRepository {
   delete(ctx: TenantContext, id: number): Promise<boolean>;
   /** Le client appartient-il au tenant ? (anti-IDOR-FK) */
   ownsClient(ctx: TenantContext, clientId: number): Promise<boolean>;
+  withDb(db: DbClient): IRdvRepository;
 }

@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { router, permissionProcedure } from "../../../../interface/trpc/trpc";
+import type { DbClient } from "../../../../shared/db";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
+import { withOutbox } from "../../../../shared/events/with-outbox";
 
 /*
  * Tout le routeur rdv exige `rdv.gerer` (parité legacy ; pas de permission `rdv.voir` distincte).
@@ -52,6 +55,7 @@ export function createRdvEnLigneRouter(
   repo: IRdvRepository,
   interventionRepo: IInterventionRepository,
   clientRepo: IClientRepository,
+  db?: DbClient,
 ) {
   return router({
     /** Liste enrichie du `client` (parité legacy — le client UI lit `rdv.client.prenom/nom`). */
@@ -69,33 +73,47 @@ export function createRdvEnLigneRouter(
     create: gerer
       .input(createSchema)
       .mutation(async ({ ctx, input }) => {
-        const result = await creerRdv(repo, ctx.tenant, input);
-        const level = input.urgence === "tres_urgente" ? "warn" : "info";
-        ctx.log[level]({ event: "rdv_cree", rdvId: result.id, clientId: input.clientId, urgence: input.urgence ?? "normale" }, "RDV en ligne créé");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await creerRdv(r, ctx.tenant, input);
+          const level = input.urgence === "tres_urgente" ? "warn" : "info";
+          ctx.log[level]({ event: "rdv_cree", rdvId: result.id, clientId: input.clientId, urgence: input.urgence ?? "normale" }, "RDV en ligne créé");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "rdv.cree", entityType: "rdv", entityId: result.id, payload: { clientId: result.clientId, titre: result.titre, urgence: result.urgence, statut: result.statut } });
+          return result;
+        });
       }),
 
     update: gerer
       .input(z.object({ id: z.number().int() }).and(updateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { id, ...data } = input;
-        return modifierRdv(repo, ctx.tenant, id, data);
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await modifierRdv(r, ctx.tenant, id, data);
+          if (tx && result) await outboxEvent(tx, ctx.tenant, { action: "rdv.modifie", entityType: "rdv", entityId: id, payload: { titre: result.titre, dureeEstimee: result.dureeEstimee, urgence: result.urgence } });
+          return result;
+        });
       }),
 
     delete: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        await supprimerRdv(repo, ctx.tenant, input.id);
-        return { success: true };
+        return withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          await supprimerRdv(r, ctx.tenant, input.id);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "rdv.supprime", entityType: "rdv", entityId: input.id, payload: { snapshot: { clientId: before?.clientId, titre: before?.titre, statut: before?.statut } } });
+          return { success: true };
+        });
       }),
 
     /** Transitions de statut (état machine) — chacune valide la légalité depuis le statut courant. */
     confirmer: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await confirmerRdv(repo, ctx.tenant, input.id);
-        ctx.log.info({ event: "rdv_confirme", rdvId: input.id }, "RDV confirmé");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await confirmerRdv(r, ctx.tenant, input.id);
+          ctx.log.info({ event: "rdv_confirme", rdvId: input.id }, "RDV confirmé");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "rdv.confirme", entityType: "rdv", entityId: input.id, payload: { statut: result.statut } });
+          return result;
+        });
       }),
 
     confirm: gerer
@@ -109,9 +127,12 @@ export function createRdvEnLigneRouter(
     refuse: gerer
       .input(z.object({ rdvId: z.number().int(), motif: z.string().min(1).max(5000) }))
       .mutation(async ({ ctx, input }) => {
-        const result = await refuserRdv(repo, ctx.tenant, input.rdvId, input.motif);
-        ctx.log.warn({ event: "rdv_refuse", rdvId: input.rdvId }, "RDV refusé");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await refuserRdv(r, ctx.tenant, input.rdvId, input.motif);
+          ctx.log.warn({ event: "rdv_refuse", rdvId: input.rdvId }, "RDV refusé");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "rdv.refuse", entityType: "rdv", entityId: input.rdvId, payload: { motifRefus: input.motif } });
+          return result;
+        });
       }),
 
     proposeAutreCreneau: gerer
@@ -125,17 +146,23 @@ export function createRdvEnLigneRouter(
     refuser: gerer
       .input(z.object({ id: z.number().int(), motifRefus: z.string().min(1).max(5000) }))
       .mutation(async ({ ctx, input }) => {
-        const result = await refuserRdv(repo, ctx.tenant, input.id, input.motifRefus);
-        ctx.log.warn({ event: "rdv_refuse", rdvId: input.id }, "RDV refusé");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await refuserRdv(r, ctx.tenant, input.id, input.motifRefus);
+          ctx.log.warn({ event: "rdv_refuse", rdvId: input.id }, "RDV refusé");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "rdv.refuse", entityType: "rdv", entityId: input.id, payload: { motifRefus: input.motifRefus } });
+          return result;
+        });
       }),
 
     annuler: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await annulerRdv(repo, ctx.tenant, input.id);
-        ctx.log.warn({ event: "rdv_annule", rdvId: input.id }, "RDV annulé");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await annulerRdv(r, ctx.tenant, input.id);
+          ctx.log.warn({ event: "rdv_annule", rdvId: input.id }, "RDV annulé");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "rdv.annule", entityType: "rdv", entityId: input.id, payload: { statut: result.statut } });
+          return result;
+        });
       }),
   });
 }

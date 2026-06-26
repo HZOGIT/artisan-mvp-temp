@@ -1,3 +1,4 @@
+import type { DbClient } from "../../shared/db";
 import type { IRdvRepository } from "./application/rdv-repository";
 import type { IInterventionRepository } from "../interventions/application/intervention-repository";
 import type { IClientRepository } from "../clients/application/client-repository";
@@ -12,6 +13,8 @@ export interface RdvEnLigneModuleDeps {
   readonly repository: IRdvRepository;
   readonly interventionRepository: IInterventionRepository;
   readonly clientRepository: IClientRepository;
+  /** Pool DB pour les transactions outbox events (défaut : sans outbox). */
+  readonly db?: DbClient;
 }
 
 export interface RdvEnLigneModule {
@@ -22,6 +25,6 @@ export interface RdvEnLigneModule {
 export function createRdvEnLigneModule(deps: RdvEnLigneModuleDeps): RdvEnLigneModule {
   return {
     deps,
-    router: createRdvEnLigneRouter(deps.repository, deps.interventionRepository, deps.clientRepository),
+    router: createRdvEnLigneRouter(deps.repository, deps.interventionRepository, deps.clientRepository, deps.db),
   };
 }

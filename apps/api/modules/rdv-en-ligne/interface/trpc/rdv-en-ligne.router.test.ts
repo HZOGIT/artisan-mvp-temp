@@ -6,6 +6,8 @@ import { createDbClient } from "../../../../shared/db";
 import { DrizzleTenantResolver } from "../../../../shared/tenant/drizzle-tenant-resolver";
 import { RdvRepositoryDrizzle } from "../../infra/rdv-repository-drizzle";
 import { injectTrpc } from "../../../../shared/testing/trpc-inject";
+import { withOutbox } from "../../../../shared/events/with-outbox";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
 
 const URL = process.env.DATABASE_URL;
 const APP_URL =
@@ -38,6 +40,7 @@ describe.skipIf(!URL)("rdv.router e2e (HTTP → tRPC → use-case → repo → R
   let clientB = 0;
 
   const purge = async (uid: number) => {
+    await admin.query('delete from event_outbox where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from interventions where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from rdv_en_ligne where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from clients where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
@@ -56,7 +59,7 @@ describe.skipIf(!URL)("rdv.router e2e (HTTP → tRPC → use-case → repo → R
     const artisanB = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UB])).rows[0].id;
     clientA = (await admin.query('insert into clients ("artisanId", nom) values ($1,$2) returning id', [artisanA, "Client A"])).rows[0].id;
     clientB = (await admin.query('insert into clients ("artisanId", nom) values ($1,$2) returning id', [artisanB, "Client B"])).rows[0].id;
-    server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(app.db), rdvRepo: new RdvRepositoryDrizzle(app.db) });
+    server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(app.db), rdvRepo: new RdvRepositoryDrizzle(app.db), rdvDb: app.db });
   });
 
   afterAll(async () => {
@@ -227,5 +230,43 @@ describe.skipIf(!URL)("rdv.router e2e (HTTP → tRPC → use-case → repo → R
     const pending = (await q(server, "rdv.getPendingCount", undefined, tA)).json().result.data as number;
     expect(pending).toBe(basePending + 1);
     expect(pending).toBe(stats.enAttente);
+  });
+
+  it("outbox atomicité — create → rdv ET event_outbox co-écrits (artisanId + userId + action + payload)", async () => {
+    const tA = await token(UA);
+    const before = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+    const res = await creer(tA);
+    expect(res.statusCode).toBe(200);
+    const rdvId = res.json().result.data.id as number;
+    const artisanA = (await admin.query('select id from artisans where "userId"=$1', [UA])).rows[0].id as number;
+    const row = (await admin.query("select * from event_outbox where \"entityId\"=$1 and action='rdv.cree'", [rdvId])).rows[0];
+    expect(row).toBeDefined();
+    expect(row.artisanId).toBe(artisanA);
+    expect(row.userId).toBe(UA);
+    expect(row.entityType).toBe("rdv");
+    expect((row.payload as { titre?: string }).titre).toBe("Dépannage");
+    const after = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+    expect(after).toBe(before + 1);
+  });
+
+  it("outbox atomicité — rollback: throw après write rdv → 0 rdv ET 0 event_outbox persistés", async () => {
+    const artisanA = (await admin.query('select id from artisans where "userId"=$1', [UA])).rows[0].id as number;
+    const ctx = { artisanId: artisanA, userId: UA, role: "artisan" as const, isOwner: true, franchiseTVA: false };
+    const repo = new RdvRepositoryDrizzle(app.db);
+    const rdvBefore = Number((await admin.query('select count(*) from rdv_en_ligne where "artisanId"=$1', [artisanA])).rows[0].count);
+    const outboxBefore = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+
+    await expect(
+      withOutbox(app.db, repo, async (r, tx) => {
+        const result = await r.create(ctx, { clientId: clientA, titre: "Rollback test", dateProposee: new Date(DATE) });
+        if (tx) await outboxEvent(tx, ctx, { action: "rdv.cree", entityType: "rdv", entityId: result.id, payload: {} });
+        throw new Error("échec simulé post-write");
+      }),
+    ).rejects.toThrow("échec simulé post-write");
+
+    const rdvAfter = Number((await admin.query('select count(*) from rdv_en_ligne where "artisanId"=$1', [artisanA])).rows[0].count);
+    const outboxAfter = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+    expect(rdvAfter).toBe(rdvBefore);
+    expect(outboxAfter).toBe(outboxBefore);
   });
 });

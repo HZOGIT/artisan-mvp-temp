@@ -337,6 +337,8 @@ export interface AppDeps extends ContextDeps {
   readonly modeleDevisRepo?: IModeleDevisRepository;
   readonly configRelancesRepo?: IConfigRelancesRepository;
   readonly rdvRepo?: IRdvRepository;
+  /** Pool DB pour les transactions outbox events du module rdv-en-ligne (défaut : getDbHandle().db). */
+  readonly rdvDb?: DbClient;
   readonly relanceDevisRepo?: IRelanceDevisRepository;
   readonly categorieDepenseRepo?: ICategorieDepenseRepository;
   readonly contratRepo?: IContratRepository;
@@ -722,6 +724,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     repository: deps.rdvRepo ?? new RdvRepositoryDrizzle(getDbHandle().db),
     interventionRepository: interventionRepo,
     clientRepository: clientRepo,
+    db: deps.rdvDb ?? getDbHandle().db,
   });
   const relancesDevis = createRelancesDevisModule({
     repository: relanceDevisRepo,

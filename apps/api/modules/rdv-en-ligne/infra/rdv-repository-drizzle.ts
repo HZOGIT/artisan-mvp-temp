@@ -129,4 +129,8 @@ export class RdvRepositoryDrizzle implements IRdvRepository {
       return (row?.n ?? 0) > 0;
     });
   }
+
+  withDb(db: DbClient): RdvRepositoryDrizzle {
+    return new RdvRepositoryDrizzle(db);
+  }
 }

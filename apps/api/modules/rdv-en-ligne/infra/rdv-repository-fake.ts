@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IRdvRepository, SetStatutOptions } from "../application/rdv-repository";
 import type { CreateRdvInput, Rdv, RdvStatut, UpdateRdvInput } from "../domain/rdv";
@@ -95,5 +96,9 @@ export class FakeRdvRepository implements IRdvRepository {
 
   async ownsClient(ctx: TenantContext, clientId: number): Promise<boolean> {
     return this.clientsByArtisan.get(ctx.artisanId)?.has(clientId) ?? false;
+  }
+
+  withDb(_db: DbClient): FakeRdvRepository {
+    return this;
   }
 }
