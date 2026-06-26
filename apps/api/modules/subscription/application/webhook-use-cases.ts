@@ -115,7 +115,7 @@ async function handleCheckoutCompleted(deps: StripeWebhookDeps, session: Record<
     stripePaymentIntentId: session.payment_intent ? String(session.payment_intent) : "",
   });
   await deps.genererEcrituresFacture?.(resolved.artisanId, resolved.factureId).catch(() => {});
-  void deps.eventBus?.publish({ type: "FACTURE_PAYEE", aggregateType: "facture", aggregateId: resolved.factureId, artisanId: resolved.artisanId, userId: null, occurredAt: new Date(), payload: { factureId: resolved.factureId } });
+  void deps.eventBus?.publish({ type: "facture.payee", aggregateType: "facture", aggregateId: resolved.factureId, artisanId: resolved.artisanId, userId: null, occurredAt: new Date(), payload: { factureId: resolved.factureId } });
   deps.log?.info({ event: "stripe_checkout_completed", artisanId: resolved.artisanId, factureId: resolved.factureId }, `Paiement portail complété (artisan ${resolved.artisanId})`);
   try {
     await deps.notifier.notifyArtisan(resolved.artisanId, {
