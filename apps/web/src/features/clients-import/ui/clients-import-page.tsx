@@ -31,7 +31,7 @@ export default function ClientsImportPage() {
     setFile(selected);
     setIsLoading(true);
     try {
-      const { default: readXlsxFile } = await import("read-excel-file");
+      const { default: readXlsxFile } = await import("read-excel-file/browser");
       const sheets = (await readXlsxFile(selected)) as Array<{ data: unknown[][] }>;
       const sheetData = sheets[0].data as unknown[][];
       const [headers, ...dataRows] = sheetData;
