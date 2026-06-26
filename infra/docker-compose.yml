@@ -58,6 +58,15 @@ services:
       postgres:
         condition: service_healthy
 
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    restart: unless-stopped
+    volumes:
+      - ../scripts/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - new-stack
+
   cloudflared:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
@@ -72,3 +81,4 @@ services:
 
 volumes:
   postgres_staging_data:
+  prometheus_data:
