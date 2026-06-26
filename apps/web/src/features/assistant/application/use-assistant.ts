@@ -8,13 +8,13 @@ export function useStreamMessage() {
   const utils = trpc.useUtils();
   return useCallback(
     (
-      body: { message: string; history: Message[]; threadId: number | undefined },
+      body: { message: string; history: Message[]; threadId: number | undefined; fileIds?: number[] },
       onEvent: (ev: StreamEvent) => void,
       signal: AbortSignal,
     ): Promise<void> =>
       new Promise((resolve, reject) => {
         const sub = utils.client.assistant.stream.subscribe(
-          { message: body.message, history: body.history, threadId: body.threadId },
+          { message: body.message, history: body.history, threadId: body.threadId, fileIds: body.fileIds },
           {
             onData(chunk) {
               const ev: StreamEvent = {};
@@ -45,6 +45,10 @@ export function useStreamMessage() {
       }),
     [utils.client],
   );
+}
+
+export function useUploadFile() {
+  return trpc.assistant.uploadFile.useMutation();
 }
 
 /** Couche APPLICATION — assistant : chargement d'un thread + actions rapides + liste devis. */

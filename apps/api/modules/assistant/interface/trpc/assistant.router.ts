@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { randomUUID } from "crypto";
+import { eq, and, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IAssistantThreadsRepository } from "../../application/assistant-threads-repository";
@@ -12,6 +14,10 @@ import {
 } from "../../application/generator-use-cases";
 import { runAssistantAgent, type AssistantAgentDeps } from "../../application/assistant-agent-use-cases";
 import { ValidationError, TooManyRequestsError } from "../../../../shared/errors";
+import type { StoragePort } from "../../../../shared/ports/storage";
+import type { DbClient } from "../../../../shared/db";
+import { files } from "../../../../../../drizzle/schema/files";
+import { messageFiles } from "../../../../../../drizzle/schema/message-files";
 
 /**
  * Schéma Zod de l'union discriminée des événements émis par la subscription `stream`.
@@ -27,11 +33,19 @@ export const assistantStreamEventSchema = z.union([
   z.object({ navigate: z.string(), filtre: z.string().optional(), message: z.string().optional() }),
 ]);
 
-/** Routeur tRPC assistant : 2 lectures + 4 générateurs IA + 1 subscription de chat en streaming agentique. */
+const MIME_TO_EXT: Record<string, string> = {
+  "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
+  "image/heic": "heic", "image/gif": "gif", "application/pdf": "pdf",
+  "text/plain": "txt", "text/csv": "csv",
+};
+
+/** Routeur tRPC assistant : lectures + générateurs IA + upload + subscription de chat en streaming agentique. */
 export function createAssistantRouter(
   threadsRepo: IAssistantThreadsRepository,
   generators: AssistantGeneratorDeps,
   agentDeps: AssistantAgentDeps,
+  storage: StoragePort,
+  db: DbClient,
 ) {
   return router({
     getThreads: protectedProcedure.query(({ ctx }) => {
@@ -66,6 +80,28 @@ export function createAssistantRouter(
       return predictionTresorerie(generators, ctx.tenant);
     }),
 
+    uploadFile: protectedProcedure
+      .input(z.object({
+        base64: z.string().min(1),
+        mimeType: z.string().min(1),
+        filename: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
+        const raw = input.base64.replace(/^data:[^,]+,/, "");
+        const buf = Buffer.from(raw, "base64");
+        if (buf.byteLength > 20 * 1024 * 1024) throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Fichier trop volumineux (max 20 Mo)" });
+        const ext = MIME_TO_EXT[input.mimeType] ?? "bin";
+        const key = `chat/${ctx.tenant.artisanId}/${randomUUID()}.${ext}`;
+        const stored = await storage.upload(key, buf, {
+          contentType: input.mimeType,
+          artisanId: ctx.tenant.artisanId,
+          filename: input.filename,
+          purpose: "assistant-chat",
+        }, ctx.tenant);
+        return { fileId: stored.id };
+      }),
+
     /**
      * Chat IA en streaming agentique (function-calling, outils navigate/invalide/écriture).
      * Remplace l'ancien text-mode ; émet threadId, content, toolStart, toolEnd, navigate, invalidate.
@@ -77,6 +113,7 @@ export function createAssistantRouter(
           history: z.array(z.object({ role: z.string(), content: z.string() })).optional(),
           pageContext: z.string().optional(),
           threadId: z.number().int().optional(),
+          fileIds: z.array(z.number().int()).max(5).optional(),
         }),
       )
       .subscription(async function* ({ ctx, input }) {
@@ -89,8 +126,38 @@ export function createAssistantRouter(
           const canWrite = ctx.role === "admin" || ctx.tenant?.isOwner === true;
           const canDevis = canWrite || ctx.permissions.includes("devis.gerer");
           const canFactures = canWrite || ctx.permissions.includes("factures.gerer");
-          for await (const ev of runAssistantAgent(agentDeps, tenant, { ...input, userCanWriteDevis: canDevis, userCanWriteFactures: canFactures })) {
+
+          let attachments: Array<{ data: Buffer; mimeType: string }> | undefined;
+          if (input.fileIds?.length) {
+            const rows = await db
+              .select({ id: files.id, storageKey: files.storageKey, mimeType: files.mimeType, artisanId: files.artisanId })
+              .from(files)
+              .where(and(inArray(files.id, input.fileIds), eq(files.artisanId, tenant.artisanId)));
+            const fetched = await Promise.all(
+              rows.map(async (r) => {
+                const data = await storage.get(r.storageKey);
+                return data ? { data, mimeType: r.mimeType } : null;
+              }),
+            );
+            attachments = fetched.filter((x): x is { data: Buffer; mimeType: string } => x !== null);
+          }
+
+          let resolvedThreadId = input.threadId;
+          for await (const ev of runAssistantAgent(agentDeps, tenant, { ...input, userCanWriteDevis: canDevis, userCanWriteFactures: canFactures, attachments })) {
             const validated = assistantStreamEventSchema.parse(ev);
+            if ("threadId" in validated) {
+              resolvedThreadId = validated.threadId;
+              if (input.fileIds?.length && resolvedThreadId) {
+                await db.insert(messageFiles).values(
+                  input.fileIds.map((fileId) => ({
+                    conversationId: resolvedThreadId!.toString(),
+                    messageIndex: 0,
+                    fileId,
+                    artisanId: tenant.artisanId,
+                  })),
+                ).onConflictDoNothing().catch(() => { /* best-effort */ });
+              }
+            }
             if ("content" in validated) contentEvents++;
             if ("toolStart" in validated) toolCalls++;
             yield validated;

@@ -10,3 +10,4 @@ export * from "./rh";
 export * from "./divers";
 export * from "./einvoicing";
 export * from "./files";
+export * from "./message-files";

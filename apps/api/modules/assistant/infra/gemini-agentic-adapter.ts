@@ -13,6 +13,7 @@ import { type AppLogger, ConsoleLogger } from "../../../shared/ports/logger";
 interface GenAiPart {
   text?: string;
   functionCall?: { name?: string; args?: Record<string, unknown> };
+  inlineData?: { data: string; mimeType: string };
 }
 type GenAiUsageMeta = {
   promptTokenCount?: number;
@@ -40,7 +41,8 @@ const GENAI_MODULE: string = "@google/genai";
 type AgenticContent =
   | { kind: "text"; text: string }
   | { kind: "tool-results"; results: ReadonlyArray<{ name: string; response: unknown }> }
-  | { kind: "raw"; parts: unknown[] };
+  | { kind: "raw"; parts: unknown[] }
+  | { kind: "parts"; parts: ReadonlyArray<{ text?: string; inlineData?: { data: string; mimeType: string } }> };
 
 /** ── Mappers PURS (testables) ─────────────────────────────────────────────────────────────────── */
 
@@ -84,6 +86,7 @@ export function toGeminiContents(messages: readonly AgenticMessage[]): unknown[]
       if (c.kind === "raw") return { role: "model", parts: c.parts };
       return { role: "model", parts: [{ text: c.kind === "text" ? c.text : "" }] };
     }
+    if (c.kind === "parts") return { role: "user", parts: c.parts };
     return { role: "user", parts: [{ text: c.kind === "text" ? c.text : "" }] };
   });
 }

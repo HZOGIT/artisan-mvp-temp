@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { Streamdown } from "streamdown";
-import { Sparkles, Send, FileText, RefreshCw, Calculator, TrendingUp, Calendar, Loader2, User, Bot, Mic, MicOff, Phone, PhoneOff, Radio, Plus, CheckCircle2, XCircle } from "lucide-react";
+import { Sparkles, Send, FileText, RefreshCw, Calculator, TrendingUp, Calendar, Loader2, User, Bot, Mic, MicOff, Phone, PhoneOff, Radio, Plus, CheckCircle2, XCircle, Paperclip, X, Image } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Textarea } from "@/shared/ui/textarea";
@@ -13,7 +13,7 @@ import { Label } from "@/shared/ui/label";
 import { useVoiceSession } from "@/shared/voice/use-voice-session";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { useSpeechRecognition } from "@/shared/hooks/use-speech-recognition";
-import { useAssistant, useStreamMessage, type DevisLigne, type Relances } from "../application/use-assistant";
+import { useAssistant, useStreamMessage, useUploadFile, type DevisLigne, type Relances } from "../application/use-assistant";
 import { sliceHistory, navigateTarget, buildDevisMarkdown, buildRelancesMarkdown } from "../domain/assistant";
 import { navigate } from "@/shared/router/navigation";
 import { useAssistantStore } from "../application/assistant-store";
@@ -42,6 +42,8 @@ export default function AssistantPage({ embedded = false, preprompt, onPreprompt
 
   const [input, setInput] = useState("");
   const [activeTools, setActiveTools] = useState<{ name: string; ok?: boolean }[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<Array<{ fileId: number; filename: string; mimeType: string; preview?: string }>>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const loadedThreadRef = useRef(false);
@@ -55,6 +57,7 @@ export default function AssistantPage({ embedded = false, preprompt, onPreprompt
 
   const { threadQuery, generateDevis, suggestRelances, rentabilite, tresorerie, devisList } = useAssistant(threadId, selectedDevisId);
   const streamMessage = useStreamMessage();
+  const uploadFile = useUploadFile();
 
   useEffect(() => {
     if (loadedThreadRef.current || !threadQuery.data) return;
@@ -97,16 +100,37 @@ export default function AssistantPage({ embedded = false, preprompt, onPreprompt
   useEffect(() => { if (speech.isListening) { userEditedRef.current = false; setInput(speech.transcript); } }, [speech.isListening, speech.transcript]);
   useEffect(() => { if (speech.error) toast.error(speech.error); }, [speech.error]);
 
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!e.target) return;
+    (e.target as HTMLInputElement).value = "";
+    if (!file) return;
+    if (file.size > 20 * 1024 * 1024) { toast.error(t("fichierTropVolumineux")); return; }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = reader.result as string;
+      try {
+        const { fileId } = await uploadFile.mutateAsync({ base64, mimeType: file.type, filename: file.name });
+        const preview = file.type.startsWith("image/") ? base64 : undefined;
+        setPendingFiles((prev) => [...prev, { fileId, filename: file.name, mimeType: file.type, preview }]);
+      } catch {
+        toast.error(t("errUpload"));
+      }
+    };
+    reader.readAsDataURL(file);
+  }, [uploadFile, t]);
+
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || isStreaming) return;
+    const fileIds = pendingFiles.map((f) => f.fileId);
     setMessages((prev) => [...prev, { role: "user", content: text.trim() }, { role: "assistant", content: "" }]);
     setActiveTools([]);
-    setInput(""); setIsStreaming(true);
+    setInput(""); setPendingFiles([]); setIsStreaming(true);
     try {
       const controller = new AbortController();
       abortRef.current = controller;
       const history = sliceHistory(messages);
-      await streamMessage({ message: text.trim(), history, threadId }, (ev) => {
+      await streamMessage({ message: text.trim(), history, threadId, fileIds: fileIds.length ? fileIds : undefined }, (ev) => {
         if (ev.threadId && !threadId) { setThreadId(ev.threadId); navigate(`/assistant?thread=${ev.threadId}`, { replace: true }); }
         if (ev.content) { const c = ev.content; setMessages((prev) => { const u = [...prev]; const last = u[u.length - 1]; if (!last || last.role !== "assistant") return [...u, { role: "assistant", content: c }]; u[u.length - 1] = { ...last, content: last.content + c }; return u; }); }
         if (ev.error) toast.error(ev.error);
@@ -242,7 +266,31 @@ export default function AssistantPage({ embedded = false, preprompt, onPreprompt
           </div>
           <div className="p-3 border-t">
             <form onSubmit={handleSubmit} className="flex flex-col gap-1">
+              {pendingFiles.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pb-1">
+                  {pendingFiles.map((f) => (
+                    <div key={f.fileId} className="flex items-center gap-1 bg-muted rounded-md px-2 py-1 text-xs max-w-[160px]">
+                      {f.preview ? (
+                        <img src={f.preview} alt={f.filename} className="h-5 w-5 rounded object-cover shrink-0" />
+                      ) : (
+                        <Image className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      )}
+                      <span className="truncate">{f.filename}</span>
+                      <button type="button" onClick={() => setPendingFiles((prev) => prev.filter((x) => x.fileId !== f.fileId))} className="ml-0.5 shrink-0 text-muted-foreground hover:text-foreground" aria-label="Supprimer">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="flex gap-2">
+                <input
+                  type="file"
+                  hidden
+                  ref={fileInputRef}
+                  accept="image/*,application/pdf,text/plain,text/csv"
+                  onChange={handleFileChange}
+                />
                 <Textarea
                   value={input}
                   onChange={(e) => { userEditedRef.current = true; if (countdown !== null) setCountdown(null); setInput(e.target.value); }}
@@ -253,12 +301,17 @@ export default function AssistantPage({ embedded = false, preprompt, onPreprompt
                   disabled={isStreaming || voice.isVoiceActive}
                 />
                 {!voice.isVoiceActive && (
-                  <div className="relative self-end">
-                    {speech.isListening && (<span aria-hidden className="absolute inset-0 rounded-md bg-red-500/40 animate-ping" />)}
-                    <Button type="button" variant={speech.isListening ? "destructive" : "outline"} onClick={handleMicClick} disabled={!speech.isSupported || isStreaming} className="relative" aria-label={speech.isListening ? t("arreterDictee") : t("dicteeVocale")} title={!speech.isSupported ? t("dicteeIndispoTitre") : speech.isListening ? t("arreterDictee") : t("dicteeVocale")}>
-                      {speech.isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                  <>
+                    <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isStreaming || uploadFile.isPending} className="self-end" aria-label={t("joindreUnFichier")} title={t("joindreUnFichier")}>
+                      {uploadFile.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
                     </Button>
-                  </div>
+                    <div className="relative self-end">
+                      {speech.isListening && (<span aria-hidden className="absolute inset-0 rounded-md bg-red-500/40 animate-ping" />)}
+                      <Button type="button" variant={speech.isListening ? "destructive" : "outline"} onClick={handleMicClick} disabled={!speech.isSupported || isStreaming} className="relative" aria-label={speech.isListening ? t("arreterDictee") : t("dicteeVocale")} title={!speech.isSupported ? t("dicteeIndispoTitre") : speech.isListening ? t("arreterDictee") : t("dicteeVocale")}>
+                        {speech.isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </>
                 )}
                 {voice.isVoiceActive && (
                   <Button type="button" variant={voice.isMuted ? "default" : "outline"} onClick={voice.toggleMute} className={`self-end ${voice.isMuted ? "bg-amber-500 hover:bg-amber-600 text-white" : ""}`} aria-label={voice.isMuted ? t("reactiverMicro") : t("couperMicro")} title={voice.isMuted ? t("microCoupe") : t("couperMicroGemini")}>

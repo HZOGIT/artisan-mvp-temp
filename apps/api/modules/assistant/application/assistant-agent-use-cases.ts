@@ -45,6 +45,7 @@ export interface AssistantAgentInput {
   readonly threadId?: number;
   readonly userCanWriteDevis?: boolean;
   readonly userCanWriteFactures?: boolean;
+  readonly attachments?: ReadonlyArray<{ data: Buffer; mimeType: string }>;
 }
 
 /** Évènements émis vers la couche transport (SSE). **Noms alignés sur le contrat client** (`useAssistantStream` */
@@ -65,7 +66,8 @@ export type AssistantAgentEvent =
  */
 export type SeededMessageContent =
   | { readonly kind: "text"; readonly text: string }
-  | { readonly kind: "tool-results"; readonly results: readonly AgenticToolResultPart[] };
+  | { readonly kind: "tool-results"; readonly results: readonly AgenticToolResultPart[] }
+  | { readonly kind: "parts"; readonly parts: ReadonlyArray<{ text?: string; inlineData?: { data: string; mimeType: string } }> };
 
 export const userMessage = (text: string): AgenticMessage => ({ role: "user", content: { kind: "text", text } satisfies SeededMessageContent });
 export const modelTextMessage = (text: string): AgenticMessage => ({ role: "model", content: { kind: "text", text } satisfies SeededMessageContent });
@@ -109,7 +111,20 @@ export async function* runAssistantAgent(
   for (const h of (input.history ?? []).slice(-HISTORY_WINDOW)) {
     messages.push(h.role === "assistant" || h.role === "model" ? modelTextMessage(h.content) : userMessage(h.content));
   }
-  messages.push(userMessage(input.message));
+  if (input.attachments?.length) {
+    messages.push({
+      role: "user",
+      content: {
+        kind: "parts",
+        parts: [
+          ...input.attachments.map((a) => ({ inlineData: { data: a.data.toString("base64"), mimeType: a.mimeType } })),
+          { text: input.message },
+        ],
+      } satisfies SeededMessageContent,
+    });
+  } else {
+    messages.push(userMessage(input.message));
+  }
 
   let full = "";
   for (let turn = 0; turn < MAX_AGENT_TURNS; turn++) {
