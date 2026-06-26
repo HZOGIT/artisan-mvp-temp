@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { Conge, CongeStatut, CreateCongeInput, UpdateCongeInput } from "../domain/conge";
 import type { SoldeCongeType } from "./solde";
@@ -80,4 +81,5 @@ export interface ICongeRepository {
     ctx: TenantContext,
     opts: { technicienId: number; dateDebut: string; dateFin: string; excludeId?: number },
   ): Promise<boolean>;
+  withDb(db: DbClient): ICongeRepository;
 }
