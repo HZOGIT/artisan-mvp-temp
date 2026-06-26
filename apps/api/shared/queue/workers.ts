@@ -21,37 +21,38 @@ async function resolveArtisanEmail(db: DbClient, artisanId: number): Promise<str
  * Handlers best-effort : les erreurs sont silencieuses (pg-boss gère les retries).
  */
 export function registerWorkers(workers: WorkerPort, deps: WorkerDeps): void {
-  workers.register<{ factureId: number; artisanId: number }>("FACTURE_PAYEE", async (event) => {
+  workers.register("FACTURE_PAYEE", async (event) => {
     try {
-      const to = await resolveArtisanEmail(deps.db, event.payload.artisanId);
+      const to = await resolveArtisanEmail(deps.db, event.artisanId);
       if (!to) return;
-      await deps.email.send({ to, subject: "Facture payée", body: `Votre facture #${event.payload.factureId} a été réglée.` });
+      await deps.email.send({ to, subject: "Facture payée", body: `Votre facture #${event.payload?.factureId as number} a été réglée.` });
     } catch { /* best-effort */ }
   });
 
-  workers.register<{ devisId: number; artisanId: number }>("DEVIS_ACCEPTE", async (event) => {
+  workers.register("DEVIS_ACCEPTE", async (event) => {
     try {
-      const to = await resolveArtisanEmail(deps.db, event.payload.artisanId);
+      const to = await resolveArtisanEmail(deps.db, event.artisanId);
       if (!to) return;
-      await deps.email.send({ to, subject: "Devis accepté", body: `Votre devis #${event.payload.devisId} a été accepté par votre client.` });
+      await deps.email.send({ to, subject: "Devis accepté", body: `Votre devis #${event.payload?.devisId as number} a été accepté par votre client.` });
     } catch { /* best-effort */ }
   });
 
-  workers.register<{ devisId: number; artisanId: number }>("SIGNATURE_COMPLETE", async (event) => {
+  workers.register("SIGNATURE_COMPLETE", async (event) => {
     try {
+      const devisId = event.payload?.devisId as number;
       const [artisanTo, sigs] = await Promise.all([
-        resolveArtisanEmail(deps.db, event.payload.artisanId),
-        deps.db.select({ signataireEmail: signaturesDevis.signataireEmail }).from(signaturesDevis).where(eq(signaturesDevis.devisId, event.payload.devisId)).limit(1),
+        resolveArtisanEmail(deps.db, event.artisanId),
+        deps.db.select({ signataireEmail: signaturesDevis.signataireEmail }).from(signaturesDevis).where(eq(signaturesDevis.devisId, devisId)).limit(1),
       ]);
-      if (artisanTo) await deps.email.send({ to: artisanTo, subject: "Contrat signé", body: `Le devis #${event.payload.devisId} a été signé par votre client.` });
+      if (artisanTo) await deps.email.send({ to: artisanTo, subject: "Contrat signé", body: `Le devis #${devisId} a été signé par votre client.` });
       const clientEmail = sigs[0]?.signataireEmail;
-      if (clientEmail) await deps.email.send({ to: clientEmail, subject: "Contrat signé", body: `Votre signature pour le devis #${event.payload.devisId} a bien été enregistrée.` });
+      if (clientEmail) await deps.email.send({ to: clientEmail, subject: "Contrat signé", body: `Votre signature pour le devis #${devisId} a bien été enregistrée.` });
     } catch { /* best-effort */ }
   });
 
-  workers.register<{ artisanId: number }>("ABONNEMENT_EXPIRE", async (event) => {
+  workers.register("ABONNEMENT_EXPIRE", async (event) => {
     try {
-      const to = await resolveArtisanEmail(deps.db, event.payload.artisanId);
+      const to = await resolveArtisanEmail(deps.db, event.artisanId);
       if (!to) return;
       await deps.email.send({ to, subject: "Abonnement expiré", body: "Votre abonnement Operioz a expiré. Renouvelez-le pour continuer à accéder à toutes les fonctionnalités." });
     } catch { /* best-effort */ }

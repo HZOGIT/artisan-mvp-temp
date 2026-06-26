@@ -109,33 +109,32 @@ export class FakeLlmPort implements LlmPort {
  * Aucun appel réseau. `responses` = réponse fixe ou file (une par appel). `throwOn` force une erreur.
  */
 export class FakeEventBus implements EventBusPort {
-  readonly published: DomainEvent<unknown>[] = [];
+  readonly published: DomainEvent[] = [];
 
-  async publish<T>(event: DomainEvent<T>): Promise<void> {
-    this.published.push(event as DomainEvent<unknown>);
+  async publish(event: DomainEvent): Promise<void> {
+    this.published.push(event);
   }
 
-  async publishMany<T>(events: readonly DomainEvent<T>[]): Promise<void> {
-    for (const e of events) this.published.push(e as DomainEvent<unknown>);
+  async publishMany(events: readonly DomainEvent[]): Promise<void> {
+    for (const e of events) this.published.push(e);
   }
 
-  getPublished<T>(type?: string): DomainEvent<T>[] {
-    const all = this.published as DomainEvent<T>[];
-    return type ? all.filter((e) => e.type === type) : all;
+  getPublished(type?: string): DomainEvent[] {
+    return type ? this.published.filter((e) => e.type === type) : this.published;
   }
 }
 
 export class FakeWorkerPort implements WorkerPort {
-  private readonly handlers = new Map<string, (event: DomainEvent<unknown>) => Promise<void>>();
+  private readonly handlers = new Map<string, (event: DomainEvent) => Promise<void>>();
 
-  register<T>(type: string, handler: (event: DomainEvent<T>) => Promise<void>): void {
-    this.handlers.set(type, handler as (event: DomainEvent<unknown>) => Promise<void>);
+  register(type: string, handler: (event: DomainEvent) => Promise<void>): void {
+    this.handlers.set(type, handler);
   }
 
-  async trigger<T>(type: string, event: DomainEvent<T>): Promise<void> {
+  async trigger(type: string, event: DomainEvent): Promise<void> {
     const handler = this.handlers.get(type);
     if (!handler) throw new Error(`Aucun handler enregistré pour le type "${type}"`);
-    await handler(event as DomainEvent<unknown>);
+    await handler(event);
   }
 
   registeredTypes(): string[] {
