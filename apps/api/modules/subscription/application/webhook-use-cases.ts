@@ -1,9 +1,22 @@
+import { Counter } from "prom-client";
 import type { StripePort } from "../../../shared/ports/stripe";
 import type { AppLogger } from "../../../shared/ports/logger";
 import type { WebhookPaymentWriter } from "./webhook-payment-writer";
 import type { SubscriptionEventNotifier } from "./subscription-event-notifier";
 import type { EventBusPort } from "../../../shared/ports/event-bus";
 import { subscriptionEmail } from "../domain/webhook";
+
+const stripeWebhookCounter = new Counter({
+  name: "stripe_webhook_total",
+  help: "Webhooks Stripe par type d'event et résultat",
+  labelNames: ["event_type", "status"],
+});
+
+const stripePaymentCounter = new Counter({
+  name: "stripe_payment_total",
+  help: "Paiements Stripe par résultat",
+  labelNames: ["status"],
+});
 
 export interface StripeWebhookDeps {
   readonly stripe: StripePort;
@@ -62,7 +75,10 @@ export async function processStripeWebhook(
   const EVENTS_WITH_OWN_DEDUP = ["payment_intent.succeeded", "payment_intent.payment_failed"];
   if (deps.markWebhookProcessed && !EVENTS_WITH_OWN_DEDUP.includes(event.type)) {
     const isNew = await deps.markWebhookProcessed(event.id, event.type);
-    if (!isNew) return { http: 200, body: { received: true, duplicate: true } };
+    if (!isNew) {
+      stripeWebhookCounter.inc({ event_type: event.type, status: "ignored" });
+      return { http: 200, body: { received: true, duplicate: true } };
+    }
   }
 
   deps.log?.info({ event: "stripe_webhook_received", stripeEvent: event.type, eventId: event.id }, `Stripe webhook: ${event.type}`);
@@ -95,9 +111,11 @@ export async function processStripeWebhook(
     } else if (event.type === "customer.subscription.deleted") {
       await handleSubscriptionDeleted(deps, event.data.object);
     }
+    stripeWebhookCounter.inc({ event_type: event.type, status: "success" });
     return { http: 200, body: { received: true } };
   } catch (e) {
     deps.log?.error({ event: "stripe_webhook_handler_error", stripeEvent: event.type, error: e instanceof Error ? e.message : String(e) }, "Stripe webhook handler failed");
+    stripeWebhookCounter.inc({ event_type: event.type, status: "error" });
     return { http: 500, body: { error: "Webhook handler failed" } };
   }
 }
@@ -116,6 +134,7 @@ async function handleCheckoutCompleted(deps: StripeWebhookDeps, session: Record<
   });
   await deps.genererEcrituresFacture?.(resolved.artisanId, resolved.factureId).catch(() => {});
   void deps.eventBus?.publish({ type: "facture.payee", aggregateType: "facture", aggregateId: resolved.factureId, artisanId: resolved.artisanId, userId: null, occurredAt: new Date(), payload: { factureId: resolved.factureId } });
+  stripePaymentCounter.inc({ status: "succeeded" });
   deps.log?.info({ event: "stripe_checkout_completed", artisanId: resolved.artisanId, factureId: resolved.factureId }, `Paiement portail complété (artisan ${resolved.artisanId})`);
   try {
     await deps.notifier.notifyArtisan(resolved.artisanId, {
@@ -134,6 +153,7 @@ async function handlePaymentFailed(deps: StripeWebhookDeps, pi: Record<string, u
   const resolved = await deps.paymentWriter.resolvePaiement(token);
   if (!resolved) return;
   await deps.paymentWriter.failPaiement({ artisanId: resolved.artisanId, paiementId: resolved.paiementId });
+  stripePaymentCounter.inc({ status: "failed" });
   deps.log?.warn({ event: "stripe_payment_failed", artisanId: resolved.artisanId, paiementId: resolved.paiementId }, `Paiement Stripe échoué (artisan ${resolved.artisanId})`);
 }
 
