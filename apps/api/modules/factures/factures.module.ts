@@ -19,6 +19,8 @@ export interface FacturesModuleDeps {
   /** Composition de l'envoi par email (lecture artisan/client + PdfPort + EmailPort + rate-limiter). */
   readonly mailing: FactureMailingDeps;
   readonly push?: PushPort;
+  /** Outbox PA : écriture non-bloquante dans pa_outbox lors du passage en statut envoyee. */
+  readonly outboxInsert?: (artisanId: number, factureId: number) => Promise<void>;
 }
 
 export interface FacturesModule {
@@ -27,5 +29,5 @@ export interface FacturesModule {
 }
 
 export function createFacturesModule(deps: FacturesModuleDeps): FacturesModule {
-  return { deps, router: createFacturesRouter(deps.repository, deps.devisReader, deps.compta ?? NOOP_COMPTA, deps.mailing, deps.push) };
+  return { deps, router: createFacturesRouter(deps.repository, deps.devisReader, deps.compta ?? NOOP_COMPTA, deps.mailing, deps.push, deps.outboxInsert) };
 }

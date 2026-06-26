@@ -387,6 +387,7 @@ export async function changerStatutFacture(
   cible: FactureStatut,
   compta: ComptaPort = NOOP_COMPTA,
   artisanReader?: ArtisanReader,
+  outboxInsert?: (artisanId: number, factureId: number) => Promise<void>,
 ): Promise<Facture> {
   const facture = await getFactureOwned(repo, ctx, id);
   /** idempotent */
@@ -403,6 +404,8 @@ export async function changerStatutFacture(
   if (!updated) throw new NotFoundError("Facture introuvable");
   /** À l'émission (passage `envoyee`) : génère la pièce de vente FEC (411/706/445). Idempotent. */
   if (cible === "envoyee") await compta.genererEcrituresVente(ctx, id);
+  /** Outbox PA : écriture non-bloquante pour émission asynchrone vers la plateforme agréée. */
+  if (cible === "envoyee") await outboxInsert?.(ctx.artisanId, id);
   return updated;
 }
 

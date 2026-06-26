@@ -114,7 +114,7 @@ const avoirInputSchema = z.object({
  * use-cases (scoping tenant + numérotation serveur + anti-IDOR-FK + immutabilité post-émission),
  * laisse remonter les Domain errors (NotFound→404, Validation→400, Conflict→409).
  */
-export function createFacturesRouter(repo: IFactureRepository, devisReader: IDevisReader, compta: ComptaPort, mailing: FactureMailingDeps, push?: PushPort) {
+export function createFacturesRouter(repo: IFactureRepository, devisReader: IDevisReader, compta: ComptaPort, mailing: FactureMailingDeps, push?: PushPort, outboxInsert?: (artisanId: number, factureId: number) => Promise<void>) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listFactures(repo, ctx.tenant)),
 
@@ -199,7 +199,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
     envoyer: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await changerStatutFacture(repo, ctx.tenant, input.id, "envoyee", compta, mailing.artisanReader);
+        const result = await changerStatutFacture(repo, ctx.tenant, input.id, "envoyee", compta, mailing.artisanReader, outboxInsert);
         ctx.log.info({ event: "facture_envoyee", factureId: input.id }, "Facture envoyée au client");
         return result;
       }),
