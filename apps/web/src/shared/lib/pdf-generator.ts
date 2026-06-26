@@ -691,8 +691,8 @@ export function generateFacturePDF(artisan: Artisan, client: Client, facture: Fa
   yPos = addLignesTable(doc, facture.lignes, yPos);
   addTotals(doc, facture.totalHT, facture.totalTVA, facture.totalTTC, yPos, facture.montantPaye);
   /*
-   */95 — sur une facture (pas un avoir) : conditions réelles + mentions légales.
-   * ajoute les mentions de RETARD DE PAIEMENT (pénalités + indemnité forfaitaire
+   * Conditions réelles + mentions légales sur une facture (pas un avoir).
+   * Ajoute les mentions de RETARD DE PAIEMENT (pénalités + indemnité forfaitaire
    * de 40 €, Art. L441-10 / D441-5 C. com.) — obligatoires et sanctionnées si absentes.
    * Parité avec le générateur PDF serveur (portail) qui les affiche déjà : le PDF client
    * (téléchargé/envoyé par l'artisan) les omettait → divergence corrigée.
