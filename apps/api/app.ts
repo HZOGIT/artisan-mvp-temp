@@ -309,6 +309,8 @@ export interface AppDeps extends ContextDeps {
   readonly lienBaseUrl?: string;
   readonly badgeRepo?: IBadgeRepository;
   readonly technicienRepo?: ITechnicienRepository;
+  /** Pool DB pour les transactions outbox du module techniciens (défaut : getDbHandle().db). */
+  readonly techniciensDb?: DbClient;
   readonly notificationRepo?: INotificationRepository;
   readonly fournisseurRepo?: IFournisseurRepository;
   readonly commandeRepo?: ICommandeRepository;
@@ -501,6 +503,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const technicienRepo = deps.technicienRepo ?? new TechnicienRepositoryDrizzle(getDbHandle().db);
   const techniciens = createTechniciensModule({
     repository: technicienRepo,
+    db: deps.techniciensDb ?? getDbHandle().db,
   });
   /*
    * Repo notifications partagé : utilisé par le module notifications ET composé par stocks

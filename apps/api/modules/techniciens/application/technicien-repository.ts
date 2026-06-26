@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { Technicien, CreateTechnicienInput, UpdateTechnicienInput } from "../domain/technicien";
 import type { Disponibilite, SetDisponibiliteInput } from "../domain/disponibilite";
@@ -70,4 +71,6 @@ export interface ITechnicienRepository {
    * SQL scopé artisanId+technicienId). null si le technicien n'appartient pas au tenant (anti-IDOR).
    */
   statsTechnicien(ctx: TenantContext, technicienId: number): Promise<TechnicienStats | null>;
+
+  withDb(db: DbClient): ITechnicienRepository;
 }

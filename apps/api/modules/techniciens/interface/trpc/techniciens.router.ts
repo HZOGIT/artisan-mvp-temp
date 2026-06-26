@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import type { DbClient } from "../../../../shared/db";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
+import { withOutbox } from "../../../../shared/events/with-outbox";
 import type { ITechnicienRepository } from "../../application/technicien-repository";
 import { listTechniciens, getTechnicien, listDisponibilites, getDernierePosition, listerUtilisateursLiables, listHabilitations, getStatsTechnicien } from "../../application/read-use-cases";
 import { creerTechnicien, modifierTechnicien, supprimerTechnicien, definirDisponibilite, enregistrerPosition, ajouterHabilitation, supprimerHabilitation, setSuiviActif } from "../../application/write-use-cases";
@@ -44,7 +47,7 @@ const updateSchema = z.object({
  * (NotFound→404, Validation→400). Repository injecté (DI) → testable. `getAll` alias de
  * `list` (parité legacy). `getLinkableUsers` (lecture users du tenant) = étape ultérieure.
  */
-export function createTechniciensRouter(repo: ITechnicienRepository) {
+export function createTechniciensRouter(repo: ITechnicienRepository, db?: DbClient) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listTechniciens(repo, ctx.tenant)),
     getAll: protectedProcedure.query(({ ctx }) => listTechniciens(repo, ctx.tenant)),
@@ -56,29 +59,39 @@ export function createTechniciensRouter(repo: ITechnicienRepository) {
     create: protectedProcedure
       .input(createSchema)
       .mutation(async ({ ctx, input }) => {
-        const result = await creerTechnicien(repo, ctx.tenant, input);
-        ctx.log.info({ event: "technicien_cree", technicienId: result.id, specialite: input.specialite ?? null, lieuUserId: input.userId ?? null }, "Technicien créé");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await creerTechnicien(r, ctx.tenant, input);
+          ctx.log.info({ event: "technicien_cree", technicienId: result.id, specialite: input.specialite ?? null, lieuUserId: input.userId ?? null }, "Technicien créé");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "technicien.cree", entityType: "technicien", entityId: result.id, payload: { userId: result.userId, specialite: result.specialite } });
+          return result;
+        });
       }),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
       .mutation(async ({ ctx, input }) => {
         const { id, ...data } = input;
-        const result = await modifierTechnicien(repo, ctx.tenant, id, data);
-        if (data.statut) {
-          const level = data.statut === "inactif" ? "warn" : "info";
-          ctx.log[level]({ event: "technicien_statut_changed", technicienId: id, newStatut: data.statut }, `Technicien statut → ${data.statut}`);
-        }
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await modifierTechnicien(r, ctx.tenant, id, data);
+          if (data.statut) {
+            const level = data.statut === "inactif" ? "warn" : "info";
+            ctx.log[level]({ event: "technicien_statut_changed", technicienId: id, newStatut: data.statut }, `Technicien statut → ${data.statut}`);
+          }
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "technicien.modifie", entityType: "technicien", entityId: id, payload: { specialite: result.specialite, statut: result.statut, userId: result.userId } });
+          return result;
+        });
       }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        await supprimerTechnicien(repo, ctx.tenant, input.id);
-        ctx.log.warn({ event: "technicien_supprime", technicienId: input.id }, "Technicien supprimé");
-        return { success: true };
+        return withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          await supprimerTechnicien(r, ctx.tenant, input.id);
+          ctx.log.warn({ event: "technicien_supprime", technicienId: input.id }, "Technicien supprimé");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "technicien.supprime", entityType: "technicien", entityId: input.id, payload: { snapshot: { technicienId: input.id, specialite: before?.specialite ?? null } } });
+          return { success: true };
+        });
       }),
 
     getDisponibilites: protectedProcedure
@@ -95,9 +108,13 @@ export function createTechniciensRouter(repo: ITechnicienRepository) {
           disponible: z.boolean(),
         }),
       )
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { technicienId, ...data } = input;
-        return definirDisponibilite(repo, ctx.tenant, technicienId, data);
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await definirDisponibilite(r, ctx.tenant, technicienId, data);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "technicien.disponibilite_definie", entityType: "technicien", entityId: technicienId, payload: { jourSemaine: result.jourSemaine, heureDebut: result.heureDebut, heureFin: result.heureFin, disponible: result.disponible } });
+          return result;
+        });
       }),
 
     getLinkableUsers: protectedProcedure.query(({ ctx }) => listerUtilisateursLiables(repo, ctx.tenant)),
@@ -120,15 +137,25 @@ export function createTechniciensRouter(repo: ITechnicienRepository) {
           interventionEnCoursId: z.number().int().nullish(),
         }),
       )
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { technicienId, ...data } = input;
-        return enregistrerPosition(repo, ctx.tenant, technicienId, data);
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await enregistrerPosition(r, ctx.tenant, technicienId, data);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "technicien.position_enregistree", entityType: "technicien", entityId: technicienId, payload: { latitude: result.latitude, longitude: result.longitude } });
+          return result;
+        });
       }),
 
     /** CNIL — active/désactive le suivi GPS d'un technicien (interrupteur salarié). */
     setSuiviActif: protectedProcedure
       .input(z.object({ technicienId: z.number().int(), actif: z.boolean() }))
-      .mutation(({ ctx, input }) => setSuiviActif(repo, ctx.tenant, input.technicienId, input.actif)),
+      .mutation(async ({ ctx, input }) => {
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await setSuiviActif(r, ctx.tenant, input.technicienId, input.actif);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "technicien.suivi_modifie", entityType: "technicien", entityId: input.technicienId, payload: { actif: input.actif } });
+          return result;
+        });
+      }),
 
     /** ── Habilitations / certifications BTP (données salarié — anti-IDOR ownership) ──────────── */
     getHabilitations: protectedProcedure
@@ -146,16 +173,23 @@ export function createTechniciensRouter(repo: ITechnicienRepository) {
           dateExpiration: z.string().optional(),
         }),
       )
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { technicienId, ...data } = input;
-        return ajouterHabilitation(repo, ctx.tenant, technicienId, data);
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await ajouterHabilitation(r, ctx.tenant, technicienId, data);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "technicien.habilitation_ajoutee", entityType: "technicien", entityId: technicienId, payload: { habilitationId: result.id, type: result.type } });
+          return result;
+        });
       }),
 
     deleteHabilitation: protectedProcedure
       .input(z.object({ technicienId: z.number().int(), id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        await supprimerHabilitation(repo, ctx.tenant, input.technicienId, input.id);
-        return { success: true };
+        return withOutbox(db, repo, async (r, tx) => {
+          await supprimerHabilitation(r, ctx.tenant, input.technicienId, input.id);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "technicien.habilitation_supprimee", entityType: "technicien", entityId: input.technicienId, payload: { habilitationId: input.id } });
+          return { success: true };
+        });
       }),
 
     /** Stats d'activité d'un technicien (interventions par statut). Anti-IDOR : hors tenant → 404. */

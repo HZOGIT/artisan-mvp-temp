@@ -375,6 +375,10 @@ export class TechnicienRepositoryDrizzle implements ITechnicienRepository {
     });
   }
 
+  withDb(db: DbClient): TechnicienRepositoryDrizzle {
+    return new TechnicienRepositoryDrizzle(db);
+  }
+
   /** Le technicien appartient-il au tenant ? (techniciens a un artisanId → RLS + filtre) */
   private async ownsTechnicien(tx: DbClient, ctx: TenantContext, technicienId: number): Promise<boolean> {
     const [row] = await tx

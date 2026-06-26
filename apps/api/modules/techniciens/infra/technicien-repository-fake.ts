@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ITechnicienRepository } from "../application/technicien-repository";
 import type { Technicien, CreateTechnicienInput, UpdateTechnicienInput } from "../domain/technicien";
@@ -205,6 +206,10 @@ export class FakeTechnicienRepository implements ITechnicienRepository {
     const before = this.habilitations.length;
     this.habilitations = this.habilitations.filter((h) => !(h.id === id && h.technicienId === technicienId));
     return this.habilitations.length < before;
+  }
+
+  withDb(_db: DbClient): FakeTechnicienRepository {
+    return this;
   }
 
   async statsTechnicien(ctx: TenantContext, technicienId: number): Promise<TechnicienStats | null> {
