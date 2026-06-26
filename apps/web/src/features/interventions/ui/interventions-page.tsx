@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useInterventions, useEquipe } from "../application/use-interventions";
+import { apiUrl } from "@/shared/backend-url";
 import {
   availableTechniciens,
   buildAdresse,
@@ -534,7 +535,7 @@ export default function InterventionsPage() {
                         {intervention.statut === "terminee" && (
                           <DropdownMenuItem asChild>
                             <a
-                              href={`/api/interventions/${intervention.id}/bon-pdf`}
+                              href={apiUrl(`/api/interventions/${intervention.id}/bon-pdf`)}
                               target="_blank"
                               rel="noopener noreferrer"
                             >

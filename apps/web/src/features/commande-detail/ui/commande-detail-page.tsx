@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { apiUrl } from "@/shared/backend-url";
 import { format } from "date-fns";
 import { ArrowLeft, Pencil, Download, Mail, Trash2, ChevronDown, Truck, Building2, CalendarDays, MapPin, FileText, Package } from "lucide-react";
 import { Button } from "@/shared/ui/button";
@@ -68,7 +69,7 @@ export default function CommandeDetailPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Button variant="outline" onClick={() => { window.location.href = `/commandes/${id}/modifier`; }}><Pencil className="h-4 w-4 mr-2" />{t("modifier")}</Button>
-          <Button variant="outline" asChild><a href={`/api/commandes-fournisseurs/${id}/pdf`} target="_blank" rel="noopener noreferrer"><Download className="h-4 w-4 mr-2" />{t("pdf")}</a></Button>
+          <Button variant="outline" asChild><a href={apiUrl(`/api/commandes-fournisseurs/${id}/pdf`)} target="_blank" rel="noopener noreferrer"><Download className="h-4 w-4 mr-2" />{t("pdf")}</a></Button>
           <Button variant="outline" onClick={handleSendEmail} disabled={sendEmail.isPending}><Mail className="h-4 w-4 mr-2" />{t("envoyer")}</Button>
           {recue_ && (<Button variant="outline" onClick={() => toggleFacturation(statutFacturation === "facturee" ? "a_facturer" : "facturee")} disabled={setFacturation.isPending}>{statutFacturation === "facturee" ? t("marquerAFacturer") : t("marquerFacturee")}</Button>)}
           {recue_ && statutFacturation !== "facturee" && depenses.length > 0 && (

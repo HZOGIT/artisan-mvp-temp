@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { apiUrl } from "@/shared/backend-url";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { ArrowLeft, Download, FileText, Loader2, Plus, Calendar, CheckCircle, XCircle, Clock, Wrench, Receipt, AlertTriangle } from "lucide-react";
@@ -76,7 +77,7 @@ export default function ContratDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" asChild><a href={`/api/contrats/${contrat.id}/pdf`} target="_blank" rel="noopener noreferrer"><Download className="h-4 w-4 mr-2" />{t("pdf")}</a></Button>
+          <Button variant="outline" size="sm" asChild><a href={apiUrl(`/api/contrats/${contrat.id}/pdf`)} target="_blank" rel="noopener noreferrer"><Download className="h-4 w-4 mr-2" />{t("pdf")}</a></Button>
           <Button size="sm" onClick={genFacture} disabled={generateFacture.isPending || contrat.statut !== "actif"}>
             {generateFacture.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Receipt className="h-4 w-4 mr-2" />}{t("genererFacture")}
           </Button>

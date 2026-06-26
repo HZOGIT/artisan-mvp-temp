@@ -1,37 +1,36 @@
-import { useSyncExternalStore, useCallback, useEffect, type AnchorHTMLAttributes, type ReactNode } from "react";
+import { useEffect, type AnchorHTMLAttributes, type ReactNode } from "react";
+import { useRouterState } from "@tanstack/react-router";
+import { modernRouter } from "./router";
 
 /*
- * Navigation du front neuf SANS wouter : s'appuie sur l'History API + un popstate synthétique pour notifier
- * TOUS les routeurs montés (le routeur TanStack /v2 écoute `popstate`). API compatible avec l'usage wouter du
- * code modern (useLocation/useSearch/Link/Redirect) → wouter entièrement remplacé.
+ * Abstraction de navigation UNIFIÉE du front neuf. Façade unique (useLocation/useSearch/navigate/Link/
+ * Redirect) consommée par tout le code modern — mais désormais adossée au SEUL routeur TanStack
+ * (`modernRouter`). Lecture via `useRouterState` (source de vérité du routeur), écriture via son
+ * `history` natif. Plus de `popstate` synthétique : un seul système de routage, donc plus de désync
+ * lecture/écriture (cause de la boucle onboarding↔dashboard sur les comptes neufs).
  */
 
-function notify() {
-  /** popstate synthétique : re-route le(s) routeur(s) montés (TanStack /v2) qui écoutent popstate. */
-  window.dispatchEvent(new PopStateEvent("popstate"));
-}
 export function navigate(to: string, opts?: { replace?: boolean }): void {
   if (typeof window === "undefined") return;
-  if (opts?.replace) window.history.replaceState(null, "", to);
-  else window.history.pushState(null, "", to);
-  notify();
+  if (opts?.replace) modernRouter.history.replace(to);
+  else modernRouter.history.push(to);
 }
 
-/** Redirection déclarative (équivalent wouter <Redirect>) : remplace l'entrée d'historique (replace) puis ne rend rien. */
+/** Redirection déclarative : remplace l'entrée d'historique (replace) puis ne rend rien. */
 export function Redirect({ to }: { to: string }) {
   useEffect(() => { navigate(to, { replace: true }); }, [to]);
   return null;
 }
-function subscribe(cb: () => void) {
-  window.addEventListener("popstate", cb);
-  return () => window.removeEventListener("popstate", cb);
-}
+
+/** `[pathname, setLocation]` — pathname lu du routeur TanStack (source de vérité, pas de window.location stale). */
 export function useLocation(): [string, (to: string) => void] {
-  const pathname = useSyncExternalStore(subscribe, () => window.location.pathname, () => "/");
-  return [pathname, useCallback((to: string) => navigate(to), [])];
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  return [pathname, navigate];
 }
+
+/** Chaîne de query (ex. `?filtre=alerte`) lue du routeur TanStack. Compatible `new URLSearchParams(...)`. */
 export function useSearch(): string {
-  return useSyncExternalStore(subscribe, () => window.location.search, () => "");
+  return useRouterState({ select: (s) => s.location.searchStr });
 }
 
 type LinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & { to?: string; href?: string; children?: ReactNode };

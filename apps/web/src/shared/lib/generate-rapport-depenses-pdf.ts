@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { apiUrl } from "@/shared/backend-url";
 
 async function loadFontBase64(url: string): Promise<string> {
   const res = await fetch(url);
@@ -41,8 +42,8 @@ export async function generateRapportDepensesPDF(data: RapportDepensesData) {
   let robotoLoaded = false;
   try {
     const [regB64, boldB64] = await Promise.all([
-      loadFontBase64("/api/fonts/roboto-regular.ttf"),
-      loadFontBase64("/api/fonts/roboto-bold.ttf"),
+      loadFontBase64(apiUrl("/api/fonts/roboto-regular.ttf")),
+      loadFontBase64(apiUrl("/api/fonts/roboto-bold.ttf")),
     ]);
     doc.addFileToVFS("Roboto-Regular.ttf", regB64);
     doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");

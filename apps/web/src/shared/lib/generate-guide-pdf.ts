@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { apiUrl } from "@/shared/backend-url";
 
 /*
  * Charge un .ttf depuis l'API serveur et le convertit en base64 pour jsPDF.
@@ -33,8 +34,8 @@ export async function generateGuidePDF() {
    */
   try {
     const [regB64, boldB64] = await Promise.all([
-      loadFontBase64("/api/fonts/roboto-regular.ttf"),
-      loadFontBase64("/api/fonts/roboto-bold.ttf"),
+      loadFontBase64(apiUrl("/api/fonts/roboto-regular.ttf")),
+      loadFontBase64(apiUrl("/api/fonts/roboto-bold.ttf")),
     ]);
     doc.addFileToVFS("Roboto-Regular.ttf", regB64);
     doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");
