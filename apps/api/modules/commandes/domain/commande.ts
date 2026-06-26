@@ -48,6 +48,7 @@ export interface Commande {
   readonly notes: string | null;
   readonly statutFacturation: CommandeStatutFacturation;
   readonly depenseId: number | null;
+  readonly alerteRetardEnvoyee: boolean;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }

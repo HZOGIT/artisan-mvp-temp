@@ -288,6 +288,13 @@
       "when": 1782453695329,
       "tag": "0040_events-rls-open",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1782460334731,
+      "tag": "0041_alerte-retard-livraison",
+      "breakpoints": true
     }
   ]
 }

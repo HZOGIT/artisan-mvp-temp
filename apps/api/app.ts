@@ -163,6 +163,7 @@ import { rgpdCronPlugin } from "./shared/infra/rgpd-cron";
 import { notificationsCronPlugin } from "./shared/infra/notifications-cron";
 import { genererRappelsFacturesEnRetard } from "./modules/notifications/application/derived-use-cases";
 import { genererAlertesStock } from "./modules/stocks/application/alertes-use-cases";
+import { genererAlertesRetardLivraison } from "./modules/commandes/application/alertes-retard-use-cases";
 import { artisans as artisansTable, paOutbox } from "../../drizzle/schema.pg";
 import { alertesPrevisionsCronPlugin } from "./shared/infra/alertes-previsions-cron";
 import { ensureStripeWebhookEndpoint } from "./shared/infra/stripe-webhook-setup";
@@ -1093,6 +1094,15 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
         let alertsCreated = 0;
         for (const { id: artisanId } of rows) {
           const r = await genererAlertesStock(stockRepo, notificationRepo, { artisanId, userId: 0 }).catch(() => ({ alertsCreated: 0 }));
+          alertsCreated += r.alertsCreated;
+        }
+        return { alertsCreated };
+      },
+      generateCommandeRetardAlerts: async () => {
+        const rows = await getDbHandle().db.select({ id: artisansTable.id }).from(artisansTable);
+        let alertsCreated = 0;
+        for (const { id: artisanId } of rows) {
+          const r = await genererAlertesRetardLivraison(commandeRepo, notificationRepo, { artisanId, userId: 0 }).catch(() => ({ alertsCreated: 0 }));
           alertsCreated += r.alertsCreated;
         }
         return { alertsCreated };

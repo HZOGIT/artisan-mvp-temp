@@ -44,6 +44,7 @@ function toCommande(r: CommandeRow): Commande {
     notes: r.notes ?? null,
     statutFacturation: (r.statutFacturation ?? "a_facturer") as Commande["statutFacturation"],
     depenseId: r.depenseId ?? null,
+    alerteRetardEnvoyee: r.alerteRetardEnvoyee ?? false,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };
@@ -368,6 +369,15 @@ export class CommandeRepositoryDrizzle implements ICommandeRepository {
         .where(and(eq(commandesFournisseurs.id, id), eq(commandesFournisseurs.artisanId, ctx.artisanId)))
         .returning();
       return row ? toCommande(row) : null;
+    });
+  }
+
+  markAlerteSent(ctx: TenantContext, id: number): Promise<void> {
+    return withTenant(this.db, ctx, async (tx) => {
+      await tx
+        .update(commandesFournisseurs)
+        .set({ alerteRetardEnvoyee: true })
+        .where(and(eq(commandesFournisseurs.id, id), eq(commandesFournisseurs.artisanId, ctx.artisanId)));
     });
   }
 
