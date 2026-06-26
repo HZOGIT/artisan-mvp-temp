@@ -8,6 +8,19 @@ import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 
+const ACTION_LABELS: Record<string, string> = {
+  created: "Création",
+  updated: "Modification",
+  deleted: "Suppression",
+  status_changed: "Changement statut",
+  sent: "Envoi",
+  signed: "Signé",
+  paid: "Paiement",
+  cancelled: "Annulation",
+};
+
+const actionLabel = (action: string) => ACTION_LABELS[action] ?? action;
+
 function formatDate(value: Date | string | null | undefined): string {
   if (!value) return "—";
   const d = typeof value === "string" ? new Date(value) : value;
@@ -57,7 +70,7 @@ export default function EventsAdminPage() {
       <div className="flex flex-wrap gap-3 items-end">
         <div className="flex flex-col gap-1">
           <label className="text-xs text-muted-foreground">{t("type")}</label>
-          <Input className="w-52" value={typeInput} onChange={(e) => { setTypeInput(e.target.value); setPage(1); }} placeholder="ex. FACTURE_PAYEE" />
+          <Input className="w-52" value={typeInput} onChange={(e) => { setTypeInput(e.target.value); setPage(1); }} placeholder={t("typePlaceholder")} />
         </div>
         <Button size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching}>
           <RefreshCw className={`mr-1 h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
@@ -92,7 +105,7 @@ export default function EventsAdminPage() {
                         {formatDate(row.occurredAt ?? row.createdAt)}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="font-mono text-xs">{row.action}</Badge>
+                        <Badge variant="outline" className="font-mono text-xs">{actionLabel(row.action)}</Badge>
                       </TableCell>
                       <TableCell className="text-sm">
                         <span className="text-muted-foreground">{row.entityType}</span>
