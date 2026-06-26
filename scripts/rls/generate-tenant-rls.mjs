@@ -22,7 +22,8 @@ await c.connect();
 // Tables identité/auth/plateforme lues HORS contexte tenant (auth, session, device,
 // billing par customerId Stripe) → exclues de la RLS tenant (sinon le nouveau stack
 // ne pourrait plus authentifier / résoudre le tenant / traiter les webhooks).
-const DENYLIST = new Set(["users", "active_sessions", "devices", "subscriptions"]);
+/* events + event_outbox = journaux globaux inter-tenant, RLS désactivée explicitement (0040, 0047). */
+const DENYLIST = new Set(["users", "active_sessions", "devices", "subscriptions", "events", "event_outbox"]);
 
 const { rows: allRows } = await c.query(`
   select table_name, column_name

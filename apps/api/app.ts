@@ -8,7 +8,7 @@ import { buildFastifyLoggerConfig } from "./shared/ports/logger-fastify";
 import { fastifyTRPCPlugin } from "@trpc/server/adapters/fastify";
 import { createAppRouter } from "./interface/trpc/router";
 import { makeCreateContext, type ContextDeps } from "./interface/trpc/context";
-import { getDbHandle } from "./shared/db";
+import { getDbHandle, type DbClient } from "./shared/db";
 import { DrizzleTenantResolver } from "./shared/tenant/drizzle-tenant-resolver";
 import { DrizzleUserRoleReader } from "./shared/tenant/role-reader";
 import { DrizzlePermissionsReader } from "./shared/tenant/permissions-reader";
@@ -160,6 +160,7 @@ import { handleBillingWebhookEvent } from "./modules/billing/interface/http/bill
 import fastifySchedule from "@fastify/schedule";
 import { billingCronPlugin } from "./shared/infra/billing-cron";
 import { paOutboxDrainerPlugin } from "./shared/infra/pa-outbox-drainer";
+import { eventOutboxDrainerPlugin } from "./shared/events/outbox-drainer";
 import { geoPurgeCronPlugin } from "./shared/infra/geo-purge-cron";
 import { rgpdCronPlugin } from "./shared/infra/rgpd-cron";
 import { notificationsCronPlugin } from "./shared/infra/notifications-cron";
@@ -318,6 +319,8 @@ export interface AppDeps extends ContextDeps {
   readonly transactionBancaireRepo?: ITransactionBancaireRepository;
   readonly fecReader?: FecReader;
   readonly devisRepo?: IDevisRepository;
+  /** Pool DB pour les transactions outbox du module devis (défaut : getDbHandle().db). */
+  readonly devisDb?: DbClient;
   readonly factureRepo?: IFactureRepository;
   readonly devisReader?: IDevisReader;
   readonly compta?: ComptaPort;
@@ -644,6 +647,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     ia: { llm: deps.llm ?? new GeminiLlmAdapter(app.log), trackLlm: makeLlmUsageTracker(getDbHandle().db), rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000) },
     push: pushAdapter,
     eventBus,
+    db: deps.devisDb,
   });
   /*
    * Génération FEC réelle : l'adapter ecritures implémente le seam `ComptaPort` des factures
@@ -1077,6 +1081,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   /** Drainer PA outbox — toutes les 30s, envoie les factures pending à la PA avec retries. */
   app.register(paOutboxDrainerPlugin, { pa: einvoicing.pa, db: getDbHandle().db, dbUrl: getDbHandle().pool.options.connectionString ?? "" });
+  app.register(eventOutboxDrainerPlugin, { db: getDbHandle().db });
 
   /** Cron CNIL — purge des positions GPS expirées toutes les 6 h (rétention 8 h par position). */
   app.register(geoPurgeCronPlugin, { technicienRepo, db: getDbHandle().db });

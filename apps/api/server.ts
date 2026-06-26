@@ -29,7 +29,7 @@ async function main(): Promise<void> {
   const eventBus = new LoggingEventBus(new PgBossEventBus(boss), getDbHandle().db);
   registerWorkers(new PgBossWorkerAdapter(boss), { email: new ResendEmailAdapter(), db: getDbHandle().db });
 
-  const app = buildApp({ eventBus });
+  const app = buildApp({ eventBus, devisDb: getDbHandle().db });
   app.addHook("onClose", async () => { await boss.stop(); });
   const port = Number(process.env.NEW_STACK_PORT ?? process.env.PORT ?? 3001);
   const host = process.env.HOST ?? "0.0.0.0";

@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type {
   Devis,
@@ -55,4 +56,7 @@ export interface IDevisRepository {
   updateLigne(ctx: TenantContext, ligneId: number, input: UpdateDevisLigneInput): Promise<DevisLigne | null>;
   /** false si la ligne ne relève pas d'un devis du tenant. */
   deleteLigne(ctx: TenantContext, ligneId: number): Promise<boolean>;
+
+  /** Retourne une nouvelle instance du repo utilisant `db` (pool ou tx Drizzle) — pour l'atomicité outbox. */
+  withDb(db: DbClient): IDevisRepository;
 }

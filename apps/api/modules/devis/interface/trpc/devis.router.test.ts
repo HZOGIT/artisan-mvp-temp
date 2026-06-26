@@ -6,6 +6,8 @@ import { createDbClient } from "../../../../shared/db";
 import { DrizzleTenantResolver } from "../../../../shared/tenant/drizzle-tenant-resolver";
 import { DevisRepositoryDrizzle } from "../../infra/devis-repository-drizzle";
 import { injectTrpc } from "../../../../shared/testing/trpc-inject";
+import { withOutbox } from "../../../../shared/events/with-outbox";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
 
 const URL = process.env.DATABASE_URL;
 const APP_URL =
@@ -40,6 +42,7 @@ describe.skipIf(!URL)("devis.router e2e (HTTP → tRPC → use-case → repo →
   let server: ReturnType<typeof buildApp>;
 
   const purge = async (uid: number) => {
+    await admin.query('delete from event_outbox where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from devis_lignes where "devisId" in (select id from devis where "artisanId" in (select id from artisans where "userId"=$1))', [uid]);
     await admin.query('delete from devis where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from parametres_artisan where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
@@ -59,7 +62,7 @@ describe.skipIf(!URL)("devis.router e2e (HTTP → tRPC → use-case → repo →
     artisanB = (await admin.query('insert into artisans ("userId",siret) values ($1,$2) returning id', [UB, "73282932000074"])).rows[0].id;
     clientA = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [artisanA, "Client A"])).rows[0].id;
     clientB = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [artisanB, "Client B"])).rows[0].id;
-    server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(app.db), devisRepo: new DevisRepositoryDrizzle(app.db) });
+    server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(app.db), devisRepo: new DevisRepositoryDrizzle(app.db), devisDb: app.db });
   });
 
   afterAll(async () => {
@@ -165,5 +168,54 @@ describe.skipIf(!URL)("devis.router e2e (HTTP → tRPC → use-case → repo →
     } finally {
       await admin.query('update artisans set "franchiseTVA"=false where id=$1', [artisanA]);
     }
+  });
+
+  it("outbox atomicité — create → devis ET event_outbox co-écrits (artisanId + userId + action + payload)", async () => {
+    const tA = await token(UA);
+    const before = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+    const res = await callMutation(server, "devis.create", { clientId: clientA }, tA);
+    expect(res.statusCode).toBe(200);
+    const devisId = res.json().result.data.id as number;
+    const row = (await admin.query("select * from event_outbox where \"entityId\"=$1 and action='devis.cree'", [devisId])).rows[0];
+    expect(row).toBeDefined();
+    expect(row.artisanId).toBe(artisanA);
+    expect(row.userId).toBe(UA);
+    expect(row.entityType).toBe("devis");
+    expect((row.payload as { numero?: string }).numero).toMatch(/^DEV-/);
+    const after = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+    expect(after).toBe(before + 1);
+  });
+
+  it("outbox atomicité — accepter → event_outbox action=devis.accepte avec userId tracé", async () => {
+    const tA = await token(UA);
+    const created = (await callMutation(server, "devis.create", { clientId: clientA }, tA)).json().result.data.id as number;
+    await callMutation(server, "devis.envoyer", { id: created }, tA);
+    const res = await callMutation(server, "devis.accepter", { id: created }, tA);
+    expect(res.statusCode).toBe(200);
+    const row = (await admin.query("select * from event_outbox where \"entityId\"=$1 and action='devis.accepte'", [created])).rows[0];
+    expect(row).toBeDefined();
+    expect(row.userId).toBe(UA);
+    expect(row.artisanId).toBe(artisanA);
+  });
+
+  it("outbox atomicité — rollback: throw après write devis → 0 devis ET 0 event_outbox persistés", async () => {
+    const ctx = { artisanId: artisanA, userId: UA, role: "artisan" as const, isOwner: true, franchiseTVA: false };
+    const repo = new DevisRepositoryDrizzle(app.db);
+    const devisBefore = Number((await admin.query('select count(*) from devis where "artisanId"=$1', [artisanA])).rows[0].count);
+    const outboxBefore = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+
+    await expect(
+      withOutbox(app.db, repo, async (r, tx) => {
+        const numero = await r.nextNumero(ctx);
+        await r.create(ctx, { clientId: clientA, numero });
+        if (tx) await outboxEvent(tx, ctx, { action: "devis.cree", entityType: "devis", entityId: 99999, payload: {} });
+        throw new Error("échec simulé post-write");
+      }),
+    ).rejects.toThrow("échec simulé post-write");
+
+    const devisAfter = Number((await admin.query('select count(*) from devis where "artisanId"=$1', [artisanA])).rows[0].count);
+    const outboxAfter = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+    expect(devisAfter).toBe(devisBefore);
+    expect(outboxAfter).toBe(outboxBefore);
   });
 });
