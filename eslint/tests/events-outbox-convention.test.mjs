@@ -26,6 +26,10 @@ ruleTester.run("events-outbox-convention", eventsOutboxConvention, {
       code: `emitEvent(eventBus, ctx, { type: 'user.created', entityType: 'user', entityId: 1 })`,
       filename: "/app/apps/api/modules/users/application/use-create-user.ts",
     },
+    {
+      code: `outboxEvent(tx, ctx, { action: 'modele_email.cree', entityType: 'modele_email', entityId: 1 })`,
+      filename: "/app/apps/api/modules/modeles-email/interface/trpc/modeles-email.router.ts",
+    },
   ],
   invalid: [
     {

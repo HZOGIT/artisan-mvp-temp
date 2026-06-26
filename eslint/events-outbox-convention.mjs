@@ -1,4 +1,4 @@
-const ACTION_TYPE_PATTERN = /^[a-z]+\.[a-z_]+$/;
+const ACTION_TYPE_PATTERN = /^[a-z_]+\.[a-z_]+$/;
 
 function isOutboxOrEmitCall(callee) {
   return (

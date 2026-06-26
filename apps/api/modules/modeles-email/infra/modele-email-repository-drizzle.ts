@@ -127,4 +127,8 @@ export class ModeleEmailRepositoryDrizzle implements IModeleEmailRepository {
       return deleted.length > 0;
     });
   }
+
+  withDb(db: DbClient): ModeleEmailRepositoryDrizzle {
+    return new ModeleEmailRepositoryDrizzle(db);
+  }
 }

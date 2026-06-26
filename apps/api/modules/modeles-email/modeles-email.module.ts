@@ -1,3 +1,4 @@
+import type { DbClient } from "../../shared/db";
 import type { IModeleEmailRepository } from "./application/modele-email-repository";
 import { createModelesEmailRouter } from "./interface/trpc/modeles-email.router";
 
@@ -7,6 +8,8 @@ import { createModelesEmailRouter } from "./interface/trpc/modeles-email.router"
  */
 export interface ModelesEmailModuleDeps {
   readonly repository: IModeleEmailRepository;
+  /** Pool DB pour les transactions outbox events (défaut : sans outbox). */
+  readonly db?: DbClient;
 }
 
 export interface ModelesEmailModule {
@@ -15,5 +18,5 @@ export interface ModelesEmailModule {
 }
 
 export function createModelesEmailModule(deps: ModelesEmailModuleDeps): ModelesEmailModule {
-  return { deps, router: createModelesEmailRouter(deps.repository) };
+  return { deps, router: createModelesEmailRouter(deps.repository, deps.db) };
 }
