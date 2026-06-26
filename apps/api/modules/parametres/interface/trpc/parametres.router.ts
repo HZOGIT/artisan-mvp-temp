@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import type { DbClient } from "../../../../shared/db";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
+import { withOutbox } from "../../../../shared/events/with-outbox";
 import type { IParametresRepository } from "../../application/parametres-repository";
 import { getParametres } from "../../application/read-use-cases";
 import { mettreAJourParametres } from "../../application/write-use-cases";
@@ -37,17 +40,20 @@ const updateSchema = z.object({
  * mince : valide les inputs (zod), délègue aux use-cases (scoping tenant via ctx.tenant), laisse
  * remonter les Domain errors (Validation→400). Repo injecté (DI).
  */
-export function createParametresRouter(repo: IParametresRepository) {
+export function createParametresRouter(repo: IParametresRepository, db?: DbClient) {
   return router({
     get: protectedProcedure.query(({ ctx }) => getParametres(repo, ctx.tenant)),
 
     update: protectedProcedure
       .input(updateSchema)
       .mutation(async ({ ctx, input }) => {
-        const result = await mettreAJourParametres(repo, ctx.tenant, input);
-        const changedFields = Object.keys(input).filter((k) => input[k as keyof typeof input] !== undefined);
-        ctx.log.warn({ event: "parametres_updated", changedFields }, `Paramètres artisan modifiés : ${changedFields.join(", ")}`);
-        return result;
+        const champsModifies = Object.keys(input).filter((k) => input[k as keyof typeof input] !== undefined);
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await mettreAJourParametres(r, ctx.tenant, input);
+          ctx.log.warn({ event: "parametres_updated", champsModifies }, `Paramètres artisan modifiés : ${champsModifies.join(", ")}`);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "parametres.mis_a_jour", entityType: "parametres", entityId: ctx.tenant.artisanId, payload: { champsModifies } });
+          return result;
+        });
       }),
   });
 }
