@@ -49,5 +49,8 @@
   "errConnexion": "Erreur de connexion",
   "errServeur": "Erreur serveur",
   "errGenerationDevis": "Erreur lors de la génération du devis",
-  "erreur": "Erreur"
+  "erreur": "Erreur",
+  "joindreUnFichier": "Joindre un fichier",
+  "errUpload": "Erreur lors de l'upload du fichier",
+  "fichierTropVolumineux": "Fichier trop volumineux (max 20 Mo)"
 }

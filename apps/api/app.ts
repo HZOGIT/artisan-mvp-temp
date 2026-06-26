@@ -279,6 +279,8 @@ import type { EmailPort, RateLimiterPort, LlmPort, VisionPort } from "./shared/p
 import type { EventBusPort } from "./shared/ports/event-bus";
 import { FakeEventBus } from "./shared/ports/fakes";
 import { ResendEmailAdapter, SlidingWindowRateLimiter, GeminiLlmAdapter, GeminiVisionAdapter } from "./shared/ports";
+import type { StoragePort } from "./shared/ports/storage";
+import { OvhS3Adapter } from "./shared/storage/ovh-s3-adapter";
 import { makeLlmUsageTracker } from "./shared/ports/llm-usage-tracker";
 import type { AppLogger } from "./shared/ports/logger";
 import { JsPdfAdapter } from "./shared/pdf/js-pdf-adapter";
@@ -297,6 +299,7 @@ export interface AppDeps extends ContextDeps {
   readonly emailPort?: EmailPort;
   readonly pushPort?: PushPort;
   readonly rateLimiter?: RateLimiterPort;
+  readonly storage?: StoragePort;
   /** Port LLM (Gemini) + rate-limiter IA dédié — injectables en test (FakeLlmPort déterministe). */
   readonly llm?: LlmPort;
   /** Provider LLM AGENTIQUE (function-calling) de l'assistant ; injectable en test (FakeLlmAgenticPort). */
@@ -896,6 +899,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
    * La subscription tRPC `assistant.stream` utilise le mode agentique (function-calling) afin de
    * supporter les outils navigate, invalidate, etc.
    */
+  const storage: StoragePort = deps.storage ?? new OvhS3Adapter(getDbHandle().db);
   const assistant = createAssistantModule({
     threadsRepo: new AssistantThreadsRepositoryDrizzle(getDbHandle().db),
     generators: {
@@ -906,6 +910,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       dataReader: new AssistantDataReaderDrizzle(getDbHandle().db),
     },
     agentDeps,
+    storage,
+    db: getDbHandle().db,
   });
   /*
    * Chat support artisan↔client (request/response). Notifier email best-effort (rate-limit anti-spam
