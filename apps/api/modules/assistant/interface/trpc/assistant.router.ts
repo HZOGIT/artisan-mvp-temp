@@ -39,7 +39,6 @@ const MIME_TO_EXT: Record<string, string> = {
   "image/heic": "heic", "image/gif": "gif", "application/pdf": "pdf",
   "text/plain": "txt", "text/csv": "csv",
 };
-const ALLOWED_MIMES = new Set(Object.keys(MIME_TO_EXT));
 
 /** Routeur tRPC assistant : lectures + générateurs IA + upload + subscription de chat en streaming agentique. */
 export function createAssistantRouter(
@@ -93,8 +92,8 @@ export function createAssistantRouter(
         const raw = input.base64.replace(/^data:[^,]+,/, "");
         const buf = Buffer.from(raw, "base64");
         if (buf.byteLength > 20 * 1024 * 1024) throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Fichier trop volumineux (max 20 Mo)" });
-        if (!ALLOWED_MIMES.has(input.mimeType)) throw new TRPCError({ code: "BAD_REQUEST", message: `Type de fichier non supporté : ${input.mimeType}` });
-        const ext = MIME_TO_EXT[input.mimeType]!;
+        const ext = MIME_TO_EXT[input.mimeType];
+        if (!ext) throw new TRPCError({ code: "BAD_REQUEST", message: `Type de fichier non supporté : ${input.mimeType}` });
         const key = `chat/${ctx.tenant.artisanId}/${randomUUID()}.${ext}`;
         const stored = await storage.upload(key, buf, {
           contentType: input.mimeType,
@@ -130,12 +129,13 @@ export function createAssistantRouter(
           const canDevis = canWrite || ctx.permissions.includes("devis.gerer");
           const canFactures = canWrite || ctx.permissions.includes("factures.gerer");
 
+          const fileIds = input.fileIds;
           let attachments: Array<{ data: Buffer; mimeType: string }> | undefined;
-          if (input.fileIds?.length) {
+          if (fileIds?.length) {
             const rows = await withTenant(db, tenant, (tx) =>
               tx.select({ storageKey: files.storageKey, mimeType: files.mimeType })
                 .from(files)
-                .where(inArray(files.id, input.fileIds!)),
+                .where(inArray(files.id, fileIds)),
             );
             const fetched = await Promise.all(
               rows.map(async (r) => {
@@ -152,10 +152,10 @@ export function createAssistantRouter(
             if ("threadId" in validated) {
               resolvedThreadId = validated.threadId;
               const tid = resolvedThreadId;
-              if (input.fileIds?.length && tid) {
+              if (fileIds?.length && tid) {
                 await withTenant(db, tenant, (tx) =>
                   tx.insert(messageFiles).values(
-                    input.fileIds!.map((fileId) => ({
+                    fileIds.map((fileId) => ({
                       conversationId: tid.toString(),
                       messageIndex: 0,
                       fileId,
