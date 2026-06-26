@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import type { DbClient } from "../../../../shared/db";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
+import { withOutbox } from "../../../../shared/events/with-outbox";
 import type { IPrevisionCARepository } from "../../application/prevision-ca-repository";
 import { listPrevisions, previsionsParAnnee, getPrevision, getPrevisions, getHistorique, getComparaison } from "../../application/read-use-cases";
 import { creerPrevision, modifierPrevision, supprimerPrevision } from "../../application/write-use-cases";
@@ -39,7 +42,7 @@ const updateSchema = z.object({
  * inputs (zod), délègue aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain
  * errors (NotFound→404, Validation→400). Repo injecté.
  */
-export function createPrevisionsCARouter(repo: IPrevisionCARepository, facturesCAReader?: FacturesCAReader, tresorerieReader?: TresorerieReader) {
+export function createPrevisionsCARouter(repo: IPrevisionCARepository, facturesCAReader?: FacturesCAReader, tresorerieReader?: TresorerieReader, db?: DbClient) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listPrevisions(repo, ctx.tenant)),
 
@@ -53,20 +56,35 @@ export function createPrevisionsCARouter(repo: IPrevisionCARepository, facturesC
 
     create: protectedProcedure
       .input(createSchema)
-      .mutation(({ ctx, input }) => creerPrevision(repo, ctx.tenant, input)),
+      .mutation(async ({ ctx, input }) => {
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await creerPrevision(r, ctx.tenant, input);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "prevision_ca.creee", entityType: "prevision_ca", entityId: result.id, payload: { previsionId: result.id, mois: result.mois, montantPrevu: result.caPrevisionnel } });
+          return result;
+        });
+      }),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { id, ...data } = input;
-        return modifierPrevision(repo, ctx.tenant, id, data);
+        const champsModifies = Object.keys(data).filter((k) => data[k as keyof typeof data] !== undefined);
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await modifierPrevision(r, ctx.tenant, id, data);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "prevision_ca.modifiee", entityType: "prevision_ca", entityId: id, payload: { previsionId: id, champsModifies } });
+          return result;
+        });
       }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        await supprimerPrevision(repo, ctx.tenant, input.id);
-        return { success: true };
+        return withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          await supprimerPrevision(r, ctx.tenant, input.id);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "prevision_ca.supprimee", entityType: "prevision_ca", entityId: input.id, payload: { snapshot: { previsionId: input.id, mois: before?.mois } } });
+          return { success: true };
+        });
       }),
 
     /*

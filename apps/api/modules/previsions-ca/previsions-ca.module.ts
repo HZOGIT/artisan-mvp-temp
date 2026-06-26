@@ -1,3 +1,4 @@
+import type { DbClient } from "../../shared/db";
 import type { IPrevisionCARepository } from "./application/prevision-ca-repository";
 import type { FacturesCAReader } from "./application/factures-ca-reader";
 import type { TresorerieReader } from "./application/tresorerie-reader";
@@ -12,6 +13,7 @@ export interface PrevisionsCAModuleDeps {
   readonly repository: IPrevisionCARepository;
   readonly facturesCAReader?: FacturesCAReader;
   readonly tresorerieReader?: TresorerieReader;
+  readonly db?: DbClient;
 }
 
 export interface PrevisionsCAModule {
@@ -20,5 +22,5 @@ export interface PrevisionsCAModule {
 }
 
 export function createPrevisionsCAModule(deps: PrevisionsCAModuleDeps): PrevisionsCAModule {
-  return { deps, router: createPrevisionsCARouter(deps.repository, deps.facturesCAReader, deps.tresorerieReader) };
+  return { deps, router: createPrevisionsCARouter(deps.repository, deps.facturesCAReader, deps.tresorerieReader, deps.db) };
 }

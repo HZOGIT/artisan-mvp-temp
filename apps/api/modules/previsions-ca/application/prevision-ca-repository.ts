@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type {
   CreatePrevisionInput,
@@ -15,6 +16,7 @@ import type {
  * ne touche que les montants/méthode/confiance (mois/annee immuables).
  */
 export interface IPrevisionCARepository {
+  withDb(db: DbClient): IPrevisionCARepository;
   list(ctx: TenantContext): Promise<PrevisionCA[]>;
   /** Prévisions du tenant pour une année donnée ; [] si aucune. */
   listByAnnee(ctx: TenantContext, annee: number): Promise<PrevisionCA[]>;
