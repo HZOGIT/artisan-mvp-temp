@@ -66,18 +66,17 @@ describe("fetchWithRetry", () => {
   });
 
   it("aborts on timeout", async () => {
-    const controller = new AbortController();
-    mockFetch.mockImplementation(() => {
-      return new Promise((resolve) => {
-        setTimeout(() => resolve(new Response("", { status: 200 })), 20000);
-      });
-    });
+    vi.useFakeTimers();
 
-    await expect(
-      fetchWithRetry("https://example.com", {}, { timeoutMs: 100, maxRetries: 0 }),
-    ).rejects.toThrow();
+    mockFetch.mockImplementation(() => new Promise(() => {}));
 
-    expect(mockFetch).toHaveBeenCalled();
+    const promise = fetchWithRetry("https://example.com", {}, { timeoutMs: 20, maxRetries: 0 });
+
+    await vi.runAllTimersAsync();
+
+    await expect(promise).rejects.toThrow();
+
+    vi.useRealTimers();
   });
 
   it("returns 4xx errors without retrying", async () => {
