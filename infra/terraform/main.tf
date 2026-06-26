@@ -12,10 +12,18 @@ terraform {
       source  = "BetterStackHQ/better-uptime"
       version = "~> 0.0"
     }
+    logtail = {
+      source  = "BetterStackHQ/logtail"
+      version = "~> 0.0"
+    }
   }
 }
 
 provider "betteruptime" {
+  api_token = var.betterstack_api_token
+}
+
+provider "logtail" {
   api_token = var.betterstack_api_token
 }
 

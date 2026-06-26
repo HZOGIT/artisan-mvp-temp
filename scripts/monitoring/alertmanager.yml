@@ -1,0 +1,12 @@
+receivers:
+  - name: ntfy
+    webhook_configs:
+      - url: https://ntfy.sh/operioz-claude-code-2026
+        send_resolved: true
+
+route:
+  receiver: ntfy
+  group_by: [alertname]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 1h
