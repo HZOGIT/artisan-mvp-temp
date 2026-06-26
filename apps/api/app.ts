@@ -164,7 +164,6 @@ import { notificationsCronPlugin } from "./shared/infra/notifications-cron";
 import { genererRappelsFacturesEnRetard } from "./modules/notifications/application/derived-use-cases";
 import { genererAlertesStock } from "./modules/stocks/application/alertes-use-cases";
 import { artisans as artisansTable, paOutbox } from "../../drizzle/schema.pg";
-import { withTenant } from "./shared/db/with-tenant";
 import { alertesPrevisionsCronPlugin } from "./shared/infra/alertes-previsions-cron";
 import { ensureStripeWebhookEndpoint } from "./shared/infra/stripe-webhook-setup";
 import { WebhookPaymentWriterDrizzle } from "./modules/subscription/infra/webhook-payment-writer-drizzle";
@@ -666,10 +665,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       modeleEmailRepo,
     },
     push: pushAdapter,
-    outboxInsert: (artisanId, factureId) =>
-      withTenant(getDbHandle().db, { artisanId, userId: 0 }, (tx) =>
-        tx.insert(paOutbox).values({ artisanId, factureId, statut: "pending", tentatives: 0 }).then(() => {}),
-      ),
+    outboxInTx: (artisanId, factureId, tx) =>
+      tx.insert(paOutbox).values({ artisanId, factureId, statut: "pending", tentatives: 0 }).then(() => {}),
   });
   /*
    * Domaine compta/écritures — lecture seule (balance/grand-livre/FEC). La génération est

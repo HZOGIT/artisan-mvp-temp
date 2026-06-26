@@ -1,4 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
+import type { DbClient } from "../../../shared/db";
 import type {
   Facture,
   FactureLigne,
@@ -30,8 +31,9 @@ export interface IFactureRepository {
   /** false si la facture n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
 
-  /** Définit le statut (transition pilotée par le use-case workflow) — null hors tenant. */
-  setStatut(ctx: TenantContext, id: number, statut: FactureStatut): Promise<Facture | null>;
+  /** Définit le statut (transition pilotée par le use-case workflow) — null hors tenant.
+   *  `inTx` est exécuté dans la même transaction que l'UPDATE (atomicité outbox PA). */
+  setStatut(ctx: TenantContext, id: number, statut: FactureStatut, inTx?: (tx: DbClient) => Promise<void>): Promise<Facture | null>;
   /*
    * Enregistre un paiement (écrit montantPaye cumulé + date/mode + statut calculés par le
    * use-case) — null hors tenant. Les invariants (montant > 0, anti-sur-paiement, statut

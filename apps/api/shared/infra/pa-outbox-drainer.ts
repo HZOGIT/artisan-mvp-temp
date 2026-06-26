@@ -63,7 +63,7 @@ export const paOutboxDrainerPlugin = fp(
                 const pending = await tx
                   .select()
                   .from(paOutbox)
-                  .where(and(inArray(paOutbox.statut, ["pending", "failed"]), lt(paOutbox.tentatives!, MAX_TENTATIVES)))
+                  .where(and(inArray(paOutbox.statut, ["pending", "failed"]), lt(sql`coalesce(${paOutbox.tentatives}, 0)`, MAX_TENTATIVES)))
                   .limit(10);
                 for (const entry of pending) {
                   await drainEntry(entry, opts.pa, (id, set) =>

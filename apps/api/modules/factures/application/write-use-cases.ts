@@ -3,6 +3,7 @@ import type { TenantContext } from "../../../shared/tenant";
 import { TVA_CATEGORIES_MAP } from "../../../shared/tva/taux-tva-fr";
 import { round2 } from "../../../shared/money";
 import type { IFactureRepository, AvoirLigneData, CopiedLigneData } from "./facture-repository";
+import type { DbClient } from "../../../shared/db";
 import type { IDevisReader } from "./devis-reader";
 import type { ComptaPort } from "./compta-port";
 import { NOOP_COMPTA } from "./compta-port";
@@ -387,7 +388,7 @@ export async function changerStatutFacture(
   cible: FactureStatut,
   compta: ComptaPort = NOOP_COMPTA,
   artisanReader?: ArtisanReader,
-  outboxInsert?: (artisanId: number, factureId: number) => Promise<void>,
+  outboxInTx?: (artisanId: number, factureId: number, tx: DbClient) => Promise<void>,
 ): Promise<Facture> {
   const facture = await getFactureOwned(repo, ctx, id);
   /** idempotent */
@@ -400,12 +401,14 @@ export async function changerStatutFacture(
     const artisan = await artisanReader.getArtisan(ctx);
     if (!artisan?.siret) throw new ValidationError("Le SIRET de l'artisan est requis pour émettre une facture");
   }
-  const updated = await repo.setStatut(ctx, id, cible);
+  /** Insert pa_outbox dans la même tx que setStatut → atomicité réglementaire. */
+  const inTx = cible === "envoyee" && outboxInTx
+    ? (tx: DbClient) => outboxInTx(ctx.artisanId, id, tx)
+    : undefined;
+  const updated = await repo.setStatut(ctx, id, cible, inTx);
   if (!updated) throw new NotFoundError("Facture introuvable");
   /** À l'émission (passage `envoyee`) : génère la pièce de vente FEC (411/706/445). Idempotent. */
   if (cible === "envoyee") await compta.genererEcrituresVente(ctx, id);
-  /** Outbox PA : écriture non-bloquante pour émission asynchrone vers la plateforme agréée. */
-  if (cible === "envoyee") await outboxInsert?.(ctx.artisanId, id);
   return updated;
 }
 
