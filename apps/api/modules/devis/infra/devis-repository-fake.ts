@@ -158,6 +158,7 @@ export class FakeDevisRepository implements IDevisRepository {
       unite: isDisplay ? "unité" : input.unite ?? "unité",
       prixUnitaireHT,
       tauxTVA,
+      remise: isDisplay ? "0" : input.remise ?? "0",
       tvaCategorieId: isDisplay ? null : (input.tvaCategorieId ?? null),
       montantHT: montants.montantHT,
       montantTVA: montants.montantTVA,
