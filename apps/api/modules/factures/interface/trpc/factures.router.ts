@@ -8,8 +8,7 @@ import type { FactureMailingDeps } from "../../application/envoyer-facture-email
 import type { PushPort } from "../../../../shared/push/web-push-adapter";
 import type { DbClient } from "../../../../shared/db";
 import type { EventBusPort } from "../../../../shared/ports/event-bus";
-import { outboxEvent } from "../../../../shared/events/outbox-event";
-import { withOutbox } from "../../../../shared/events/with-outbox";
+import { emitEvent } from "../../../../shared/events/emit-event";
 import { envoyerFactureParEmail } from "../../application/envoyer-facture-email";
 import { listFactures, getFactureDetail, listLignesFacture, getAvoirsFacture, getAuditLogFacture } from "../../application/read-use-cases";
 import {
@@ -118,7 +117,7 @@ const avoirInputSchema = z.object({
  * use-cases (scoping tenant + numérotation serveur + anti-IDOR-FK + immutabilité post-émission),
  * laisse remonter les Domain errors (NotFound→404, Validation→400, Conflict→409).
  */
-export function createFacturesRouter(repo: IFactureRepository, devisReader: IDevisReader, compta: ComptaPort, mailing: FactureMailingDeps, push?: PushPort, outboxInTx?: (artisanId: number, factureId: number, tx: DbClient) => Promise<void>, db?: DbClient) {
+export function createFacturesRouter(repo: IFactureRepository, devisReader: IDevisReader, compta: ComptaPort, mailing: FactureMailingDeps, push?: PushPort, outboxInTx?: (artisanId: number, factureId: number, tx: DbClient) => Promise<void>, eventBus?: EventBusPort) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listFactures(repo, ctx.tenant)),
 
@@ -152,13 +151,15 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
           const categorieId = tvaCategorieId ?? "FR_20";
           return { ...l, tauxTVA: TVA_CATEGORIES_MAP[categorieId].taux, tvaCategorieId: categorieId, remise: String(remiseNum ?? 0) };
         });
-        return withOutbox(db, repo, async (r, tx) => {
-          const result = await creerFacture(r, ctx.tenant, { ...rest, dateEcheance: toDate(rest.dateEcheance), lignes });
-          ctx.log.info({ event: "facture_created", factureId: result.id, clientId: rest.clientId }, "Facture créée");
-          push?.sendToUser(ctx.tenant.artisanId, { title: "Operioz", body: `Nouvelle facture créée (brouillon)` }).catch(() => undefined);
-          if (tx) await outboxEvent(tx, ctx.tenant, { action: "facture.creee", entityType: "facture", entityId: result.id, payload: { clientId: rest.clientId, numero: result.numero ?? null } });
-          return result;
-        });
+        const result = await creerFacture(repo, ctx.tenant, { ...rest, dateEcheance: toDate(rest.dateEcheance), lignes });
+        ctx.log.info({ event: "facture_created", factureId: result.id, clientId: rest.clientId }, "Facture créée");
+        push?.sendToUser(ctx.tenant.artisanId, { title: "Operioz", body: `Nouvelle facture créée (brouillon)` }).catch(() => undefined);
+        if (eventBus) {
+          /* TODO: migrer vers withOutbox + outboxEvent (OPE-647 fan-out) */
+          /* eslint-disable-next-line local/events-outbox-convention */
+          emitEvent(eventBus, ctx.tenant, { type: "facture.creee", entityType: "facture", entityId: result.id, payload: { clientId: rest.clientId, numero: result.numero ?? null } });
+        }
+        return result;
       }),
 
     update: protectedProcedure
@@ -206,12 +207,14 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
     envoyer: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        return withOutbox(db, repo, async (r, tx) => {
-          const result = await changerStatutFacture(r, ctx.tenant, input.id, "envoyee", compta, mailing.artisanReader, outboxInTx);
-          ctx.log.info({ event: "facture_envoyee", factureId: input.id }, "Facture envoyée au client");
-          if (tx) await outboxEvent(tx, ctx.tenant, { action: "facture.envoyee", entityType: "facture", entityId: input.id });
-          return result;
-        });
+        const result = await changerStatutFacture(repo, ctx.tenant, input.id, "envoyee", compta, mailing.artisanReader, outboxInTx);
+        ctx.log.info({ event: "facture_envoyee", factureId: input.id }, "Facture envoyée au client");
+        if (eventBus) {
+          /* TODO: migrer vers withOutbox + outboxEvent (OPE-647 fan-out) */
+          /* eslint-disable-next-line local/events-outbox-convention */
+          emitEvent(eventBus, ctx.tenant, { type: "facture.envoyee", entityType: "facture", entityId: input.id });
+        }
+        return result;
       }),
 
     marquerEnRetard: protectedProcedure
@@ -243,18 +246,20 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
     enregistrerPaiement: protectedProcedure
       .input(z.object({ id: z.number().int(), montant: decimal, date: isoDate.optional(), mode: z.string().max(50).optional() }))
       .mutation(async ({ ctx, input }) => {
-        return withOutbox(db, repo, async (r, tx) => {
-          const result = await enregistrerPaiementFacture(
-            r,
-            ctx.tenant,
-            input.id,
-            { montant: input.montant, date: toDate(input.date), mode: input.mode ?? null },
-            compta,
-          );
-          ctx.log.info({ event: "facture_paiement_enregistre", factureId: input.id, montant: Number(input.montant), mode: input.mode ?? null }, "Paiement facture enregistré");
-          if (tx) await outboxEvent(tx, ctx.tenant, { action: "facture.paiement_enregistre", entityType: "facture", entityId: input.id, payload: { montant: input.montant, mode: input.mode ?? null } });
-          return result;
-        });
+        const result = await enregistrerPaiementFacture(
+          repo,
+          ctx.tenant,
+          input.id,
+          { montant: input.montant, date: toDate(input.date), mode: input.mode ?? null },
+          compta,
+        );
+        ctx.log.info({ event: "facture_paiement_enregistre", factureId: input.id, montant: Number(input.montant), mode: input.mode ?? null }, "Paiement facture enregistré");
+        if (eventBus) {
+          /* TODO: migrer vers withOutbox + outboxEvent (OPE-647 fan-out) */
+          /* eslint-disable-next-line local/events-outbox-convention */
+          emitEvent(eventBus, ctx.tenant, { type: "facture.paiement_enregistre", entityType: "facture", entityId: input.id, payload: { montant: input.montant, mode: input.mode ?? null } });
+        }
+        return result;
       }),
 
     /*
@@ -264,12 +269,14 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
     markAsPaid: protectedProcedure
       .input(z.object({ id: z.number().int(), montantPaye: decimal, datePaiement: isoDate }))
       .mutation(async ({ ctx, input }) => {
-        return withOutbox(db, repo, async (r, tx) => {
-          const result = await enregistrerPaiementFacture(r, ctx.tenant, input.id, { montant: input.montantPaye, date: toDate(input.datePaiement) }, compta);
-          ctx.log.info({ event: "facture_paiement_enregistre", factureId: input.id, montant: Number(input.montantPaye) }, "Paiement facture enregistré");
-          if (tx) await outboxEvent(tx, ctx.tenant, { action: "facture.paiement_enregistre", entityType: "facture", entityId: input.id, payload: { montant: input.montantPaye } });
-          return result;
-        });
+        const result = await enregistrerPaiementFacture(repo, ctx.tenant, input.id, { montant: input.montantPaye, date: toDate(input.datePaiement) }, compta);
+        ctx.log.info({ event: "facture_paiement_enregistre", factureId: input.id, montant: Number(input.montantPaye) }, "Paiement facture enregistré");
+        if (eventBus) {
+          /* TODO: migrer vers withOutbox + outboxEvent (OPE-647 fan-out) */
+          /* eslint-disable-next-line local/events-outbox-convention */
+          emitEvent(eventBus, ctx.tenant, { type: "facture.paiement_enregistre", entityType: "facture", entityId: input.id, payload: { montant: input.montantPaye } });
+        }
+        return result;
       }),
 
     /*
