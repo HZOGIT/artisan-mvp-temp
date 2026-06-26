@@ -71,6 +71,35 @@ Après 3 rounds de corrections sans avancée → `notify.sh human BLOCKED`.
 - `PR_READY` — envoyé par la session worker quand la PR est prête
 - `REVIEW_FEEDBACK` — envoyé par le reviewer vers la session worker (demande de corrections)
 
+## Linear CLI — linearis
+
+`linearis` est disponible sur ce serveur (v2026.4.9) et peut être utilisé par **tous les agents**
+en complément ou à la place des outils MCP Linear.
+
+```bash
+# Lire une issue
+linearis issues read OPE-XXX
+
+# Lister les issues
+linearis issues list --project "Points bloquants déploiement en production" --priority 2
+
+# Créer une issue (team requis)
+linearis issues create "titre" --team Operioz --priority 2 --parent-ticket OPE-XXX
+
+# Mettre à jour statut / priorité
+linearis issues update OPE-XXX --status "Done"
+linearis issues update OPE-XXX --status "In Progress" --priority 2
+
+# Poster un commentaire
+linearis issues discuss OPE-XXX --body "markdown ici"
+```
+
+**Quand l'utiliser :** dans les sessions worktree où les outils MCP ne sont pas disponibles, ou
+pour scripter des opérations Linear en cascade (plusieurs updates / commentaires d'un coup).
+Les agents MCP peuvent continuer à utiliser les outils Linear MCP — les deux coexistent.
+
+---
+
 ## Structure du projet
 
 ```
@@ -101,6 +130,8 @@ eslint/
 > **⚠️ Répertoires INTERDITS à recréer** — le dossier `devtools/` a été dissout dans `scripts/` (commit `c1cb0b4f`). Ne jamais le recréer. Tout nouveau prompt va dans `scripts/prompts/`. Tout nouveau script va dans `scripts/`.
 
 > **⚠️ INTERDIT — variables d'environnement dans `.env.production`** — Ne jamais écrire une valeur d'env runtime (URL de backend, clé API, feature flag d'infra) dans `.env.production` committé. Ces variables se configurent **dans le dashboard du service de déploiement** (Cloudflare Pages : `wrangler pages secret put <KEY> --project-name <project>` ; backend : fichier `.env` sur le serveur ou variables d'env Docker). `.env.production` ne contient que des constantes publiques non-sensibles (ex. titre de l'app, logo).
+
+> **⚠️ Branches distantes protégées — NE PAS supprimer au ménage** — `main`, `staging`, et **`old-main`**. `old-main` est une **archive volontaire de l'état pré-refonte** (ancien main legacy/MySQL avant la migration clean-archi) conservée pour **comparer l'état actuel à l'avant-refonte**. Le ménage des branches (suppression des `feat/*` dont la PR est MERGED/CLOSED) doit **exclure** ces trois branches — même si `old-main` apparaît comme « mergée »/ancêtre de staging.
 
 ## Environnements — déploiement
 
