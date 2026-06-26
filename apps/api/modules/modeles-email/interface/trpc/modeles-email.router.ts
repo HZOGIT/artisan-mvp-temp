@@ -1,4 +1,7 @@
 import { z } from "zod";
+import type { DbClient } from "../../../../shared/db";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
+import { withOutbox } from "../../../../shared/events/with-outbox";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IModeleEmailRepository } from "../../application/modele-email-repository";
 import { listModelesEmail, modelesParType, getModeleEmail } from "../../application/read-use-cases";
@@ -30,7 +33,7 @@ const updateSchema = z.object({
  * use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors (NotFound→404,
  * Validation→400). L'unicité du défaut par type est portée par les write use-cases. Repo injecté.
  */
-export function createModelesEmailRouter(repo: IModeleEmailRepository) {
+export function createModelesEmailRouter(repo: IModeleEmailRepository, db?: DbClient) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listModelesEmail(repo, ctx.tenant)),
 
@@ -44,20 +47,34 @@ export function createModelesEmailRouter(repo: IModeleEmailRepository) {
 
     create: protectedProcedure
       .input(createSchema)
-      .mutation(({ ctx, input }) => creerModeleEmail(repo, ctx.tenant, input)),
+      .mutation(({ ctx, input }) =>
+        withOutbox(db, repo, async (r, tx) => {
+          const result = await creerModeleEmail(r, ctx.tenant, input);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "modele_email.cree", entityType: "modele_email", entityId: result.id, payload: { nom: result.nom, sujet: result.sujet, typeModele: result.type, isDefault: result.isDefault } });
+          return result;
+        }),
+      ),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
       .mutation(({ ctx, input }) => {
         const { id, ...data } = input;
-        return modifierModeleEmail(repo, ctx.tenant, id, data);
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await modifierModeleEmail(r, ctx.tenant, id, data);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "modele_email.modifie", entityType: "modele_email", entityId: id, payload: { nom: result.nom, sujet: result.sujet, typeModele: result.type, isDefault: result.isDefault } });
+          return result;
+        });
       }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        await supprimerModeleEmail(repo, ctx.tenant, input.id);
-        return { success: true };
+        return withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          await supprimerModeleEmail(r, ctx.tenant, input.id);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "modele_email.supprime", entityType: "modele_email", entityId: input.id, payload: { snapshot: { nom: before?.nom, typeModele: before?.type } } });
+          return { success: true };
+        });
       }),
   });
 }

@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { CreateModeleEmailInput, ModeleEmail, TypeModeleEmail, UpdateModeleEmailInput } from "../domain/modele-email";
 
@@ -18,4 +19,5 @@ export interface IModeleEmailRepository {
   update(ctx: TenantContext, id: number, input: UpdateModeleEmailInput): Promise<ModeleEmail | null>;
   /** false si le modèle n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
+  withDb(db: DbClient): IModeleEmailRepository;
 }

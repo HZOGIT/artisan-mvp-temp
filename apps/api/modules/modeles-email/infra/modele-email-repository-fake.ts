@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IModeleEmailRepository } from "../application/modele-email-repository";
 import type { CreateModeleEmailInput, ModeleEmail, TypeModeleEmail, UpdateModeleEmailInput } from "../domain/modele-email";
@@ -70,5 +71,9 @@ export class FakeModeleEmailRepository implements IModeleEmailRepository {
     if (idx === -1) return false;
     this.store.splice(idx, 1);
     return true;
+  }
+
+  withDb(_db: DbClient): FakeModeleEmailRepository {
+    return this;
   }
 }
