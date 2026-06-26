@@ -47,9 +47,9 @@ describe("conges — invariants métier (synthèse)", () => {
     const c = await creerConge(repo, OWNER, conge());
     await approuverConge(repo, OWNER, c.id);
     await approuverConge(repo, OWNER, c.id); // idempotent
-    expect(repo.getJoursPris(1, TECH, "conge_paye", 2026)).toBe(5);
+    expect(repo.getJoursPris(1, TECH, "conge_paye", 2026)).toBe(3); /* 2026-07-01(mer)→05(dim) = 3 jours ouvrés */
     await annulerConge(repo, OWNER, c.id);
-    expect(repo.getJoursPris(1, TECH, "conge_paye", 2026)).toBe(0); // recrédité
+    expect(repo.getJoursPris(1, TECH, "conge_paye", 2026)).toBe(0); /* recrédité */
     // un type sans impact solde (maladie) n'écrit jamais
     const m = await creerConge(repo, OWNER, conge({ type: "maladie" }));
     await approuverConge(repo, OWNER, m.id);

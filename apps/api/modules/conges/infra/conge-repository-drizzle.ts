@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte, ne, notInArray, sql } from "drizzle-orm";
 import { conges, techniciens, soldesConges } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
@@ -210,6 +210,24 @@ export class CongeRepositoryDrizzle implements ICongeRepository {
         joursAcquis: Number(r.joursAcquis),
         joursPris: Number(r.joursPris),
       }));
+    });
+  }
+
+  hasOverlap(
+    ctx: TenantContext,
+    { technicienId, dateDebut, dateFin, excludeId }: { technicienId: number; dateDebut: string; dateFin: string; excludeId?: number },
+  ): Promise<boolean> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const conds = [
+        eq(conges.artisanId, ctx.artisanId),
+        eq(conges.technicienId, technicienId),
+        notInArray(conges.statut, ["annule", "refuse"]),
+        lte(conges.dateDebut, dateFin),
+        gte(conges.dateFin, dateDebut),
+      ];
+      if (excludeId) conds.push(ne(conges.id, excludeId));
+      const [row] = await tx.select({ id: conges.id }).from(conges).where(and(...conds)).limit(1);
+      return !!row;
     });
   }
 }

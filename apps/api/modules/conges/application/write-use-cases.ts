@@ -35,9 +35,26 @@ function assertDatesCoherentes(dateDebut?: string, dateFin?: string): void {
 
 export async function creerConge(repo: ICongeRepository, ctx: TenantContext, input: CreateCongeInput): Promise<Conge> {
   assertDatesCoherentes(input.dateDebut, input.dateFin);
-  /** Anti-IDOR-FK : le technicien (demandeur) doit appartenir au tenant. */
+  /* Anti-IDOR-FK : le technicien (demandeur) doit appartenir au tenant. */
   if (!(await repo.ownsTechnicien(ctx, input.technicienId))) {
     throw new NotFoundError("Technicien introuvable");
+  }
+  if (await repo.hasOverlap(ctx, { technicienId: input.technicienId, dateDebut: input.dateDebut, dateFin: input.dateFin })) {
+    throw new ConflictError("Le technicien a déjà une demande de congé sur cette période");
+  }
+  if (typeAffecteSolde(input.type)) {
+    const { jours } = calculerJoursConge({
+      dateDebut: input.dateDebut,
+      dateFin: input.dateFin,
+      demiJourneeDebut: input.demiJourneeDebut ?? false,
+      demiJourneeFin: input.demiJourneeFin ?? false,
+    });
+    const annee = new Date(input.dateDebut).getFullYear();
+    const soldes = await repo.getSolde(ctx, input.technicienId, annee);
+    const solde = soldes.find((s) => s.type === input.type);
+    if (solde && solde.soldeRestant < jours) {
+      throw new ConflictError(`Solde insuffisant : ${solde.soldeRestant} jour(s) disponible(s), ${jours} demandé(s)`);
+    }
   }
   return repo.create(ctx, input);
 }
@@ -52,6 +69,11 @@ export async function modifierConge(
   const existing = await repo.getById(ctx, id);
   if (!existing) throw new NotFoundError("Demande de congé introuvable");
   if (existing.statut !== "en_attente") throw new ConflictError("Impossible de modifier un congé " + existing.statut);
+  const effectiveDebut = input.dateDebut ?? existing.dateDebut;
+  const effectiveFin = input.dateFin ?? existing.dateFin;
+  if (await repo.hasOverlap(ctx, { technicienId: existing.technicienId, dateDebut: effectiveDebut, dateFin: effectiveFin, excludeId: id })) {
+    throw new ConflictError("Le technicien a déjà une demande de congé sur cette période");
+  }
   const updated = await repo.update(ctx, id, input);
   if (!updated) throw new NotFoundError("Demande de congé introuvable");
   return updated;
