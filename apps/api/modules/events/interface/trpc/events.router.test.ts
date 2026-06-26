@@ -21,7 +21,7 @@ describe.skipIf(!URL)("events.list L2/L3 — isolation tenant (RLS off, filtre a
   let artisanIdB: number;
 
   const cleanup = async () => {
-    await admin.query('delete from "eventLog" where "artisanId" in (select id from artisans where "userId" in ($1,$2))', [UID_A, UID_B]);
+    await admin.query('delete from "events" where "artisanId" in (select id from artisans where "userId" in ($1,$2))', [UID_A, UID_B]);
     await admin.query('delete from artisans where "userId" in ($1,$2)', [UID_A, UID_B]);
     await admin.query("delete from users where id in ($1,$2)", [UID_A, UID_B]);
   };
@@ -36,15 +36,15 @@ describe.skipIf(!URL)("events.list L2/L3 — isolation tenant (RLS off, filtre a
     artisanIdB = resB.rows[0].id;
 
     await admin.query(
-      'insert into "eventLog" ("artisanId", action, "entityType", "entityId", "occurredAt") values ($1, $2, $3, $4, now())',
+      'insert into "events" ("artisanId", action, "entityType", "entityId", "occurredAt") values ($1, $2, $3, $4, now())',
       [artisanIdA, "FACTURE_PAYEE", "Facture", 100],
     );
     await admin.query(
-      'insert into "eventLog" ("artisanId", action, "entityType", "entityId", "occurredAt") values ($1, $2, $3, $4, now())',
+      'insert into "events" ("artisanId", action, "entityType", "entityId", "occurredAt") values ($1, $2, $3, $4, now())',
       [artisanIdA, "DEVIS_ACCEPTE", "Devis", 1],
     );
     await admin.query(
-      'insert into "eventLog" ("artisanId", action, "entityType", "entityId", "occurredAt") values ($1, $2, $3, $4, now())',
+      'insert into "events" ("artisanId", action, "entityType", "entityId", "occurredAt") values ($1, $2, $3, $4, now())',
       [artisanIdB, "FACTURE_PAYEE", "Facture", 200],
     );
 
