@@ -111,6 +111,7 @@ export class DevisOptionRepositoryDrizzle implements IDevisOptionRepository {
           unite: l.unite,
           prixUnitaireHT: l.prixUnitaireHT ?? "0.00",
           tauxTVA: l.tauxTVA,
+          remise: l.remise ?? "0.00",
           montantHT: l.montantHT,
           montantTVA: l.montantTVA,
           montantTTC: l.montantTTC,

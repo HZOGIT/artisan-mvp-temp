@@ -100,4 +100,19 @@ describe("modeles-devis — write use-cases", () => {
     const m = await creerModeleDevis(repo, A, { nom: "Trame" });
     await expectCrossTenantDenied(() => getModeleDevisAvecLignes(repo, B, m.id));
   });
+
+  it("remise préservée : modèle ligne remise=10 → ajouterLigneModeleDevis → ligne a remise='10'", async () => {
+    const repo = new FakeModeleDevisRepository();
+    const m = await creerModeleDevis(repo, A, { nom: "Trame" });
+    const l = await ajouterLigneModeleDevis(repo, A, m.id, { designation: "Pose", prixUnitaireHT: "100.00", quantite: "2", remise: "10" });
+    expect(l.remise).toBe("10");
+    const detail = await getModeleDevisAvecLignes(repo, A, m.id);
+    expect(detail.lignes[0].remise).toBe("10");
+  });
+
+  it("validation remise > 100 → ValidationError", async () => {
+    const repo = new FakeModeleDevisRepository();
+    const m = await creerModeleDevis(repo, A, { nom: "Trame" });
+    await expect(ajouterLigneModeleDevis(repo, A, m.id, { designation: "X", remise: "101" })).rejects.toBeInstanceOf(ValidationError);
+  });
 });

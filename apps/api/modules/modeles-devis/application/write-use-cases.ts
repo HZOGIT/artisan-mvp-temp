@@ -26,6 +26,7 @@ function assertLigne(l: CreateModeleDevisLigneInput): void {
   assertMontantPositif(l.quantite, "La quantité");
   assertMontantPositif(l.prixUnitaireHT, "Le prix unitaire HT");
   assertPourcentage(l.tauxTVA, "Le taux de TVA");
+  assertPourcentage(l.remise, "La remise");
 }
 
 function assertLignes(lignes: readonly CreateModeleDevisLigneInput[] | undefined): void {

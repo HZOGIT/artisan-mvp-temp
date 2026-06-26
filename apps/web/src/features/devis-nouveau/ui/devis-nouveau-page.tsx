@@ -85,7 +85,7 @@ export default function DevisNouveauPage() {
             if (n >= 2.1) return "FR_2_1";
             return "FR_EXONERE";
           };
-          return [...ls, ...data.lignes.map((l) => ({ ...emptyLigne(), description: l.designation, quantite: parseFloat(String(l.quantite)), prixUnitaireHT: parseFloat(String(l.prixUnitaireHT)), tvaCategorieId: (l.tvaCategorieId as TvaCategorieId | null | undefined) ?? tauxToId(String(l.tauxTVA)), unite: l.unite || "unité" }))];
+          return [...ls, ...data.lignes.map((l) => ({ ...emptyLigne(), description: l.designation, quantite: parseFloat(String(l.quantite)), prixUnitaireHT: parseFloat(String(l.prixUnitaireHT)), tvaCategorieId: (l.tvaCategorieId as TvaCategorieId | null | undefined) ?? tauxToId(String(l.tauxTVA)), unite: l.unite || "unité", remise: parseFloat(String(l.remise ?? "0")) }))];
         });
         setSelectedModeleId(null); toast.success(t("toastModeleCharge"));
       }
