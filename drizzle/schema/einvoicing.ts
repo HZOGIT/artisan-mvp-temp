@@ -35,7 +35,7 @@ export type InsertFactureCycleVieEvent = typeof facturesCycleVieEvents.$inferIns
 export const paOutbox = pgTable("pa_outbox", {
   id: serial("id").primaryKey(),
   artisanId: integer("artisanId").notNull().references(() => artisans.id),
-  factureId: integer("factureId").notNull().references(() => factures.id),
+  factureId: integer("factureId").notNull().references(() => factures.id, { onDelete: "cascade" }),
   statut: varchar("statut", { length: 30 }).default("pending").notNull(),
   tentatives: integer("tentatives").default(0),
   derniereErreur: text("derniereErreur"),

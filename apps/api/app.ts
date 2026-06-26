@@ -157,12 +157,13 @@ import { registerBillingSchedulerRoute } from "./interface/http/billing-schedule
 import { handleBillingWebhookEvent } from "./modules/billing/interface/http/billing-webhook-handler";
 import fastifySchedule from "@fastify/schedule";
 import { billingCronPlugin } from "./shared/infra/billing-cron";
+import { paOutboxDrainerPlugin } from "./shared/infra/pa-outbox-drainer";
 import { geoPurgeCronPlugin } from "./shared/infra/geo-purge-cron";
 import { rgpdCronPlugin } from "./shared/infra/rgpd-cron";
 import { notificationsCronPlugin } from "./shared/infra/notifications-cron";
 import { genererRappelsFacturesEnRetard } from "./modules/notifications/application/derived-use-cases";
 import { genererAlertesStock } from "./modules/stocks/application/alertes-use-cases";
-import { artisans as artisansTable } from "../../drizzle/schema.pg";
+import { artisans as artisansTable, paOutbox } from "../../drizzle/schema.pg";
 import { alertesPrevisionsCronPlugin } from "./shared/infra/alertes-previsions-cron";
 import { ensureStripeWebhookEndpoint } from "./shared/infra/stripe-webhook-setup";
 import { WebhookPaymentWriterDrizzle } from "./modules/subscription/infra/webhook-payment-writer-drizzle";
@@ -664,6 +665,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       modeleEmailRepo,
     },
     push: pushAdapter,
+    outboxInTx: (artisanId, factureId, tx) =>
+      tx.insert(paOutbox).values({ artisanId, factureId, statut: "pending", tentatives: 0 }).then(() => {}),
   });
   /*
    * Domaine compta/écritures — lecture seule (balance/grand-livre/FEC). La génération est
@@ -1058,6 +1061,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   /** Cron billing maison — tick toutes les heures, lock pg_advisory_xact pour éviter les doublons multi-réplica. */
   app.register(billingCronPlugin, { schedulerDeps: billingSchedulerDeps, db: getDbHandle().db, dbUrl: getDbHandle().pool.options.connectionString ?? "", onCritical: (msg) => app.log.fatal({ event: "billing_tick_critical" }, msg) });
+
+  /** Drainer PA outbox — toutes les 30s, envoie les factures pending à la PA avec retries. */
+  app.register(paOutboxDrainerPlugin, { pa: einvoicing.pa, db: getDbHandle().db, dbUrl: getDbHandle().pool.options.connectionString ?? "" });
 
   /** Cron CNIL — purge des positions GPS expirées toutes les 6 h (rétention 8 h par position). */
   app.register(geoPurgeCronPlugin, { technicienRepo, db: getDbHandle().db });

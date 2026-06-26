@@ -6,6 +6,7 @@ import type { IDevisReader } from "../../application/devis-reader";
 import type { ComptaPort } from "../../application/compta-port";
 import type { FactureMailingDeps } from "../../application/envoyer-facture-email";
 import type { PushPort } from "../../../../shared/push/web-push-adapter";
+import type { DbClient } from "../../../../shared/db";
 import { envoyerFactureParEmail } from "../../application/envoyer-facture-email";
 import { listFactures, getFactureDetail, listLignesFacture, getAvoirsFacture, getAuditLogFacture } from "../../application/read-use-cases";
 import {
@@ -114,7 +115,7 @@ const avoirInputSchema = z.object({
  * use-cases (scoping tenant + numérotation serveur + anti-IDOR-FK + immutabilité post-émission),
  * laisse remonter les Domain errors (NotFound→404, Validation→400, Conflict→409).
  */
-export function createFacturesRouter(repo: IFactureRepository, devisReader: IDevisReader, compta: ComptaPort, mailing: FactureMailingDeps, push?: PushPort) {
+export function createFacturesRouter(repo: IFactureRepository, devisReader: IDevisReader, compta: ComptaPort, mailing: FactureMailingDeps, push?: PushPort, outboxInTx?: (artisanId: number, factureId: number, tx: DbClient) => Promise<void>) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listFactures(repo, ctx.tenant)),
 
@@ -199,7 +200,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
     envoyer: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await changerStatutFacture(repo, ctx.tenant, input.id, "envoyee", compta, mailing.artisanReader);
+        const result = await changerStatutFacture(repo, ctx.tenant, input.id, "envoyee", compta, mailing.artisanReader, outboxInTx);
         ctx.log.info({ event: "facture_envoyee", factureId: input.id }, "Facture envoyée au client");
         return result;
       }),
