@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IDepenseRepository, DepenseRefKind } from "../application/depense-repository";
 import type { Depense, CreateDepenseInput, UpdateDepenseInput, DoublonParams, DepenseDoublon, DepenseStats } from "../domain/depense";
@@ -141,6 +142,10 @@ export class FakeDepenseRepository implements IDepenseRepository {
    * ⚠️ Version simplifiée (suffisante pour les tests de use-case : défaut du mois + délégation).
    * L'agrégation fidèle est validée par le test DB du repo Drizzle.
    */
+  withDb(_db: DbClient): FakeDepenseRepository {
+    return this;
+  }
+
   async getStats(ctx: TenantContext, mois: string): Promise<DepenseStats> {
     const dansMois = this.store.filter((d) => d.artisanId === ctx.artisanId && d.dateDepense.slice(0, 7) === mois);
     const totalMois = dansMois.reduce((s, d) => s + Number(d.montantTtc), 0);

@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { Depense, CreateDepenseInput, UpdateDepenseInput, DoublonParams, DepenseDoublon, DepenseStats } from "../domain/depense";
 
@@ -51,4 +52,5 @@ export interface IDepenseRepository {
    * scopé tenant. No-op si la dépense n'appartient pas au tenant. Parité `markDepenseOcrTraite`.
    */
   setOcr(ctx: TenantContext, id: number, data: unknown): Promise<void>;
+  withDb(db: DbClient): IDepenseRepository;
 }

@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import type { DbClient } from "../../../../shared/db";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
+import { withOutbox } from "../../../../shared/events/with-outbox";
 import type { IDepenseRepository } from "../../application/depense-repository";
 import { listDepenses, getDepense, checkDoublons, getDepensesStats } from "../../application/read-use-cases";
 import { creerDepense, modifierDepense, supprimerDepense, creerIndemniteKm } from "../../application/write-use-cases";
@@ -130,6 +133,7 @@ export function createDepensesRouter(
   noteRepo: INoteDeFraisRepository,
   transactionRepo: ITransactionBancaireRepository,
   fecReader: FecReader,
+  db?: DbClient,
   ocr?: { vision: VisionPort; rateLimiter: RateLimiterPort },
 ) {
   return router({
@@ -142,27 +146,38 @@ export function createDepensesRouter(
     create: protectedProcedure
       .input(createSchema)
       .mutation(async ({ ctx, input }) => {
-        const result = await creerDepense(repo, ctx.tenant, input);
-        ctx.log.info(
-          { event: "depense_creee", depenseId: result.id, montantHt: Number(input.montantHt), categorie: input.categorie, chantierId: input.chantierId ?? null, recurrente: input.recurrente ?? false },
-          "Dépense enregistrée",
-        );
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await creerDepense(r, ctx.tenant, input);
+          ctx.log.info(
+            { event: "depense_creee", depenseId: result.id, montantHt: Number(input.montantHt), categorie: input.categorie, chantierId: input.chantierId ?? null, recurrente: input.recurrente ?? false },
+            "Dépense enregistrée",
+          );
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "depense.creee", entityType: "depense", entityId: result.id, payload: { depenseId: result.id, montant: result.montantTtc, categorieId: result.categorie } });
+          return result;
+        });
       }),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { id, ...data } = input;
-        return modifierDepense(repo, ctx.tenant, id, data);
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await modifierDepense(r, ctx.tenant, id, data);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "depense.modifiee", entityType: "depense", entityId: id, payload: { depenseId: id } });
+          return result;
+        });
       }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        await supprimerDepense(repo, ctx.tenant, input.id);
-        ctx.log.warn({ event: "depense_supprimee", depenseId: input.id }, "Dépense supprimée");
-        return { success: true };
+        return withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          await supprimerDepense(r, ctx.tenant, input.id);
+          ctx.log.warn({ event: "depense_supprimee", depenseId: input.id }, "Dépense supprimée");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "depense.supprimee", entityType: "depense", entityId: input.id, payload: { snapshot: { depenseId: input.id, montant: before?.montantTtc ?? null } } });
+          return { success: true };
+        });
       }),
 
     /*
@@ -270,16 +285,20 @@ export function createDepensesRouter(
           clientId: z.number().int().nullish(),
         }),
       )
-      .mutation(({ ctx, input }) =>
-        creerIndemniteKm(repo, ctx.tenant, {
-          dateDepense: input.dateDepense,
-          kilometres: input.kilometres,
-          tarifKm: input.tarifKm,
-          motif: input.motif,
-          chantierId: input.chantierId ?? null,
-          clientId: input.clientId ?? null,
-        }),
-      ),
+      .mutation(async ({ ctx, input }) => {
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await creerIndemniteKm(r, ctx.tenant, {
+            dateDepense: input.dateDepense,
+            kilometres: input.kilometres,
+            tarifKm: input.tarifKm,
+            motif: input.motif,
+            chantierId: input.chantierId ?? null,
+            clientId: input.clientId ?? null,
+          });
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "depense.indemnite_km_creee", entityType: "depense", entityId: result.id, payload: { depenseId: result.id, km: input.kilometres, taux: input.tarifKm } });
+          return result;
+        });
+      }),
 
     /** ── Règles de catégorisation auto (parité client : trpc.depenses.getRegles/...) ──── */
     getRegles: protectedProcedure.query(({ ctx }) => listRegles(regleRepo, ctx.tenant)),
