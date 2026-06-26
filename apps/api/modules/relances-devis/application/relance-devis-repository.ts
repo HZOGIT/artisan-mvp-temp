@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { CreateRelanceInput, RelanceDevis } from "../domain/relance-devis";
 
@@ -18,4 +19,5 @@ export interface IRelanceDevisRepository {
   delete(ctx: TenantContext, id: number): Promise<boolean>;
   /** Le devis appartient-il au tenant ? (anti-IDOR-FK) */
   ownsDevis(ctx: TenantContext, devisId: number): Promise<boolean>;
+  withDb(db: DbClient): IRelanceDevisRepository;
 }

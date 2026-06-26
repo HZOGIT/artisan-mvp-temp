@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IRelanceDevisRepository } from "../application/relance-devis-repository";
 import type { CreateRelanceInput, RelanceDevis } from "../domain/relance-devis";
@@ -60,4 +61,6 @@ export class FakeRelanceDevisRepository implements IRelanceDevisRepository {
   async ownsDevis(ctx: TenantContext, devisId: number): Promise<boolean> {
     return this.devisByArtisan.get(ctx.artisanId)?.has(devisId) ?? false;
   }
+
+  withDb(_db: DbClient): this { return this; }
 }

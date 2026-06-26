@@ -99,4 +99,8 @@ export class RelanceDevisRepositoryDrizzle implements IRelanceDevisRepository {
       return (row?.n ?? 0) > 0;
     });
   }
+
+  withDb(db: DbClient): RelanceDevisRepositoryDrizzle {
+    return new RelanceDevisRepositoryDrizzle(db);
+  }
 }

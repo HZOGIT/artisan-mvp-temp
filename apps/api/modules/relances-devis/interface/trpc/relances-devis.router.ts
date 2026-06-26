@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import type { DbClient } from "../../../../shared/db";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
+import { withOutbox } from "../../../../shared/events/with-outbox";
 import type { IRelanceDevisRepository } from "../../application/relance-devis-repository";
 import { listRelances, relancesParDevis, getRelance } from "../../application/read-use-cases";
 import { enregistrerRelance, supprimerRelance } from "../../application/write-use-cases";
@@ -20,7 +23,7 @@ const createSchema = z.object({
  * laisse remonter les Domain errors (NotFound→404, Validation→400). ⚠️ PAS de procédure `update` :
  * une relance est immuable. Repo injecté.
  */
-export function createRelancesDevisRouter(repo: IRelanceDevisRepository) {
+export function createRelancesDevisRouter(repo: IRelanceDevisRepository, db?: DbClient) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listRelances(repo, ctx.tenant)),
 
@@ -35,17 +38,24 @@ export function createRelancesDevisRouter(repo: IRelanceDevisRepository) {
     create: protectedProcedure
       .input(createSchema)
       .mutation(async ({ ctx, input }) => {
-        const result = await enregistrerRelance(repo, ctx.tenant, input);
-        ctx.log.info({ event: "relance_devis_envoyee", devisId: input.devisId, type: input.type, statut: input.statut ?? "envoyee" }, `Relance devis enregistrée (${input.type})`);
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await enregistrerRelance(r, ctx.tenant, input);
+          ctx.log.info({ event: "relance_devis_envoyee", devisId: input.devisId, type: input.type, statut: input.statut ?? "envoyee" }, `Relance devis enregistrée (${input.type})`);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "relance_devis.enregistree", entityType: "relance_devis", entityId: result.id, payload: { relanceId: result.id, devisId: result.devisId, clientId: null, dateRelance: result.createdAt, canal: result.type } });
+          return result;
+        });
       }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        await supprimerRelance(repo, ctx.tenant, input.id);
-        ctx.log.warn({ event: "relance_devis_supprimee", relanceId: input.id }, "Relance devis supprimée");
-        return { success: true };
+        return withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          await supprimerRelance(r, ctx.tenant, input.id);
+          ctx.log.warn({ event: "relance_devis_supprimee", relanceId: input.id }, "Relance devis supprimée");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "relance_devis.supprimee", entityType: "relance_devis", entityId: input.id, payload: { snapshot: { relanceId: input.id, devisId: before?.devisId, dateRelance: before?.createdAt } } });
+          return { success: true };
+        });
       }),
   });
 }

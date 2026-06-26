@@ -356,6 +356,8 @@ export interface AppDeps extends ContextDeps {
   /** Pool DB pour les transactions outbox events du module rdv-en-ligne (défaut : getDbHandle().db). */
   readonly rdvDb?: DbClient;
   readonly relanceDevisRepo?: IRelanceDevisRepository;
+  /** Pool DB pour les transactions outbox events du module relances-devis (défaut : getDbHandle().db). */
+  readonly relancesDevisDb?: DbClient;
   readonly categorieDepenseRepo?: ICategorieDepenseRepository;
   readonly contratRepo?: IContratRepository;
   /** Pool DB pour les transactions outbox du module contrats-maintenance (défaut : getDbHandle().db). */
@@ -753,6 +755,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   });
   const relancesDevis = createRelancesDevisModule({
     repository: relanceDevisRepo,
+    db: deps.relancesDevisDb ?? getDbHandle().db,
   });
   const categoriesDepenses = createCategoriesDepensesModule({
     repository: categorieDepenseRepo,

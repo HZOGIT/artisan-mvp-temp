@@ -1,3 +1,4 @@
+import type { DbClient } from "../../shared/db";
 import type { IRelanceDevisRepository } from "./application/relance-devis-repository";
 import { createRelancesDevisRouter } from "./interface/trpc/relances-devis.router";
 
@@ -7,6 +8,7 @@ import { createRelancesDevisRouter } from "./interface/trpc/relances-devis.route
  */
 export interface RelancesDevisModuleDeps {
   readonly repository: IRelanceDevisRepository;
+  readonly db?: DbClient;
 }
 
 export interface RelancesDevisModule {
@@ -15,5 +17,5 @@ export interface RelancesDevisModule {
 }
 
 export function createRelancesDevisModule(deps: RelancesDevisModuleDeps): RelancesDevisModule {
-  return { deps, router: createRelancesDevisRouter(deps.repository) };
+  return { deps, router: createRelancesDevisRouter(deps.repository, deps.db) };
 }
