@@ -54,9 +54,9 @@ export class OvhS3Adapter implements StoragePort {
     const purpose = opts?.purpose ?? "unknown";
     const contentType = opts?.contentType ?? "application/octet-stream";
 
-    const doInsert = async (db: DbClient): Promise<StoredFile> => {
+    const doInsert = async (tx: DbClient): Promise<StoredFile> => {
       if (opts?.artisanId !== undefined) {
-        const [existing] = await db
+        const [existing] = await tx
           .select()
           .from(files)
           .where(and(eq(files.sha256, sha256), eq(files.artisanId, opts.artisanId), eq(files.purpose, purpose)))
@@ -68,7 +68,7 @@ export class OvhS3Adapter implements StoragePort {
         new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: body, ContentType: contentType }),
       );
 
-      const [row] = await db
+      const [row] = await tx
         .insert(files)
         .values({
           artisanId: opts?.artisanId ?? null,
@@ -83,7 +83,7 @@ export class OvhS3Adapter implements StoragePort {
         .returning();
 
       if (ctx) {
-        await outboxEvent(db, ctx, {
+        await outboxEvent(tx, ctx, {
           action: "fichier.importe",
           entityType: "fichier",
           entityId: row.id,
