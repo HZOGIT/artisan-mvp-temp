@@ -24,44 +24,45 @@ async function signToken(userId: number, email: string): Promise<string> {
     .sign(new TextEncoder().encode(SECRET));
 }
 
+/*
+ * Un seul buildApp partagé entre tous les describe : évite la collision prom-client
+ * ("process_cpu_user_seconds_total already registered") quand deux instances Fastify
+ * co-existent dans le même processus vitest.
+ */
+const admin = new Pool({ connectionString: URL });
+const appDb = createDbClient(APP_URL!);
+const appPool = new Pool({ connectionString: APP_URL });
+let server: ReturnType<typeof buildApp>;
+const eventIds: number[] = [];
+
+const purgeUser = async (uid: number) => {
+  await admin.query('delete from artisans where "userId" = $1', [uid]);
+  await admin.query("delete from users where id = $1", [uid]);
+};
+
+beforeAll(async () => {
+  if (!URL) return;
+  await purgeUser(UID_USER);
+  await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [UID_USER, `u${UID_USER}@t.fr`]);
+  await purgeUser(UID_ADMIN_STAFF);
+  await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','admin')", [UID_ADMIN_STAFF, `u${UID_ADMIN_STAFF}@t.fr`]);
+  await purgeUser(UID_ADMIN_TENANT);
+  await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','admin')", [UID_ADMIN_TENANT, `u${UID_ADMIN_TENANT}@t.fr`]);
+  await admin.query('insert into artisans ("userId") values ($1)', [UID_ADMIN_TENANT]);
+  server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(appDb.db), roleReader: new DrizzleUserRoleReader(appDb.db) });
+});
+
+afterAll(async () => {
+  if (!URL) return;
+  if (eventIds.length) await admin.query("delete from events where id = any($1)", [eventIds]);
+  await server?.close();
+  for (const uid of [UID_USER, UID_ADMIN_STAFF, UID_ADMIN_TENANT]) await purgeUser(uid);
+  await appDb.close();
+  await appPool.end();
+  await admin.end();
+});
+
 describe.skipIf(!URL)("platformAdmin.artisans.list L3", () => {
-  const admin = new Pool({ connectionString: URL });
-  const appDb = createDbClient(APP_URL!);
-  let server: ReturnType<typeof buildApp>;
-
-  const purge = async (uid: number) => {
-    await admin.query('delete from artisans where "userId" = $1', [uid]);
-    await admin.query("delete from users where id = $1", [uid]);
-  };
-
-  beforeAll(async () => {
-    /* utilisateur sans rôle admin */
-    await purge(UID_USER);
-    await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [UID_USER, `u${UID_USER}@t.fr`]);
-
-    /* staff admin Operioz — rôle admin SANS artisan */
-    await purge(UID_ADMIN_STAFF);
-    await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','admin')", [UID_ADMIN_STAFF, `u${UID_ADMIN_STAFF}@t.fr`]);
-
-    /* admin d'un tenant artisan — rôle admin AVEC artisan */
-    await purge(UID_ADMIN_TENANT);
-    await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','admin')", [UID_ADMIN_TENANT, `u${UID_ADMIN_TENANT}@t.fr`]);
-    await admin.query('insert into artisans ("userId") values ($1)', [UID_ADMIN_TENANT]);
-
-    server = buildApp({
-      jwtSecret: SECRET,
-      resolver: new DrizzleTenantResolver(appDb.db),
-      roleReader: new DrizzleUserRoleReader(appDb.db),
-    });
-  });
-
-  afterAll(async () => {
-    await server.close();
-    for (const uid of [UID_USER, UID_ADMIN_STAFF, UID_ADMIN_TENANT]) await purge(uid);
-    await appDb.close();
-    await admin.end();
-  });
-
   it("sans cookie → 401", async () => {
     const res = await injectTrpc(server, "GET", "platformAdmin.artisans.list", {});
     expect(res.statusCode).toBe(401);
@@ -86,7 +87,6 @@ describe.skipIf(!URL)("platformAdmin.artisans.list L3", () => {
     const data = (res.json() as { result: { data: { items: { id: number }[]; total: number } } }).result.data;
     expect(Array.isArray(data.items)).toBe(true);
     expect(typeof data.total).toBe("number");
-    /* Le staff voit l'artisan de UID_ADMIN_TENANT (un tenant distinct) — pas de filtre RLS par artisanId. */
     const artisanRow = await admin.query<{ id: number }>('select id from artisans where "userId" = $1', [UID_ADMIN_TENANT]);
     const artisanId = artisanRow.rows[0]?.id;
     expect(artisanId).toBeDefined();
@@ -96,39 +96,20 @@ describe.skipIf(!URL)("platformAdmin.artisans.list L3", () => {
 });
 
 describe.skipIf(!URL)("platformAdmin.events.list L2 — RLS events ouverte", () => {
-  const admin2 = new Pool({ connectionString: URL });
-  const appPool = new Pool({ connectionString: APP_URL });
-  const appDb2 = createDbClient(APP_URL!);
-  let server2: ReturnType<typeof buildApp>;
-  const insertedIds: number[] = [];
-
-  beforeAll(async () => {
-    await admin2.query("insert into users (id, email, password, role) values ($1,$2,'x','admin') on conflict (id) do nothing", [UID_ADMIN_STAFF, `u${UID_ADMIN_STAFF}@t.fr`]);
-    server2 = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(appDb2.db), roleReader: new DrizzleUserRoleReader(appDb2.db) });
-  });
-
-  afterAll(async () => {
-    if (insertedIds.length) await admin2.query("delete from events where id = any($1)", [insertedIds]);
-    await server2.close();
-    await appDb2.close();
-    await appPool.end();
-    await admin2.end();
-  });
-
-  it("app_tenant peut insérer un event avec artisanId null (RLS events ouverte, pas de WITH CHECK rejet)", async () => {
-    /* ponytail: pool directe app_tenant — simule ce que LoggingEventBus fait sans set_config('app.tenant') */
+  it("app_tenant peut insérer un event avec artisanId null (pas de WITH CHECK rejet)", async () => {
+    /* ponytail: pool directe app_tenant — simule LoggingEventBus sans set_config('app.tenant') */
     const r = await appPool.query<{ id: number }>('insert into events ("entityType","entityId",action) values ($1,$2,$3) returning id', ["system", 0, "TEST_NULL_ARTISAN"]);
     expect(r.rows[0]!.id).toBeGreaterThan(0);
-    insertedIds.push(r.rows[0]!.id);
+    eventIds.push(r.rows[0]!.id);
   });
 
-  it("staff admin lit les events cross-tenant sans filtre artisanId", async () => {
-    const r1 = await admin2.query<{ id: number }>('insert into events ("entityType","entityId",action,"artisanId") values ($1,$2,$3,$4) returning id', ["system", 0, "CROSS_TENANT_TEST", null]);
-    const r2 = await admin2.query<{ id: number }>('insert into events ("entityType","entityId",action,"artisanId") values ($1,$2,$3,$4) returning id', ["facture", 1, "CROSS_TENANT_TEST", 9999]);
-    insertedIds.push(r1.rows[0]!.id, r2.rows[0]!.id);
+  it("staff admin lit les events cross-tenant (artisanId null + artisan distinct)", async () => {
+    const r1 = await admin.query<{ id: number }>('insert into events ("entityType","entityId",action,"artisanId") values ($1,$2,$3,$4) returning id', ["system", 0, "CROSS_TENANT_TEST", null]);
+    const r2 = await admin.query<{ id: number }>('insert into events ("entityType","entityId",action,"artisanId") values ($1,$2,$3,$4) returning id', ["facture", 1, "CROSS_TENANT_TEST", 9999]);
+    eventIds.push(r1.rows[0]!.id, r2.rows[0]!.id);
 
     const tok = await signToken(UID_ADMIN_STAFF, `u${UID_ADMIN_STAFF}@t.fr`);
-    const res = await injectTrpc(server2, "GET", "platformAdmin.events.list", { type: "CROSS_TENANT_TEST" }, tok);
+    const res = await injectTrpc(server, "GET", "platformAdmin.events.list", { type: "CROSS_TENANT_TEST" }, tok);
     expect(res.statusCode).toBe(200);
     const data = (res.json() as { result: { data: { items: { id: number }[]; total: number } } }).result.data;
     expect(data.items.length).toBeGreaterThanOrEqual(2);
