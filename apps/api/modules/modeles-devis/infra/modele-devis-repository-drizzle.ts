@@ -167,6 +167,10 @@ export class ModeleDevisRepositoryDrizzle implements IModeleDevisRepository {
     });
   }
 
+  withDb(db: DbClient): ModeleDevisRepositoryDrizzle {
+    return new ModeleDevisRepositoryDrizzle(db);
+  }
+
   private async owns(tx: DbClient, ctx: TenantContext, id: number): Promise<boolean> {
     const [row] = await tx
       .select({ id: modelesDevis.id })

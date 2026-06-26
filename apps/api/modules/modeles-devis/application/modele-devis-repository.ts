@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type {
   CreateModeleDevisInput,
@@ -28,4 +29,5 @@ export interface IModeleDevisRepository {
    * l'ensemble). null si le modèle n'appartient pas au tenant (anti-IDOR via le parent).
    */
   addLigne(ctx: TenantContext, modeleId: number, input: CreateModeleDevisLigneInput): Promise<ModeleDevisLigne | null>;
+  withDb(db: DbClient): IModeleDevisRepository;
 }

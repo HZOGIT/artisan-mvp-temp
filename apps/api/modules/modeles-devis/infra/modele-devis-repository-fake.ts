@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IModeleDevisRepository } from "../application/modele-devis-repository";
 import type { CreateModeleDevisInput, CreateModeleDevisLigneInput, ModeleDevis, ModeleDevisLigne, UpdateModeleDevisInput } from "../domain/modele-devis";
@@ -110,5 +111,10 @@ export class FakeModeleDevisRepository implements IModeleDevisRepository {
     const ligne = this.toLigne(modeleId, input, existantes.length + 1);
     this.lignes.set(modeleId, [...existantes, ligne]);
     return ligne;
+  }
+
+  /* ponytail: withDb no-op on fake — outbox wraps a real tx, fake ignores it */
+  withDb(_db: DbClient): FakeModeleDevisRepository {
+    return this;
   }
 }

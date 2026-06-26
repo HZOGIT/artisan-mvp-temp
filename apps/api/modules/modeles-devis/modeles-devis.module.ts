@@ -1,3 +1,4 @@
+import type { DbClient } from "../../shared/db";
 import type { IModeleDevisRepository } from "./application/modele-devis-repository";
 import { createModelesDevisRouter } from "./interface/trpc/modeles-devis.router";
 
@@ -7,6 +8,7 @@ import { createModelesDevisRouter } from "./interface/trpc/modeles-devis.router"
  */
 export interface ModelesDevisModuleDeps {
   readonly repository: IModeleDevisRepository;
+  readonly db?: DbClient;
 }
 
 export interface ModelesDevisModule {
@@ -15,5 +17,5 @@ export interface ModelesDevisModule {
 }
 
 export function createModelesDevisModule(deps: ModelesDevisModuleDeps): ModelesDevisModule {
-  return { deps, router: createModelesDevisRouter(deps.repository) };
+  return { deps, router: createModelesDevisRouter(deps.repository, deps.db) };
 }

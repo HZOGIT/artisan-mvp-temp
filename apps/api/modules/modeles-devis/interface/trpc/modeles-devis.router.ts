@@ -1,8 +1,11 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import type { DbClient } from "../../../../shared/db";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
+import { withOutbox } from "../../../../shared/events/with-outbox";
 import type { IModeleDevisRepository } from "../../application/modele-devis-repository";
 import { listModelesDevis, getModeleDevis } from "../../application/read-use-cases";
-import { creerModeleDevis, modifierModeleDevis, supprimerModeleDevis } from "../../application/write-use-cases";
+import { creerModeleDevis, modifierModeleDevis, supprimerModeleDevis, ajouterLigneModeleDevis } from "../../application/write-use-cases";
 
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
 
@@ -45,7 +48,7 @@ const updateSchema = z.object({
  * errors (NotFound→404, Validation→400). L'unicité du défaut par artisan est portée par les write
  * use-cases. Repo injecté.
  */
-export function createModelesDevisRouter(repo: IModeleDevisRepository) {
+export function createModelesDevisRouter(repo: IModeleDevisRepository, db?: DbClient) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listModelesDevis(repo, ctx.tenant)),
 
@@ -55,20 +58,45 @@ export function createModelesDevisRouter(repo: IModeleDevisRepository) {
 
     create: protectedProcedure
       .input(createSchema)
-      .mutation(({ ctx, input }) => creerModeleDevis(repo, ctx.tenant, input)),
+      .mutation(({ ctx, input }) =>
+        withOutbox(db, repo, async (r, tx) => {
+          const result = await creerModeleDevis(r, ctx.tenant, input);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "modele_devis.cree", entityType: "modele_devis", entityId: result.id, payload: { nom: result.nom, isDefault: result.isDefault } });
+          return result;
+        }),
+      ),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
       .mutation(({ ctx, input }) => {
         const { id, ...data } = input;
-        return modifierModeleDevis(repo, ctx.tenant, id, data);
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await modifierModeleDevis(r, ctx.tenant, id, data);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "modele_devis.modifie", entityType: "modele_devis", entityId: id, payload: { nom: result.nom, isDefault: result.isDefault } });
+          return result;
+        });
       }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number().int() }))
-      .mutation(async ({ ctx, input }) => {
-        await supprimerModeleDevis(repo, ctx.tenant, input.id);
-        return { success: true };
+      .mutation(async ({ ctx, input }) =>
+        withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          await supprimerModeleDevis(r, ctx.tenant, input.id);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "modele_devis.supprime", entityType: "modele_devis", entityId: input.id, payload: { snapshot: { nom: before?.nom, isDefault: before?.isDefault } } });
+          return { success: true };
+        }),
+      ),
+
+    ajouterLigne: protectedProcedure
+      .input(z.object({ modeleId: z.number().int() }).and(ligneSchema))
+      .mutation(({ ctx, input }) => {
+        const { modeleId, ...ligne } = input;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await ajouterLigneModeleDevis(r, ctx.tenant, modeleId, ligne);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "modele_devis.ligne_ajoutee", entityType: "modele_devis", entityId: modeleId, payload: { ligneId: result.id, designation: result.designation } });
+          return result;
+        });
       }),
   });
 }
