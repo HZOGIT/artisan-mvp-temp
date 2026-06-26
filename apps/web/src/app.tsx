@@ -6,7 +6,7 @@ import ErrorBoundary from "./bootstrap/error-boundary";
 import { ThemeProvider } from "./bootstrap/theme-context";
 
 /*
- * Routeur UNIFIÉ (OPE-403/F1) : un seul RouterProvider TanStack porte TOUT l'espace d'URL — pages publiques
+ * Routeur UNIFIÉ : un seul RouterProvider TanStack porte TOUT l'espace d'URL — pages publiques
  * (hors shell), routes authentifiées (sous le shell modern via le layout `app-shell`), onboarding plein écran
  * et la redirection racine `/`→`/home`. Plus de dispatch manuel ni de double routeur (public/auth) dans App.
  */

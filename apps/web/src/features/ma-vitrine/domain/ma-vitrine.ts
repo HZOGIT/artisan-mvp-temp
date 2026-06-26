@@ -5,7 +5,7 @@ import type { RouterOutputs } from "@/shared/trpc";
  * règles pures testables (services, URL publique, statut d'avis, date). 0 dépendance React/tRPC.
  */
 
-/** Les champs vitrine vivent dans le module `vitrine` (OPE-504), pas `parametres`. */
+/** Les champs vitrine vivent dans le module `vitrine`, pas `parametres`. */
 export type VitrineSettings = RouterOutputs["vitrine"]["getSettings"];
 export type ArtisanProfile = RouterOutputs["artisan"]["getProfile"];
 export type Avis = RouterOutputs["avis"]["getAll"][number];

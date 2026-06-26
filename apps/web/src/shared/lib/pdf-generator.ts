@@ -191,7 +191,7 @@ function renderArtisanBlock(doc: jsPDF, artisan: Artisan, yStart: number): numbe
     doc.text(`SIRET: ${artisan.siret}`, 20, yPos);
     yPos += 5;
   }
-  /** OPE-151 — mentions légales émetteur (société : forme/capital/RCS ; RM si renseigné). */
+  /** mentions légales émetteur (société : forme/capital/RCS ; RM si renseigné). */
   const SOCIETES = ["EURL", "SARL", "SAS", "SASU", "SA"];
   if (artisan.formeJuridique && SOCIETES.includes(artisan.formeJuridique)) {
     const siren = artisan.siret ? String(artisan.siret).replace(/\D/g, "").slice(0, 9) : "";
@@ -225,7 +225,7 @@ interface Artisan {
   telephone?: string | null;
   email?: string | null;
   logo?: string | null;
-  /** OPE-151 — mentions légales émetteur (société : forme/capital/RCS ; RM) */
+  /** mentions légales émetteur (société : forme/capital/RCS ; RM) */
   formeJuridique?: string | null;
   capitalSocial?: string | null;
   villeRCS?: string | null;
@@ -239,13 +239,13 @@ interface Client {
   adresse?: string | null;
   codePostal?: string | null;
   ville?: string | null;
-  /** OPE-93 — adresse de facturation distincte (fallback adresse principale) */
+  /** adresse de facturation distincte (fallback adresse principale) */
   adresseFacturation?: string | null;
   codePostalFacturation?: string | null;
   villeFacturation?: string | null;
   telephone?: string | null;
   email?: string | null;
-  /** OPE-92 — identité B2B (rappelée sur le document si client professionnel) */
+  /** identité B2B (rappelée sur le document si client professionnel) */
   type?: string | null;
   raisonSociale?: string | null;
   siret?: string | null;
@@ -261,7 +261,7 @@ interface LigneDocument {
   tauxTva?: number | null;
   tvaCategorieId?: string | null;
   /*
-   * OPE-168 — `section` (en-tête de lot) / `note` (texte libre) rendues en pleine
+   * `section` (en-tête de lot) / `note` (texte libre) rendues en pleine
    * largeur, sans colonnes de prix, exclues des totaux. Absent/`produit` = ligne normale.
    */
   type?: string | null;
@@ -361,13 +361,13 @@ function addClientInfo(doc: jsPDF, client: Client, yStart: number): number {
   doc.setFontSize(9);
   doc.setTextColor(60, 60, 60);
 
-  /** OPE-92 — client pro : raison sociale comme intitulé + mentions SIRET / TVA. */
+  /** client pro : raison sociale comme intitulé + mentions SIRET / TVA. */
   const isPro = client.type === "professionnel";
   const clientName = (isPro && client.raisonSociale) || client.entreprise || `${client.prenom || ""} ${client.nom}`.trim();
   doc.text(clientName, pageWidth - 85, yPos);
   yPos += 5;
 
-  /** OPE-93 — adresse de facturation si renseignée (fallback par champ vers principale). */
+  /** adresse de facturation si renseignée (fallback par champ vers principale). */
   const adrFact = client.adresseFacturation || client.adresse;
   const cpFact = client.codePostalFacturation || client.codePostal;
   const villeFact = client.villeFacturation || client.ville;
@@ -431,7 +431,7 @@ function addDocumentInfo(
   doc.setFont("Roboto", "normal");
   doc.text(getStatutLabel(data.statut, type), 65, yPos);
 
-  /** OPE-158 — référence/N° de commande du client (B2B), rappelée si renseignée. */
+  /** référence/N° de commande du client (B2B), rappelée si renseignée. */
   if (data.referenceClient) {
     yPos += 6;
     doc.setFont("Roboto", "bold");
@@ -455,7 +455,7 @@ function addDocumentInfo(
 
 function addLignesTable(doc: jsPDF, lignes: LigneDocument[], yStart: number): number {
   /*
-   * OPE-168 — une ligne `section`/`note` occupe toute la largeur (titre de lot en
+   * une ligne `section`/`note` occupe toute la largeur (titre de lot en
    * gras / texte libre en italique) sans colonnes chiffrées ; les autres restent des
    * lignes produit normales. autoTable accepte des cellules { content, colSpan, styles }.
    */
@@ -691,8 +691,8 @@ export function generateFacturePDF(artisan: Artisan, client: Client, facture: Fa
   yPos = addLignesTable(doc, facture.lignes, yPos);
   addTotals(doc, facture.totalHT, facture.totalTVA, facture.totalTTC, yPos, facture.montantPaye);
   /*
-   * OPE-164/95 — sur une facture (pas un avoir) : conditions réelles + mentions légales.
-   * OPE-95 ajoute les mentions de RETARD DE PAIEMENT (pénalités + indemnité forfaitaire
+   * Conditions réelles + mentions légales sur une facture (pas un avoir).
+   * Ajoute les mentions de RETARD DE PAIEMENT (pénalités + indemnité forfaitaire
    * de 40 €, Art. L441-10 / D441-5 C. com.) — obligatoires et sanctionnées si absentes.
    * Parité avec le générateur PDF serveur (portail) qui les affiche déjà : le PDF client
    * (téléchargé/envoyé par l'artisan) les omettait → divergence corrigée.
@@ -712,7 +712,7 @@ export function generateFacturePDF(artisan: Artisan, client: Client, facture: Fa
   addFooter(doc, factureConditions, factureMentions);
 
   /*
-   * OPE-127 — CGV réutilisables sur une page dédiée (comme le devis). Pas sur un avoir
+   * CGV réutilisables sur une page dédiée (comme le devis). Pas sur un avoir
    * (document d'annulation). N'apparaît que si l'artisan a renseigné ses CGV.
    */
   if (!isAvoir && options?.cgv) {

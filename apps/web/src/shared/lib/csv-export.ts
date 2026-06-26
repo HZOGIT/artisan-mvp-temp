@@ -1,10 +1,10 @@
 /*
- * Export CSV générique — portabilité des données (RGPD art. 20, OPE-175).
+ * Export CSV générique — portabilité des données (RGPD art. 20,).
  * 
  * Échappement RFC-4180 : chaque cellule est entre guillemets et les guillemets
  * internes sont doublés → gère sans risque les virgules, retours à la ligne et
  * guillemets présents dans les données (objets, adresses, notes…).
- * + Neutralisation de l'injection de formule (cf. OPE-180) : une cellule
+ * + Neutralisation de l'injection de formule (cf.) : une cellule
  *   commençant par = + - @ TAB CR est exécutée par Excel/LibreOffice à
  *   l'ouverture (DDE / =WEBSERVICE). On la préfixe d'une apostrophe pour la
  *   forcer en texte. Les nombres/montants et les numéros de téléphone (chiffres,

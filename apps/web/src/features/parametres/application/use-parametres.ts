@@ -28,7 +28,7 @@ export function useParametres() {
   const parametres: Parametres | undefined = parametresQ.data;
   const artisan: ArtisanProfile | undefined = artisanQ.data;
   const icalFeed: IcalFeed | undefined = icalQ.data;
-  /** OPE-505 résolu : `getDemandesContact` renvoie un DTO typé → type dérivé, plus d'assertion. */
+  /** résolu : `getDemandesContact` renvoie un DTO typé → type dérivé, plus d'assertion. */
   const demandes: DemandeContact[] = demandesQ.data ?? [];
   const vitrineSettings: VitrineSettings | undefined = vitrineQ.data;
 

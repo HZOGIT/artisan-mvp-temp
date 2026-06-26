@@ -43,7 +43,7 @@ export default function ParametresPage() {
     if (artisan) setLogoPreview(artisan.logo || null);
   }, [artisan]);
 
-  /** Réglages vitrine (OPE-504) : fusionnés dans le formulaire dès chargement. */
+  /** Réglages vitrine : fusionnés dans le formulaire dès chargement. */
   useEffect(() => {
     if (vitrineSettings) setFormData((prev) => applyVitrineToForm(prev, vitrineSettings));
   }, [vitrineSettings]);

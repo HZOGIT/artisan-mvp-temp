@@ -4,7 +4,7 @@ import type { RouterOutputs } from "@/shared/trpc";
 
 /*
  * Couche DOMAIN de la feature `notes-frais` (clean-archi) : types dérivés du routeur (le backend
- * expose enfin `depenses[]`/`nbDepenses` — OPE-490, donc 0 `any`) + helpers PURS (formatage, timeline
+ * expose enfin `depenses[]`/`nbDepenses` —, donc 0 `any`) + helpers PURS (formatage, timeline
  * workflow, filtrage des dépenses brouillon ajoutables). Aucune dépendance React/tRPC.
  */
 
