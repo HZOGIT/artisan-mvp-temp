@@ -142,7 +142,7 @@ services:
     image: prometheuscommunity/postgres-exporter:v0.15.0
     restart: unless-stopped
     environment:
-      DATA_SOURCE_NAME: ${DATABASE_URL}
+      DATA_SOURCE_NAME: postgres://artisan_user:${POSTGRES_PASSWORD:-artisan_password}@postgres:5432/artisan_mvp?sslmode=disable
     depends_on:
       - postgres
 
