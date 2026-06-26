@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { httpBatchLink } from "@trpc/client";
 import superjson from "superjson";
@@ -8,6 +8,13 @@ import { trpc } from "./shared/trpc";
 import { adminRouter } from "./shared/router";
 
 const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (error: unknown) => {
+      if ((error as { data?: { code?: string } })?.data?.code === 'UNAUTHORIZED') {
+        window.location.href = '/login'
+      }
+    },
+  }),
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
 });
 
