@@ -75,13 +75,10 @@ export function buildAdresse(
   return `${client.adresse}, ${client.codePostal || ""} ${client.ville || ""}`.trim().replace(/,\s*$/, "");
 }
 
-/*
- * Durée réelle sur site (captée par l'app mobile arrivée→départ). FINDING : non exposée par le DTO
- * `interventions.list` du new-stack (le legacy lisait `dureeReelleMinutes`, toujours `undefined` → "-").
- * On centralise l'accès ici : le jour où le DTO l'expose, on change CETTE ligne (parité préservée = "-").
- */
-export function dureeReelleMinutes(_i: Intervention): number | null {
-  return null;
+export function dureeReelleMinutes(i: Intervention): number | null {
+  if (!i.heureArrivee || !i.heureDepart) return null;
+  const diff = Math.round((new Date(i.heureDepart).getTime() - new Date(i.heureArrivee).getTime()) / 60000);
+  return diff >= 0 ? diff : null;
 }
 
 /** Descripteur PUR de durée (l'UI choisit la clé i18n). null = pas de durée. */
