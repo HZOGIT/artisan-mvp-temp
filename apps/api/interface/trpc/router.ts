@@ -60,6 +60,7 @@ import type { ClientPortalModule } from "../../modules/client-portal/client-port
 import type { IntegrationsComptablesModule } from "../../modules/integrations-comptables/integrations-comptables.module";
 import type { DevisIAModule } from "../../modules/devis-ia/devis-ia.module";
 import type { BillingModule } from "../../modules/billing/billing.module";
+import type { EinvoicingModule } from "../../modules/einvoicing/einvoicing.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
@@ -123,6 +124,7 @@ export interface AppRouterDeps {
   readonly devisIA: DevisIAModule;
   readonly billing: BillingModule;
   readonly platformAdmin: PlatformAdminModule;
+  readonly einvoicing: EinvoicingModule;
 }
 
 /*
@@ -198,6 +200,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     devisIA: deps.devisIA.router,
     billing: deps.billing.router,
     platformAdmin: deps.platformAdmin.router,
+    einvoicing: deps.einvoicing.router,
   });
 }
 
