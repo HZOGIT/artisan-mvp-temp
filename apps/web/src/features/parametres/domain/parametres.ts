@@ -4,8 +4,8 @@ import type { RouterInputs, RouterOutputs } from "@/shared/trpc";
  * Couche DOMAIN de la feature `parametres` (clean-archi) : types dérivés du routeur + mappers PURS
  * serveur↔formulaire + helpers (URL iCal, classe de badge lead). Aucune dépendance React/tRPC.
  * ⚠️ La sous-section « réglages vitrine » (vitrineActive/Description/Zone/Services/Experience) est
- * VOLONTAIREMENT ABSENTE : le new-stack n'a aucun endpoint write/read pour ces champs (finding OPE-504)
- * → on ne migre pas une UI sans backend. À réintégrer quand OPE-504 livre `vitrine.updateSettings`.
+ * VOLONTAIREMENT ABSENTE : le new-stack n'a aucun endpoint write/read pour ces champs (finding)
+ * → on ne migre pas une UI sans backend. À réintégrer quand livre `vitrine.updateSettings`.
  */
 
 export type Parametres = RouterOutputs["parametres"]["get"];
@@ -14,12 +14,12 @@ export type IcalFeed = RouterOutputs["calendrier"]["getIcalFeed"];
 export type UpdateParametresInput = RouterInputs["parametres"]["update"];
 export type DemandeStatut = RouterInputs["vitrine"]["updateDemandeContactStatut"]["statut"];
 export type DelaiPaiementType = NonNullable<UpdateParametresInput["delaiPaiementType"]>;
-/** Réglages vitrine (OPE-504 — endpoints backend livrés). La section « Ma page vitrine » est réintégrée. */
+/** Réglages vitrine (endpoints backend livrés). La section « Ma page vitrine » est réintégrée. */
 export type VitrineSettings = RouterOutputs["vitrine"]["getSettings"];
 export type UpdateVitrineSettingsInput = RouterInputs["vitrine"]["updateSettings"];
 
 /*
- * OPE-505 RÉSOLU : `vitrine.getDemandesContact` est désormais typé `DemandeContact[]` côté backend →
+ * RÉSOLU : `vitrine.getDemandesContact` est désormais typé `DemandeContact[]` côté backend →
  * on dérive directement le type du routeur (plus d'interface locale ni d'assertion).
  */
 export type DemandeContact = RouterOutputs["vitrine"]["getDemandesContact"][number];

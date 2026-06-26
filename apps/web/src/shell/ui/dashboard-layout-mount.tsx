@@ -30,7 +30,7 @@ export function DashboardLayoutMount() {
   const { user, permissions, modulesActifs, logout } = useShell();
   const { data: sub } = trpc.subscription.getCurrent.useQuery(undefined, { staleTime: 60 * 1000 });
   /*
-   * Gate onboarding (relocalisé d'App.tsx au shell, OPE-403/F1) : un artisan dont l'onboarding n'est pas
+   * Gate onboarding (relocalisé d'App.tsx au shell,/F1) : un artisan dont l'onboarding n'est pas
    * terminé est redirigé vers /onboarding (sauf routes bypass). /onboarding est hors shell (route dédiée).
    */
   const { data: onboardingStatus, isLoading: onbLoading } = trpc.modules.getOnboardingStatus.useQuery();

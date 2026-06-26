@@ -19,7 +19,7 @@ interface Intervention {
     nom: string;
     prenom?: string | null;
   } | null;
-  /** OPE-111 — équipe (intervenants additionnels), optionnel. */
+  /** équipe (intervenants additionnels), optionnel. */
   equipe?: { technicienId: number; nom?: string | null; prenom?: string | null }[];
 }
 
@@ -242,7 +242,7 @@ export default function Calendar({ interventions, onDateClick, onInterventionCli
                             <> - {format(new Date(intervention.dateFin), "HH:mm", { locale: fr })}</>
                           )}
                         </p>
-                        {/* OPE-111 — équipe (intervenants additionnels) */}
+                        {/* équipe (intervenants additionnels) */}
                         {intervention.equipe && intervention.equipe.length > 0 && (
                           <div className="mt-1 flex flex-wrap gap-1">
                             {intervention.equipe.map((m) => (

@@ -39,7 +39,7 @@ function RouterNotFound() {
 }
 
 /*
- * Racine NUE (un seul routeur unifié, OPE-403/F1) : porte l'<Outlet/> commun. Trois zones d'enfants :
+ * Racine NUE (un seul routeur unifié,/F1) : porte l'<Outlet/> commun. Trois zones d'enfants :
  * (1) `appShellRoute` — layout pathless qui rend le SHELL modern (sidebar/topbar/chrome) → routes AUTHENTIFIÉES ;
  * (2) routes PUBLIQUES (paiement/signature/portail/auth/légales/home) montées DIRECTEMENT (hors shell) ;
  * (3) `/onboarding` plein écran (hors shell) + redirection racine `/`→`/home`.
@@ -454,7 +454,7 @@ const devisOptionsRoute = createRoute({
 
 /*
  * Paramètres — migration clean-archi de `pages/Parametres.tsx` (onglet général + abonnement réutilisé).
- * La sous-section « réglages vitrine » est omise (pas d'endpoint backend — finding OPE-504).
+ * La sous-section « réglages vitrine » est omise (pas d'endpoint backend — finding).
  */
 const parametresRoute = createRoute({
   getParentRoute: () => appShellRoute,
@@ -469,7 +469,7 @@ const dashboardRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/dashboard/ui/dashboard-page")),
 });
 
-/** Notes de frais — migration clean-archi de `pages/NotesFrais.tsx` (débloquée par OPE-490 backend). */
+/** Notes de frais — migration clean-archi de `pages/NotesFrais.tsx` (débloquée par backend). */
 const notesFraisRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/notes-de-frais",
@@ -478,7 +478,7 @@ const notesFraisRoute = createRoute({
 
 /*
  * ============================================================================
- * Routes PUBLIQUES (hors auth/shell) — fusionnées depuis l'ancien public-router.tsx (OPE-403/F1).
+ * Routes PUBLIQUES (hors auth/shell) — fusionnées depuis l'ancien public-router.tsx.
  * Montées directement sous la racine NUE (pas de chrome). Paiement/signature/portail/avis/vitrine par
  * token/slug, pages auth (visiteur déconnecté), pages légales, home (vitrine).
  * ============================================================================

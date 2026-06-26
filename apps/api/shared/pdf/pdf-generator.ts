@@ -586,7 +586,7 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   /*
    * Totaux — lus depuis les champs DB (pré-calculés) pour garantir la cohérence
    * avec ce qui est stocké et éviter tout recalcul divergent côté PDF.
-   * TVA ventilée par taux (OPE-58/OPE-487) : si plusieurs taux coexistent (ex. 10% + 20%),
+   * TVA ventilée par taux : si plusieurs taux coexistent (ex. 10% + 20%),
    * on affiche une ligne par taux pour respecter l'obligation légale de ventilation.
    */
   const sousTotal = parseFloat(String(devis.totalHT ?? "0")) || 0;
@@ -652,7 +652,7 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
     doc.setFont("Roboto", "normal");
   }
 
-  /** OPE-151 — mentions légales émetteur (société : forme/capital/RCS ; RM si renseigné). */
+  /** Mentions légales émetteur (société : forme/capital/RCS ; RM si renseigné). */
   const mentions = buildMentionsLegalesEmetteur(artisan);
   if (mentions.length > 0) {
     doc.setFontSize(7);
@@ -663,7 +663,7 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
     }
   }
 
-  /** OPE-127 — CGV sur page dédiée (parité avec le PDF client). N'apparaît que si renseignées. */
+  /** CGV sur page dédiée (parité avec le PDF client). N'apparaît que si renseignées. */
   if (data.cgv && String(data.cgv).trim()) renderCgvPage(doc, String(data.cgv));
 
   return Buffer.from(doc.output("arraybuffer"));
@@ -685,7 +685,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   const dangerColor: RGB = [239, 68, 68];
 
   /*
-   * OPE-165 — un avoir (note de crédit) est un document DISTINCT d'une facture :
+   * Un avoir (note de crédit) est un document DISTINCT d'une facture :
    * titré « AVOIR », rappelant la facture d'origine, sans échéance ni mentions de
    * pénalité de retard. Parité avec le générateur PDF client (déjà avoir-aware).
    * typeDocument ∈ { facture, avoir } (défaut « facture ») → comportement inchangé
@@ -714,7 +714,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   });
 
   /*
-   * OPE-165 — sous-bandeau rouge distinctif pour un avoir, placé dans l'espace
+   * Sous-bandeau rouge distinctif pour un avoir, placé dans l'espace
    * entre le bandeau d'en-tête (y=HEADER_H) et les blocs émetteur/client (y=50).
    */
   if (isAvoir) {
@@ -732,7 +732,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   /** Tableau des lignes */
   const tableData = facture.lignes.map((ligne) => {
     /*
-     * OPE-168 (volet 2) — section (en-tête de lot, gras) / note (texte libre, italique)
+     * Section (en-tête de lot, gras) / note (texte libre, italique)
      * en pleine largeur, sans colonnes chiffrées ; exclues des totaux (montants 0).
      */
     const type = ligne.type ?? "produit";
@@ -770,7 +770,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   /*
    * Totaux — lus depuis les champs DB (pré-calculés) pour garantir la cohérence
    * avec ce qui est stocké et éviter tout recalcul divergent côté PDF.
-   * TVA ventilée par taux (OPE-58/OPE-487) : si plusieurs taux coexistent (ex. 10% + 20%),
+   * TVA ventilée par taux : si plusieurs taux coexistent (ex. 10% + 20%),
    * on affiche une ligne par taux pour respecter l'obligation légale de ventilation.
    */
   const sousTotal = parseFloat(String(facture.totalHT ?? "0")) || 0;
@@ -805,7 +805,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   doc.setFontSize(11);
   if (isAvoir) {
     /*
-     * OPE-165 — un avoir n'a pas de statut de paiement : il vient en déduction
+     * Un avoir n'a pas de statut de paiement : il vient en déduction
      * ou remboursement, pas « en attente de paiement ».
      */
     doc.setTextColor(...primary);
@@ -826,7 +826,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   doc.setTextColor(...TEXT_BODY);
 
   /*
-   * OPE-165 — `fy` = ordonnée de la dernière ligne de pied dessinée (avant les
+   * `fy` = ordonnée de la dernière ligne de pied dessinée (avant les
    * mentions légales émetteur). Un avoir n'appelle aucun règlement : pas d'IBAN,
    * pas de conditions de paiement, pas de pénalités de retard ni d'escompte.
    */
@@ -854,7 +854,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
     doc.setFontSize(7);
     doc.setTextColor(...TEXT_MUTED);
     /*
-     * OPE-164 — condition de paiement RÉELLE de la facture (au lieu du « 30 jours » figé) :
+     * Condition de paiement RÉELLE de la facture (au lieu du « 30 jours » figé) :
      * `conditionsPaiement` si renseignée, sinon repli sur l'échéance, sinon « à réception ».
      */
     const condRaw = facture.conditionsPaiement && String(facture.conditionsPaiement).trim()
@@ -875,7 +875,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
       MARGIN,
       fyPenalty + 4,
     );
-    /** OPE-164 — mention d'escompte obligatoire en B2B (Art. L441-9 II 3° C. com.). */
+    /** Mention d'escompte obligatoire en B2B (Art. L441-9 II 3° C. com.). */
     doc.text(
       "Escompte pour paiement anticipé : néant (Art. L441-9 C. com.).",
       MARGIN,
@@ -907,14 +907,14 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
     doc.setFontSize(7);
   }
 
-  /** OPE-151 — mentions légales émetteur (forme juridique / capital / RCS / RM). */
+  /** Mentions légales émetteur (forme juridique / capital / RCS / RM). */
   const mentions = buildMentionsLegalesEmetteur(artisan);
   for (const m of mentions) {
     doc.text(m, MARGIN, factureMentionY);
     factureMentionY += 4;
   }
 
-  /** OPE-127 — CGV sur page dédiée (parité PDF client) ; PAS sur un avoir (document d'annulation). */
+  /** CGV sur page dédiée (parité PDF client) ; PAS sur un avoir (document d'annulation). */
   if (data.cgv && String(data.cgv).trim() && facture.typeDocument !== "avoir") {
     renderCgvPage(doc, String(data.cgv));
   }
@@ -1068,7 +1068,7 @@ export function generateContratPDF(data: PDFContratData): Buffer {
 
 /*
  * ============================================================================
- * BON D'INTERVENTION / COMPTE-RENDU SIGNÉ (OPE-161)
+ * BON D'INTERVENTION / COMPTE-RENDU SIGNÉ
  * ============================================================================
  * Matérialise en PDF une intervention terminée + sa signature client déjà
  * capturée (interventions_mobile). Rapport FIXE (pas de worksheet paramétrable).

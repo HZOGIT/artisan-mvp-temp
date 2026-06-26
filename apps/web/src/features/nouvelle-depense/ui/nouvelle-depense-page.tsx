@@ -39,7 +39,7 @@ export default function NouvelleDepensePage() {
   const { ht, tva, ttc } = montants(form.montantHt, form.tauxTva);
   const occ = prochaineOccurrence(form.dateDepense, form.recurrente, form.frequenceRecurrence);
 
-  /** OPE-99 — détection NON bloquante de doublons (debouncée). */
+  /** détection NON bloquante de doublons (debouncée). */
   const [doublonKey, setDoublonKey] = useState({ montantTtc: 0, dateDepense: "", fournisseur: "" });
   useEffect(() => {
     const id = setTimeout(() => setDoublonKey({ montantTtc: ttc, dateDepense: form.dateDepense, fournisseur: form.fournisseur }), 500);
