@@ -45,13 +45,23 @@ describe("auth use-cases", () => {
     expect(repo.touched).toEqual([]); // aucun login réussi
   });
 
-  it("signin : compte désactivé (actif===false) → ForbiddenError (message explicite)", async () => {
+  it("signin : compte désactivé (actif===false) + BON mot de passe → ForbiddenError (message explicite)", async () => {
     const repo = new FakeAuthRepository();
     repo.seed({ id: 9, email: "disabled@t.fr", password: "hashed:secret", actif: false });
     const deps = makeDeps(repo);
     const error = await signin(deps, { email: "disabled@t.fr", password: "secret" }).catch((e) => e);
     expect(error).toBeInstanceOf(ForbiddenError);
     expect(error.message).toBe("Votre compte a été désactivé. Contactez le support.");
+    expect(repo.touched).toEqual([]); // pas de lastSignedIn touché
+  });
+
+  it("signin : compte désactivé + MAUVAIS mot de passe → UnauthorizedError (anti-énumération)", async () => {
+    const repo = new FakeAuthRepository();
+    repo.seed({ id: 10, email: "disabled2@t.fr", password: "hashed:secret", actif: false });
+    const deps = makeDeps(repo);
+    const error = await signin(deps, { email: "disabled2@t.fr", password: "mauvais" }).catch((e) => e);
+    expect(error).toBeInstanceOf(UnauthorizedError);
+    expect(error.message).toBe("Invalid email or password");
     expect(repo.touched).toEqual([]); // pas de lastSignedIn touché
   });
 

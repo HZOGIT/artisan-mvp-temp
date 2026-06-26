@@ -45,14 +45,14 @@ export async function me(repo: IAuthRepository, claims: TokenClaims | null, perm
  */
 export async function signin(deps: AuthDeps, input: { email: string; password: string }): Promise<{ user: AuthUser; token: string }> {
   const cred = await deps.repo.findCredentials(input.email);
-  if (cred && cred.actif === false) {
-    throw new ForbiddenError("Votre compte a été désactivé. Contactez le support.");
-  }
   if (!cred || !cred.password) {
     throw new UnauthorizedError("Invalid email or password");
   }
   if (!(await deps.hasher.verify(input.password, cred.password))) {
     throw new UnauthorizedError("Invalid email or password");
+  }
+  if (cred.actif === false) {
+    throw new ForbiddenError("Votre compte a été désactivé. Contactez le support.");
   }
   await deps.repo.touchLastSignedIn(cred.id);
   const token = await signAuthToken({ userId: cred.id, email: cred.email ?? "" }, deps.jwtSecret, deps.tokenTtl ?? "7d");
