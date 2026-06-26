@@ -29,11 +29,8 @@ services:
       retries: 10
       start_period: 20s
 
-  # Stack clean-archi (Fastify + tRPC 11 + Drizzle pg) — désormais le SEUL backend.
-  # Tourne sous le rôle non-superuser app_tenant (soumis RLS). Le tunnel `cloudflared`
-  # le sert directement (le dispatcher edge route tout `/api/*` vers le new-stack).
-  # Exposé sur le port hôte 3010 pour smoke-test.
-  new-stack:
+  # Slot blue — slot par défaut au démarrage. Géré par deploy-backend.sh (blue-green).
+  new-stack-blue:
     image: operioz-newstack:latest
     build:
       context: ..
@@ -46,17 +43,55 @@ services:
       # OWNER (artisan_user) : provision au boot (migrations schéma + RLS, création/grants du rôle app). Éphémère.
       DATABASE_URL: postgres://artisan_user:${POSTGRES_PASSWORD:-artisan_password}@postgres:5432/artisan_mvp
       # APP (app_tenant) non-superuser → soumis aux policies RLS. Sert toutes les requêtes (long-lived).
-      # Source unique du secret app : ensureAppRole provisionne le rôle avec CE user+password.
       APP_DATABASE_URL: postgres://app_tenant:${APP_DB_PASSWORD:-app_tenant_pw}@postgres:5432/artisan_mvp
       BETTERSTACK_TOKEN: ${BETTERSTACK_TOKEN:-}
     # JWT_SECRET (mêmes cookies que le legacy) + autres secrets via .env.staging.
     env_file:
       - ../.env.staging
     ports:
-      - "3010:3001"
+      - "3011:3001"
     depends_on:
       postgres:
         condition: service_healthy
+
+  # Slot green — démarré uniquement par deploy-backend.sh lors d'un déploiement.
+  new-stack-green:
+    image: operioz-newstack:latest
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NEW_STACK_PORT: "3001"
+      HOST: 0.0.0.0
+      DATABASE_URL: postgres://artisan_user:${POSTGRES_PASSWORD:-artisan_password}@postgres:5432/artisan_mvp
+      APP_DATABASE_URL: postgres://app_tenant:${APP_DB_PASSWORD:-app_tenant_pw}@postgres:5432/artisan_mvp
+      BETTERSTACK_TOKEN: ${BETTERSTACK_TOKEN:-}
+    env_file:
+      - ../.env.staging
+    ports:
+      - "3012:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Proxy nginx — point d'entrée unique sur 3010. Route vers le slot actif (blue|green).
+  # L'alias réseau `new-stack` maintient la compatibilité avec le tunnel CF (configuré
+  # en Terraform sur http://new-stack:3001) sans modification du dashboard CF.
+  proxy:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "3010:3001"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      default:
+        aliases:
+          - new-stack
+    depends_on:
+      - new-stack-blue
 
   prometheus:
     image: prom/prometheus:v2.52.0
@@ -66,7 +101,7 @@ services:
       - ../scripts/monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus_data:/prometheus
     depends_on:
-      - new-stack
+      - proxy
 
   alertmanager:
     image: prom/alertmanager:v0.27.0
@@ -79,14 +114,10 @@ services:
   cloudflared:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
-    # The artisan-staging tunnel routes the new-stack backend hostname -> http://new-stack:3001
-    # (configured in Terraform, cloudflare-managed). cloudflared reaches the service by its
-    # compose name over the shared network — no host ports. L'ancien ingress vers `app:3000`
-    # (backend legacy) est mort (le dispatcher edge ne cible plus que le new-stack) ; son
-    # nettoyage Terraform est traité séparément.
+    # Le tunnel CF route staging-backend.operioz.com → http://new-stack:3001 (alias du proxy).
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN_STAGING}
     depends_on:
-      - new-stack
+      - proxy
 
 volumes:
   postgres_staging_data:

@@ -35,18 +35,39 @@ else
   echo "  [INFO] snapshot ignoré (répertoire indisponible ou conteneur postgres absent)"
 fi
 
-echo "▶ Rebuild + recreate du conteneur new-stack (docker compose --build)…"
-$COMPOSE up -d --build new-stack
+echo "▶ Déploiement blue-green…"
+ACTIVE=$(cat /tmp/.active-slot 2>/dev/null || echo "blue")
+NEXT=$([ "$ACTIVE" = "blue" ] && echo "green" || echo "blue")
+NEXT_EXT_PORT=$([ "$NEXT" = "blue" ] && echo "3011" || echo "3012")
 
-echo "▶ Attente du démarrage (health)…"
+echo "  Slot actif : $ACTIVE → nouveau slot : $NEXT (port $NEXT_EXT_PORT)"
+$COMPOSE up -d --build "new-stack-$NEXT"
+
+echo "▶ Attente health du nouveau slot (new-stack-$NEXT)…"
 for i in $(seq 1 30); do
-  if curl -fsS -o /dev/null "$NEWSTACK_URL/health" 2>/dev/null; then
+  if curl -fsS -o /dev/null "http://localhost:$NEXT_EXT_PORT/health" 2>/dev/null; then
     echo "  health OK"
     break
   fi
-  [ "$i" = "30" ] && { echo "✖ health KO après 30s"; $COMPOSE logs --tail=40 new-stack; exit 1; }
+  if [ "$i" = "30" ]; then
+    echo "✖ health KO après 30s — rollback : arrêt de new-stack-$NEXT"
+    $COMPOSE logs --tail=40 "new-stack-$NEXT"
+    $COMPOSE stop "new-stack-$NEXT"
+    exit 1
+  fi
   sleep 1
 done
+
+echo "▶ Bascule nginx → new-stack-$NEXT…"
+sed -i "s/new-stack-$ACTIVE/new-stack-$NEXT/g" infra/nginx.conf
+docker exec "$($COMPOSE ps -q proxy)" nginx -s reload
+echo "  Nginx rechargé — trafic → new-stack-$NEXT"
+
+echo "▶ Grace period (5s) puis arrêt de new-stack-$ACTIVE…"
+sleep 5
+$COMPOSE stop "new-stack-$ACTIVE"
+echo "$NEXT" > /tmp/.active-slot
+echo "  Slot actif mis à jour : $NEXT"
 
 # Domaines servis par le nouveau stack = DEFAULT_ENABLED de l'edge (source : src migrated-domains.ts
 # STAGING_NEW_STACK_DEFAULT_DOMAINS). Smoke : la route tRPC doit exister (401 sans cookie = OK ;
