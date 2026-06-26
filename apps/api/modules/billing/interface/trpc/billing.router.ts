@@ -10,6 +10,7 @@ import {
   changePlan,
   cancelAtPeriodEnd,
   reactivateSubscription,
+  activateOnboardingSubscription,
   NotFoundError,
   InvalidPlanError,
 } from "../../application/billing-use-cases";
@@ -81,5 +82,17 @@ export function createBillingRouter(deps: BillingDeps) {
     getBillingInfo: protectedProcedure.query(({ ctx }) =>
       getBillingInfo(deps, ctx.tenant),
     ),
+
+    /** Fin d'onboarding avec plan : crée un abonnement trialing J+15. */
+    activateOnboardingSubscription: protectedProcedure
+      .input(
+        z.object({
+          planId: z.enum(["starter", "pro", "enterprise"]),
+          paymentMethodId: z.number().int().positive(),
+        }),
+      )
+      .mutation(({ ctx, input }) =>
+        activateOnboardingSubscription(deps, ctx.tenant, input).catch(mapError),
+      ),
   });
 }

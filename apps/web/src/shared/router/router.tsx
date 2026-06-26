@@ -61,6 +61,9 @@ const onboardingRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/onboarding",
   component: OnboardingPage,
+  validateSearch: (s: Record<string, unknown>) => ({
+    plan: typeof s.plan === "string" ? s.plan : undefined,
+  }),
 });
 
 /*

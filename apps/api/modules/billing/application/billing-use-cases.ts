@@ -257,6 +257,50 @@ export async function reactivateSubscription(deps: Pick<BillingDeps, "repo">, ct
 }
 
 
+export interface ActivateOnboardingSubscriptionParams {
+  readonly planId: "starter" | "pro" | "enterprise";
+  readonly paymentMethodId: number;
+}
+
+/**
+ * Crée un abonnement trialing J+15 à la fin de l'onboarding.
+ * Idempotent : retourne l'abonnement existant non-annulé s'il en existe déjà un.
+ */
+export async function activateOnboardingSubscription(
+  deps: Pick<BillingDeps, "repo">,
+  ctx: TenantContext,
+  params: ActivateOnboardingSubscriptionParams,
+): Promise<{ subscriptionId: number }> {
+  const pm = await deps.repo.findPaymentMethodById(ctx, params.paymentMethodId);
+  if (!pm) throw new NotFoundError(`Moyen de paiement ${params.paymentMethodId} introuvable`);
+
+  const existing = await deps.repo.findSubscription(ctx);
+  if (existing && existing.status !== "canceled") return { subscriptionId: existing.id };
+
+  const trialEndsAt = new Date(Date.now() + 15 * 24 * 3600_000);
+  const sub = await deps.repo.saveSubscription({
+    artisanId: ctx.artisanId,
+    planId: params.planId,
+    billingMode: "maison",
+    status: "trialing",
+    currentPeriodStart: null,
+    currentPeriodEnd: null,
+    trialEndsAt,
+    paymentMethodId: pm.id,
+  });
+
+  await deps.repo.appendEvent({
+    entityType: "billing_subscription",
+    entityId: sub.id,
+    eventType: "subscription.onboarding_activated",
+    payload: { artisanId: ctx.artisanId, planId: params.planId, trialEndsAt: trialEndsAt.toISOString() },
+    actor: `user:${ctx.userId}`,
+  });
+
+  return { subscriptionId: sub.id };
+}
+
+
 export class NotFoundError extends Error {
   constructor(message: string) {
     super(message);

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useSearch } from "@tanstack/react-router";
 /*
  * Cette page est rendue par App.tsx HORS du ModernRouterMount → on initialise l'i18n du front neuf ici aussi
  * (sinon `t()` renvoie les clés). Idempotent (l'init est gardé par `i18n.isInitialized`).
@@ -7,14 +8,120 @@ import { useTranslation } from "react-i18next";
 import "@/shared/i18n";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, Check, Lock, PartyPopper, Rocket, Sparkles, type LucideIcon, Bell, Calculator, Calendar, FileCheck, FileText, Globe, LayoutGrid, MapPin, MessageCircle, Package, PenTool, Receipt, ShoppingCart, Users, Wrench } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Loader2, Lock, PartyPopper, Rocket, Sparkles, type LucideIcon, Bell, Calculator, Calendar, FileCheck, FileText, Globe, LayoutGrid, MapPin, MessageCircle, Package, PenTool, Receipt, ShoppingCart, Users, Wrench } from "lucide-react";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { Button } from "@/shared/ui/button";
 import { Switch } from "@/shared/ui/switch";
 import { Input } from "@/shared/ui/input";
+import { trpc } from "@/shared/trpc";
 import { useOnboarding } from "../application/use-onboarding";
 import { METIERS, recommendedSlugs, metierFinal as computeMetierFinal, buildCompletePayload, toggleSlug, type Step } from "../domain/onboarding";
 
 const ICON_MAP: Record<string, LucideIcon> = { Bell, Calculator, Calendar, FileCheck, FileText, Globe, LayoutGrid, MapPin, MessageCircle, Package, PenTool, Receipt, ShoppingCart, Sparkles, Users, Wrench };
+
+const stripePromise = loadStripe(
+  (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined) ?? "",
+);
+
+const VALID_PLAN_IDS = ["starter", "pro", "enterprise"] as const;
+type OnboardingPlanId = typeof VALID_PLAN_IDS[number];
+
+function isValidPlanId(p: string | undefined): p is OnboardingPlanId {
+  return VALID_PLAN_IDS.includes(p as OnboardingPlanId);
+}
+
+function PaymentForm({ stripeCustomerId, plan, onSuccess }: { stripeCustomerId: string; plan: OnboardingPlanId; onSuccess: () => void }) {
+  const { t } = useTranslation("onboarding");
+  const stripe = useStripe();
+  const elements = useElements();
+  const confirmPM = trpc.billing.confirmPaymentMethod.useMutation();
+  const activateSub = trpc.billing.activateOnboardingSubscription.useMutation();
+  const [busy, setBusy] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+    setBusy(true);
+    try {
+      const result = await stripe.confirmSetup({
+        elements,
+        confirmParams: { return_url: window.location.href },
+        redirect: "if_required",
+      });
+      if (result.error) {
+        toast.error(result.error.message ?? t("paiementErreurStripe"));
+        return;
+      }
+      const pm = result.setupIntent.payment_method;
+      const pmStripeId = pm == null ? null : typeof pm === "string" ? pm : pm.id;
+      if (!pmStripeId) {
+        toast.error(t("paiementErreurPM"));
+        return;
+      }
+      const confirmed = await confirmPM.mutateAsync({ stripePaymentMethodId: pmStripeId, stripeCustomerId, setAsDefault: true });
+      await activateSub.mutateAsync({ planId: plan, paymentMethodId: confirmed.paymentMethod.id });
+      onSuccess();
+    } catch {
+      toast.error(t("paiementErreurEnregistrement"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <PaymentElement />
+      <Button type="submit" size="lg" disabled={busy || !stripe || !elements} className="w-full bg-white text-slate-900 hover:bg-blue-50">
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : t("paiementEnregistrer")}
+      </Button>
+    </form>
+  );
+}
+
+function PaymentStep({ plan, onSuccess, onBack }: { plan: OnboardingPlanId; onSuccess: () => void; onBack: () => void }) {
+  const { t } = useTranslation("onboarding");
+  const setupIntentMut = trpc.billing.createSetupIntent.useMutation();
+  const [setup, setSetup] = useState<{ clientSecret: string; stripeCustomerId: string } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void setupIntentMut.mutateAsync(undefined)
+      .then((data) => { if (!cancelled) setSetup({ clientSecret: data.clientSecret, stripeCustomerId: data.stripeCustomerId }); })
+      .catch(() => { if (!cancelled) toast.error(t("paiementErreurInit")); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const trialEndDate = new Date(Date.now() + 15 * 24 * 3600_000).toLocaleDateString("fr-FR");
+
+  return (
+    <motion.section key="step4" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.4 }}>
+      <p className="text-xs uppercase tracking-widest font-semibold text-blue-300/80">{t("etapePaiement")}</p>
+      <h2 className="mt-2 text-2xl sm:text-4xl font-bold">{t("paiementTitre")}</h2>
+      <p className="mt-3 text-blue-100/80">{t("paiementDesc", { date: trialEndDate })}</p>
+      <div className="mt-4 flex items-center gap-2 rounded-xl bg-white/5 border border-white/10 p-3 text-sm text-blue-100/70">
+        <Lock className="h-4 w-4 shrink-0 text-blue-300" />
+        <span>{t("paiementSecurise")}</span>
+      </div>
+      <div className="mt-6">
+        {!setup ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-blue-300" />
+          </div>
+        ) : (
+          <Elements stripe={stripePromise} options={{ clientSecret: setup.clientSecret, appearance: { theme: "night" } }}>
+            <PaymentForm stripeCustomerId={setup.stripeCustomerId} plan={plan} onSuccess={onSuccess} />
+          </Elements>
+        )}
+      </div>
+      <div className="mt-4">
+        <Button variant="ghost" className="text-blue-100 hover:text-white" onClick={onBack}>
+          <ArrowLeft className="h-4 w-4 mr-2" /> {t("retour")}
+        </Button>
+      </div>
+    </motion.section>
+  );
+}
 
 /*
  * Page `/onboarding` (plein écran post-signup) — migration clean-archi de `pages/Onboarding.tsx`. Markup à
@@ -23,10 +130,14 @@ const ICON_MAP: Record<string, LucideIcon> = { Bell, Calculator, Calendar, FileC
 export default function OnboardingPage() {
   const { t } = useTranslation("onboarding");
   const { modules, complete, skip } = useOnboarding();
-  const [step, setStep] = useState<Step>(1);
+  const [step, setStep] = useState<Step | 5>(1);
   const [metierKey, setMetierKey] = useState<string | null>(null);
   const [metierAutre, setMetierAutre] = useState("");
   const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
+
+  const { plan: planParam } = useSearch({ from: "/onboarding" });
+  const hasPlan = isValidPlanId(planParam);
+  const planId = hasPlan ? planParam : null;
 
   useEffect(() => {
     if (!metierKey || modules.length === 0) return;
@@ -43,7 +154,9 @@ export default function OnboardingPage() {
   };
   const doSkip = () => skip.mutate(undefined, { onSuccess: () => { toast.info(t("toastSaute")); window.location.href = "/dashboard"; } });
 
-  const stepProgress = (step / 4) * 100;
+  const totalSteps = hasPlan ? 5 : 4;
+  const stepProgress = (step / totalSteps) * 100;
+  const finalStep: Step | 5 = hasPlan ? 5 : 4;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white relative overflow-hidden">
@@ -128,8 +241,12 @@ export default function OnboardingPage() {
             </motion.section>
           )}
 
-          {step === 4 && (
-            <motion.section key="step4" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.5 }} className="text-center">
+          {step === 4 && hasPlan && planId && (
+            <PaymentStep key="step4" plan={planId} onSuccess={() => setStep(5)} onBack={() => setStep(3)} />
+          )}
+
+          {step === finalStep && (
+            <motion.section key={`step${finalStep}`} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.5 }} className="text-center">
               <div aria-hidden className="relative mx-auto mb-6 inline-block">
                 <motion.div animate={{ rotate: [0, -10, 10, -10, 0] }} transition={{ duration: 0.8, repeat: 2 }} className="inline-flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-cyan-500 shadow-2xl"><PartyPopper className="h-12 w-12 text-white" /></motion.div>
               </div>
