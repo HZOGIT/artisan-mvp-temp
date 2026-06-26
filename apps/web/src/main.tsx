@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client'
 import * as Sentry from '@sentry/react'
 import App from './app.tsx'
 import './index.css'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { trpc } from './shared/trpc'
 import { httpBatchLink, httpLink, httpSubscriptionLink, splitLink } from '@trpc/client'
 import superjson from 'superjson'
@@ -53,6 +53,13 @@ window.addEventListener('vite:preloadError', (e) => {
 })
 
 const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (error: unknown) => {
+      if ((error as { data?: { code?: string } })?.data?.code === 'UNAUTHORIZED') {
+        window.location.href = '/login'
+      }
+    },
+  }),
   defaultOptions: {
     queries: {
       /*
