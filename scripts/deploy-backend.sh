@@ -81,7 +81,7 @@ echo "upstream backend { server new-stack-$NEXT:3001; }" > infra/upstream.conf
 # Recréer le proxy si nginx.conf a changé (inode remplacé par git → reload ne suffit pas)
 # Robuste vs historique git complexe : comparer les hashs du contenu réel
 HOST_HASH=$(md5sum infra/nginx.conf 2>/dev/null | awk '{print $1}')
-LIVE_HASH=$(docker exec "$($COMPOSE ps -q proxy)" md5sum /etc/nginx/nginx.conf 2>/dev/null | awk '{print $1}')
+LIVE_HASH=$(docker exec "$($COMPOSE ps -q proxy)" md5sum /etc/nginx/conf.d/default.conf 2>/dev/null | awk '{print $1}')
 if [ "$HOST_HASH" != "$LIVE_HASH" ]; then
   echo "  nginx.conf modifié ($HOST_HASH vs $LIVE_HASH) — recréation du proxy (--force-recreate)…"
   $COMPOSE up -d --force-recreate proxy
