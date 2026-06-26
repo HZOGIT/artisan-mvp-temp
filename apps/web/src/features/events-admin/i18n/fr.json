@@ -31,6 +31,10 @@
   "facture.annulee": "Facture annulée",
   "commande.creee": "Commande créée",
   "commande.modifiee": "Commande modifiée",
+  "commande.supprimee": "Commande supprimée",
+  "commande.statut_modifie": "Statut commande modifié",
+  "commande.recue": "Commande reçue",
+  "commande.facturation_definie": "Facturation commande définie",
   "intervention.creee": "Intervention créée",
   "intervention.modifiee": "Intervention modifiée"
 }
