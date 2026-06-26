@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ConfigRelancesAuto, UpdateConfigRelancesInput } from "../domain/config-relances";
 
@@ -11,4 +12,5 @@ export interface IConfigRelancesRepository {
   get(ctx: TenantContext): Promise<ConfigRelancesAuto>;
   /** Crée la ligne si absente, sinon met à jour les champs config fournis. Idempotent. */
   upsert(ctx: TenantContext, input: UpdateConfigRelancesInput): Promise<ConfigRelancesAuto>;
+  withDb(db: DbClient): IConfigRelancesRepository;
 }

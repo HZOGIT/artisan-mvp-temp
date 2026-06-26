@@ -57,6 +57,10 @@ export class ConfigRelancesRepositoryDrizzle implements IConfigRelancesRepositor
     });
   }
 
+  withDb(db: DbClient): ConfigRelancesRepositoryDrizzle {
+    return new ConfigRelancesRepositoryDrizzle(db);
+  }
+
   upsert(ctx: TenantContext, input: UpdateConfigRelancesInput): Promise<ConfigRelancesAuto> {
     return withTenant(this.db, ctx, async (tx) => {
       const set = toConfigSet(input);

@@ -11,6 +11,11 @@ import type { ConfigRelancesAuto, UpdateConfigRelancesInput } from "../domain/co
 export class FakeConfigRelancesRepository implements IConfigRelancesRepository {
   private readonly store = new Map<number, ConfigRelancesAuto>();
 
+  /* ponytail: withDb ignoré — fake in-memory, pas de transaction réelle */
+  withDb(_db: unknown): FakeConfigRelancesRepository {
+    return this;
+  }
+
   async get(ctx: TenantContext): Promise<ConfigRelancesAuto> {
     return this.store.get(ctx.artisanId) ?? defaultConfigRelances(ctx.artisanId);
   }
