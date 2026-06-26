@@ -15,7 +15,7 @@ import { ymdCompact } from "../domain/csv-export";
 /** Sous-ensemble du domaine Facture nécessaire à la sélection (le lister renvoie le domaine complet). */
 interface FactureLotItem {
   readonly id: number;
-  readonly numero: string;
+  readonly numero: string | null;
   readonly clientId: number;
   readonly dateFacture: Date;
   readonly statut: string;
@@ -85,7 +85,7 @@ export async function collectFacturxLot(deps: ExportLotReaderDeps, ctx: TenantCo
     /** client supprimé : on saute (parité legacy) */
     if (!client) continue;
     const xml = generateFacturXML({ ...facture, lignes } as never, artisan as never, client as never);
-    entries.push({ name: `${facture.numero}_${sanitizeName(client.nom)}.xml`, content: xml });
+    entries.push({ name: `${facture.numero ?? ""}_${sanitizeName(client.nom)}.xml`, content: xml });
   }
   return { entries, filename: `FacturX_${ymdCompact(debut)}_${ymdCompact(fin)}.zip` };
 }
@@ -98,7 +98,7 @@ export async function collectFacturePdfLot(deps: ExportLotPdfDeps, ctx: TenantCo
     const [lignes, client] = await Promise.all([deps.factureReader.listLignes(ctx, facture.id), deps.clientReader.getById(ctx, facture.clientId)]);
     if (!client) continue;
     const buffer = await deps.pdf.render("facture", { facture: { ...facture, lignes }, artisan, client });
-    entries.push({ name: `${facture.numero}_${sanitizeName(client.nom)}.pdf`, content: buffer });
+    entries.push({ name: `${facture.numero ?? ""}_${sanitizeName(client.nom)}.pdf`, content: buffer });
   }
   return { entries, filename: `Factures_PDF_${ymdCompact(debut)}_${ymdCompact(fin)}.zip` };
 }

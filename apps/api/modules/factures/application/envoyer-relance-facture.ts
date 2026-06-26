@@ -144,7 +144,7 @@ export async function envoyerRelanceFacture(
         {
           client_nom: clientName,
           client_prenom: client.prenom ?? "",
-          numero: facture.numero,
+          numero: facture.numero ?? "",
           montant_ttc: totalTTC,
           jours_retard: String(joursRetard),
           nom_entreprise: artisanName,
@@ -154,7 +154,7 @@ export async function envoyerRelanceFacture(
     : buildRelanceEmail({
         artisanName,
         clientName,
-        factureNumero: facture.numero,
+        factureNumero: facture.numero ?? "",
         totalTTC,
         joursRetard,
         customMessage: input.customMessage ?? null,
@@ -162,5 +162,5 @@ export async function envoyerRelanceFacture(
 
   await deps.email.send({ to: client.email, subject, body, fromName: artisan.nomEntreprise ?? undefined, replyTo: artisan.email ?? undefined });
 
-  return { success: true, message: `Relance envoyée à ${client.email} — facture ${facture.numero}, ${joursRetard} j de retard` };
+  return { success: true, message: `Relance envoyée à ${client.email} — facture ${facture.numero ?? ""}, ${joursRetard} j de retard` };
 }

@@ -32,8 +32,8 @@ export async function genererRappelsFacturesEnRetard(
     const montant = round2(Number(f.totalTTC) || 0).toFixed(2);
     await repo.creer(ctx, {
       type: "rappel",
-      titre: `Facture ${f.numero} en retard`,
-      message: `La facture ${f.numero} de ${f.clientNom ?? "Client"} est en retard de ${joursRetard} jour(s). Montant: ${montant} €`,
+      titre: `Facture ${f.numero ?? ""} en retard`,
+      message: `La facture ${f.numero ?? ""} de ${f.clientNom ?? "Client"} est en retard de ${joursRetard} jour(s). Montant: ${montant} €`,
       lien,
     });
     rappelsCreated++;

@@ -16,7 +16,7 @@ export interface PortalDevis {
 
 export interface PortalFacture {
   readonly id: number;
-  readonly numero: string;
+  readonly numero: string | null;
   readonly objet: string | null;
   readonly totalTTC: string | null;
   readonly statut: string | null;

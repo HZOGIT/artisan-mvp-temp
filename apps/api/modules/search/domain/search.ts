@@ -14,7 +14,7 @@ export interface SearchResult {
 export interface SearchMatches {
   readonly clients: ReadonlyArray<{ id: number; nom: string; prenom: string | null; email: string | null; telephone: string | null; ville: string | null }>;
   readonly devis: ReadonlyArray<{ id: number; numero: string; objet: string | null; statut: string | null; totalTTC: string | null }>;
-  readonly factures: ReadonlyArray<{ id: number; numero: string; objet: string | null; statut: string | null; totalTTC: string | null }>;
+  readonly factures: ReadonlyArray<{ id: number; numero: string | null; objet: string | null; statut: string | null; totalTTC: string | null }>;
   readonly interventions: ReadonlyArray<{ id: number; titre: string; statut: string | null; dateDebut: Date | string | null }>;
   readonly fournisseurs: ReadonlyArray<{ id: number; nom: string; email: string | null; telephone: string | null }>;
 }

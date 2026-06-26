@@ -14,7 +14,7 @@ export interface GenererFactureContratInput {
 /** Référence de la facture créée (le client n'exploite pas le détail — toast + refetch). */
 export interface FactureGenereeRef {
   readonly id: number;
-  readonly numero: string;
+  readonly numero: string | null;
 }
 
 /** Port cross-domaine : génère une facture **émise** (`envoyee`) pour un contrat — 1 ligne (designation */

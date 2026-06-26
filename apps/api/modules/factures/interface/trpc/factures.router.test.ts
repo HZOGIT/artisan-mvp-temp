@@ -80,16 +80,21 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
     expect((await callQuery(server, "factures.list", undefined)).statusCode).toBe(401);
   });
 
-  it("create : numéro auto serveur + statut brouillon + list scopé", async () => {
+  it("create : brouillon sans numéro ; numéro FAC- assigné à l'émission + list scopé", async () => {
     const tA = await token(UA);
     const created = await callMutation(server, "factures.create", { clientId: clientA, objet: "Travaux" }, tA);
     expect(created.statusCode).toBe(200);
-    const f = created.json().result.data as { id: number; numero: string; statut: string; totalTTC: string };
-    expect(f.numero).toMatch(/^FAC-\d{5}$/);
+    const f = created.json().result.data as { id: number; numero: string | null; statut: string; totalTTC: string };
+    expect(f.numero).toBeNull();
     expect(f.statut).toBe("brouillon");
     expect(f.totalTTC).toBe("0.00");
     const list = await callQuery(server, "factures.list", undefined, tA);
     expect((list.json().result.data as Array<{ id: number }>).some((x) => x.id === f.id)).toBe(true);
+    const emise = (await callMutation(server, "factures.envoyer", { id: f.id }, tA)).json().result.data as { numero: string | null };
+    expect(emise.numero).toMatch(/^FAC-\d{5}$/);
+    /* idempotence : second envoyer → même numéro conservé */
+    const emise2 = (await callMutation(server, "factures.envoyer", { id: f.id }, tA)).json().result.data as { numero: string | null };
+    expect(emise2.numero).toBe(emise.numero);
   });
 
   it("ANTI-IDOR-FK : create avec un clientId/devisId d'un autre tenant → 404", async () => {
@@ -228,9 +233,9 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
     // conversion OK
     const res = await callMutation(server, "factures.convertirDepuisDevis", { devisId }, tA);
     expect(res.statusCode).toBe(200);
-    const f = res.json().result.data as { id: number; typeDocument: string; numero: string; totalTTC: string; devisId: number; statut: string };
+    const f = res.json().result.data as { id: number; typeDocument: string; numero: string | null; totalTTC: string; devisId: number; statut: string };
     expect(f.typeDocument).toBe("facture");
-    expect(f.numero).toMatch(/^FAC-\d{5}$/);
+    expect(f.numero).toBeNull();
     expect(f.statut).toBe("brouillon");
     expect(f.devisId).toBe(devisId);
     expect(f.totalTTC).toBe("240.00"); // totaux = ceux du devis

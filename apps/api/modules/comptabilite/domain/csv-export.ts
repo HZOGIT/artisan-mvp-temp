@@ -37,7 +37,7 @@ export function csvCell(val: string | number | null | undefined): string {
 
 export interface FactureCsvRow {
   readonly dateFacture: Date;
-  readonly numero: string;
+  readonly numero: string | null;
   readonly clientNom: string;
   readonly totalHT: string;
   readonly totalTVA: string;
@@ -52,7 +52,7 @@ export function buildFacturesCsv(rows: readonly FactureCsvRow[]): string {
   const lignes = [CSV_HEADER];
   for (const f of rows) {
     lignes.push(
-      [formatDateFr(f.dateFacture), f.numero, f.clientNom || "Client", fecAmount(f.totalHT), fecAmount(f.totalTVA), fecAmount(f.totalTTC), f.statut]
+      [formatDateFr(f.dateFacture), f.numero ?? "", f.clientNom || "Client", fecAmount(f.totalHT), fecAmount(f.totalTVA), fecAmount(f.totalTTC), f.statut]
         .map(csvCell)
         .join(";"),
     );

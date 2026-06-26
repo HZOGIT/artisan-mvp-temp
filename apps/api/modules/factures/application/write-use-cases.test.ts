@@ -38,7 +38,7 @@ describe("factures — use-cases d'écriture", () => {
     expect(await repo.list(A)).toHaveLength(0);
   });
 
-  it("creerFacture avec lignes — totaux recalculés, lignes visibles, numéro généré serveur", async () => {
+  it("creerFacture avec lignes — totaux recalculés, lignes visibles, brouillon sans numéro", async () => {
     const repo = repoWithClient(A, 100);
     const f = await creerFacture(repo, A, {
       clientId: 100,
@@ -47,19 +47,21 @@ describe("factures — use-cases d'écriture", () => {
         { designation: "Matériaux", quantite: "1", prixUnitaireHT: "50.00", tauxTVA: "20" },
       ],
     });
-    expect(f.numero).toBe("FAC-00001");
+    expect(f.numero).toBeNull();
     expect(f.totalTTC).toBe("300.00");
     expect(await repo.listLignes(A, f.id)).toHaveLength(2);
   });
 
-  it("creerFacture génère le numéro serveur (FAC-00001) et scope au tenant", async () => {
+  it("creerFacture — brouillon sans numéro ; numéro assigné à l'émission (changerStatut envoyee)", async () => {
     const repo = repoWithClient(A, 100);
     const f1 = await creerFacture(repo, A, { clientId: 100, objet: "Travaux" });
     const f2 = await creerFacture(repo, A, { clientId: 100 });
-    expect(f1.numero).toBe("FAC-00001");
-    expect(f2.numero).toBe("FAC-00002");
+    expect(f1.numero).toBeNull();
+    expect(f2.numero).toBeNull();
     expect(f1.statut).toBe("brouillon");
-    expect(f1.totalTTC).toBe("0.00");
+    const emise = await changerStatutFacture(repo, A, f1.id, "envoyee", undefined, fakeArtisanReader);
+    expect(emise.numero).toBe("FAC-00001");
+    expect(emise.statut).toBe("envoyee");
   });
 
   it("creerFacture — clientId hors tenant → NotFound (anti-IDOR-FK)", async () => {

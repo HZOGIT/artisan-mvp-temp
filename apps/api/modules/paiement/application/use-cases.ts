@@ -99,7 +99,7 @@ export async function createInvoiceCheckout(
   const tokenPaiement = (randomUUID() + randomUUID()).replace(/-/g, "").slice(0, 32);
   const result = await deps.stripe.createInvoiceCheckout({
     factureId: input.factureId,
-    numeroFacture: facture.numero,
+    numeroFacture: facture.numero ?? "",
     montantTTC: parseFloat(facture.totalTTC) || 0,
     clientEmail: client.email ?? "",
     clientName: clientFullName(client),

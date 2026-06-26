@@ -59,7 +59,7 @@ export class WebhookPaymentWriterDrizzle implements WebhookPaymentWriter {
         artisanId: input.artisanId,
         type: "succes",
         titre: "Paiement reçu en ligne",
-        message: `Facture ${facture.numero} payée en ligne par ${nom} (${montant} €)`,
+        message: `Facture ${facture.numero ?? ""} payée en ligne par ${nom} (${montant} €)`,
         lien: `/factures/${input.factureId}`,
       });
     });

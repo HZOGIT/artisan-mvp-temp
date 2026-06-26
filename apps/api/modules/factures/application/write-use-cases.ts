@@ -62,9 +62,8 @@ export async function creerFacture(repo: IFactureRepository, ctx: TenantContext,
   if (!(await repo.ownsClient(ctx, input.clientId))) throw new NotFoundError("Client introuvable");
   if (input.devisId != null && !(await repo.ownsDevis(ctx, input.devisId))) throw new NotFoundError("Devis introuvable");
   const { lignes, ...header } = input;
-  const numero = await repo.nextNumero(ctx);
-  if (lignes && lignes.length > 0) return repo.createWithLignes(ctx, { ...header, numero }, lignes);
-  return repo.create(ctx, { ...header, numero });
+  if (lignes && lignes.length > 0) return repo.createWithLignes(ctx, { ...header, numero: null }, lignes);
+  return repo.create(ctx, { ...header, numero: null });
 }
 
 export async function modifierFacture(
@@ -308,7 +307,7 @@ export async function creerAvoir(
     factureOrigineId,
     clientId: origine.clientId,
     numero,
-    objet: input.objet ?? `Avoir sur facture ${origine.numero}`,
+    objet: input.objet ?? `Avoir sur facture ${origine.numero ?? ""}`,
     notes: input.notes ?? null,
     conditionsPaiement: origine.conditionsPaiement,
     lignes,
@@ -366,11 +365,10 @@ export async function convertirDevisEnFacture(
     montantTTC: l.montantTTC,
     type: l.type,
   }));
-  const numero = await factureRepo.nextNumero(ctx);
   const facture = await factureRepo.createFromDevis(ctx, {
     devisId: devis.id,
     clientId: devis.clientId,
-    numero,
+    numero: null,
     objet: devis.objet,
     referenceClient: devis.referenceClient,
     conditionsPaiement: devis.conditionsPaiement,
@@ -400,6 +398,10 @@ export async function changerStatutFacture(
     if (!artisanReader) throw new ValidationError("Le SIRET de l'artisan est requis pour émettre une facture");
     const artisan = await artisanReader.getArtisan(ctx);
     if (!artisan?.siret) throw new ValidationError("Le SIRET de l'artisan est requis pour émettre une facture");
+  }
+  if (cible === "envoyee" && facture.statut === "brouillon" && !facture.numero) {
+    const numero = await repo.nextNumero(ctx);
+    await repo.assignNumero(ctx, id, numero);
   }
   /** Insert pa_outbox dans la même tx que setStatut → atomicité réglementaire. */
   const inTx = cible === "envoyee" && outboxInTx

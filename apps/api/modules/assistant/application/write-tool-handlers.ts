@@ -91,7 +91,7 @@ export interface FactureWriterForAgent {
   ajouterLigne(ctx: TenantContext, factureId: number, ligne: FactureLigneInput): Promise<void>;
   convertirDevis(ctx: TenantContext, devisId: number): Promise<{ id: number }>;
   setObjet(ctx: TenantContext, factureId: number, objet: string): Promise<void>;
-  getById(ctx: TenantContext, factureId: number): Promise<{ numero: string; totalTTC: string; statut: string; objet: string | null } | null>;
+  getById(ctx: TenantContext, factureId: number): Promise<{ numero: string | null; totalTTC: string; statut: string; objet: string | null } | null>;
 }
 
 /*
