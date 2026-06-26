@@ -11,6 +11,7 @@ const stubRepo: IBudgetCategorieRepository = {
   },
   update: async () => null,
   delete: async () => false,
+  withDb: () => stubRepo,
 };
 
 describe("budgets-categories.module", () => {
@@ -19,13 +20,13 @@ describe("budgets-categories.module", () => {
     expect(module.deps.repository).toBe(stubRepo);
   });
 
-  it("le port expose CRUD + listByMois attendus", () => {
-    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "listByMois", "update"]);
+  it("le port expose CRUD + listByMois + withDb attendus", () => {
+    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "listByMois", "update", "withDb"]);
   });
 
-  it("expose un routeur tRPC assemblé (CRUD + byMois)", () => {
+  it("expose un routeur tRPC assemblé (CRUD + byMois + copierBudgetsMois)", () => {
     const module = createBudgetsCategoriesModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["byMois", "create", "delete", "getById", "list", "update"]);
+    expect(procedures).toEqual(["byMois", "copierBudgetsMois", "create", "delete", "getById", "list", "update"]);
   });
 });

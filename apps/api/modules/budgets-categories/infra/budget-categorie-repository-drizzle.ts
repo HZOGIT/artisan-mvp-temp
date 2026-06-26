@@ -129,4 +129,8 @@ export class BudgetCategorieRepositoryDrizzle implements IBudgetCategorieReposit
       return deleted.length > 0;
     });
   }
+
+  withDb(db: DbClient): BudgetCategorieRepositoryDrizzle {
+    return new BudgetCategorieRepositoryDrizzle(db);
+  }
 }
