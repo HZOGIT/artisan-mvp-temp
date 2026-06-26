@@ -242,6 +242,48 @@ await casBillingRender();
 await casBillingMutations();
 await casBillingChangePlan();
 await casBillingCancelReactivate();
+
+// ── CAS 7 — Anti-régression OPE-606 : routing /dashboard stable + /signin accessible ────────────────
+// Bug corrigé : gate onboarding utilisait navigate() custom (pushState + popstate synthétique) → conflit
+// TanStack Router → 24+ transitions /dashboard↔/onboarding. Fix : useNavigate de @tanstack/react-router.
+// Bug corrigé : 401 UNAUTHORIZED redirectait vers /login (inexistant). Fix : redirige vers /signin.
+// Ce cas vérifie : (1) /dashboard se charge sans boucle (< 5 navigations), (2) /signin répond 200.
+async function casSignupRoutingStable() {
+  casesRun++;
+  const tag = 'routing.signup-no-loop';
+  const page = await ctx.newPage();
+  const consoleErrors = [];
+  page.on('pageerror', (e) => consoleErrors.push(String(e).slice(0, 200)));
+  try {
+    let navCount = 0;
+    page.on('framenavigated', () => { navCount++; });
+    await page.goto('/dashboard', { waitUntil: 'networkidle', timeout: 15000 });
+    await page.waitForTimeout(2000);
+    if (navCount > 5) {
+      issues.push({ tag, error: `boucle de navigation détectée : ${navCount} transitions sur /dashboard`, consoleErrors });
+      return;
+    }
+    const finalUrl = new URL(page.url()).pathname;
+    if (finalUrl !== '/dashboard' && finalUrl !== '/onboarding') {
+      issues.push({ tag, error: `URL finale inattendue : ${finalUrl}`, navCount, consoleErrors });
+      return;
+    }
+    // Vérifier que /signin répond 200 (cible du redirect 401 — était /login avant fix)
+    const signinRes = await ctx.request.get('/signin');
+    if (!signinRes.ok()) {
+      issues.push({ tag, step: '/signin-accessible', error: `HTTP ${signinRes.status()}` });
+    }
+    if (consoleErrors.length > 0) {
+      issues.push({ tag, warning: 'erreurs console/pageerror', consoleErrors });
+    }
+  } catch (e) {
+    issues.push({ tag, error: String(e).slice(0, 200) });
+  } finally {
+    await page.close();
+  }
+}
+
+await casSignupRoutingStable();
 // ── (Ajouter ici les cas factures/contrats et tout futur bug d'intégration front↔tRPC) ─────────────
 
 console.log('=== E2E MUTATIONS RESULT ===');
