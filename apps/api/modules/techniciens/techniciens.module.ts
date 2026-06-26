@@ -1,3 +1,4 @@
+import type { DbClient } from "../../shared/db";
 import type { ITechnicienRepository } from "./application/technicien-repository";
 import { createTechniciensRouter } from "./interface/trpc/techniciens.router";
 
@@ -7,6 +8,7 @@ import { createTechniciensRouter } from "./interface/trpc/techniciens.router";
  */
 export interface TechniciensModuleDeps {
   readonly repository: ITechnicienRepository;
+  readonly db?: DbClient;
 }
 
 export interface TechniciensModule {
@@ -15,5 +17,5 @@ export interface TechniciensModule {
 }
 
 export function createTechniciensModule(deps: TechniciensModuleDeps): TechniciensModule {
-  return { deps, router: createTechniciensRouter(deps.repository) };
+  return { deps, router: createTechniciensRouter(deps.repository, deps.db) };
 }
