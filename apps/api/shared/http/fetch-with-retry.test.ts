@@ -66,7 +66,13 @@ describe("fetchWithRetry", () => {
   });
 
   it("aborts on timeout", async () => {
-    const fetchMock = vi.fn(() => new Promise(() => {}));
+    const fetchMock = vi.fn((_url, init) =>
+      new Promise((_, reject) => {
+        init.signal?.addEventListener("abort", () =>
+          reject(new DOMException("Aborted", "AbortError"))
+        );
+      })
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
