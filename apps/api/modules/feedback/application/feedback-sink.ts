@@ -5,5 +5,5 @@ export interface IFeedbackSink {
 }
 
 export const noopFeedbackSink: IFeedbackSink = {
-  submit: async () => ({ ok: false }),
+  submit: () => Promise.resolve({ ok: false }),
 };

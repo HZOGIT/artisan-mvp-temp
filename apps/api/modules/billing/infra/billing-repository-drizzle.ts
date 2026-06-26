@@ -27,8 +27,10 @@ import type {
   CreateInvoiceForCycleParams,
 } from "../application/billing-repository";
 
-/** billing_payment_methods : RLS tenant — accès via withTenant (UI uniquement).
- *  billing_subscriptions / billing_invoices : HORS RLS — scope explicite artisan_id. */
+/**
+ * billing_payment_methods : RLS tenant — accès via withTenant (UI uniquement).
+ * billing_subscriptions / billing_invoices : HORS RLS — scope explicite artisan_id.
+ */
 export class BillingRepositoryDrizzle implements IBillingRepository {
   constructor(private readonly db: DbClient) {}
 
