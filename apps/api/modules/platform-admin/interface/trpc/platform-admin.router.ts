@@ -85,7 +85,7 @@ export function createPlatformAdminRouter(db: DbClient) {
     }),
     llmUsage: router({
       summary: platformAdminProcedure
-        .input(z.object({ from: z.string().optional(), to: z.string().optional() }))
+        .input(z.object({}))
         .query(async () => {
           const rows = await db
             .select({
