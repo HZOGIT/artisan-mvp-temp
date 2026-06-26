@@ -100,7 +100,7 @@ export default function AssistantPage({ embedded = false, preprompt, onPreprompt
   useEffect(() => { if (speech.isListening) { userEditedRef.current = false; setInput(speech.transcript); } }, [speech.isListening, speech.transcript]);
   useEffect(() => { if (speech.error) toast.error(speech.error); }, [speech.error]);
 
-  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!e.target) return;
     (e.target as HTMLInputElement).value = "";
