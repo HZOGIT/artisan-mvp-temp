@@ -381,6 +381,10 @@ export class CommandeRepositoryDrizzle implements ICommandeRepository {
     });
   }
 
+  withDb(db: DbClient): CommandeRepositoryDrizzle {
+    return new CommandeRepositoryDrizzle(db);
+  }
+
   /** La commande appartient-elle au tenant ? (RLS + filtre artisanId) */
   private async ownsCommande(tx: DbClient, ctx: TenantContext, commandeId: number): Promise<boolean> {
     const [row] = await tx
