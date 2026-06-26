@@ -1,4 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
+import type { DbClient } from "../../../shared/db";
 import type { IFactureRepository, PaiementPatch, CreateAvoirInput, CreateFromDevisInput } from "../application/facture-repository";
 import type {
   Facture,
@@ -446,6 +447,10 @@ export class FakeFactureRepository implements IFactureRepository {
     this.lignesStore = this.lignesStore.filter((l) => l.id !== ligneId);
     this.recalculerTotaux(ligne.factureId);
     return true;
+  }
+
+  withDb(_db: DbClient): FakeFactureRepository {
+    return this;
   }
 
   private recalculerTotaux(factureId: number): void {

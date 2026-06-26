@@ -83,6 +83,8 @@ export interface IFactureRepository {
   updateLigne(ctx: TenantContext, ligneId: number, input: UpdateFactureLigneInput): Promise<FactureLigne | null>;
   /** false si la ligne ne relève pas d'une facture du tenant. */
   deleteLigne(ctx: TenantContext, ligneId: number): Promise<boolean>;
+  /** Retourne une instance du repo scopée à la transaction `db` (nécessaire pour withOutbox). */
+  withDb(db: DbClient): IFactureRepository;
 }
 
 /** Patch d'enregistrement de paiement (valeurs déjà calculées par le use-case). */
