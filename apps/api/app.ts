@@ -107,6 +107,7 @@ import { AuthRepositoryDrizzle } from "./modules/auth/infra/auth-repository-driz
 import type { IAuthRepository } from "./modules/auth/application/auth-repository";
 import { createSubscriptionModule } from "./modules/subscription/subscription.module";
 import { createBillingModule } from "./modules/billing/billing.module";
+import { buildEinvoicingModule } from "./modules/einvoicing/einvoicing.module";
 import { BillingRepositoryDrizzle } from "./modules/billing/infra/billing-repository-drizzle";
 import { BillingAdapter } from "./shared/ports/billing-adapter";
 import { mapPlan, normalizeStatus } from "./modules/billing/application/billing-migration";
@@ -980,6 +981,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     bibliotheque: deps.bibliothequeReader ?? new BibliothequeReaderDrizzle(getDbHandle().db),
   });
 
+  const einvoicing = buildEinvoicingModule({ PA_PROVIDER: process.env.PA_PROVIDER });
+
   const billingRepo = new BillingRepositoryDrizzle(getDbHandle().db);
   const billing = createBillingModule({
     repo: billingRepo,
@@ -988,7 +991,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   const platformAdmin = createPlatformAdminModule(getDbHandle().db);
 
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp, interventionsMobile, vitrine, clientPortal, integrationsComptables, devisIA, billing, platformAdmin });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp, interventionsMobile, vitrine, clientPortal, integrationsComptables, devisIA, billing, platformAdmin, einvoicing });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
