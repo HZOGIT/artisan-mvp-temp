@@ -8,8 +8,10 @@ const URL = process.env.DATABASE_URL;
 const SECRET = "test-secret-at-least-32-characters-long-xxxx";
 const UID_A = 9952401;
 const UID_B = 9952402;
+const UID_COLLAB = 9952403;
 const EMAIL_A = `u${UID_A}@t.fr`;
 const EMAIL_B = `u${UID_B}@t.fr`;
+const EMAIL_COLLAB = `u${UID_COLLAB}@t.fr`;
 
 const jwt = (userId: number) =>
   new SignJWT({ userId, email: userId === UID_A ? EMAIL_A : EMAIL_B }).setProtectedHeader({ alg: "HS256" }).setExpirationTime("1h").sign(new TextEncoder().encode(SECRET));
@@ -23,7 +25,7 @@ describe.skipIf(!URL)("events.list L2/L3 — isolation tenant (RLS off, filtre a
   const cleanup = async () => {
     await admin.query('delete from "events" where "artisanId" in (select id from artisans where "userId" in ($1,$2))', [UID_A, UID_B]);
     await admin.query('delete from artisans where "userId" in ($1,$2)', [UID_A, UID_B]);
-    await admin.query("delete from users where id in ($1,$2)", [UID_A, UID_B]);
+    await admin.query("delete from users where id in ($1,$2,$3)", [UID_A, UID_B, UID_COLLAB]);
   };
 
   beforeAll(async () => {
@@ -34,6 +36,7 @@ describe.skipIf(!URL)("events.list L2/L3 — isolation tenant (RLS off, filtre a
     const resB = await admin.query('insert into artisans ("userId","nomEntreprise") values ($1,$2) returning id', [UID_B, "Artisan B SARL"]);
     artisanIdA = resA.rows[0].id;
     artisanIdB = resB.rows[0].id;
+    await admin.query("insert into users (id, email, password, role, \"artisanId\") values ($1,$2,'x','secretaire',$3)", [UID_COLLAB, EMAIL_COLLAB, artisanIdA]);
 
     await admin.query(
       'insert into "events" ("artisanId", action, "entityType", "entityId", "occurred_at") values ($1, $2, $3, $4, now())',
@@ -89,5 +92,12 @@ describe.skipIf(!URL)("events.list L2/L3 — isolation tenant (RLS off, filtre a
     const items = res.json().result.data.items as Array<{ artisanId: number }>;
     expect(items.length).toBe(1);
     expect(items[0].artisanId).toBe(artisanIdB);
+  });
+
+  it("collaborateur (secrétaire/technicien, non-owner) → 403 FORBIDDEN", async () => {
+    const tok = await jwt(UID_COLLAB);
+    const res = await injectTrpc(app, "GET", "events.list", { page: 1 }, tok);
+    expect(res.statusCode).toBe(403);
+    expect(res.json().error).toBeDefined();
   });
 });

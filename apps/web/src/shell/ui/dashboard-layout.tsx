@@ -17,7 +17,7 @@ export interface DashboardLayoutProps {
   location: string;
   permissions: string[];
   modulesActifs: string[] | null;
-  user: { name?: string; email?: string; initial: string };
+  user: { name?: string; email?: string; initial: string; role?: string };
   logo?: string | null;
   entrepriseName?: string;
   onNavigate: (finalPath: string) => void;
@@ -40,7 +40,7 @@ export function DashboardLayout(props: DashboardLayoutProps) {
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [openMobileGroups, setOpenMobileGroups] = useState<Set<GroupId>>(new Set());
 
-  const groups = useMemo(() => buildSidebarGroups(permissions, modulesActifs), [permissions, modulesActifs]);
+  const groups = useMemo(() => buildSidebarGroups(permissions, modulesActifs, user.role), [permissions, modulesActifs, user.role]);
   const isActive = (p: string) => isPathActive(location, p);
   const activeGroup = resolveActiveGroup(groups, location);
   const activeItem = resolveActiveItem(groups, location);

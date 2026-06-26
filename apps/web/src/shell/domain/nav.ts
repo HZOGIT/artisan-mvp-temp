@@ -15,7 +15,7 @@ import {
 
 export type GroupId = "assistant" | "dashboard" | "commercial" | "clients" | "terrain" | "gestion" | "finance" | "parametres";
 export type NavColor = "violet" | "blue" | "emerald" | "orange" | "rose" | "cyan" | "slate" | "purple";
-export interface MenuItem { icon: LucideIcon; label: string; path: string; }
+export interface MenuItem { icon: LucideIcon; label: string; path: string; ownerOnly?: boolean; }
 export interface NavGroup { id: GroupId; title: string; icon: LucideIcon; color: NavColor; items: MenuItem[]; }
 
 export const NAV_GROUPS: NavGroup[] = [
@@ -88,7 +88,7 @@ export const NAV_GROUPS: NavGroup[] = [
     { icon: Mail, label: "Modèles Email", path: "/modeles-email" },
     { icon: Mail, label: "Modèles Transactionnels", path: "/modeles-email-transactionnels" },
     { icon: History, label: "Historique emails", path: "/historique-emails" },
-    { icon: Activity, label: "Mes événements", path: "/events-admin" },
+    { icon: Activity, label: "Mes événements", path: "/events-admin", ownerOnly: true },
     { icon: Users, label: "Utilisateurs", path: "/utilisateurs" },
   ] },
 ];
@@ -116,10 +116,11 @@ export const pathPermissionMap: Record<string, string> = {
   "/regles-depenses": "comptabilite.voir", "/modules": "", "/onboarding": "", "/import": "", "/events-admin": "",
 };
 
-/** Filtre les items d'un groupe selon les permissions. Vide → show-all. PUR. */
-export function filterGroupByPermissions(group: NavGroup, permissions: string[]): NavGroup {
-  if (permissions.length === 0) return group;
+/** Filtre les items d'un groupe selon les permissions et rôle. Vide → show-all. PUR. */
+export function filterGroupByPermissions(group: NavGroup, permissions: string[], userRole?: string): NavGroup {
+  if (permissions.length === 0 && !userRole) return group;
   return { ...group, items: group.items.filter((item) => {
+    if (item.ownerOnly && userRole !== "artisan") return false;
     const required = pathPermissionMap[item.path];
     if (!required) return true;
     return permissions.includes(required);
@@ -195,9 +196,9 @@ export const MOBILE_PRIMARY: { id: GroupId; path: string; label: string; icon: L
 ];
 
 /** Composition de la sidebar : permissions → modules actifs → drop des groupes vides. PUR (port lignes 763-767). */
-export function buildSidebarGroups(permissions: string[], modulesActifs: string[] | null): NavGroup[] {
+export function buildSidebarGroups(permissions: string[], modulesActifs: string[] | null, userRole?: string): NavGroup[] {
   return NAV_GROUPS
-    .map((g) => filterGroupByPermissions(g, permissions))
+    .map((g) => filterGroupByPermissions(g, permissions, userRole))
     .map((g) => filterGroupByModules(g, modulesActifs))
     .filter((g) => g.items.length > 0);
 }

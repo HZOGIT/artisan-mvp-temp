@@ -15,7 +15,7 @@ export function useShell() {
   });
   const me = meQ.data ?? null;
   return {
-    user: { name: me?.name ?? undefined, email: me?.email ?? undefined, initial: userInitial(me?.name, me?.email) },
+    user: { name: me?.name ?? undefined, email: me?.email ?? undefined, initial: userInitial(me?.name, me?.email), role: me?.role },
     permissions: (me?.permissions ?? []) as string[],
     modulesActifs: modulesQ.data ?? null,
     isLoading: meQ.isLoading,
