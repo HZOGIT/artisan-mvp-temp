@@ -49,6 +49,7 @@ export function DashboardLayoutMount() {
   const [searchOpen, setSearchOpen] = useState(false);
   /** Auto-open du panneau assistant sur desktop large (port du comportement legacy). */
   const [assistantOpen, setAssistantOpen] = useState(initialAssistantOpen);
+  const [pendingPreprompt, setPendingPreprompt] = useState<string | null>(null);
   /** Taille du panneau (sm/md/lg) persistée en localStorage. */
   const [panelSize, setPanelSize] = useState<AssistantPanelSize>(readPanelSize);
   useEffect(() => { writePanelSize(panelSize); }, [panelSize]);
@@ -67,7 +68,11 @@ export function DashboardLayoutMount() {
    * de rouvrir le panneau IA sans prop-drilling (port du comportement legacy).
    */
   useEffect(() => {
-    const onOpen = () => setAssistantOpen(true);
+    const onOpen = (e: Event) => {
+      setAssistantOpen(true);
+      const pp = (e as CustomEvent<{ preprompt?: string }>).detail?.preprompt ?? null;
+      if (pp) setPendingPreprompt(pp);
+    };
     window.addEventListener("operioz:open-assistant", onOpen);
     return () => window.removeEventListener("operioz:open-assistant", onOpen);
   }, []);
@@ -101,7 +106,7 @@ export function DashboardLayoutMount() {
         assistant={
           <>
             <AssistantFAB onClick={() => setAssistantOpen(true)} hidden={isAssistantPage || assistantOpen} />
-            <AssistantDrawer open={assistantOpen} onClose={() => setAssistantOpen(false)} panelSize={panelSize} onPanelSizeChange={setPanelSize} />
+            <AssistantDrawer open={assistantOpen} onClose={() => setAssistantOpen(false)} panelSize={panelSize} onPanelSizeChange={setPanelSize} preprompt={pendingPreprompt} onPrepromptConsumed={() => setPendingPreprompt(null)} />
           </>
         }
       >
