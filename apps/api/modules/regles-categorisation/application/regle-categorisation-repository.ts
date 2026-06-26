@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { RegleCategorisation, CreateRegleInput, UpdateRegleInput } from "../domain/regle-categorisation";
 
@@ -15,4 +16,5 @@ export interface IRegleCategorisationRepository {
   update(ctx: TenantContext, id: number, input: UpdateRegleInput): Promise<RegleCategorisation | null>;
   /** false si la règle n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
+  withDb(db: DbClient): IRegleCategorisationRepository;
 }

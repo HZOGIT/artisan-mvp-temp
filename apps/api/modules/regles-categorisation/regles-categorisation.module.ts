@@ -1,3 +1,4 @@
+import type { DbClient } from "../../shared/db";
 import type { IRegleCategorisationRepository } from "./application/regle-categorisation-repository";
 import { createReglesCategorisationRouter } from "./interface/trpc/regles-categorisation.router";
 
@@ -7,6 +8,7 @@ import { createReglesCategorisationRouter } from "./interface/trpc/regles-catego
  */
 export interface ReglesCategorisationModuleDeps {
   readonly repository: IRegleCategorisationRepository;
+  readonly db?: DbClient;
 }
 
 export interface ReglesCategorisationModule {
@@ -15,5 +17,5 @@ export interface ReglesCategorisationModule {
 }
 
 export function createReglesCategorisationModule(deps: ReglesCategorisationModuleDeps): ReglesCategorisationModule {
-  return { deps, router: createReglesCategorisationRouter(deps.repository) };
+  return { deps, router: createReglesCategorisationRouter(deps.repository, deps.db) };
 }
