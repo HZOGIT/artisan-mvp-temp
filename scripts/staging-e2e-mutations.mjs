@@ -11,6 +11,8 @@
 import { chromium } from 'playwright';
 
 const BASE = process.env.BASE || 'https://staging.operioz.com';
+/* Front et backend sont sur deux domaines : les appels /api/* visent le backend DIRECT (plus de proxy
+ * same-origin). Les pages (page.goto) restent sur BASE (le domaine front). Cf. shared/backend-url.ts. */
 const BACKEND = process.env.BACKEND || 'https://staging-backend.operioz.com';
 const EMAIL = process.env.E2E_EMAIL || 'dev@operioz.com';
 const PASS = process.env.E2E_PASS || '';
@@ -18,13 +20,13 @@ const issues = [];
 
 const browser = await chromium.launch({ args: ['--no-sandbox'] });
 const ctx = await browser.newContext({ baseURL: BASE, ignoreHTTPSErrors: true });
-const signin = await ctx.request.post('/api/trpc/auth.signin?batch=1', {
+const signin = await ctx.request.post(`${BACKEND}/api/trpc/auth.signin?batch=1`, {
   headers: { 'content-type': 'application/json' }, data: { '0': { json: { email: EMAIL, password: PASS } } },
 });
 if (!signin.ok()) { console.log(JSON.stringify({ fatal: `login failed HTTP ${signin.status()}` })); await browser.close(); process.exit(2); }
 
 const trpcGet = async (path, input) => {
-  const r = await ctx.request.get(`/api/trpc/${path}?batch=1&input=` + encodeURIComponent(JSON.stringify({ 0: { json: input } })));
+  const r = await ctx.request.get(`${BACKEND}/api/trpc/${path}?batch=1&input=` + encodeURIComponent(JSON.stringify({ 0: { json: input } })));
   return (await r.json())[0]?.result?.data?.json;
 };
 
@@ -123,7 +125,7 @@ async function casBillingRender() {
 async function casBillingMutations() {
   casesRun++;
   const tag = 'billing.mutations-persist';
-  const trpcPost = async (proc, input) => ctx.request.post(`/api/trpc/${proc}?batch=1`, {
+  const trpcPost = async (proc, input) => ctx.request.post(`${BACKEND}/api/trpc/${proc}?batch=1`, {
     headers: { 'content-type': 'application/json' },
     data: { '0': { json: input } },
   });
@@ -174,7 +176,7 @@ async function casBillingMutations() {
 async function casBillingChangePlan() {
   casesRun++;
   const tag = 'billing.changePlan-persist';
-  const trpcPost = async (proc, input) => ctx.request.post(`/api/trpc/${proc}?batch=1`, {
+  const trpcPost = async (proc, input) => ctx.request.post(`${BACKEND}/api/trpc/${proc}?batch=1`, {
     headers: { 'content-type': 'application/json' },
     data: { '0': { json: input } },
   });
@@ -205,7 +207,7 @@ async function casBillingChangePlan() {
 async function casBillingCancelReactivate() {
   casesRun++;
   const tag = 'billing.cancelAtPeriodEnd+reactivate';
-  const trpcPost = async (proc, input) => ctx.request.post(`/api/trpc/${proc}?batch=1`, {
+  const trpcPost = async (proc, input) => ctx.request.post(`${BACKEND}/api/trpc/${proc}?batch=1`, {
     headers: { 'content-type': 'application/json' },
     data: { '0': { json: input } },
   });
@@ -284,47 +286,63 @@ async function casSignupRoutingStable() {
   }
 }
 
-await casSignupRoutingStable();
-
-// ── CAS 7b — Anti-régression OPE-642 : compte NEUF (onboardingCompleted=false) → PAS de boucle ──────
-// CAS 7 utilise dev@operioz.com (onboardingCompleted=true) → le gate onboarding ne se déclenche JAMAIS,
-// donc il NE COUVRE PAS la boucle. Seul un compte fraîchement créé (onboardingCompleted=false) déclenche
-// le gate. Bug OPE-642 : le gate faisait `tsNavigate('/onboarding')` (route HORS du sous-arbre shell) →
-// collision avec la ré-assertion d'historique TanStack → 29-32 transitions /dashboard↔/onboarding.
-// Fix : navigation pleine page (`window.location.replace('/onboarding')`), comme home→/dashboard.
+// ── CAS 7b — Anti-régression OPE-642 : COMPTE NEUF (onboardingCompleted=false) sans boucle ──────────
+// Le vrai déclencheur du bug : un compte dont l'onboarding n'est PAS terminé. dev@operioz.com a
+// onboardingCompleted=true → ne déclenche jamais la gate (CAS 7 ne couvrait donc pas la boucle).
+// Cause racine : le gate (dashboard-layout-mount) redirigeait vers /onboarding via tsNavigate, or
+// /onboarding vit HORS du sous-arbre du shell → la navigation in-router franchit deux arbres de routes
+// et entre en collision avec la ré-assertion d'historique de TanStack → boucle /dashboard↔/onboarding
+// (29-32 navigations sur compte neuf). Fix : navigation pleine page (window.location.replace), comme la
+// redirection sœur /home→/dashboard. Ce cas reproduit le déclencheur réel (signup neuf + goto('/')) et
+// vérifie qu'on atterrit sur /onboarding SANS boucle.
 async function casSignupNeufNoLoop() {
   casesRun++;
   const tag = 'routing.signup-neuf-no-loop';
   const freshCtx = await browser.newContext({ baseURL: BASE, ignoreHTTPSErrors: true });
+  const email = `e2e_onboarding_${Date.now()}@test.operioz.com`;
+  const page = await freshCtx.newPage();
+  const pageErrors = [];
+  page.on('pageerror', (e) => pageErrors.push(String(e).slice(0, 200)));
+  let signedUp = false;
   try {
-    const email = `e2e642+${Date.now()}@operioz.com`;
-    const su = await freshCtx.request.post(`${BACKEND}/api/trpc/auth.signup?batch=1`, {
+    const res = await freshCtx.request.post(`${BACKEND}/api/trpc/auth.signup?batch=1`, {
       headers: { 'content-type': 'application/json' },
-      data: { '0': { json: { email, password: PASS || 'Azerqsdf1234!', name: 'E2E 642' } } },
+      data: { '0': { json: { email, password: PASS || 'Azerqsdf1234!', name: 'E2E Onboarding' } } },
     });
-    if (!su.ok()) { issues.push({ tag, step: 'signup', error: `HTTP ${su.status()}` }); return; }
-    const page = await freshCtx.newPage();
+    if (!res.ok()) { issues.push({ tag, step: 'signup', error: `HTTP ${res.status()}` }); return; }
+    signedUp = true;
     let navCount = 0;
     page.on('framenavigated', (f) => { if (f === page.mainFrame()) navCount++; });
-    try {
-      await page.goto('/', { waitUntil: 'load', timeout: 20000 });
-      await page.waitForTimeout(6000);
-      const finalUrl = new URL(page.url()).pathname;
-      if (navCount > 8) {
-        issues.push({ tag, error: `boucle onboarding détectée : ${navCount} navigations`, finalUrl });
-      } else if (finalUrl !== '/onboarding') {
-        issues.push({ tag, error: `compte neuf attendu sur /onboarding, obtenu ${finalUrl}`, navCount });
-      }
-    } finally {
-      await page.close();
+    await page.goto('/', { waitUntil: 'load', timeout: 20000 });
+    await page.waitForTimeout(6000);
+    const finalUrl = new URL(page.url()).pathname;
+    if (navCount > 8) {
+      issues.push({ tag, error: `boucle détectée sur compte neuf : ${navCount} navigations`, finalUrl, pageErrors });
+      return;
+    }
+    if (finalUrl !== '/onboarding') {
+      issues.push({ tag, error: `compte neuf devrait atterrir sur /onboarding, obtenu ${finalUrl}`, navCount, pageErrors });
+      return;
+    }
+    if (pageErrors.length > 0) {
+      issues.push({ tag, warning: 'erreurs pageerror', pageErrors });
     }
   } catch (e) {
     issues.push({ tag, error: String(e).slice(0, 200) });
   } finally {
+    if (signedUp) {
+      try {
+        await freshCtx.request.post(`${BACKEND}/api/trpc/auth.deleteAccount?batch=1`, {
+          headers: { 'content-type': 'application/json' }, data: { '0': { json: { confirmation: 'SUPPRIMER' } } },
+        });
+      } catch { /* nettoyage best-effort */ }
+    }
+    await page.close();
     await freshCtx.close();
   }
 }
 
+await casSignupRoutingStable();
 await casSignupNeufNoLoop();
 // ── (Ajouter ici les cas factures/contrats et tout futur bug d'intégration front↔tRPC) ─────────────
 

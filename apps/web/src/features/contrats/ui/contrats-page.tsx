@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { apiUrl } from "@/shared/backend-url";
 import { format } from "date-fns";
 import { Plus, Pencil, Trash2, FileText, Loader2, Search, Eye, Download } from "lucide-react";
 import { Button } from "@/shared/ui/button";
@@ -355,7 +356,7 @@ export default function ContratsPage() {
                           <Eye className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" asChild title={t("telechargerPdf")}>
-                          <a href={`/api/contrats/${contrat.id}/pdf`} target="_blank" rel="noopener noreferrer">
+                          <a href={apiUrl(`/api/contrats/${contrat.id}/pdf`)} target="_blank" rel="noopener noreferrer">
                             <Download className="h-4 w-4" />
                           </a>
                         </Button>

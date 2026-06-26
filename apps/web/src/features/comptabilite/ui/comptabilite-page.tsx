@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { apiUrl } from "@/shared/backend-url";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
@@ -63,7 +64,7 @@ export default function ComptabilitePage() {
   };
 
   const downloadFec = () => {
-    const url = `/api/comptabilite/fec?dateDebut=${dateDebut}&dateFin=${dateFin}`;
+    const url = apiUrl(`/api/comptabilite/fec?dateDebut=${dateDebut}&dateFin=${dateFin}`);
     const a = document.createElement('a');
     a.href = url;
     a.download = '';
@@ -72,7 +73,7 @@ export default function ComptabilitePage() {
   };
 
   const downloadCsv = () => {
-    const url = `/api/comptabilite/export-csv?dateDebut=${dateDebut}&dateFin=${dateFin}`;
+    const url = apiUrl(`/api/comptabilite/export-csv?dateDebut=${dateDebut}&dateFin=${dateFin}`);
     const a = document.createElement('a');
     a.href = url;
     a.download = '';
@@ -81,7 +82,7 @@ export default function ComptabilitePage() {
   };
 
   const downloadPdfLot = () => {
-    const url = `/api/comptabilite/export-pdf-lot?dateDebut=${dateDebut}&dateFin=${dateFin}`;
+    const url = apiUrl(`/api/comptabilite/export-pdf-lot?dateDebut=${dateDebut}&dateFin=${dateFin}`);
     const a = document.createElement('a');
     a.href = url;
     a.download = '';
@@ -90,7 +91,7 @@ export default function ComptabilitePage() {
   };
 
   const downloadFacturxLot = () => {
-    const url = `/api/comptabilite/export-facturx-lot?dateDebut=${dateDebut}&dateFin=${dateFin}`;
+    const url = apiUrl(`/api/comptabilite/export-facturx-lot?dateDebut=${dateDebut}&dateFin=${dateFin}`);
     const a = document.createElement('a');
     a.href = url;
     a.download = '';

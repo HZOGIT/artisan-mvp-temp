@@ -4,6 +4,7 @@ import { useLocation } from "@/shared/router/navigation";
 import { Outlet } from "@tanstack/react-router";
 import { Search } from "lucide-react";
 import { trpc } from "@/shared/trpc";
+import { apiUrl } from "@/shared/backend-url";
 import { useShell } from "../application/use-shell";
 import { usePushSubscription } from "../application/use-push-subscription";
 import { accountBlockState } from "../domain/subscription";
@@ -104,7 +105,7 @@ export function DashboardLayoutMount() {
           </>
         }
       >
-        {isBlocked && !blockerAllowed ? <ExpiredBlocker onExportData={() => { window.location.href = "/api/rgpd/export"; }} /> : <Outlet />}
+        {isBlocked && !blockerAllowed ? <ExpiredBlocker onExportData={() => { window.location.href = apiUrl("/api/rgpd/export"); }} /> : <Outlet />}
       </DashboardLayout>
       <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
     </>
