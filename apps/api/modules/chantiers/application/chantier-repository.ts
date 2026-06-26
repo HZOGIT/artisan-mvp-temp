@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type {
   Chantier,
@@ -126,4 +127,6 @@ export interface IChantierRepository {
   sumDepensesChantier(ctx: TenantContext, chantierId: number): Promise<string>;
   /** Met à jour l'avancement (0..100) d'un chantier possédé (scopé tenant). Ownership vérifiée en amont. */
   setAvancement(ctx: TenantContext, chantierId: number, avancement: number): Promise<void>;
+  /** Retourne une instance utilisant `db` comme pool (requis par withOutbox). */
+  withDb(db: DbClient): IChantierRepository;
 }

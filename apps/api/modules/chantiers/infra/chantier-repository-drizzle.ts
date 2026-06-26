@@ -584,4 +584,8 @@ export class ChantierRepositoryDrizzle implements IChantierRepository {
       await tx.update(chantiers).set({ avancement, updatedAt: new Date() }).where(eq(chantiers.id, chantierId));
     });
   }
+
+  withDb(db: DbClient): ChantierRepositoryDrizzle {
+    return new ChantierRepositoryDrizzle(db);
+  }
 }
