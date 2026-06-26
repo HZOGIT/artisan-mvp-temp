@@ -294,6 +294,7 @@ export interface AppDeps extends ContextDeps {
    */
   readonly vehiculeRepo?: IVehiculeRepository;
   readonly avisRepo?: IAvisRepository;
+  readonly avisDb?: DbClient;
   /** Dépendances du workflow demande d'avis (injectables en test : email/rate-limiter fakes). */
   readonly demandeAvisRepo?: IDemandeAvisRepository;
   readonly emailPort?: EmailPort;
@@ -499,6 +500,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       contextReader: new PublicDemandeContextReaderDrizzle(getDbHandle().db),
       writer: new PublicAvisWriterDrizzle(getDbHandle().db),
     },
+    db: deps.avisDb ?? getDbHandle().db,
   });
   const badgeRepo = deps.badgeRepo ?? new BadgeRepositoryDrizzle(getDbHandle().db);
   const badges = createBadgesModule({ repository: badgeRepo, db: deps.badgesDb ?? getDbHandle().db });

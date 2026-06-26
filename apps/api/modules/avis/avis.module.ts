@@ -1,3 +1,4 @@
+import type { DbClient } from "../../shared/db";
 import type { IAvisRepository } from "./application/avis-repository";
 import type { DemandeAvisDeps } from "./application/demande-avis-use-cases";
 import type { AvisPublicDeps } from "./application/avis-public-use-cases";
@@ -12,6 +13,7 @@ export interface AvisModuleDeps {
   readonly avisRepo: IAvisRepository;
   readonly demande: DemandeAvisDeps;
   readonly public: AvisPublicDeps;
+  readonly db?: DbClient;
 }
 
 export interface AvisModule {
@@ -20,5 +22,5 @@ export interface AvisModule {
 }
 
 export function createAvisModule(deps: AvisModuleDeps): AvisModule {
-  return { deps, router: createAvisRouter(deps.avisRepo, deps.demande, deps.public) };
+  return { deps, router: createAvisRouter(deps.avisRepo, deps.demande, deps.public, deps.db) };
 }

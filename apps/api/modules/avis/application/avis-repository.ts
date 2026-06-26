@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { Avis, AvisEnrichi, AvisStats, StatutAvis } from "../domain/avis";
 
@@ -6,6 +7,7 @@ import type { Avis, AvisEnrichi, AvisStats, StatutAvis } from "../domain/avis";
  * Gestion des avis côté artisan : consultation, statistiques, réponse, modération de statut.
  */
 export interface IAvisRepository {
+  withDb(db: DbClient): IAvisRepository;
   list(ctx: TenantContext): Promise<Avis[]>;
   /** Liste enrichie du client + intervention liés (résumés), scopée tenant (jointures RLS). */
   listEnrichi(ctx: TenantContext): Promise<AvisEnrichi[]>;

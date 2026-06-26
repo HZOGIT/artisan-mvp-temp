@@ -33,6 +33,10 @@ function toAvis(r: AvisRow): Avis {
 export class AvisRepositoryDrizzle implements IAvisRepository {
   constructor(private readonly db: DbClient) {}
 
+  withDb(db: DbClient): AvisRepositoryDrizzle {
+    return new AvisRepositoryDrizzle(db);
+  }
+
   list(ctx: TenantContext): Promise<Avis[]> {
     return withTenant(this.db, ctx, async (tx) => {
       const rows = await tx

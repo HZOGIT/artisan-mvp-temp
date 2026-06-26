@@ -1,4 +1,7 @@
 import { z } from "zod";
+import type { DbClient } from "../../../../shared/db";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
+import { withOutbox } from "../../../../shared/events/with-outbox";
 import { router, protectedProcedure, publicProcedure } from "../../../../interface/trpc/trpc";
 import type { IAvisRepository } from "../../application/avis-repository";
 import { listAvisEnrichi, getAvis, getAvisStats } from "../../application/read-use-cases";
@@ -22,7 +25,7 @@ const modererSchema = z.object({ avisId: z.number().int(), statut: z.enum(["publ
  * dépendances du workflow demande d'avis injectés (DI) → testable.
  * `getAll` = alias de `list` (parité legacy).
  */
-export function createAvisRouter(repo: IAvisRepository, demandeDeps: DemandeAvisDeps, publicDeps: AvisPublicDeps) {
+export function createAvisRouter(repo: IAvisRepository, demandeDeps: DemandeAvisDeps, publicDeps: AvisPublicDeps, db?: DbClient) {
   return router({
     /** Parité legacy : list/getAll renvoient l'avis enrichi (client + intervention). */
     list: protectedProcedure.query(({ ctx }) => listAvisEnrichi(repo, ctx.tenant)),
@@ -36,19 +39,26 @@ export function createAvisRouter(repo: IAvisRepository, demandeDeps: DemandeAvis
 
     repondre: protectedProcedure
       .input(repondreSchema)
-      .mutation(async ({ ctx, input }) => {
-        const result = await repondreAvis(repo, ctx.tenant, input.avisId, input.reponse);
-        ctx.log.info({ event: "avis_repondu", avisId: input.avisId }, "Réponse artisan publiée");
-        return result;
-      }),
+      .mutation(({ ctx, input }) =>
+        withOutbox(db, repo, async (r, tx) => {
+          const result = await repondreAvis(r, ctx.tenant, input.avisId, input.reponse);
+          ctx.log.info({ event: "avis_repondu", avisId: input.avisId }, "Réponse artisan publiée");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "avis.repondu", entityType: "avis", entityId: result.id, payload: { avisId: result.id, clientId: result.clientId, note: result.note, reponse: result.reponseArtisan } });
+          return result;
+        }),
+      ),
 
     moderer: protectedProcedure
       .input(modererSchema)
-      .mutation(async ({ ctx, input }) => {
-        const result = await changerStatutAvis(repo, ctx.tenant, input.avisId, input.statut);
-        ctx.log.info({ event: "avis_modere", avisId: input.avisId, statut: input.statut }, `Avis ${input.statut}`);
-        return result;
-      }),
+      .mutation(({ ctx, input }) =>
+        withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.avisId);
+          const result = await changerStatutAvis(r, ctx.tenant, input.avisId, input.statut);
+          ctx.log.info({ event: "avis_modere", avisId: input.avisId, statut: input.statut }, `Avis ${input.statut}`);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "avis.statut_change", entityType: "avis", entityId: result.id, payload: { avisId: result.id, statutAvant: before?.statut ?? null, statutApres: result.statut } });
+          return result;
+        }),
+      ),
 
     /** Workflow demande d'avis (parité legacy) : envoi d'un lien d'avis au client. */
     envoyerDemande: protectedProcedure

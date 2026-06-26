@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IAvisRepository } from "../application/avis-repository";
 import type { Avis, AvisClientResume, AvisEnrichi, AvisInterventionResume, AvisStats, StatutAvis } from "../domain/avis";
@@ -31,6 +32,10 @@ export class FakeAvisRepository implements IAvisRepository {
   private clientsStore: SeedClient[] = [];
   private interventionsStore: SeedIntervention[] = [];
   private seq = 0;
+
+  withDb(_db: DbClient): IAvisRepository {
+    return this;
+  }
 
   /** Utilitaires de test (hors port) pour alimenter les jointures enrichies. */
   seedClient(c: SeedClient): void {
