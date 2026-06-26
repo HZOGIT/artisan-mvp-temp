@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "@tanstack/react-router";
 import { trpc } from "@/shared/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
@@ -35,8 +36,18 @@ function PayloadCell({ payload }: { payload: unknown }) {
 
 export default function EventsAdminPage() {
   const { t } = useTranslation("events-admin");
+  const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [typeInput, setTypeInput] = useState("");
+
+  const meQ = trpc.auth.me.useQuery();
+  const userRole = meQ.data?.role;
+
+  useEffect(() => {
+    if (userRole && userRole !== "artisan") {
+      navigate({ to: "/dashboard" });
+    }
+  }, [userRole, navigate]);
 
   const type = typeInput.trim() || undefined;
 

@@ -31,6 +31,14 @@ describe("shell/nav — domain pur (port fidèle DashboardLayout)", () => {
     expect(params.items.map((i) => i.path)).toContain("/profil");
   });
 
+  it("filterGroupByPermissions : ownerOnly filtre par rôle artisan", () => {
+    const params = group("parametres");
+    const withArtisan = filterGroupByPermissions(params, [], "artisan");
+    expect(withArtisan.items.map((i) => i.label)).toContain("Mes événements");
+    const withoutArtisan = filterGroupByPermissions(params, [], "secretaire");
+    expect(withoutArtisan.items.map((i) => i.label)).not.toContain("Mes événements");
+  });
+
   it("filterGroupByModules : null → show-all ; ALWAYS_VISIBLE toujours là ; item filtré si module inactif", () => {
     const commercial = group("commercial");
     expect(filterGroupByModules(commercial, null).items).toHaveLength(commercial.items.length);
