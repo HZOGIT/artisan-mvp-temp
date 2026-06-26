@@ -341,4 +341,8 @@ export class ContratRepositoryDrizzle implements IContratRepository {
         .where(and(eq(contratsMaintenance.id, id), eq(contratsMaintenance.artisanId, ctx.artisanId)));
     });
   }
+
+  withDb(db: DbClient): ContratRepositoryDrizzle {
+    return new ContratRepositoryDrizzle(db);
+  }
 }

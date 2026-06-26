@@ -214,4 +214,8 @@ export class FakeContratRepository implements IContratRepository {
     const idx = this.store.findIndex((c) => c.id === id && c.artisanId === ctx.artisanId);
     if (idx !== -1) this.store[idx] = { ...this.store[idx], alerteReconductionEnvoyeeLe: new Date() };
   }
+
+  withDb(_db: unknown): this {
+    return this;
+  }
 }
