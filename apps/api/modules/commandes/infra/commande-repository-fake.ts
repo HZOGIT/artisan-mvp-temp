@@ -88,6 +88,7 @@ export class FakeCommandeRepository implements ICommandeRepository {
       notes: input.notes ?? null,
       statutFacturation: "a_facturer",
       depenseId: null,
+      alerteRetardEnvoyee: false,
       createdAt: now,
       updatedAt: now,
     };
@@ -197,6 +198,12 @@ export class FakeCommandeRepository implements ICommandeRepository {
     };
     this.store = this.store.map((x) => (x.id === commandeId ? updated : x));
     return updated;
+  }
+
+  async markAlerteSent(ctx: TenantContext, id: number): Promise<void> {
+    this.store = this.store.map((c) =>
+      c.id === id && c.artisanId === ctx.artisanId ? { ...c, alerteRetardEnvoyee: true } : c,
+    );
   }
 
   async setStatutFacturation(

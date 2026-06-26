@@ -43,6 +43,8 @@ export interface ICommandeRepository {
   ): Promise<Commande | null>;
   /** Commandes du tenant en retard de livraison (échéance dépassée, non livrées/annulées). */
   listEnRetard(ctx: TenantContext): Promise<Commande[]>;
+  /** Pose le flag idempotence alerte retard (scoped tenant). */
+  markAlerteSent(ctx: TenantContext, id: number): Promise<void>;
 
   /*
    * Enregistre la réception (quantiteRecue par ligne) — n'affecte que les lignes de CETTE

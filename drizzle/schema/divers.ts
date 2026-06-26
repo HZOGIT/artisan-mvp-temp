@@ -159,6 +159,7 @@ export const commandesFournisseurs = pgTable("commandes_fournisseurs", {
   notes: text("notes"),
   statutFacturation: commandeStatutFacturationEnum("statutFacturation").default("a_facturer"),
   depenseId: integer("depenseId"),
+  alerteRetardEnvoyee: boolean("alerteRetardEnvoyee").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
