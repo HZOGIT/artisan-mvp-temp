@@ -5,7 +5,6 @@ import { NOOP_COMPTA } from "./application/compta-port";
 import type { FactureMailingDeps } from "./application/envoyer-facture-email";
 import type { PushPort } from "../../shared/push/web-push-adapter";
 import type { DbClient } from "../../shared/db";
-import type { EventBusPort } from "../../shared/ports/event-bus";
 import { createFacturesRouter } from "./interface/trpc/factures.router";
 
 /*
@@ -23,7 +22,8 @@ export interface FacturesModuleDeps {
   readonly push?: PushPort;
   /** Outbox PA : insert dans pa_outbox dans la même tx que setStatut (atomicité réglementaire). */
   readonly outboxInTx?: (artisanId: number, factureId: number, tx: DbClient) => Promise<void>;
-  readonly eventBus?: EventBusPort;
+  /** Pool DB pour les transactions outbox events (défaut : sans outbox). */
+  readonly db?: DbClient;
 }
 
 export interface FacturesModule {
@@ -32,5 +32,5 @@ export interface FacturesModule {
 }
 
 export function createFacturesModule(deps: FacturesModuleDeps): FacturesModule {
-  return { deps, router: createFacturesRouter(deps.repository, deps.devisReader, deps.compta ?? NOOP_COMPTA, deps.mailing, deps.push, deps.outboxInTx, deps.eventBus) };
+  return { deps, router: createFacturesRouter(deps.repository, deps.devisReader, deps.compta ?? NOOP_COMPTA, deps.mailing, deps.push, deps.outboxInTx, deps.db) };
 }

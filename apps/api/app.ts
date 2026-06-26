@@ -324,6 +324,8 @@ export interface AppDeps extends ContextDeps {
   /** Pool DB pour les transactions outbox du module devis (défaut : getDbHandle().db). */
   readonly devisDb?: DbClient;
   readonly factureRepo?: IFactureRepository;
+  /** Pool DB pour les transactions outbox events du module factures (défaut : getDbHandle().db). */
+  readonly facturesDb?: DbClient;
   readonly devisReader?: IDevisReader;
   readonly compta?: ComptaPort;
   readonly ecritureRepo?: IEcritureRepository;
@@ -678,7 +680,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     push: pushAdapter,
     outboxInTx: (artisanId, factureId, tx) =>
       tx.insert(paOutbox).values({ artisanId, factureId, statut: "pending", tentatives: 0 }).then(() => {}),
-    eventBus,
+    db: deps.facturesDb ?? getDbHandle().db,
   });
   /*
    * Domaine compta/écritures — lecture seule (balance/grand-livre/FEC). La génération est

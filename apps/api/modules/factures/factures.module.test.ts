@@ -40,6 +40,7 @@ const stubRepo: IFactureRepository = {
   addLigne: async () => null,
   updateLigne: async () => null,
   deleteLigne: async () => false,
+  withDb: () => stubRepo,
 };
 
 describe("factures.module", () => {
@@ -48,7 +49,7 @@ describe("factures.module", () => {
     expect(module.deps.repository).toBe(stubRepo);
   });
 
-  it("le port expose les opérations attendues (CRUD + statut + numéro + ownership + lignes)", () => {
+  it("le port expose les opérations attendues (CRUD + statut + numéro + ownership + lignes + withDb)", () => {
     expect(Object.keys(stubRepo).sort()).toEqual([
       "addLigne",
       "create",
@@ -70,6 +71,7 @@ describe("factures.module", () => {
       "setStatut",
       "update",
       "updateLigne",
+      "withDb",
     ]);
   });
 

@@ -609,6 +609,10 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
       .where(eq(factures.id, factureId));
   }
 
+  withDb(db: DbClient): FactureRepositoryDrizzle {
+    return new FactureRepositoryDrizzle(db);
+  }
+
   /** La facture appartient-elle au tenant ? (RLS + filtre artisanId) */
   private async ownsFacture(tx: DbClient, ctx: TenantContext, factureId: number): Promise<boolean> {
     const [row] = await tx
