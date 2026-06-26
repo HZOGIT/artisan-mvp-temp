@@ -52,11 +52,12 @@ export interface MontantsAvoirLigne extends MontantsLigne {
   readonly prixUnitaireHT: string;
 }
 
-export function calculerMontantsAvoirLigne(quantite: string, prixUnitaireHT: string, tauxTVA: string): MontantsAvoirLigne {
+export function calculerMontantsAvoirLigne(quantite: string, prixUnitaireHT: string, tauxTVA: string, remise = "0"): MontantsAvoirLigne {
   const q = Math.abs(Number(quantite) || 0);
   const pu = Math.abs(Number(prixUnitaireHT) || 0);
   const taux = Number(tauxTVA) || 0;
-  const ht = -round2(q * pu);
+  const r = Math.min(100, Math.max(0, Number(remise) || 0));
+  const ht = -round2(q * pu * (1 - r / 100));
   const tva = round2(ht * (taux / 100));
   return {
     prixUnitaireHT: (-pu).toFixed(2),
