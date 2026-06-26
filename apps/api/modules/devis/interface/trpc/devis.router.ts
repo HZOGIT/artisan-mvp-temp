@@ -141,44 +141,54 @@ export function createDevisRouter(
         const result = await creerDevis(repo, ctx.tenant, { ...input, dateValidite: toDate(input.dateValidite) });
         ctx.log.info({ event: "devis_created", devisId: result.id, clientId: input.clientId }, "Devis créé");
         push?.sendToUser(ctx.tenant.artisanId, { title: "Operioz", body: `Nouveau devis ${result.numero} créé` }).catch(() => undefined);
+        if (eventBus) emitEvent(eventBus, ctx.tenant, { type: "created", entityType: "devis", entityId: result.id, payload: { numero: result.numero, clientId: result.clientId, totalTTC: result.totalTTC, statut: result.statut } });
         return result;
       }),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { id, dateValidite, ...data } = input;
-        return modifierDevis(repo, ctx.tenant, id, { ...data, dateValidite: toDate(dateValidite) });
+        const result = await modifierDevis(repo, ctx.tenant, id, { ...data, dateValidite: toDate(dateValidite) });
+        if (eventBus) emitEvent(eventBus, ctx.tenant, { type: "updated", entityType: "devis", entityId: id, payload: { objet: result.objet, referenceClient: result.referenceClient } });
+        return result;
       }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
+        const before = await repo.getById(ctx.tenant, input.id);
         await supprimerDevis(repo, ctx.tenant, input.id);
+        if (eventBus) emitEvent(eventBus, ctx.tenant, { type: "deleted", entityType: "devis", entityId: input.id, payload: { snapshot: { numero: before?.numero, totalTTC: before?.totalTTC, statut: before?.statut, clientId: before?.clientId } } });
         return { success: true };
       }),
 
     addLigne: devisCreer
       .input(z.object({ devisId: z.number().int() }).and(ligneCreateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { devisId, tvaCategorieId, remise: remiseNum, ...data } = input;
         const effectiveCategorieId = ctx.tenant.franchiseTVA && (!tvaCategorieId || tvaCategorieId === "FR_20") ? "FR_FRANCHISE" : (tvaCategorieId ?? "FR_20");
         const tauxTVA = TVA_CATEGORIES_MAP[effectiveCategorieId].taux;
-        return ajouterLigneDevis(repo, ctx.tenant, devisId, { ...data, tauxTVA, tvaCategorieId: effectiveCategorieId, remise: String(remiseNum ?? 0) });
+        const result = await ajouterLigneDevis(repo, ctx.tenant, devisId, { ...data, tauxTVA, tvaCategorieId: effectiveCategorieId, remise: String(remiseNum ?? 0) });
+        if (eventBus) emitEvent(eventBus, ctx.tenant, { type: "ligne_added", entityType: "devis", entityId: devisId, payload: { ligneId: result.id, designation: result.designation, prixUnitaireHT: result.prixUnitaireHT } });
+        return result;
       }),
 
     updateLigne: devisCreer
       .input(z.object({ id: z.number().int(), devisId: z.number().int() }).and(ligneUpdateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { id, devisId, tvaCategorieId, remise: remiseNum, ...data } = input;
         const tauxTVA = tvaCategorieId ? TVA_CATEGORIES_MAP[tvaCategorieId].taux : undefined;
-        return modifierLigneDevis(repo, ctx.tenant, devisId, id, { ...data, ...(tauxTVA !== undefined && { tauxTVA }), ...(tvaCategorieId !== undefined && { tvaCategorieId }), ...(remiseNum !== undefined && { remise: String(remiseNum) }) });
+        const result = await modifierLigneDevis(repo, ctx.tenant, devisId, id, { ...data, ...(tauxTVA !== undefined && { tauxTVA }), ...(tvaCategorieId !== undefined && { tvaCategorieId }), ...(remiseNum !== undefined && { remise: String(remiseNum) }) });
+        if (eventBus) emitEvent(eventBus, ctx.tenant, { type: "ligne_updated", entityType: "devis", entityId: devisId, payload: { ligneId: id, designation: result.designation, prixUnitaireHT: result.prixUnitaireHT } });
+        return result;
       }),
 
     deleteLigne: devisCreer
       .input(z.object({ id: z.number().int(), devisId: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerLigneDevis(repo, ctx.tenant, input.devisId, input.id);
+        if (eventBus) emitEvent(eventBus, ctx.tenant, { type: "ligne_deleted", entityType: "devis", entityId: input.devisId, payload: { ligneId: input.id } });
         return { success: true };
       }),
 
@@ -188,6 +198,7 @@ export function createDevisRouter(
       .mutation(async ({ ctx, input }) => {
         const result = await changerStatutDevis(repo, ctx.tenant, input.id, "envoye", mailing.artisanReader);
         ctx.log.info({ event: "devis_envoye", devisId: input.id }, "Devis envoyé au client");
+        if (eventBus) emitEvent(eventBus, ctx.tenant, { type: "status_changed", entityType: "devis", entityId: input.id, payload: { before: { statut: "brouillon" }, after: { statut: result.statut }, totalTTC: result.totalTTC } });
         return result;
       }),
 
@@ -197,6 +208,7 @@ export function createDevisRouter(
         const result = await changerStatutDevis(repo, ctx.tenant, input.id, "accepte");
         ctx.log.info({ event: "devis_accepte", devisId: input.id }, "Devis accepté");
         if (eventBus) emitEvent(eventBus, ctx.tenant, { type: "DEVIS_ACCEPTE", entityType: "devis", entityId: input.id, payload: { devisId: input.id } });
+        if (eventBus) emitEvent(eventBus, ctx.tenant, { type: "status_changed", entityType: "devis", entityId: input.id, payload: { before: { statut: "envoye" }, after: { statut: result.statut }, totalTTC: result.totalTTC } });
         return result;
       }),
 
@@ -205,12 +217,17 @@ export function createDevisRouter(
       .mutation(async ({ ctx, input }) => {
         const result = await changerStatutDevis(repo, ctx.tenant, input.id, "refuse");
         ctx.log.warn({ event: "devis_refuse", devisId: input.id }, "Devis refusé");
+        if (eventBus) emitEvent(eventBus, ctx.tenant, { type: "status_changed", entityType: "devis", entityId: input.id, payload: { before: { statut: "envoye" }, after: { statut: result.statut }, totalTTC: result.totalTTC } });
         return result;
       }),
 
     expirer: protectedProcedure
       .input(z.object({ id: z.number().int() }))
-      .mutation(({ ctx, input }) => changerStatutDevis(repo, ctx.tenant, input.id, "expire")),
+      .mutation(async ({ ctx, input }) => {
+        const result = await changerStatutDevis(repo, ctx.tenant, input.id, "expire");
+        if (eventBus) emitEvent(eventBus, ctx.tenant, { type: "status_changed", entityType: "devis", entityId: input.id, payload: { before: { statut: "envoye" }, after: { statut: result.statut }, totalTTC: result.totalTTC } });
+        return result;
+      }),
 
     /** ── Modèles de devis (gabarits réutilisables) exposés sous `devis.*` (parité client) ────────── */
     getModeles: protectedProcedure.query(({ ctx }) => listModelesDevis(modeleRepo, ctx.tenant)),
@@ -283,7 +300,11 @@ export function createDevisRouter(
     /** Duplique un devis (nouveau brouillon, numéro serveur, lignes copiées) — parité `duplicate`. */
     duplicate: devisCreer
       .input(z.object({ devisId: z.number().int() }))
-      .mutation(({ ctx, input }) => dupliquerDevis(repo, ctx.tenant, input.devisId)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await dupliquerDevis(repo, ctx.tenant, input.devisId);
+        if (eventBus) emitEvent(eventBus, ctx.tenant, { type: "duplicated", entityType: "devis", entityId: result.id, payload: { sourceId: input.devisId, numero: result.numero } });
+        return result;
+      }),
 
     /*
      * Envoi du devis par email (PDF en PJ) — parité client `trpc.devis.sendByEmail`.
