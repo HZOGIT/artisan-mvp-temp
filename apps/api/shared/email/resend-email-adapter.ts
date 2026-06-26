@@ -15,6 +15,10 @@ const EMAIL_FROM = process.env.EMAIL_FROM || "Operioz <noreply@operioz.com>";
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+function sanitizeCRLF(s: string): string {
+  return s.replace(/[\r\n]/g, " ").replace(/[<>"]/g, "");
+}
+
 export class ResendEmailAdapter implements EmailPort {
   private readonly log: AppLogger;
 
@@ -38,8 +42,8 @@ export class ResendEmailAdapter implements EmailPort {
       return;
     }
     const options: Parameters<typeof resend.emails.send>[0] = {
-      from: EMAIL_FROM,
-      replyTo: "support@operioz.com",
+      from: message.fromName ? `${sanitizeCRLF(message.fromName)} <noreply@operioz.com>` : EMAIL_FROM,
+      replyTo: message.replyTo && EMAIL_RE.test(message.replyTo) ? sanitizeCRLF(message.replyTo) : "support@operioz.com",
       to,
       subject,
       html: body,

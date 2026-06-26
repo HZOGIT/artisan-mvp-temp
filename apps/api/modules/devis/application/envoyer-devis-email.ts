@@ -178,7 +178,7 @@ export async function envoyerDevisParEmail(
       })()
     : undefined;
 
-  await deps.email.send({ to: destinataireEmail, subject, body, ...(attachments ? { attachments } : {}) });
+  await deps.email.send({ to: destinataireEmail, subject, body, ...(attachments ? { attachments } : {}), fromName: artisan.nomEntreprise ?? undefined, replyTo: artisan.email ?? undefined });
 
   /** Envoi réussi : passage `envoye` depuis brouillon uniquement (ne régresse pas un devis émis/signé). */
   if (devis.statut === "brouillon") {

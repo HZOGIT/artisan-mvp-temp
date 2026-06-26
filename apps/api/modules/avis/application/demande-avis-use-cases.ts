@@ -2,6 +2,7 @@ import { NotFoundError, ValidationError, TooManyRequestsError } from "../../../s
 import type { EmailPort } from "../../../shared/ports/email";
 import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { TenantContext } from "../../../shared/tenant";
+import type { ArtisanReader } from "../../../shared/readers/contact-readers";
 import type { IDemandeAvisRepository } from "./demande-avis-repository";
 import type { ClientRef, DemandeAvis, InterventionRef } from "../domain/demande-avis";
 
@@ -17,6 +18,7 @@ export interface DemandeAvisDeps {
   readonly lienBaseUrl: string;
   readonly genererToken?: () => string;
   readonly maintenant?: () => Date;
+  readonly artisanReader?: ArtisanReader;
 }
 
 const DUREE_VALIDITE_JOURS = 14;
@@ -52,6 +54,7 @@ async function creerEtEnvoyer(
     expiresAt,
   });
 
+  const artisan = deps.artisanReader ? await deps.artisanReader.getArtisan(ctx) : null;
   const lien = `${deps.lienBaseUrl}/avis/${token}`;
   await deps.email.send({
     to: client.email,
@@ -61,6 +64,8 @@ async function creerEtEnvoyer(
       `<p>Suite à notre intervention, votre retour nous aiderait beaucoup.</p>` +
       `<p><a href="${lien}">Donner mon avis</a></p>` +
       `<p>Ce lien est valable ${DUREE_VALIDITE_JOURS} jours.</p>`,
+    fromName: artisan?.nomEntreprise ?? undefined,
+    replyTo: artisan?.email ?? undefined,
   });
 
   return demande;
