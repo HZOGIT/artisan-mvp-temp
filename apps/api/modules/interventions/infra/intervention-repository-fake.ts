@@ -64,6 +64,8 @@ export class FakeInterventionRepository implements IInterventionRepository {
       devisId: input.devisId ?? null,
       factureId: input.factureId ?? null,
       technicienId: input.technicienId ?? null,
+      heureArrivee: null,
+      heureDepart: null,
       createdAt: now,
       updatedAt: now,
     };

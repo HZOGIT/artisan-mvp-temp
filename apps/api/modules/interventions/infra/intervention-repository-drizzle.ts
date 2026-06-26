@@ -1,5 +1,5 @@
-import { and, asc, desc, eq, gte, lte, ne, sql } from "drizzle-orm";
-import { interventions, clients, techniciens, devis, factures, interventionsTechniciens, couleursInterventions } from "../../../../../drizzle/schema.pg";
+import { and, asc, desc, eq, getTableColumns, gte, lte, ne, sql } from "drizzle-orm";
+import { interventions, interventionsMobile, clients, techniciens, devis, factures, interventionsTechniciens, couleursInterventions } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
@@ -13,7 +13,7 @@ import type {
   AjouterMembreEquipeInput,
 } from "../domain/intervention";
 
-type InterventionRow = typeof interventions.$inferSelect;
+type InterventionRow = typeof interventions.$inferSelect & { heureArrivee?: Date | null; heureDepart?: Date | null };
 
 function toIntervention(r: InterventionRow): Intervention {
   return {
@@ -30,6 +30,8 @@ function toIntervention(r: InterventionRow): Intervention {
     devisId: r.devisId ?? null,
     factureId: r.factureId ?? null,
     technicienId: r.technicienId ?? null,
+    heureArrivee: r.heureArrivee ?? null,
+    heureDepart: r.heureDepart ?? null,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };
@@ -47,8 +49,9 @@ export class InterventionRepositoryDrizzle implements IInterventionRepository {
   list(ctx: TenantContext): Promise<Intervention[]> {
     return withTenant(this.db, ctx, async (tx) => {
       const rows = await tx
-        .select()
+        .select({ ...getTableColumns(interventions), heureArrivee: interventionsMobile.heureArrivee, heureDepart: interventionsMobile.heureDepart })
         .from(interventions)
+        .leftJoin(interventionsMobile, and(eq(interventionsMobile.interventionId, interventions.id), eq(interventionsMobile.artisanId, ctx.artisanId)))
         .where(eq(interventions.artisanId, ctx.artisanId))
         .orderBy(desc(interventions.dateDebut), desc(interventions.id));
       return rows.map(toIntervention);
@@ -58,8 +61,9 @@ export class InterventionRepositoryDrizzle implements IInterventionRepository {
   getById(ctx: TenantContext, id: number): Promise<Intervention | null> {
     return withTenant(this.db, ctx, async (tx) => {
       const [row] = await tx
-        .select()
+        .select({ ...getTableColumns(interventions), heureArrivee: interventionsMobile.heureArrivee, heureDepart: interventionsMobile.heureDepart })
         .from(interventions)
+        .leftJoin(interventionsMobile, and(eq(interventionsMobile.interventionId, interventions.id), eq(interventionsMobile.artisanId, ctx.artisanId)))
         .where(and(eq(interventions.id, id), eq(interventions.artisanId, ctx.artisanId)))
         .limit(1);
       return row ? toIntervention(row) : null;

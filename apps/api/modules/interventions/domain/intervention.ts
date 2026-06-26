@@ -21,6 +21,8 @@ export interface Intervention {
   readonly devisId: number | null;
   readonly factureId: number | null;
   readonly technicienId: number | null;
+  readonly heureArrivee: Date | null;
+  readonly heureDepart: Date | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
