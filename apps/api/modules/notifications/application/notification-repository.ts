@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { Notification, ListNotificationsOptions } from "../domain/notification";
 import type { FactureEnRetard, CreerNotificationInput } from "../domain/facture-en-retard";
@@ -27,4 +28,5 @@ export interface INotificationRepository {
   existeNotificationActive(ctx: TenantContext, lien: string): Promise<boolean>;
   /** Crée une notification pour le tenant (insert scopé artisanId). */
   creer(ctx: TenantContext, input: CreerNotificationInput): Promise<Notification>;
+  withDb(db: DbClient): INotificationRepository;
 }
