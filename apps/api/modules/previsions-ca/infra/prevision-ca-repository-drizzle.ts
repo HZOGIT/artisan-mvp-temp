@@ -74,6 +74,10 @@ function toSet(input: UpdatePrevisionInput): Partial<PrevisionInsert> {
 export class PrevisionCARepositoryDrizzle implements IPrevisionCARepository {
   constructor(private readonly db: DbClient) {}
 
+  withDb(db: DbClient): PrevisionCARepositoryDrizzle {
+    return new PrevisionCARepositoryDrizzle(db);
+  }
+
   list(ctx: TenantContext): Promise<PrevisionCA[]> {
     return withTenant(this.db, ctx, async (tx) => {
       const rows = await tx

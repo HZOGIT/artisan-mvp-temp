@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IPrevisionCARepository } from "../application/prevision-ca-repository";
 import type {
@@ -17,6 +18,11 @@ import type {
 export class FakePrevisionCARepository implements IPrevisionCARepository {
   private readonly store: PrevisionCA[] = [];
   private seq = 0;
+
+  /* ponytail: withDb no-op — fake ne supporte pas les transactions réelles */
+  withDb(_db: DbClient): FakePrevisionCARepository {
+    return this;
+  }
 
   private scoped(ctx: TenantContext): PrevisionCA[] {
     return this.store.filter((p) => p.artisanId === ctx.artisanId);

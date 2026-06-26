@@ -379,6 +379,7 @@ export interface AppDeps extends ContextDeps {
   readonly budgetsCategoriesDb?: DbClient;
   readonly regleCategorisationRepo?: IRegleCategorisationRepository;
   readonly previsionCARepo?: IPrevisionCARepository;
+  readonly previsionCADb?: DbClient;
   readonly artisanRepo?: IArtisanRepository;
   readonly devisOptionRepo?: IDevisOptionRepository;
   readonly activiteRepo?: IActiviteRepository;
@@ -800,6 +801,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     facturesCAReader: deps.facturesCAReader ?? new FacturesCAReaderDrizzle(getDbHandle().db),
     /** `getTresoreriePrevisionnelle` : créances + avoirs + dépenses récurrentes (reader cross-domaine). */
     tresorerieReader: deps.tresorerieReader ?? new TresorerieReaderDrizzle(getDbHandle().db),
+    db: deps.previsionCADb ?? getDbHandle().db,
   });
   const artisan = createArtisanModule({
     repository: deps.artisanRepo ?? new ArtisanRepositoryDrizzle(getDbHandle().db),
