@@ -53,6 +53,17 @@ describe("registerRumVitalsRoute", () => {
     await app.close();
   });
 
+  it("rating/id avec newlines → strippés (anti log-injection)", async () => {
+    const logs: string[] = [];
+    const app = await buildTestApp(allow, logs);
+    await post(app, { name: "LCP", value: 100, rating: "good\nevil", id: "v4\r\ninjected" });
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).not.toContain("\n");
+    expect(logs[0]).not.toContain("\r");
+    expect(logs[0]).toContain("rating=goodevil");
+    await app.close();
+  });
+
   it("toutes les métriques valides acceptées (CLS, FCP, INP, TTFB, JS_ERROR)", async () => {
     const logs: string[] = [];
     const app = await buildTestApp(allow, logs);

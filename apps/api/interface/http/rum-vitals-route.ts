@@ -33,8 +33,9 @@ export function registerRumVitalsRoute(app: FastifyInstance, deps: RumVitalsDeps
       const name = typeof body.name === "string" ? body.name.toUpperCase() : null;
       if (!name || !VALID_METRIC_NAMES.has(name)) return reply.send({ ok: true });
       const value = sanitizeMetricValue(body.value);
-      const rating = typeof body.rating === "string" ? body.rating.slice(0, 20) : "unknown";
-      const id = typeof body.id === "string" ? body.id.slice(0, 64) : "-";
+      const strip = (s: string) => s.replace(/[\r\n\t\x00-\x1f]/g, "");
+      const rating = typeof body.rating === "string" ? strip(body.rating).slice(0, 20) : "unknown";
+      const id = typeof body.id === "string" ? strip(body.id).slice(0, 64) : "-";
       log(`[RUM] ${name} value=${value ?? "?"} rating=${rating} id=${id}`);
     } catch {
       /* fire-and-forget : ne jamais échouer */
