@@ -1,7 +1,9 @@
 /** Implémentations en mémoire des ports, pour les tests (use-cases sans infra réelle). */
 import type { EmailPort, EmailMessage } from "./email";
 import type { SmsPort, SmsMessage } from "./sms";
-import type { StoragePort, PutOptions } from "./storage";
+import type { StoragePort, StoredFile, UploadOptions } from "./storage";
+import type { DbClient } from "../db";
+import { createHash } from "crypto";
 import type { PdfPort } from "./pdf";
 import type { RateLimiterPort } from "./rate-limiter";
 import type { LlmPort, LlmResult, LlmStreamChunk, LlmUsage } from "./llm";
@@ -55,9 +57,22 @@ export class FakeSmsPort implements SmsPort {
 
 export class InMemoryStoragePort implements StoragePort {
   private readonly store = new Map<string, { body: Buffer; contentType?: string }>();
-  async put(key: string, body: Buffer, opts?: PutOptions): Promise<void> {
+  private nextId = 1;
+
+  withDb(_db: DbClient): InMemoryStoragePort { return this; }
+
+  async upload(key: string, body: Buffer, opts?: UploadOptions): Promise<StoredFile> {
     this.store.set(key, { body, contentType: opts?.contentType });
+    const sha256 = createHash("sha256").update(body).digest("hex");
+    return {
+      id: this.nextId++,
+      storageKey: key,
+      mimeType: opts?.contentType ?? "application/octet-stream",
+      sizeBytes: body.byteLength,
+      sha256,
+    };
   }
+
   async get(key: string): Promise<Buffer | null> {
     return this.store.get(key)?.body ?? null;
   }

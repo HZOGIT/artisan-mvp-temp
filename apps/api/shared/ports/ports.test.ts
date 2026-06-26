@@ -29,10 +29,14 @@ describe("ports — découplage use-case / infra", () => {
     expect(sms.sent).toEqual([{ to: "+33600000000", message: "Code: 1234" }]);
   });
 
-  it("InMemoryStoragePort : put / get / url / delete", async () => {
+  it("InMemoryStoragePort : upload / get / url / delete", async () => {
     const storage = new InMemoryStoragePort();
     const body = Buffer.from("contenu");
-    await storage.put("justif/1.pdf", body, { contentType: "application/pdf" });
+    const stored = await storage.upload("justif/1.pdf", body, { contentType: "application/pdf", purpose: "devis_pdf" });
+    expect(stored.storageKey).toBe("justif/1.pdf");
+    expect(stored.mimeType).toBe("application/pdf");
+    expect(stored.sizeBytes).toBe(body.byteLength);
+    expect(stored.sha256).toHaveLength(64);
     expect((await storage.get("justif/1.pdf"))?.toString()).toBe("contenu");
     expect(await storage.url("justif/1.pdf")).toBe("memory://justif/1.pdf");
     await storage.delete("justif/1.pdf");

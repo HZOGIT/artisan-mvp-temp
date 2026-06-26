@@ -281,7 +281,7 @@ describe("processStripeWebhook (fail-closed)", () => {
     paymentWriter.seed("tok_bus", { paiementId: 7, factureId: 42, artisanId: 3 });
     const event = { id: "evt_bus1", type: "checkout.session.completed", data: { object: { payment_intent: "pi_bus", metadata: { token_paiement: "tok_bus", facture_id: "42" } } } };
     await processStripeWebhook({ ...deps, eventBus: bus }, { rawBody: raw(event), signature: SIG });
-    const published = bus.getPublished("FACTURE_PAYEE");
+    const published = bus.getPublished("facture.payee");
     expect(published).toHaveLength(1);
     expect(published[0]?.artisanId).toBe(3);
     expect(published[0]?.payload).toEqual({ factureId: 42 });

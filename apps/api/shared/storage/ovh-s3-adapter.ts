@@ -1,5 +1,12 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
-import type { StoragePort, PutOptions } from "../ports/storage";
+import { createHash } from "crypto";
+import { eq, and } from "drizzle-orm";
+import type { StoragePort, StoredFile, UploadOptions } from "../ports/storage";
+import type { DbClient } from "../db/client";
+import { withTenant } from "../db/with-tenant";
+import type { TenantContext } from "../tenant";
+import { files } from "../../../../drizzle/schema/files";
+import { outboxEvent } from "../events/outbox-event";
 
 /*
  * Adapter OVH Object Storage (S3-compatible, région GRA — Gravelines).
@@ -13,20 +20,20 @@ import type { StoragePort, PutOptions } from "../ports/storage";
  * Nommage des clés recommandé : <type>/<artisanId>/<uuid>.<ext>
  *   logos/<id>.png, devis/<id>/<uuid>.pdf, etc.
  *
- * url() retourne l'URL publique (bucket public-read). Pour les objets privés
- * (devis PDF, factures), utiliser @aws-sdk/s3-request-presigner — à brancher
- * quand un use-case private nécessite getSignedUrl.
+ * url() retourne une URL signée S3 (accès par pre-signed URL à la demande).
  */
 
 export class OvhS3Adapter implements StoragePort {
-  private readonly client: S3Client;
+  private readonly s3: S3Client;
   private readonly bucket: string;
   private readonly publicBaseUrl: string;
+  private readonly db: DbClient;
 
-  constructor() {
-    this.bucket = process.env.OVH_S3_BUCKET ?? "operioz-staging";
-    this.publicBaseUrl = (process.env.OVH_S3_PUBLIC_BASE_URL ?? "").replace(/\/$/, "");
-    this.client = new S3Client({
+  constructor(db: DbClient, s3?: S3Client, bucket?: string, publicBaseUrl?: string) {
+    this.db = db;
+    this.bucket = bucket ?? process.env.OVH_S3_BUCKET ?? "operioz-staging";
+    this.publicBaseUrl = (publicBaseUrl ?? process.env.OVH_S3_PUBLIC_BASE_URL ?? "").replace(/\/$/, "");
+    this.s3 = s3 ?? new S3Client({
       region: "gra",
       endpoint: process.env.OVH_S3_ENDPOINT ?? "https://s3.gra.io.cloud.ovh.net",
       credentials: {
@@ -38,20 +45,62 @@ export class OvhS3Adapter implements StoragePort {
     });
   }
 
-  async put(key: string, body: Buffer, opts?: PutOptions): Promise<void> {
-    await this.client.send(
-      new PutObjectCommand({
-        Bucket: this.bucket,
-        Key: key,
-        Body: body,
-        ContentType: opts?.contentType,
-      }),
-    );
+  withDb(db: DbClient): OvhS3Adapter {
+    return new OvhS3Adapter(db, this.s3, this.bucket, this.publicBaseUrl);
+  }
+
+  async upload(key: string, body: Buffer, opts?: UploadOptions, ctx?: TenantContext): Promise<StoredFile> {
+    const sha256 = createHash("sha256").update(body).digest("hex");
+    const purpose = opts?.purpose ?? "unknown";
+    const contentType = opts?.contentType ?? "application/octet-stream";
+
+    const doInsert = async (db: DbClient): Promise<StoredFile> => {
+      if (opts?.artisanId !== undefined) {
+        const [existing] = await db
+          .select()
+          .from(files)
+          .where(and(eq(files.sha256, sha256), eq(files.artisanId, opts.artisanId), eq(files.purpose, purpose)))
+          .limit(1);
+        if (existing) return existing;
+      }
+
+      await this.s3.send(
+        new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: body, ContentType: contentType }),
+      );
+
+      const [row] = await db
+        .insert(files)
+        .values({
+          artisanId: opts?.artisanId ?? null,
+          storageKey: key,
+          filename: opts?.filename ?? null,
+          mimeType: contentType,
+          sizeBytes: body.byteLength,
+          sha256,
+          purpose,
+          bucket: this.bucket,
+        })
+        .returning();
+
+      if (ctx) {
+        await outboxEvent(db, ctx, {
+          action: "fichier.importe",
+          entityType: "fichier",
+          entityId: row.id,
+          payload: { key, purpose, size: row.sizeBytes, mimetype: row.mimeType, sha256: row.sha256 },
+        });
+      }
+
+      return row;
+    };
+
+    if (ctx) return withTenant(this.db, ctx, doInsert);
+    return doInsert(this.db);
   }
 
   async get(key: string): Promise<Buffer | null> {
     try {
-      const resp = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+      const resp = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
       if (!resp.Body) return null;
       const chunks: Uint8Array[] = [];
       for await (const chunk of resp.Body as AsyncIterable<Uint8Array>) {
@@ -65,7 +114,7 @@ export class OvhS3Adapter implements StoragePort {
   }
 
   async delete(key: string): Promise<void> {
-    await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
+    await this.s3.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
   }
 
   url(key: string): Promise<string> {
