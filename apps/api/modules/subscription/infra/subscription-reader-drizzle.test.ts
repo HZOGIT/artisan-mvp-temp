@@ -14,7 +14,7 @@ const A = 9944001;
 const B = 9944002;
 const ctx = (artisanId: number): TenantContext => ({ artisanId, userId: 1 });
 
-describe.skipIf(!URL)("SubscriptionReaderDrizzle (PG : subscriptions HORS RLS, scope artisan_id explicite)", () => {
+describe.skipIf(!URL)("SubscriptionReaderDrizzle — fallback legacy (subscriptions, pas de RLS)", () => {
   const admin = new Pool({ connectionString: URL });
   const app = createDbClient(APP_URL!);
   const reader = new SubscriptionReaderDrizzle(app.db);
@@ -50,5 +50,42 @@ describe.skipIf(!URL)("SubscriptionReaderDrizzle (PG : subscriptions HORS RLS, s
   it("tenant sans abonnement → défauts (trial/trialing)", async () => {
     expect(await reader.getSubscription(ctx(9944999))).toBeNull();
     expect((await getCurrent(reader, ctx(9944999))).plan).toBe("trial");
+  });
+});
+
+describe.skipIf(!URL)("SubscriptionReaderDrizzle — billing_subscriptions sous RLS (OPE-645)", () => {
+  const C = 9944003;
+  const admin = new Pool({ connectionString: URL });
+  const app = createDbClient(APP_URL!);
+  const reader = new SubscriptionReaderDrizzle(app.db);
+
+  afterAll(async () => {
+    await admin.query(
+      "update billing_subscriptions set status='trialing', payment_method_id=null where artisan_id=$1",
+      [C],
+    );
+    await admin.query("delete from billing_subscriptions where artisan_id=$1", [C]);
+    await app.close();
+    await admin.end();
+  });
+
+  it("getSubscription retourne la ligne billing_subscriptions sous RLS (withTenant posé)", async () => {
+    await admin.query(
+      `insert into billing_subscriptions (artisan_id, plan_id, billing_mode, status, trial_ends_at)
+       values ($1, 'pro', 'maison', 'trialing', now() + interval '14 days')
+       on conflict (artisan_id) do update set plan_id = 'pro', status = 'trialing'`,
+      [C],
+    );
+    const sub = await reader.getSubscription(ctx(C));
+    expect(sub).not.toBeNull();
+    expect(sub?.artisanId).toBe(C);
+    expect(sub?.plan).toBe("pro");
+    expect(sub?.status).toBe("trialing");
+  });
+
+  it("getCurrent : paywall correct depuis billing_subscriptions (isTrialing vrai, plan pro)", async () => {
+    const cur = await getCurrent(reader, ctx(C));
+    expect(cur.plan).toBe("pro");
+    expect(cur.isTrialing).toBe(true);
   });
 });

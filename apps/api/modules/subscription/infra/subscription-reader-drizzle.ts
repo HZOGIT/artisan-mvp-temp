@@ -1,6 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { billingSubscriptions } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
+import { withTenant } from "../../../shared/db/with-tenant";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ISubscriptionReader } from "../application/subscription-reader";
 import type { SubscriptionRow } from "../domain/subscription";
@@ -48,16 +49,14 @@ function toLegacySubscriptionRow(r: LegacyRow): SubscriptionRow {
   };
 }
 
-/** Lit depuis `billing_subscriptions` (billing maison), avec fallback sur `subscriptions` (legacy). HORS RLS → scope explicite par `artisan_id`. */
+/** Lit depuis `billing_subscriptions` (billing maison), avec fallback sur `subscriptions` (legacy). */
 export class SubscriptionReaderDrizzle implements ISubscriptionReader {
   constructor(private readonly db: DbClient) {}
 
   async getSubscription(ctx: TenantContext): Promise<SubscriptionRow | null> {
-    const [row] = await this.db
-      .select()
-      .from(billingSubscriptions)
-      .where(eq(billingSubscriptions.artisan_id, ctx.artisanId))
-      .limit(1);
+    const [row] = await withTenant(this.db, ctx, (tx) =>
+      tx.select().from(billingSubscriptions).where(eq(billingSubscriptions.artisan_id, ctx.artisanId)).limit(1),
+    );
     if (row) return toSubscriptionRow(row);
     const legacy = await this.db.execute(
       sql`SELECT id, artisan_id, plan, status, trial_ends_at, current_period_start, current_period_end, cancel_at_period_end, max_users, max_devices_per_user, max_concurrent_sessions FROM subscriptions WHERE artisan_id = ${ctx.artisanId} LIMIT 1`,

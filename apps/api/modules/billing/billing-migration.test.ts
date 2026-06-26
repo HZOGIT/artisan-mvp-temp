@@ -13,7 +13,7 @@ const PAST = new Date(Date.now() - 30 * 24 * 3600_000);
  * `billingSubExists` contrôle le retour de la vérification billing_subscriptions.
  */
 function makeDb(legacySubs: object[], billingSubExists = false): DbClient {
-  return {
+  const db: Partial<DbClient> = {
     select: (_fields?: unknown) => ({
       from: (table: unknown) => {
         if (table === subscriptions) return Promise.resolve(legacySubs);
@@ -24,7 +24,10 @@ function makeDb(legacySubs: object[], billingSubExists = false): DbClient {
         };
       },
     }),
-  } as unknown as DbClient;
+    execute: () => Promise.resolve({ rows: [] }),
+    transaction: (fn: (tx: DbClient) => Promise<unknown>) => fn(db as DbClient),
+  };
+  return db as unknown as DbClient;
 }
 
 function makeLegacySub(overrides: Partial<{
