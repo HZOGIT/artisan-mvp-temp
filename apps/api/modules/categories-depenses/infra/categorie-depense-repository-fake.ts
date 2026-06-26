@@ -77,4 +77,9 @@ export class FakeCategorieDepenseRepository implements ICategorieDepenseReposito
     this.store.splice(idx, 1);
     return true;
   }
+
+  /* ponytail: withDb no-op sur fake (pas de DB) */
+  withDb(_db: unknown): this {
+    return this;
+  }
 }

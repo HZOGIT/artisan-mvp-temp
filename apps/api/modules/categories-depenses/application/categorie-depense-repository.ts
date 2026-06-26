@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { CategorieDepense, CreateCategorieInput, UpdateCategorieInput } from "../domain/categorie-depense";
 
@@ -16,4 +17,5 @@ export interface ICategorieDepenseRepository {
   update(ctx: TenantContext, id: number, input: UpdateCategorieInput): Promise<CategorieDepense | null>;
   /** false si la catégorie n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
+  withDb(db: DbClient): ICategorieDepenseRepository;
 }
