@@ -1,9 +1,22 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import { ZodError } from "zod";
 import superjson from "superjson";
+import { Counter } from "prom-client";
 import type { AppContext } from "./context";
 import type { TenantContext } from "../../shared/tenant";
 import { NotFoundError, ForbiddenError, ValidationError, ConflictError, TooManyRequestsError, UnauthorizedError } from "../../shared/errors";
+
+const authFailuresTotal = new Counter({
+  name: "auth_failures_total",
+  help: "Échecs d'authentification par raison",
+  labelNames: ["reason"],
+});
+
+const rateLimitHitsTotal = new Counter({
+  name: "rate_limit_hits_total",
+  help: "Requêtes bloquées par rate limiting",
+  labelNames: ["endpoint"],
+});
 
 /*
  * ⚠️ Le client (client/src) et le legacy utilisent **superjson** comme data transformer. Le
@@ -28,12 +41,15 @@ export const router = t.router;
  * dont la `cause` porte l'erreur d'origine levée par le use-case. On mappe selon la cause ;
  * les erreurs déjà formées (UNAUTHORIZED, BAD_REQUEST Zod…) passent inchangées.
  */
-const mapDomainErrors = t.middleware(async ({ next, ctx }) => {
+const mapDomainErrors = t.middleware(async ({ next, ctx, path }) => {
   const result = await next();
   if (result.ok) return result;
   const cause: unknown = result.error.cause ?? result.error;
   if (cause instanceof NotFoundError) throw new TRPCError({ code: "NOT_FOUND", message: cause.message });
-  if (cause instanceof UnauthorizedError) throw new TRPCError({ code: "UNAUTHORIZED", message: cause.message });
+  if (cause instanceof UnauthorizedError) {
+    authFailuresTotal.inc({ reason: "invalid_credentials" });
+    throw new TRPCError({ code: "UNAUTHORIZED", message: cause.message });
+  }
   if (cause instanceof ValidationError) throw new TRPCError({ code: "BAD_REQUEST", message: cause.message });
   if (cause instanceof ForbiddenError) {
     /** Accès interdit depuis le domaine (ex. anti-self-approbation NDF, tentative IDOR) — signal sécurité. */
@@ -45,7 +61,10 @@ const mapDomainErrors = t.middleware(async ({ next, ctx }) => {
     ctx.log.info({ event: "trpc_conflict", reason: cause.message }, "Conflit de domaine");
     throw new TRPCError({ code: "CONFLICT", message: cause.message });
   }
-  if (cause instanceof TooManyRequestsError) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: cause.message });
+  if (cause instanceof TooManyRequestsError) {
+    rateLimitHitsTotal.inc({ endpoint: path });
+    throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: cause.message });
+  }
   /** TRPCError déjà formé (requireTenant, requireAdmin, requirePermission…) — on laisse passer sans logger. */
   if (cause instanceof TRPCError) return result;
   const err = cause instanceof Error ? cause : new Error(String(cause));
