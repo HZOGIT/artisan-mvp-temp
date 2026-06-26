@@ -11,6 +11,7 @@ export const rootRoute = createRootRoute({
         <Link to="/subscriptions" style={{ color: "#94a3b8", textDecoration: "none" }}>
           Abonnements
         </Link>
+        <Link to="/events" style={{ color: "#94a3b8", textDecoration: "none" }}>Événements</Link>
       </nav>
       <main style={{ padding: "24px" }}>
         <Outlet />

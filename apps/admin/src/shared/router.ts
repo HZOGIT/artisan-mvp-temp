@@ -4,8 +4,9 @@ import { indexRoute } from "../routes/index";
 import { loginRoute } from "../routes/login";
 import { artisansRoute } from "../routes/artisans";
 import { subscriptionsRoute } from "../routes/subscriptions";
+import { eventsRoute } from "../routes/events";
 
-const routeTree = rootRoute.addChildren([indexRoute, loginRoute, artisansRoute, subscriptionsRoute]);
+const routeTree = rootRoute.addChildren([indexRoute, loginRoute, artisansRoute, subscriptionsRoute, eventsRoute]);
 
 export const adminRouter = createRouter({ routeTree });
 
