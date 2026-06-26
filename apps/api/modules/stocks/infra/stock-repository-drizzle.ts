@@ -225,6 +225,10 @@ export class StockRepositoryDrizzle implements IStockRepository {
     });
   }
 
+  withDb(db: DbClient): StockRepositoryDrizzle {
+    return new StockRepositoryDrizzle(db);
+  }
+
   listEntrant(ctx: TenantContext): Promise<StockEntrant[]> {
     return withTenant(this.db, ctx, async (tx) => {
       /** Reste à recevoir = Σ max(quantite - quantiteRecue, 0) sur les lignes de commandes non soldées. */
