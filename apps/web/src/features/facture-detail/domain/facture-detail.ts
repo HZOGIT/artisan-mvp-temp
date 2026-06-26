@@ -19,7 +19,7 @@ export type RappelType = RouterInputs["activites"]["create"]["type"];
 
 /** Article renvoyé par `articles.search` (tRPC, camelCase — catalogue bibliothèque partagée). */
 export type ArticleSearchResult = RouterOutputs["articles"]["search"][number];
-export type AvoirLigneForm = { designation: string; quantite: string; prixUnitaireHT: string; tvaCategorieId: TvaCategorieId; unite: string };
+export type AvoirLigneForm = { designation: string; quantite: string; prixUnitaireHT: string; tvaCategorieId: TvaCategorieId; unite: string; remise?: string };
 
 export const STATUS_LABEL_KEY: Record<string, string> = {
   brouillon: "statutBrouillon", validee: "statutValidee", envoyee: "statutEnvoyee", payee: "statutPayee", en_retard: "statutEnRetard", annulee: "statutAnnulee",
@@ -59,7 +59,8 @@ export function avoirSolde(avoirs: readonly Avoir[], factureTTC: number): AvoirS
 export function avoirLignesMontantTTC(lignes: readonly AvoirLigneForm[]): number {
   return lignes.reduce((s, l) => {
     const taux = parseFloat(TVA_CATEGORIES_MAP[l.tvaCategorieId]?.taux ?? "20") || 0;
-    return s + Math.abs(n(l.quantite)) * Math.abs(n(l.prixUnitaireHT)) * (1 + taux / 100);
+    const r = Math.min(100, Math.max(0, parseFloat(l.remise ?? "0") || 0));
+    return s + Math.abs(n(l.quantite)) * Math.abs(n(l.prixUnitaireHT)) * (1 - r / 100) * (1 + taux / 100);
   }, 0);
 }
 
@@ -67,7 +68,7 @@ export function avoirLignesMontantTTC(lignes: readonly AvoirLigneForm[]): number
 export function buildAvoirTotalLignes(lignes: readonly Ligne[]): AvoirInput["lignes"] {
   return lignes
     .filter((l) => (l.type ?? "produit") === "produit")
-    .map((l) => ({ designation: l.designation, quantite: String(l.quantite ?? "1"), prixUnitaireHT: String(l.prixUnitaireHT ?? "0"), tvaCategorieId: (l.tvaCategorieId as TvaCategorieId | null | undefined) ?? "FR_20", unite: l.unite || "unité" }));
+    .map((l) => ({ designation: l.designation, quantite: String(l.quantite ?? "1"), prixUnitaireHT: String(l.prixUnitaireHT ?? "0"), tvaCategorieId: (l.tvaCategorieId as TvaCategorieId | null | undefined) ?? "FR_20", unite: l.unite || "unité", remise: String((l as { remise?: string | null }).remise ?? "0") }));
 }
 
 export type PdfLigne = { designation: string; description: string | null; quantite: number; unite: string | null; prixUnitaire: number; tauxTva: number; type: string | null; tvaCategorieId?: string | null; remise: number };

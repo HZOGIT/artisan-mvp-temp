@@ -86,4 +86,13 @@ describe("factures — montants d'avoir (pur, négatifs)", () => {
       montantTTC: "-240.00",
     });
   });
+
+  it("remise 10% : montantHT = -90.00", () => {
+    expect(calculerMontantsAvoirLigne("1", "100", "20", "10")).toEqual({
+      prixUnitaireHT: "-100.00",
+      montantHT: "-90.00",
+      montantTVA: "-18.00",
+      montantTTC: "-108.00",
+    });
+  });
 });

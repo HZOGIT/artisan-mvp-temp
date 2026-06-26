@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatCurrency, allowedNext, avoirSolde, avoirLignesMontantTTC, buildAvoirTotalLignes, statutAction, activitesForFacture, pendingCount, type Avoir, type Ligne, type Activite, type AvoirLigneForm } from "./facture-detail";
+import type { TvaCategorieId } from "@/shared/tva/taux-tva-fr";
 
 describe("facture-detail — domain pur", () => {
   it("formatCurrency", () => { expect(formatCurrency("100")).toContain("€"); expect(formatCurrency(null)).toContain("0"); });
@@ -26,6 +27,10 @@ describe("facture-detail — domain pur", () => {
   it("avoirLignesMontantTTC : valeurs absolues + TVA", () => {
     const l = [{ designation: "x", quantite: "2", prixUnitaireHT: "100", tauxTVA: "20", unite: "u" }] as AvoirLigneForm[];
     expect(avoirLignesMontantTTC(l)).toBe(240);
+  });
+  it("avoirLignesMontantTTC : remise 10% appliquée sur preview avoir", () => {
+    const l = [{ designation: "x", quantite: "1", prixUnitaireHT: "100", tvaCategorieId: "FR_20" as TvaCategorieId, unite: "u", remise: "10" }] as AvoirLigneForm[];
+    expect(avoirLignesMontantTTC(l)).toBeCloseTo(90 * 1.2, 2);
   });
   it("buildAvoirTotalLignes : exclut section/note", () => {
     const lignes = [{ designation: "P", quantite: "1", prixUnitaireHT: "100", tauxTVA: "20", unite: "u", type: "produit" }, { designation: "S", type: "section" }] as unknown as Ligne[];

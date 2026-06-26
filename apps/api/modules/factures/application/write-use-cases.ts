@@ -240,6 +240,7 @@ export type CreerAvoirInput = {
     readonly tvaCategorieId?: string;
     readonly unite?: string | null;
     readonly description?: string | null;
+    readonly remise?: string;
   }[];
   readonly objet?: string | null;
   readonly notes?: string | null;
@@ -271,7 +272,7 @@ export async function creerAvoir(
     assertLigneValide(l.designation, l.prixUnitaireHT, l.quantite);
     const categorieId = l.tvaCategorieId ?? null;
     const tauxTVA = categorieId ? (TVA_CATEGORIES_MAP[categorieId as keyof typeof TVA_CATEGORIES_MAP]?.taux ?? "20.00") : (l.tauxTVA ?? "20.00");
-    const m = calculerMontantsAvoirLigne(l.quantite, l.prixUnitaireHT, tauxTVA);
+    const m = calculerMontantsAvoirLigne(l.quantite, l.prixUnitaireHT, tauxTVA, l.remise ?? "0");
     return {
       designation: l.designation,
       description: l.description ?? null,
