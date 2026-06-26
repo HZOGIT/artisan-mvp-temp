@@ -328,6 +328,8 @@ export interface AppDeps extends ContextDeps {
   readonly interventionRepo?: IInterventionRepository;
   readonly congeRepo?: ICongeRepository;
   readonly noteDeFraisRepo?: INoteDeFraisRepository;
+  /** Pool DB pour les transactions outbox events du module notes-de-frais (défaut : getDbHandle().db). */
+  readonly notesDeFraisDb?: DbClient;
   readonly chantierRepo?: IChantierRepository;
   /** Pool DB pour les transactions outbox events du module chantiers (défaut : getDbHandle().db). */
   readonly chantiersDb?: DbClient;
@@ -633,6 +635,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const noteDeFraisRepo = deps.noteDeFraisRepo ?? new NoteDeFraisRepositoryDrizzle(getDbHandle().db);
   const notesDeFrais = createNotesDeFraisModule({
     repository: noteDeFraisRepo,
+    db: deps.notesDeFraisDb ?? getDbHandle().db,
   });
   const chantiers = createChantiersModule({
     repository: deps.chantierRepo ?? new ChantierRepositoryDrizzle(getDbHandle().db),

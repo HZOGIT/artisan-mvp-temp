@@ -232,6 +232,10 @@ export class NoteDeFraisRepositoryDrizzle implements INoteDeFraisRepository {
     });
   }
 
+  withDb(db: DbClient): NoteDeFraisRepositoryDrizzle {
+    return new NoteDeFraisRepositoryDrizzle(db);
+  }
+
   setWorkflow(ctx: TenantContext, id: number, patch: NoteDeFraisWorkflowPatch): Promise<NoteDeFrais | null> {
     return withTenant(this.db, ctx, async (tx) => {
       const set: Partial<typeof notesDeFrais.$inferInsert> = { statut: patch.statut };

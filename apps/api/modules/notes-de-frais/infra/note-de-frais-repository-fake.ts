@@ -173,4 +173,9 @@ export class FakeNoteDeFraisRepository implements INoteDeFraisRepository {
     this.store = this.store.map((x) => (x.id === id ? updated : x));
     return updated;
   }
+
+  /* ponytail: withDb ignoré — fake in-memory, pas de transaction réelle */
+  withDb(_db: unknown): FakeNoteDeFraisRepository {
+    return this;
+  }
 }

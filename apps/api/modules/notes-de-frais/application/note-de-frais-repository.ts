@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type {
   NoteDeFrais,
@@ -72,6 +73,8 @@ export interface INoteDeFraisRepository {
     noteId: number,
     patch: { statut: DepenseLieeStatut; rembourse?: boolean; dateRemboursement?: string },
   ): Promise<void>;
+
+  withDb(db: DbClient): INoteDeFraisRepository;
 }
 
 /*
