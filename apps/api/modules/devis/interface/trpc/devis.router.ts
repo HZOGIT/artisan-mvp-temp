@@ -3,6 +3,8 @@ import { router, protectedProcedure, permissionProcedure } from "../../../../int
 import { TVA_CATEGORIES_MAP } from "../../../../shared/tva/taux-tva-fr";
 import type { PushPort } from "../../../../shared/push/web-push-adapter";
 import type { EventBusPort } from "../../../../shared/ports/event-bus";
+import { getDbHandle } from "../../../../shared/db";
+import { eventLog } from "../../../../../../drizzle/schema.pg";
 /** Permissions (parité legacy) : actions sur lignes/envoi/duplication = `devis.creer` ; conversion en facture = `factures.creer`. */
 const devisCreer = permissionProcedure("devis.creer");
 const facturesCreer = permissionProcedure("factures.creer");
@@ -140,44 +142,102 @@ export function createDevisRouter(
         const result = await creerDevis(repo, ctx.tenant, { ...input, dateValidite: toDate(input.dateValidite) });
         ctx.log.info({ event: "devis_created", devisId: result.id, clientId: input.clientId }, "Devis créé");
         push?.sendToUser(ctx.tenant.artisanId, { title: "Operioz", body: `Nouveau devis ${result.numero} créé` }).catch(() => undefined);
+        await getDbHandle().db.insert(eventLog).values({
+          artisanId: ctx.tenant.artisanId,
+          userId: ctx.tenant.userId ?? null,
+          entityType: "devis",
+          entityId: result.id,
+          action: "created",
+          payload: { numero: result.numero, clientId: result.clientId, totalTTC: result.totalTTC, statut: result.statut },
+          occurredAt: new Date(),
+        });
         return result;
       }),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { id, dateValidite, ...data } = input;
-        return modifierDevis(repo, ctx.tenant, id, { ...data, dateValidite: toDate(dateValidite) });
+        const result = await modifierDevis(repo, ctx.tenant, id, { ...data, dateValidite: toDate(dateValidite) });
+        await getDbHandle().db.insert(eventLog).values({
+          artisanId: ctx.tenant.artisanId,
+          userId: ctx.tenant.userId ?? null,
+          entityType: "devis",
+          entityId: id,
+          action: "updated",
+          payload: { objet: result.objet, referenceClient: result.referenceClient, totalTTC: result.totalTTC },
+          occurredAt: new Date(),
+        });
+        return result;
       }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
+        const before = await repo.getById(ctx.tenant, input.id);
         await supprimerDevis(repo, ctx.tenant, input.id);
+        await getDbHandle().db.insert(eventLog).values({
+          artisanId: ctx.tenant.artisanId,
+          userId: ctx.tenant.userId ?? null,
+          entityType: "devis",
+          entityId: input.id,
+          action: "deleted",
+          payload: { snapshot: { numero: before?.numero, totalTTC: before?.totalTTC, statut: before?.statut, clientId: before?.clientId } },
+          occurredAt: new Date(),
+        });
         return { success: true };
       }),
 
     addLigne: devisCreer
       .input(z.object({ devisId: z.number().int() }).and(ligneCreateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { devisId, tvaCategorieId, remise: remiseNum, ...data } = input;
         const effectiveCategorieId = ctx.tenant.franchiseTVA && (!tvaCategorieId || tvaCategorieId === "FR_20") ? "FR_FRANCHISE" : (tvaCategorieId ?? "FR_20");
         const tauxTVA = TVA_CATEGORIES_MAP[effectiveCategorieId].taux;
-        return ajouterLigneDevis(repo, ctx.tenant, devisId, { ...data, tauxTVA, tvaCategorieId: effectiveCategorieId, remise: String(remiseNum ?? 0) });
+        const result = await ajouterLigneDevis(repo, ctx.tenant, devisId, { ...data, tauxTVA, tvaCategorieId: effectiveCategorieId, remise: String(remiseNum ?? 0) });
+        await getDbHandle().db.insert(eventLog).values({
+          artisanId: ctx.tenant.artisanId,
+          userId: ctx.tenant.userId ?? null,
+          entityType: "devis",
+          entityId: devisId,
+          action: "ligne_added",
+          payload: { ligneId: result.id, designation: result.designation, prixUnitaireHT: result.prixUnitaireHT },
+          occurredAt: new Date(),
+        });
+        return result;
       }),
 
     updateLigne: devisCreer
       .input(z.object({ id: z.number().int(), devisId: z.number().int() }).and(ligneUpdateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { id, devisId, tvaCategorieId, remise: remiseNum, ...data } = input;
         const tauxTVA = tvaCategorieId ? TVA_CATEGORIES_MAP[tvaCategorieId].taux : undefined;
-        return modifierLigneDevis(repo, ctx.tenant, devisId, id, { ...data, ...(tauxTVA !== undefined && { tauxTVA }), ...(tvaCategorieId !== undefined && { tvaCategorieId }), ...(remiseNum !== undefined && { remise: String(remiseNum) }) });
+        const result = await modifierLigneDevis(repo, ctx.tenant, devisId, id, { ...data, ...(tauxTVA !== undefined && { tauxTVA }), ...(tvaCategorieId !== undefined && { tvaCategorieId }), ...(remiseNum !== undefined && { remise: String(remiseNum) }) });
+        await getDbHandle().db.insert(eventLog).values({
+          artisanId: ctx.tenant.artisanId,
+          userId: ctx.tenant.userId ?? null,
+          entityType: "devis",
+          entityId: devisId,
+          action: "ligne_updated",
+          payload: { ligneId: id, designation: result.designation, prixUnitaireHT: result.prixUnitaireHT },
+          occurredAt: new Date(),
+        });
+        return result;
       }),
 
     deleteLigne: devisCreer
       .input(z.object({ id: z.number().int(), devisId: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerLigneDevis(repo, ctx.tenant, input.devisId, input.id);
+        await getDbHandle().db.insert(eventLog).values({
+          artisanId: ctx.tenant.artisanId,
+          userId: ctx.tenant.userId ?? null,
+          entityType: "devis",
+          entityId: input.devisId,
+          action: "ligne_deleted",
+          payload: { ligneId: input.id },
+          occurredAt: new Date(),
+        });
         return { success: true };
       }),
 
@@ -185,31 +245,74 @@ export function createDevisRouter(
     envoyer: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
+        const before = await repo.getById(ctx.tenant, input.id);
         const result = await changerStatutDevis(repo, ctx.tenant, input.id, "envoye", mailing.artisanReader);
         ctx.log.info({ event: "devis_envoye", devisId: input.id }, "Devis envoyé au client");
+        await getDbHandle().db.insert(eventLog).values({
+          artisanId: ctx.tenant.artisanId,
+          userId: ctx.tenant.userId ?? null,
+          entityType: "devis",
+          entityId: input.id,
+          action: "status_changed",
+          payload: { before: { statut: before?.statut }, after: { statut: result.statut }, totalTTC: result.totalTTC },
+          occurredAt: new Date(),
+        });
         return result;
       }),
 
     accepter: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
+        const before = await repo.getById(ctx.tenant, input.id);
         const result = await changerStatutDevis(repo, ctx.tenant, input.id, "accepte");
         ctx.log.info({ event: "devis_accepte", devisId: input.id }, "Devis accepté");
         await eventBus?.publish({ type: "DEVIS_ACCEPTE", aggregateId: String(input.id), aggregateType: "devis", payload: { devisId: input.id, artisanId: ctx.tenant.artisanId }, occurredAt: new Date() }).catch(() => {});
+        await getDbHandle().db.insert(eventLog).values({
+          artisanId: ctx.tenant.artisanId,
+          userId: ctx.tenant.userId ?? null,
+          entityType: "devis",
+          entityId: input.id,
+          action: "status_changed",
+          payload: { before: { statut: before?.statut }, after: { statut: result.statut }, totalTTC: result.totalTTC },
+          occurredAt: new Date(),
+        });
         return result;
       }),
 
     refuser: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
+        const before = await repo.getById(ctx.tenant, input.id);
         const result = await changerStatutDevis(repo, ctx.tenant, input.id, "refuse");
         ctx.log.warn({ event: "devis_refuse", devisId: input.id }, "Devis refusé");
+        await getDbHandle().db.insert(eventLog).values({
+          artisanId: ctx.tenant.artisanId,
+          userId: ctx.tenant.userId ?? null,
+          entityType: "devis",
+          entityId: input.id,
+          action: "status_changed",
+          payload: { before: { statut: before?.statut }, after: { statut: result.statut }, totalTTC: result.totalTTC },
+          occurredAt: new Date(),
+        });
         return result;
       }),
 
     expirer: protectedProcedure
       .input(z.object({ id: z.number().int() }))
-      .mutation(({ ctx, input }) => changerStatutDevis(repo, ctx.tenant, input.id, "expire")),
+      .mutation(async ({ ctx, input }) => {
+        const before = await repo.getById(ctx.tenant, input.id);
+        const result = await changerStatutDevis(repo, ctx.tenant, input.id, "expire");
+        await getDbHandle().db.insert(eventLog).values({
+          artisanId: ctx.tenant.artisanId,
+          userId: ctx.tenant.userId ?? null,
+          entityType: "devis",
+          entityId: input.id,
+          action: "status_changed",
+          payload: { before: { statut: before?.statut }, after: { statut: result.statut }, totalTTC: result.totalTTC },
+          occurredAt: new Date(),
+        });
+        return result;
+      }),
 
     /** ── Modèles de devis (gabarits réutilisables) exposés sous `devis.*` (parité client) ────────── */
     getModeles: protectedProcedure.query(({ ctx }) => listModelesDevis(modeleRepo, ctx.tenant)),
@@ -282,7 +385,19 @@ export function createDevisRouter(
     /** Duplique un devis (nouveau brouillon, numéro serveur, lignes copiées) — parité `duplicate`. */
     duplicate: devisCreer
       .input(z.object({ devisId: z.number().int() }))
-      .mutation(({ ctx, input }) => dupliquerDevis(repo, ctx.tenant, input.devisId)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await dupliquerDevis(repo, ctx.tenant, input.devisId);
+        await getDbHandle().db.insert(eventLog).values({
+          artisanId: ctx.tenant.artisanId,
+          userId: ctx.tenant.userId ?? null,
+          entityType: "devis",
+          entityId: result.id,
+          action: "duplicated",
+          payload: { sourceId: input.devisId, numero: result.numero },
+          occurredAt: new Date(),
+        });
+        return result;
+      }),
 
     /*
      * Envoi du devis par email (PDF en PJ) — parité client `trpc.devis.sendByEmail`.
