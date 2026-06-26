@@ -7,6 +7,9 @@ import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-qu
 import { trpc } from './shared/trpc'
 import { httpBatchLink, httpLink, httpSubscriptionLink, splitLink } from '@trpc/client'
 import superjson from 'superjson'
+import { initRum } from './shared/rum-init'
+
+initRum()
 
 if (import.meta.env.VITE_SENTRY_DSN) {
   Sentry.init({

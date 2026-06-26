@@ -196,6 +196,7 @@ import { registerFacturxRoutes } from "./interface/http/facturx-route";
 import { registerExportLotRoutes } from "./interface/http/export-lot-route";
 import { registerFontsRoute } from "./interface/http/fonts-route";
 import { registerVoiceDebugRoute } from "./interface/http/voice-debug-route";
+import { registerRumVitalsRoute } from "./interface/http/rum-vitals-route";
 import { getParametres } from "./modules/parametres/application/read-use-cases";
 import { GeminiRealtimeVoiceTokenAdapter } from "./modules/assistant/infra/gemini-realtime-voice-token-adapter";
 import { buildAssistantAgentRegistry, buildAssistantWriteHandlersFromRepos } from "./modules/assistant/infra/agent-wiring";
@@ -1399,6 +1400,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   /** §4 HORS-tRPC : télémétrie d'erreur fire-and-forget (`/api/voice/debug`, PUBLIC, sendBeacon). */
   registerVoiceDebugRoute(app, { rateLimiter: new SlidingWindowRateLimiter(30, 60 * 1000) });
+
+  /** §4 HORS-tRPC : collecte RUM Web Vitals fire-and-forget (`/api/vitals`, PUBLIC, sendBeacon). */
+  registerRumVitalsRoute(app, { rateLimiter: new SlidingWindowRateLimiter(30, 60 * 1000) });
 
   /** §4 HORS-tRPC : persistance des transcripts de la session vocale (`/api/voice/persist`, auth cookie). */
   registerVoiceRoute(app, {
