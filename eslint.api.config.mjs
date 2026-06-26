@@ -35,7 +35,7 @@ export default tseslint.config(
     },
   },
   rules: {
-    "no-warning-comments": ["error", { terms: ["TODO", "FIXME", "HACK", "XXX"], location: "anywhere" }],
+    "no-warning-comments": ["error", { terms: ["TODO", "FIXME", "HACK", "XXX", "OPE-"], location: "anywhere" }],
     "local/comments-jsdoc-only": "error",
     "multiline-comment-style": ["error", "starred-block"],
     "no-console": ["error", { allow: ["warn", "error"] }],

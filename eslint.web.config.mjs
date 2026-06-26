@@ -25,7 +25,7 @@ export default tseslint.config(
     rules: {
       "local/kebab-filename": "error",
       "local/no-trpc-in-ui": "error",
-      "no-warning-comments": ["error", { terms: ["TODO", "FIXME", "HACK", "XXX"], location: "anywhere" }],
+      "no-warning-comments": ["error", { terms: ["TODO", "FIXME", "HACK", "XXX", "OPE-"], location: "anywhere" }],
       "local/comments-jsdoc-only": "error",
       "multiline-comment-style": ["error", "starred-block"],
       "no-restricted-imports": [
