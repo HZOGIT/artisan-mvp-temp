@@ -30,19 +30,23 @@ export interface CurrentSubscription {
 }
 
 export function computeCurrentSubscription(sub: SubscriptionRow | null, now: Date): CurrentSubscription {
-  const trialEndsAt = sub?.trialEndsAt ?? null;
-  const isTrialing = sub?.status === "trialing" && trialEndsAt !== null && trialEndsAt > now;
+  if (!sub) {
+    const trialEndsAt = new Date(now.getTime() + 14 * DAY_MS);
+    return { plan: "trial", status: "trialing", isTrialing: true, trialDaysLeft: 14, trialEndsAt, currentPeriodEnd: null, cancelAtPeriodEnd: false, maxUsers: 1, maxDevicesPerUser: 3, maxConcurrentSessions: 2 };
+  }
+  const trialEndsAt = sub.trialEndsAt;
+  const isTrialing = sub.status === "trialing" && trialEndsAt !== null && trialEndsAt > now;
   const trialDaysLeft = trialEndsAt ? Math.max(0, Math.ceil((trialEndsAt.getTime() - now.getTime()) / DAY_MS)) : 0;
   return {
-    plan: sub?.plan ?? "trial",
-    status: sub?.status ?? "trialing",
+    plan: sub.plan,
+    status: sub.status,
     isTrialing,
     trialDaysLeft,
     trialEndsAt,
-    currentPeriodEnd: sub?.currentPeriodEnd ?? null,
-    cancelAtPeriodEnd: Boolean(sub?.cancelAtPeriodEnd),
-    maxUsers: sub?.maxUsers ?? 1,
-    maxDevicesPerUser: sub?.maxDevicesPerUser ?? 3,
-    maxConcurrentSessions: sub?.maxConcurrentSessions ?? 2,
+    currentPeriodEnd: sub.currentPeriodEnd ?? null,
+    cancelAtPeriodEnd: Boolean(sub.cancelAtPeriodEnd),
+    maxUsers: sub.maxUsers,
+    maxDevicesPerUser: sub.maxDevicesPerUser,
+    maxConcurrentSessions: sub.maxConcurrentSessions,
   };
 }

@@ -22,7 +22,8 @@ export function trialBannerSeverity(sub: Subscription | null | undefined): Trial
  * `location` = chemin courant (ex. `/parametres`).
  */
 export function accountBlockState(sub: Subscription | null | undefined, location: string): { isBlocked: boolean; blockerAllowed: boolean } {
-  const trialEnded = sub?.status === "trialing" && sub.trialDaysLeft <= 0;
+  if (!sub) return { isBlocked: false, blockerAllowed: false };
+  const trialEnded = sub.status === "trialing" && sub.trialDaysLeft <= 0;
   const isBlocked = !!(
     sub?.status === "expired" ||
     sub?.status === "past_due" ||

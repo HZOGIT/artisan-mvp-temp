@@ -19,19 +19,10 @@ const sub = (over: Partial<SubscriptionRow>): SubscriptionRow => ({
 });
 
 describe("computeCurrentSubscription (pur)", () => {
-  it("aucune ligne → défauts trial/trialing, quotas 1/3/2, pas en essai (trialEndsAt null)", () => {
-    expect(computeCurrentSubscription(null, NOW)).toEqual({
-      plan: "trial",
-      status: "trialing",
-      isTrialing: false,
-      trialDaysLeft: 0,
-      trialEndsAt: null,
-      currentPeriodEnd: null,
-      cancelAtPeriodEnd: false,
-      maxUsers: 1,
-      maxDevicesPerUser: 3,
-      maxConcurrentSessions: 2,
-    });
+  it("aucune ligne → essai 14j actif (non bloquant) avec trialEndsAt calculé sur now", () => {
+    const result = computeCurrentSubscription(null, NOW);
+    expect(result).toMatchObject({ plan: "trial", status: "trialing", isTrialing: true, trialDaysLeft: 14, currentPeriodEnd: null, cancelAtPeriodEnd: false, maxUsers: 1, maxDevicesPerUser: 3, maxConcurrentSessions: 2 });
+    expect(result.trialEndsAt).toEqual(new Date(NOW.getTime() + 14 * 24 * 60 * 60 * 1000));
   });
 
   it("essai en cours : isTrialing=true + jours restants (arrondi sup)", () => {
