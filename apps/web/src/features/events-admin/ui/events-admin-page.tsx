@@ -57,7 +57,7 @@ export default function EventsAdminPage() {
       <div className="flex flex-wrap gap-3 items-end">
         <div className="flex flex-col gap-1">
           <label className="text-xs text-muted-foreground">{t("type")}</label>
-          <Input className="w-52" value={typeInput} onChange={(e) => { setTypeInput(e.target.value); setPage(1); }} placeholder="ex. FACTURE_PAYEE" />
+          <Input className="w-52" value={typeInput} onChange={(e) => { setTypeInput(e.target.value); setPage(1); }} placeholder={t("typePlaceholder")} />
         </div>
         <Button size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching}>
           <RefreshCw className={`mr-1 h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
@@ -92,7 +92,9 @@ export default function EventsAdminPage() {
                         {formatDate(row.occurredAt ?? row.createdAt)}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="font-mono text-xs">{row.action}</Badge>
+                        <Badge variant="outline" className="font-mono text-xs">
+                          {t(row.action, { defaultValue: row.action })}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-sm">
                         <span className="text-muted-foreground">{row.entityType}</span>
