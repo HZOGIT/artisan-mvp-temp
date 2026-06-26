@@ -63,5 +63,15 @@
   "taillePanneau": "Taille du panneau : {{label}}",
   "rechercher": "Rechercher",
   "rechercherHint": "Rechercher (Ctrl+K)",
-  "cmdK": "⌘K"
+  "cmdK": "⌘K",
+  "feedbackBtn": "Signaler un problème",
+  "feedbackTitle": "Bug ou suggestion ?",
+  "feedbackType": "Type",
+  "feedbackTypeBug": "🐛 Bug",
+  "feedbackTypeSuggestion": "💡 Suggestion",
+  "feedbackMessage": "Décrivez le problème ou votre idée",
+  "feedbackMessagePlaceholder": "Décrivez ce qui s'est passé ou ce que vous aimeriez voir…",
+  "feedbackSubmit": "Envoyer",
+  "feedbackSuccess": "Merci ! Votre retour a bien été envoyé.",
+  "feedbackError": "Une erreur est survenue. Veuillez réessayer."
 }

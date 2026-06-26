@@ -62,6 +62,7 @@ import type { IntegrationsComptablesModule } from "../../modules/integrations-co
 import type { DevisIAModule } from "../../modules/devis-ia/devis-ia.module";
 import type { BillingModule } from "../../modules/billing/billing.module";
 import type { EinvoicingModule } from "../../modules/einvoicing/einvoicing.module";
+import type { FeedbackModule } from "../../modules/feedback/feedback.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
@@ -127,6 +128,7 @@ export interface AppRouterDeps {
   readonly platformAdmin: PlatformAdminModule;
   readonly events: EventsModule;
   readonly einvoicing: EinvoicingModule;
+  readonly feedback: FeedbackModule;
 }
 
 /*
@@ -204,6 +206,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     platformAdmin: deps.platformAdmin.router,
     events: deps.events.router,
     einvoicing: deps.einvoicing.router,
+    feedback: deps.feedback.router,
   });
 }
 
