@@ -237,7 +237,7 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
     });
   }
 
-  setStatut(ctx: TenantContext, id: number, statut: FactureStatut, inTx?: (tx: unknown) => Promise<void>): Promise<Facture | null> {
+  setStatut(ctx: TenantContext, id: number, statut: FactureStatut, inTx?: (tx: DbClient) => Promise<void>): Promise<Facture | null> {
     return withTenant(this.db, ctx, async (tx) => {
       const [row] = await tx
         .update(factures)

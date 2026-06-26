@@ -31,8 +31,10 @@ export interface IFactureRepository {
   /** false si la facture n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
 
-  /** Définit le statut (transition pilotée par le use-case workflow) — null hors tenant.
-   *  `inTx` est exécuté dans la même transaction que l'UPDATE (atomicité outbox PA). */
+  /**
+   * Définit le statut (transition pilotée par le use-case workflow) — null hors tenant.
+   * `inTx` est exécuté dans la même transaction que l'UPDATE (atomicité outbox PA).
+   */
   setStatut(ctx: TenantContext, id: number, statut: FactureStatut, inTx?: (tx: DbClient) => Promise<void>): Promise<Facture | null>;
   /*
    * Enregistre un paiement (écrit montantPaye cumulé + date/mode + statut calculés par le
