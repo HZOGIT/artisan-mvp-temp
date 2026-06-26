@@ -104,4 +104,8 @@ export class RegleCategorisationRepositoryDrizzle implements IRegleCategorisatio
       return deleted.length > 0;
     });
   }
+
+  withDb(db: DbClient): RegleCategorisationRepositoryDrizzle {
+    return new RegleCategorisationRepositoryDrizzle(db);
+  }
 }

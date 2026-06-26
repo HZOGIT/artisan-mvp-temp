@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IRegleCategorisationRepository } from "../application/regle-categorisation-repository";
 import type { RegleCategorisation, CreateRegleInput, UpdateRegleInput } from "../domain/regle-categorisation";
@@ -55,5 +56,10 @@ export class FakeRegleCategorisationRepository implements IRegleCategorisationRe
     if (idx === -1) return false;
     this.store.splice(idx, 1);
     return true;
+  }
+
+  /* ponytail: withDb no-op sur le fake, pas de transaction à envelopper */
+  withDb(_db: DbClient): this {
+    return this;
   }
 }
