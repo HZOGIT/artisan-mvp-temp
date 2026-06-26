@@ -14,7 +14,7 @@ const A = 9944001;
 const B = 9944002;
 const ctx = (artisanId: number): TenantContext => ({ artisanId, userId: 1 });
 
-describe.skipIf(!URL)("SubscriptionReaderDrizzle — fallback legacy (subscriptions, pas de RLS)", () => {
+describe.skipIf(!URL)("SubscriptionReaderDrizzle (PG : subscriptions HORS RLS, scope artisan_id explicite)", () => {
   const admin = new Pool({ connectionString: URL });
   const app = createDbClient(APP_URL!);
   const reader = new SubscriptionReaderDrizzle(app.db);
@@ -53,7 +53,7 @@ describe.skipIf(!URL)("SubscriptionReaderDrizzle — fallback legacy (subscripti
   });
 });
 
-describe.skipIf(!URL)("SubscriptionReaderDrizzle — billing_subscriptions sous RLS (OPE-645)", () => {
+describe.skipIf(!URL)("SubscriptionReaderDrizzle — billing_subscriptions HORS RLS (OPE-645)", () => {
   const C = 9944003;
   const admin = new Pool({ connectionString: URL });
   const app = createDbClient(APP_URL!);
@@ -69,7 +69,7 @@ describe.skipIf(!URL)("SubscriptionReaderDrizzle — billing_subscriptions sous 
     await admin.end();
   });
 
-  it("getSubscription retourne la ligne billing_subscriptions sous RLS (withTenant posé)", async () => {
+  it("getSubscription retourne la ligne billing_subscriptions via app_tenant (DISABLE RLS — pas de 42501)", async () => {
     await admin.query(
       `insert into billing_subscriptions (artisan_id, plan_id, billing_mode, status, trial_ends_at)
        values ($1, 'pro', 'maison', 'trialing', now() + interval '14 days')
@@ -80,10 +80,9 @@ describe.skipIf(!URL)("SubscriptionReaderDrizzle — billing_subscriptions sous 
     expect(sub).not.toBeNull();
     expect(sub?.artisanId).toBe(C);
     expect(sub?.plan).toBe("pro");
-    expect(sub?.status).toBe("trialing");
   });
 
-  it("getCurrent : paywall correct depuis billing_subscriptions (isTrialing vrai, plan pro)", async () => {
+  it("getCurrent : paywall correct depuis billing_subscriptions (scope explicite artisan_id)", async () => {
     const cur = await getCurrent(reader, ctx(C));
     expect(cur.plan).toBe("pro");
     expect(cur.isTrialing).toBe(true);

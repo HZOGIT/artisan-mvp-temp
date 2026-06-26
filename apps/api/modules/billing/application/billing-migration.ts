@@ -1,6 +1,5 @@
 import type { IBillingRepository } from "./billing-repository";
 import type { DbClient } from "../../../shared/db";
-import { withTenant } from "../../../shared/db/with-tenant";
 import { subscriptions, billingSubscriptions } from "../../../../../drizzle/schema.pg";
 import { eq } from "drizzle-orm";
 import { planById } from "../domain/plan";
@@ -63,9 +62,11 @@ export async function migrateSubscriptionsFromLegacy(
 
   for (const sub of legacySubs) {
     try {
-      const existing = await withTenant(db, { artisanId: sub.artisan_id, userId: 0 }, (tx) =>
-        tx.select({ id: billingSubscriptions.id }).from(billingSubscriptions).where(eq(billingSubscriptions.artisan_id, sub.artisan_id)).limit(1),
-      );
+      const existing = await db
+        .select({ id: billingSubscriptions.id })
+        .from(billingSubscriptions)
+        .where(eq(billingSubscriptions.artisan_id, sub.artisan_id))
+        .limit(1);
 
       if (existing.length > 0) {
         skipped++;

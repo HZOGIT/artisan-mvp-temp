@@ -42,20 +42,22 @@ alter table "badges" force row level security;
 drop policy if exists tenant_isolation on "badges";
 create policy tenant_isolation on "badges" using ("artisanId" = nullif(current_setting('app.tenant', true), '')::int) with check ("artisanId" = nullif(current_setting('app.tenant', true), '')::int);
 
-alter table "billing_invoices" enable row level security;
-alter table "billing_invoices" force row level security;
+-- billing_invoices : HORS RLS — scheduler crée des invoices dans une transaction
+-- brute sans session tenant ; isolation par scope explicite artisan_id.
 drop policy if exists tenant_isolation on "billing_invoices";
-create policy tenant_isolation on "billing_invoices" using ("artisan_id" = nullif(current_setting('app.tenant', true), '')::int) with check ("artisan_id" = nullif(current_setting('app.tenant', true), '')::int);
+alter table "billing_invoices" disable row level security;
 
+-- billing_payment_methods : RLS tenant actif — accès UI uniquement via withTenant.
 alter table "billing_payment_methods" enable row level security;
 alter table "billing_payment_methods" force row level security;
 drop policy if exists tenant_isolation on "billing_payment_methods";
 create policy tenant_isolation on "billing_payment_methods" using ("artisan_id" = nullif(current_setting('app.tenant', true), '')::int) with check ("artisan_id" = nullif(current_setting('app.tenant', true), '')::int);
 
-alter table "billing_subscriptions" enable row level security;
-alter table "billing_subscriptions" force row level security;
+-- billing_subscriptions : HORS RLS — scheduler/webhook dérivent artisanId depuis
+-- cette table (findSubscriptionById par PK) → impossible de poser app.tenant avant.
+-- Isolation : scope explicite artisan_id dans chaque requête applicative (P1 OPE-645).
 drop policy if exists tenant_isolation on "billing_subscriptions";
-create policy tenant_isolation on "billing_subscriptions" using ("artisan_id" = nullif(current_setting('app.tenant', true), '')::int) with check ("artisan_id" = nullif(current_setting('app.tenant', true), '')::int);
+alter table "billing_subscriptions" disable row level security;
 
 alter table "budgets_categories" enable row level security;
 alter table "budgets_categories" force row level security;

@@ -27,6 +27,8 @@ import type {
   CreateInvoiceForCycleParams,
 } from "../application/billing-repository";
 
+/** billing_payment_methods : RLS tenant — accès via withTenant (UI uniquement).
+ *  billing_subscriptions / billing_invoices : HORS RLS — scope explicite artisan_id. */
 export class BillingRepositoryDrizzle implements IBillingRepository {
   constructor(private readonly db: DbClient) {}
 
@@ -111,19 +113,31 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
 
 
   async findSubscription(ctx: TenantContext): Promise<BillingSubscription | null> {
-    const [row] = await withTenant(this.db, ctx, (tx) =>
-      tx.select().from(billingSubscriptions).where(eq(billingSubscriptions.artisan_id, ctx.artisanId)).limit(1),
-    );
+    const [row] = await this.db
+      .select()
+      .from(billingSubscriptions)
+      .where(eq(billingSubscriptions.artisan_id, ctx.artisanId))
+      .limit(1);
     return row ?? null;
   }
 
   async saveSubscription(params: SaveSubscriptionParams): Promise<BillingSubscription> {
-    const ctx: TenantContext = { artisanId: params.artisanId, userId: 0 };
-    const [row] = await withTenant(this.db, ctx, (tx) =>
-      tx
-        .insert(billingSubscriptions)
-        .values({
-          artisan_id: params.artisanId,
+    const [row] = await this.db
+      .insert(billingSubscriptions)
+      .values({
+        artisan_id: params.artisanId,
+        plan_id: params.planId,
+        billing_interval: params.billingInterval ?? "monthly",
+        billing_mode: params.billingMode,
+        status: params.status,
+        current_period_start: params.currentPeriodStart ?? undefined,
+        current_period_end: params.currentPeriodEnd ?? undefined,
+        trial_ends_at: params.trialEndsAt ?? undefined,
+        payment_method_id: params.paymentMethodId ?? undefined,
+      })
+      .onConflictDoUpdate({
+        target: billingSubscriptions.artisan_id,
+        set: {
           plan_id: params.planId,
           billing_interval: params.billingInterval ?? "monthly",
           billing_mode: params.billingMode,
@@ -132,23 +146,10 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
           current_period_end: params.currentPeriodEnd ?? undefined,
           trial_ends_at: params.trialEndsAt ?? undefined,
           payment_method_id: params.paymentMethodId ?? undefined,
-        })
-        .onConflictDoUpdate({
-          target: billingSubscriptions.artisan_id,
-          set: {
-            plan_id: params.planId,
-            billing_interval: params.billingInterval ?? "monthly",
-            billing_mode: params.billingMode,
-            status: params.status,
-            current_period_start: params.currentPeriodStart ?? undefined,
-            current_period_end: params.currentPeriodEnd ?? undefined,
-            trial_ends_at: params.trialEndsAt ?? undefined,
-            payment_method_id: params.paymentMethodId ?? undefined,
-            updated_at: new Date(),
-          },
-        })
-        .returning(),
-    );
+          updated_at: new Date(),
+        },
+      })
+      .returning();
     if (!row) throw new Error("DB insert returned no row");
     return row;
   }
@@ -170,9 +171,7 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
     const now = new Date();
     const set: Record<string, unknown> = { status, updated_at: now };
     if (status === "canceled") set["canceled_at"] = now;
-    await withTenant(this.db, ctx, (tx) =>
-      tx.update(billingSubscriptions).set(set).where(eq(billingSubscriptions.artisan_id, ctx.artisanId)),
-    );
+    await this.db.update(billingSubscriptions).set(set).where(eq(billingSubscriptions.artisan_id, ctx.artisanId));
   }
 
   async updateSubscriptionPeriod(subscriptionId: number, status: string, periodStart: Date, periodEnd: Date): Promise<void> {
@@ -183,30 +182,24 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
   }
 
   async updateSubscriptionPaymentMethod(ctx: TenantContext, paymentMethodId: number): Promise<void> {
-    await withTenant(this.db, ctx, (tx) =>
-      tx
-        .update(billingSubscriptions)
-        .set({ payment_method_id: paymentMethodId, updated_at: new Date() })
-        .where(eq(billingSubscriptions.artisan_id, ctx.artisanId)),
-    );
+    await this.db
+      .update(billingSubscriptions)
+      .set({ payment_method_id: paymentMethodId, updated_at: new Date() })
+      .where(eq(billingSubscriptions.artisan_id, ctx.artisanId));
   }
 
   async updateSubscriptionPlan(ctx: TenantContext, planId: string): Promise<void> {
-    await withTenant(this.db, ctx, (tx) =>
-      tx
-        .update(billingSubscriptions)
-        .set({ plan_id: planId, updated_at: new Date() })
-        .where(eq(billingSubscriptions.artisan_id, ctx.artisanId)),
-    );
+    await this.db
+      .update(billingSubscriptions)
+      .set({ plan_id: planId, updated_at: new Date() })
+      .where(eq(billingSubscriptions.artisan_id, ctx.artisanId));
   }
 
   async updateCancelAt(ctx: TenantContext, cancelAt: Date | null): Promise<void> {
-    await withTenant(this.db, ctx, (tx) =>
-      tx
-        .update(billingSubscriptions)
-        .set({ cancel_at: cancelAt, updated_at: new Date() })
-        .where(eq(billingSubscriptions.artisan_id, ctx.artisanId)),
-    );
+    await this.db
+      .update(billingSubscriptions)
+      .set({ cancel_at: cancelAt, updated_at: new Date() })
+      .where(eq(billingSubscriptions.artisan_id, ctx.artisanId));
   }
 
 
@@ -410,14 +403,12 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
   }
 
   async findInvoicesByArtisan(ctx: TenantContext, limit = 24): Promise<BillingInvoice[]> {
-    return withTenant(this.db, ctx, (tx) =>
-      tx
-        .select()
-        .from(billingInvoices)
-        .where(eq(billingInvoices.artisan_id, ctx.artisanId))
-        .orderBy(desc(billingInvoices.created_at))
-        .limit(limit),
-    );
+    return this.db
+      .select()
+      .from(billingInvoices)
+      .where(eq(billingInvoices.artisan_id, ctx.artisanId))
+      .orderBy(desc(billingInvoices.created_at))
+      .limit(limit);
   }
 
   async createInvoiceForCycle(params: CreateInvoiceForCycleParams): Promise<BillingInvoice> {
