@@ -36,15 +36,15 @@ describe.skipIf(!URL)("events.list L2/L3 — isolation tenant (RLS off, filtre a
     artisanIdB = resB.rows[0].id;
 
     await admin.query(
-      'insert into "events" ("artisanId", action, "entityType", "entityId", "occurredAt") values ($1, $2, $3, $4, now())',
+      'insert into "events" ("artisanId", action, "entityType", "entityId", "occurred_at") values ($1, $2, $3, $4, now())',
       [artisanIdA, "FACTURE_PAYEE", "Facture", 100],
     );
     await admin.query(
-      'insert into "events" ("artisanId", action, "entityType", "entityId", "occurredAt") values ($1, $2, $3, $4, now())',
+      'insert into "events" ("artisanId", action, "entityType", "entityId", "occurred_at") values ($1, $2, $3, $4, now())',
       [artisanIdA, "DEVIS_ACCEPTE", "Devis", 1],
     );
     await admin.query(
-      'insert into "events" ("artisanId", action, "entityType", "entityId", "occurredAt") values ($1, $2, $3, $4, now())',
+      'insert into "events" ("artisanId", action, "entityType", "entityId", "occurred_at") values ($1, $2, $3, $4, now())',
       [artisanIdB, "FACTURE_PAYEE", "Facture", 200],
     );
 
