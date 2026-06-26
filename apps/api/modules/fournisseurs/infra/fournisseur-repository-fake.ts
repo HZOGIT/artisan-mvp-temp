@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IFournisseurRepository } from "../application/fournisseur-repository";
 import type { Fournisseur, CreateFournisseurInput, UpdateFournisseurInput } from "../domain/fournisseur";
@@ -101,5 +102,10 @@ export class FakeFournisseurRepository implements IFournisseurRepository {
     if (!a || !this.ownsFournisseur(ctx, a.fournisseurId)) return false;
     this.assocs = this.assocs.filter((x) => x.id !== id);
     return true;
+  }
+
+  /* ponytail: withDb ignoré en fake — la tx outbox est gérée par withOutbox, pas par le repo */
+  withDb(_db: DbClient): this {
+    return this;
   }
 }
