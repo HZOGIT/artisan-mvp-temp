@@ -320,22 +320,8 @@
     {
       "idx": 45,
       "version": "7",
-      "when": 1782467671933,
-      "tag": "0045_gifted_ricochet",
-      "breakpoints": true
-    },
-    {
-      "idx": 46,
-      "version": "7",
-      "when": 1782467800000,
-      "tag": "0046_outgoing_post",
-      "breakpoints": true
-    },
-    {
-      "idx": 45,
-      "version": "7",
-      "when": 1782468338785,
-      "tag": "0045_outgoing_post",
+      "when": 1782469340145,
+      "tag": "0045_simple_glorian",
       "breakpoints": true
     }
   ]

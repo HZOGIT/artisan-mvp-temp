@@ -1,5 +1,5 @@
 {
-  "id": "27f79428-dd66-4079-9afc-36b69cf3813c",
+  "id": "4d54b380-db09-4212-8324-e06e0c7d98e2",
   "prevId": "8ca2acab-3010-4e66-9ce2-a5a2ee506794",
   "version": "7",
   "dialect": "postgresql",
@@ -503,6 +503,12 @@
         "passwordChangedAt": {
           "name": "passwordChangedAt",
           "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "registrationIp": {
+          "name": "registrationIp",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false
         }
