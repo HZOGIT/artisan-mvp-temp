@@ -116,4 +116,19 @@ describe.skipIf(!URL)("FactureRepositoryDrizzle (PG, RLS + scope tenant + lignes
     expect(await repo.delete(ctx(A), f.id)).toBe(true);
     expect(await repo.listLignes(ctx(A), f.id)).toEqual([]);
   });
+
+  it("addLigne avec remise 10% : montantHT = pu × q × 0.9", async () => {
+    const f = await repo.create(ctx(A), { clientId: clientA, numero: "FAC-REMISE-01" });
+    const l = await repo.addLigne(ctx(A), f.id, {
+      designation: "Service remisé",
+      quantite: "2",
+      prixUnitaireHT: "100.00",
+      tauxTVA: "20",
+      remise: "10",
+    });
+    expect(l?.montantHT).toBe("180.00"); /* 2 × 100 × 0.9 */
+    expect(l?.montantTTC).toBe("216.00"); /* 180 × 1.2 */
+    const detail = await repo.getById(ctx(A), f.id);
+    expect(detail?.totalHT).toBe("180.00");
+  });
 });

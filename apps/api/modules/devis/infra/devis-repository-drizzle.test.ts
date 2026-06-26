@@ -112,4 +112,17 @@ describe.skipIf(!URL)("DevisRepositoryDrizzle (PG, RLS + scope tenant + lignes)"
     expect(await repo.delete(ctx(A), d.id)).toBe(true);
     expect(await repo.listLignes(ctx(A), d.id)).toEqual([]);
   });
+
+  it("addLigne avec remise 20% : montantHT = pu × q × 0.8", async () => {
+    const d = await repo.create(ctx(A), { clientId: clientA, numero: "DEV-REMISE-01" });
+    const l = await repo.addLigne(ctx(A), d.id, {
+      designation: "Fourniture remisée",
+      quantite: "1",
+      prixUnitaireHT: "50.00",
+      tauxTVA: "20",
+      remise: "20",
+    });
+    expect(l?.montantHT).toBe("40.00"); /* 50 × 0.8 */
+    expect(l?.montantTTC).toBe("48.00"); /* 40 × 1.2 */
+  });
 });
