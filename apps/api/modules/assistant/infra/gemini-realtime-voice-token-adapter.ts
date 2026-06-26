@@ -1,5 +1,6 @@
 import { RealtimeTokenError, type RealtimeVoiceTokenPort, type VoiceTokenMinted, type VoiceTokenSetup } from "../application/voice-token-use-cases";
 import { toGeminiTools } from "./gemini-agentic-adapter";
+import { fetchWithRetry } from "../../../shared/http/fetch-with-retry";
 
 /*
  * Adapter Gemini du mint vocal : POST `v1alpha/auth_tokens` (token éphémère pour la session Live). Body
@@ -44,11 +45,16 @@ export class GeminiRealtimeVoiceTokenAdapter implements RealtimeVoiceTokenPort {
 
     let res: Response;
     try {
-      res = await fetch(`https://generativelanguage.googleapis.com/v1alpha/auth_tokens?key=${apiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      res = await fetchWithRetry(
+        `https://generativelanguage.googleapis.com/v1alpha/auth_tokens?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          forceRetry: true,
+        },
+        { timeoutMs: 10_000, maxRetries: 3 },
+      );
     } catch (e) {
       throw new RealtimeTokenError(`Échec réseau auth_tokens : ${e instanceof Error ? e.message : "inconnu"}`);
     }
