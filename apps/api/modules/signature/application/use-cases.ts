@@ -81,7 +81,7 @@ export async function createSignatureLink(
       signatureUrl,
     });
     try {
-      await deps.email.send({ to: client.email, subject, body });
+      await deps.email.send({ to: client.email, subject, body, fromName: artisan?.nomEntreprise ?? undefined, replyTo: artisan?.email ?? undefined });
     } catch {
       /* best-effort : le lien est créé même si l'email échoue */
     }

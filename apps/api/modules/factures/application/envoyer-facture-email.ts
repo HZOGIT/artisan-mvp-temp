@@ -169,7 +169,7 @@ export async function envoyerFactureParEmail(
       })()
     : undefined;
 
-  await deps.email.send({ to: client.email, subject, body, ...(attachments ? { attachments } : {}) });
+  await deps.email.send({ to: client.email, subject, body, ...(attachments ? { attachments } : {}), fromName: artisan.nomEntreprise ?? undefined, replyTo: artisan.email ?? undefined });
 
   /** Envoi réussi (pas d'exception) : passage `envoyee` depuis brouillon/validee uniquement. */
   if (facture.statut === "brouillon" || facture.statut === "validee") {

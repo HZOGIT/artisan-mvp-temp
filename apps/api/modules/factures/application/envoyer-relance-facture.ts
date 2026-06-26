@@ -160,7 +160,7 @@ export async function envoyerRelanceFacture(
         customMessage: input.customMessage ?? null,
       });
 
-  await deps.email.send({ to: client.email, subject, body });
+  await deps.email.send({ to: client.email, subject, body, fromName: artisan.nomEntreprise ?? undefined, replyTo: artisan.email ?? undefined });
 
   return { success: true, message: `Relance envoyée à ${client.email} — facture ${facture.numero}, ${joursRetard} j de retard` };
 }

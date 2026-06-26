@@ -19,6 +19,10 @@ export interface EmailMessage {
   readonly body: string;
   /** Optionnel : pièces jointes (rétro-compatible — les appelants existants n'en fournissent pas). */
   readonly attachments?: readonly EmailAttachment[];
+  /** Nom affiché de l'expéditeur (ex. « Plomberie Martin »). Domaine d'enveloppe inchangé → DKIM/SPF préservés. */
+  readonly fromName?: string;
+  /** Adresse de réponse (ex. email de l'artisan). Sanitisation CRLF appliquée dans l'adapter. */
+  readonly replyTo?: string;
 }
 
 export interface EmailPort {

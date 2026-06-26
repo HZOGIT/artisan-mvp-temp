@@ -448,6 +448,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       email: emailAdapter,
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(),
       lienBaseUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+      artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
     },
     /*
      * Surface PUBLIQUE par token (portail d'avis) : lecture demande par token (policy RLS publique),

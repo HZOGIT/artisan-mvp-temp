@@ -62,12 +62,12 @@ async function envoyerEtEnregistrer(
   ctx: TenantContext,
   devisId: number,
   client: ClientInfo & { email: string },
-  emailContent: { subject: string; body: string },
+  emailContent: { subject: string; body: string; fromName?: string; replyTo?: string },
   message: string,
 ): Promise<boolean> {
   let ok = true;
   try {
-    await deps.email.send({ to: client.email, subject: emailContent.subject, body: emailContent.body });
+    await deps.email.send({ to: client.email, subject: emailContent.subject, body: emailContent.body, fromName: emailContent.fromName, replyTo: emailContent.replyTo });
   } catch {
     ok = false;
   }
@@ -113,7 +113,7 @@ export async function envoyerRelanceDevis(
         input.message ?? null,
       )
     : { subject: `Relance - Devis n°${devis.numero}`, body: buildRelanceBody(devis.numero, message, artisan) };
-  await envoyerEtEnregistrer(deps, ctx, devis.id, { ...client, email: client.email }, emailContent, message);
+  await envoyerEtEnregistrer(deps, ctx, devis.id, { ...client, email: client.email }, { ...emailContent, fromName: artisanName, replyTo: artisan?.email ?? undefined }, message);
   return { success: true, message: "Relance envoyée avec succès" };
 }
 
@@ -156,7 +156,7 @@ export async function envoyerRelancesAutomatiques(
           null,
         )
       : { subject: `Relance - Devis n°${d.numero}`, body: buildRelanceBody(d.numero, message, artisan) };
-    const ok = await envoyerEtEnregistrer(deps, ctx, d.id, { ...client, email: client.email }, emailContent, message);
+    const ok = await envoyerEtEnregistrer(deps, ctx, d.id, { ...client, email: client.email }, { ...emailContent, fromName: artisanName, replyTo: artisan?.email ?? undefined }, message);
     if (ok) relancesEnvoyees++;
   }
   return { success: true, relancesEnvoyees };
