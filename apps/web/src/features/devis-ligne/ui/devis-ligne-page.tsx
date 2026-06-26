@@ -202,7 +202,7 @@ export default function DevisLignePage() {
             </div>
             <div className="space-y-2"><Label htmlFor="description">{t("description")}</Label><Textarea id="description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder={t("descriptionPlaceholder")} rows={3} /></div>
             {!isDisplayLine && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
                 <div className="space-y-2"><Label htmlFor="quantite">{t("quantite")}</Label><Input id="quantite" type="number" step="0.01" min="0" value={form.quantite} onChange={(e) => setForm({ ...form, quantite: e.target.value })} /></div>
                 <div className="space-y-2">
                   <Label htmlFor="unite">{t("unite")}</Label>
@@ -220,6 +220,7 @@ export default function DevisLignePage() {
                   </Select>
                 </div>
                 <div className="space-y-2"><Label htmlFor="prixUnitaireHT">{t("prixUnitaireHT")}</Label><Input id="prixUnitaireHT" type="number" step="0.01" min="0" value={form.prixUnitaireHT} onChange={(e) => setForm({ ...form, prixUnitaireHT: e.target.value })} placeholder="0.00" required /></div>
+                <div className="space-y-2"><Label htmlFor="remise">{t("remise")}</Label><Input id="remise" type="number" step="1" min="0" max="100" value={form.remise} onChange={(e) => setForm({ ...form, remise: e.target.value })} placeholder="0" /></div>
                 <div className="space-y-2">
                   <Label htmlFor="tvaCategorieId">{t("tauxTVA")}</Label>
                   <Select value={form.tvaCategorieId} onValueChange={(value) => setForm({ ...form, tvaCategorieId: value as TvaCategorieId })}>

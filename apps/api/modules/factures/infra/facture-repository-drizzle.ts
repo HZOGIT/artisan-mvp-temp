@@ -73,6 +73,7 @@ function toLigne(r: LigneRow): FactureLigne {
     prixUnitaireHT: r.prixUnitaireHT,
     tauxTVA: r.tauxTVA ?? "20.00",
     tvaCategorieId: r.tvaCategorieId ?? null,
+    remise: r.remise ?? "0.00",
     montantHT: r.montantHT ?? "0.00",
     montantTVA: r.montantTVA ?? "0.00",
     montantTTC: r.montantTTC ?? "0.00",
@@ -172,7 +173,8 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
         const quantite = isDisplay ? "0" : l.quantite ?? "1";
         const prixUnitaireHT = isDisplay ? "0" : l.prixUnitaireHT;
         const tauxTVA = isDisplay ? "0" : l.tauxTVA ?? "20.00";
-        const montants = calculerMontantsLigne(type, quantite, prixUnitaireHT, tauxTVA);
+        const remise = isDisplay ? "0" : l.remise ?? "0";
+        const montants = calculerMontantsLigne(type, quantite, prixUnitaireHT, tauxTVA, remise);
         await tx.insert(facturesLignes).values({
           factureId: row.id,
           ordre: l.ordre ?? i,
@@ -183,6 +185,7 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
           unite: isDisplay ? "unité" : l.unite ?? "unité",
           prixUnitaireHT,
           tauxTVA,
+          remise,
           tvaCategorieId: isDisplay ? null : (l.tvaCategorieId ?? null),
           montantHT: montants.montantHT,
           montantTVA: montants.montantTVA,
@@ -454,6 +457,7 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
           unite: l.unite,
           prixUnitaireHT: l.prixUnitaireHT,
           tauxTVA: l.tauxTVA,
+          remise: l.remise ?? "0",
           tvaCategorieId: l.tvaCategorieId ?? null,
           montantHT: l.montantHT,
           montantTVA: l.montantTVA,
@@ -505,7 +509,8 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
       const quantite = isDisplay ? "0" : input.quantite ?? "1";
       const prixUnitaireHT = isDisplay ? "0" : input.prixUnitaireHT;
       const tauxTVA = isDisplay ? "0" : input.tauxTVA ?? "20.00";
-      const montants = calculerMontantsLigne(type, quantite, prixUnitaireHT, tauxTVA);
+      const remise = isDisplay ? "0" : input.remise ?? "0";
+      const montants = calculerMontantsLigne(type, quantite, prixUnitaireHT, tauxTVA, remise);
       const [row] = await tx
         .insert(facturesLignes)
         .values({
@@ -518,6 +523,7 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
           unite: isDisplay ? "unité" : input.unite ?? "unité",
           prixUnitaireHT,
           tauxTVA,
+          remise,
           tvaCategorieId: isDisplay ? null : (input.tvaCategorieId ?? null),
           montantHT: montants.montantHT,
           montantTVA: montants.montantTVA,
@@ -540,12 +546,14 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
       const quantite = isDisplay ? "0" : input.quantite ?? (ligne.quantite ?? "0");
       const prixUnitaireHT = isDisplay ? "0" : input.prixUnitaireHT ?? ligne.prixUnitaireHT;
       const tauxTVA = isDisplay ? "0" : input.tauxTVA ?? (ligne.tauxTVA ?? "20.00");
-      const montants = calculerMontantsLigne(type, quantite, prixUnitaireHT, tauxTVA);
+      const remise = isDisplay ? "0" : input.remise ?? (ligne.remise ?? "0");
+      const montants = calculerMontantsLigne(type, quantite, prixUnitaireHT, tauxTVA, remise);
 
       const set: Partial<typeof facturesLignes.$inferInsert> = {
         quantite,
         prixUnitaireHT,
         tauxTVA,
+        remise,
         type,
         montantHT: montants.montantHT,
         montantTVA: montants.montantTVA,

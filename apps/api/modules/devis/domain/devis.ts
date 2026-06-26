@@ -27,6 +27,7 @@ export interface DevisLigne {
   readonly prixUnitaireHT: string;
   readonly tauxTVA: string;
   readonly tvaCategorieId: string | null;
+  readonly remise: string;
   readonly montantHT: string;
   readonly montantTVA: string;
   readonly montantTTC: string;
@@ -92,6 +93,7 @@ export interface CreateDevisLigneInput {
   readonly description?: string | null;
   readonly ordre?: number;
   readonly type?: LigneType;
+  readonly remise?: string;
 }
 
 export interface UpdateDevisLigneInput {
@@ -105,4 +107,5 @@ export interface UpdateDevisLigneInput {
   readonly description?: string | null;
   readonly ordre?: number;
   readonly type?: LigneType;
+  readonly remise?: string;
 }

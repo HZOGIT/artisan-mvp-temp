@@ -28,6 +28,7 @@ export interface FactureLigne {
   readonly prixUnitaireHT: string;
   readonly tauxTVA: string;
   readonly tvaCategorieId: string | null;
+  readonly remise: string;
   readonly montantHT: string;
   readonly montantTVA: string;
   readonly montantTTC: string;
@@ -104,6 +105,7 @@ export interface CreateFactureLigneInput {
   readonly description?: string | null;
   readonly ordre?: number;
   readonly type?: LigneType;
+  readonly remise?: string;
 }
 
 export interface UpdateFactureLigneInput {
@@ -117,6 +119,7 @@ export interface UpdateFactureLigneInput {
   readonly description?: string | null;
   readonly ordre?: number;
   readonly type?: LigneType;
+  readonly remise?: string;
 }
 
 /*

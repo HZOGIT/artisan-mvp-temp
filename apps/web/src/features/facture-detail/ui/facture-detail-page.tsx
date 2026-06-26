@@ -40,7 +40,7 @@ export default function FactureDetailPage() {
   const [avoirNotes, setAvoirNotes] = useState("");
   const [avoirLignes, setAvoirLignes] = useState<AvoirLigneForm[]>([]);
   const [paymentData, setPaymentData] = useState({ montantPaye: "", datePaiement: format(new Date(), "yyyy-MM-dd") });
-  const [lineForm, setLineForm] = useState({ reference: "", designation: "", description: "", quantite: "1", unite: "unité", prixUnitaireHT: "", tvaCategorieId: "FR_20" as TvaCategorieId });
+  const [lineForm, setLineForm] = useState({ reference: "", designation: "", description: "", quantite: "1", unite: "unité", prixUnitaireHT: "", tvaCategorieId: "FR_20" as TvaCategorieId, remise: 0 });
   const [searchResults, setSearchResults] = useState<ArticleSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -65,7 +65,7 @@ export default function FactureDetailPage() {
   }, []);
 
   const goList = () => { window.location.href = "/factures"; };
-  const resetLineForm = () => setLineForm({ reference: "", designation: "", description: "", quantite: "1", unite: "unité", prixUnitaireHT: "", tvaCategorieId: "FR_20" as TvaCategorieId });
+  const resetLineForm = () => setLineForm({ reference: "", designation: "", description: "", quantite: "1", unite: "unité", prixUnitaireHT: "", tvaCategorieId: "FR_20" as TvaCategorieId, remise: 0 });
 
   const handleStatusChange = (newStatus: string) => {
     const onOk = () => { inv(); toast.success(t("toastStatut")); };
@@ -285,10 +285,11 @@ export default function FactureDetailPage() {
                         )}
                       </div>
                       <div className="space-y-2"><Label htmlFor="reference">{t("reference")}</Label><Input id="reference" value={lineForm.reference} onChange={(e) => setLineForm({ ...lineForm, reference: e.target.value })} /></div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
                         <div className="space-y-2"><Label htmlFor="quantite">{t("quantite")}</Label><Input id="quantite" type="number" step="0.01" value={lineForm.quantite} onChange={(e) => setLineForm({ ...lineForm, quantite: e.target.value })} /></div>
                         <div className="space-y-2"><Label htmlFor="unite">{t("unite")}</Label><Input id="unite" value={lineForm.unite} onChange={(e) => setLineForm({ ...lineForm, unite: e.target.value })} /></div>
                         <div className="space-y-2"><Label htmlFor="prixUnitaireHT">{t("prixHTReq")}</Label><Input id="prixUnitaireHT" type="number" step="0.01" value={lineForm.prixUnitaireHT} onChange={(e) => setLineForm({ ...lineForm, prixUnitaireHT: e.target.value })} required /></div>
+                        <div className="space-y-2"><Label htmlFor="remise">{t("remise")}</Label><Input id="remise" type="number" step="1" min="0" max="100" value={lineForm.remise} onChange={(e) => setLineForm({ ...lineForm, remise: parseFloat(e.target.value) || 0 })} placeholder="0" /></div>
                         <div className="space-y-2"><Label htmlFor="tvaCategorieId">{t("tvaPct")}</Label><Select value={lineForm.tvaCategorieId} onValueChange={(v) => setLineForm({ ...lineForm, tvaCategorieId: v as TvaCategorieId })}><SelectTrigger id="tvaCategorieId"><SelectValue /></SelectTrigger><SelectContent>{TVA_CATEGORIES.map((c) => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}</SelectContent></Select></div>
                       </div>
                     </div>

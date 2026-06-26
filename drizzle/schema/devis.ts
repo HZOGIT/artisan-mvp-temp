@@ -47,6 +47,7 @@ export const devisLignes = pgTable("devis_lignes", {
   unite: varchar("unite", { length: 20 }).default("unité"),
   prixUnitaireHT: numeric("prixUnitaireHT", { precision: 10, scale: 2 }).notNull(),
   tauxTVA: numeric("tauxTVA", { precision: 5, scale: 2 }).default("20.00"),
+  remise: numeric("remise", { precision: 5, scale: 2 }).default("0.00"),
   montantHT: numeric("montantHT", { precision: 10, scale: 2 }).default("0.00"),
   montantTVA: numeric("montantTVA", { precision: 10, scale: 2 }).default("0.00"),
   montantTTC: numeric("montantTTC", { precision: 10, scale: 2 }).default("0.00"),

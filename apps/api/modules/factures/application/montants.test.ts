@@ -27,8 +27,24 @@ describe("factures — calcul des montants de ligne (pur)", () => {
   });
 
   it("arrondi au centime sur valeur non ronde (TVA 1.998 → 2.00)", () => {
-    // 3 × 3.33 = 9.99 HT ; TVA 20% = 1.998 → arrondi "2.00" ; TTC 11.988 → "11.99"
+    /* 3 × 3.33 = 9.99 HT ; TVA 20% = 1.998 → arrondi "2.00" ; TTC 11.988 → "11.99" */
     expect(calculerMontantsLigne("produit", "3", "3.33", "20")).toEqual({ montantHT: "9.99", montantTVA: "2.00", montantTTC: "11.99" });
+  });
+
+  it("remise 10% : HT = q×pu×(1 - r/100)", () => {
+    expect(calculerMontantsLigne("produit", "10", "100", "20", "10")).toEqual({
+      montantHT: "900.00",
+      montantTVA: "180.00",
+      montantTTC: "1080.00",
+    });
+  });
+
+  it("remise 100% : HT et totaux = 0", () => {
+    expect(calculerMontantsLigne("produit", "5", "200", "20", "100")).toEqual({
+      montantHT: "0.00",
+      montantTVA: "0.00",
+      montantTTC: "0.00",
+    });
   });
 });
 

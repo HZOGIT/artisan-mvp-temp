@@ -20,12 +20,14 @@ export function calculerMontantsLigne(
   quantite: string,
   prixUnitaireHT: string,
   tauxTVA: string,
+  remise = "0",
 ): MontantsLigne {
   const isDisplay = type === "section" || type === "note";
   const q = isDisplay ? 0 : Number(quantite) || 0;
   const pu = isDisplay ? 0 : Number(prixUnitaireHT) || 0;
   const taux = isDisplay ? 0 : Number(tauxTVA) || 0;
-  const ht = round2(q * pu);
+  const r = isDisplay ? 0 : Math.min(100, Math.max(0, Number(remise) || 0));
+  const ht = round2(q * pu * (1 - r / 100));
   const tva = round2(ht * (taux / 100));
   return { montantHT: ht.toFixed(2), montantTVA: tva.toFixed(2), montantTTC: round2(ht + tva).toFixed(2) };
 }
