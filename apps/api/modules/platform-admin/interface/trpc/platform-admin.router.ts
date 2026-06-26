@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, gte, lte } from "drizzle-orm";
 import { platformAdminProcedure, router } from "../../../../interface/trpc/trpc";
-import { artisans, subscriptions, users } from "../../../../../../drizzle/schema.pg";
+import { artisans, subscriptions, users, eventLog } from "../../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../../shared/db";
 
 const PAGE_SIZE = 50;
@@ -55,6 +55,30 @@ export function createPlatformAdminRouter(db: DbClient) {
               .limit(PAGE_SIZE)
               .offset(offset),
             db.select({ total: count() }).from(subscriptions),
+          ]);
+          return { items, total: Number(totals[0]?.total ?? 0) };
+        }),
+    }),
+    events: router({
+      list: platformAdminProcedure
+        .input(z.object({
+          page: z.number().int().min(1).optional().default(1),
+          artisanId: z.number().int().optional(),
+          type: z.string().optional(),
+          from: z.string().datetime().optional(),
+          to: z.string().datetime().optional(),
+        }))
+        .query(async ({ input }) => {
+          const offset = (input.page - 1) * PAGE_SIZE;
+          const filters = and(
+            input.artisanId !== undefined ? eq(eventLog.artisanId, input.artisanId) : undefined,
+            input.type !== undefined ? eq(eventLog.action, input.type) : undefined,
+            input.from !== undefined ? gte(eventLog.createdAt, new Date(input.from)) : undefined,
+            input.to !== undefined ? lte(eventLog.createdAt, new Date(input.to)) : undefined,
+          );
+          const [items, totals] = await Promise.all([
+            db.select().from(eventLog).where(filters).orderBy(desc(eventLog.createdAt)).limit(PAGE_SIZE).offset(offset),
+            db.select({ total: count() }).from(eventLog).where(filters),
           ]);
           return { items, total: Number(totals[0]?.total ?? 0) };
         }),

@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, sql } from "drizzle-orm";
-import { factures, facturesLignes, clients, devis, parametresArtisan, auditLog } from "../../../../../drizzle/schema.pg";
+import { factures, facturesLignes, clients, devis, parametresArtisan, eventLog } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
@@ -18,7 +18,7 @@ import { calculerMontantsLigne, calculerTotaux } from "../application/montants";
 
 type FactureRow = typeof factures.$inferSelect;
 type LigneRow = typeof facturesLignes.$inferSelect;
-type AuditRow = typeof auditLog.$inferSelect;
+type AuditRow = typeof eventLog.$inferSelect;
 
 function toAuditEntry(r: AuditRow): AuditLogEntry {
   return {
@@ -350,15 +350,15 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
     return withTenant(this.db, ctx, async (tx) => {
       const rows = await tx
         .select()
-        .from(auditLog)
+        .from(eventLog)
         .where(
           and(
-            eq(auditLog.artisanId, ctx.artisanId),
-            eq(auditLog.entityType, "facture"),
-            eq(auditLog.entityId, factureId),
+            eq(eventLog.artisanId, ctx.artisanId),
+            eq(eventLog.entityType, "facture"),
+            eq(eventLog.entityId, factureId),
           ),
         )
-        .orderBy(desc(auditLog.createdAt));
+        .orderBy(desc(eventLog.createdAt));
       return rows.map(toAuditEntry);
     });
   }
