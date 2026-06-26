@@ -37,7 +37,7 @@ export function DashboardLayoutMount() {
   const { data: onboardingStatus, isLoading: onbLoading } = trpc.modules.getOnboardingStatus.useQuery();
   useEffect(() => {
     if (onbLoading || !onboardingStatus) return;
-    if (!onboardingStatus.onboardingCompleted && !ONBOARDING_BYPASS.has(location)) void tsNavigate({ to: "/onboarding", replace: true });
+    if (!onboardingStatus.onboardingCompleted && !ONBOARDING_BYPASS.has(location)) void tsNavigate({ to: "/onboarding", search: (prev) => ({ plan: prev.plan }), replace: true });
   }, [onboardingStatus, onbLoading, location, tsNavigate]);
   const [searchOpen, setSearchOpen] = useState(false);
   /** Auto-open du panneau assistant sur desktop large (port du comportement legacy). */
