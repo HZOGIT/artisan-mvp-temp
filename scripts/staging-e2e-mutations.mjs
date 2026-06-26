@@ -283,7 +283,63 @@ async function casSignupRoutingStable() {
   }
 }
 
+// ── CAS 7b — Anti-régression OPE-606 : COMPTE NEUF (onboardingCompleted=false) sans boucle ──────────
+// Le vrai déclencheur du bug : un compte dont l'onboarding n'est PAS terminé. dev@operioz.com a
+// onboardingCompleted=true → ne déclenche jamais la gate (CAS 7 ne couvrait donc pas la boucle).
+// Cause racine corrigée : le shim navigation.tsx lisait la location via popstate synthétique alors que
+// TanStack Router écrit sans dispatcher popstate → location périmée → la gate relançait /onboarding en
+// boucle (29-32 navigations /home↔/dashboard↔/onboarding). Fix : navigation.tsx adossé au SEUL routeur
+// TanStack (lecture useRouterState, écriture history natif). Ce cas crée un compte neuf et vérifie que
+// /dashboard se stabilise sur /onboarding SANS boucle (< 5 navigations).
+async function casSignupNeufNoLoop() {
+  casesRun++;
+  const tag = 'routing.signup-neuf-no-loop';
+  const freshCtx = await browser.newContext({ baseURL: BASE, ignoreHTTPSErrors: true });
+  const email = `e2e_onboarding_${Date.now()}@test.operioz.com`;
+  const page = await freshCtx.newPage();
+  const pageErrors = [];
+  page.on('pageerror', (e) => pageErrors.push(String(e).slice(0, 200)));
+  let signedUp = false;
+  try {
+    const res = await freshCtx.request.post('/api/trpc/auth.signup?batch=1', {
+      headers: { 'content-type': 'application/json' },
+      data: { '0': { json: { email, password: 'Azerqsdf1234!', name: 'E2E Onboarding' } } },
+    });
+    if (!res.ok()) { issues.push({ tag, step: 'signup', error: `HTTP ${res.status()}` }); return; }
+    signedUp = true;
+    let navCount = 0;
+    page.on('framenavigated', () => { navCount++; });
+    await page.goto('/dashboard', { waitUntil: 'networkidle', timeout: 20000 });
+    await page.waitForTimeout(3000);
+    const finalUrl = new URL(page.url()).pathname;
+    if (navCount > 5) {
+      issues.push({ tag, error: `boucle détectée sur compte neuf : ${navCount} navigations`, finalUrl, pageErrors });
+      return;
+    }
+    if (finalUrl !== '/onboarding') {
+      issues.push({ tag, error: `compte neuf devrait atterrir sur /onboarding, obtenu ${finalUrl}`, navCount, pageErrors });
+      return;
+    }
+    if (pageErrors.length > 0) {
+      issues.push({ tag, warning: 'erreurs pageerror', pageErrors });
+    }
+  } catch (e) {
+    issues.push({ tag, error: String(e).slice(0, 200) });
+  } finally {
+    if (signedUp) {
+      try {
+        await freshCtx.request.post('/api/trpc/auth.deleteAccount?batch=1', {
+          headers: { 'content-type': 'application/json' }, data: { '0': { json: { confirmation: 'SUPPRIMER' } } },
+        });
+      } catch { /* nettoyage best-effort */ }
+    }
+    await page.close();
+    await freshCtx.close();
+  }
+}
+
 await casSignupRoutingStable();
+await casSignupNeufNoLoop();
 // ── (Ajouter ici les cas factures/contrats et tout futur bug d'intégration front↔tRPC) ─────────────
 
 console.log('=== E2E MUTATIONS RESULT ===');
