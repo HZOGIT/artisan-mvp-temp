@@ -31,6 +31,7 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
   passwordChangedAt: timestamp("passwordChangedAt"),
+  registrationIp: varchar("registrationIp", { length: 64 }),
 });
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;

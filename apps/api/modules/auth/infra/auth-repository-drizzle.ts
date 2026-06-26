@@ -74,10 +74,10 @@ export class AuthRepositoryDrizzle implements IAuthRepository {
     await this.db.update(users).set({ passwordChangedAt: new Date() }).where(eq(users.id, userId));
   }
 
-  async createUser(data: { email: string; passwordHash: string; name?: string | null }): Promise<{ id: number; email: string | null }> {
+  async createUser(data: { email: string; passwordHash: string; name?: string | null; registrationIp?: string | null }): Promise<{ id: number; email: string | null }> {
     const [row] = await this.db
       .insert(users)
-      .values({ email: data.email, password: data.passwordHash, name: data.name ?? null, loginMethod: "email", lastSignedIn: new Date() })
+      .values({ email: data.email, password: data.passwordHash, name: data.name ?? null, loginMethod: "email", lastSignedIn: new Date(), registrationIp: data.registrationIp ?? null })
       .returning({ id: users.id, email: users.email });
     return { id: row.id, email: row.email ?? null };
   }

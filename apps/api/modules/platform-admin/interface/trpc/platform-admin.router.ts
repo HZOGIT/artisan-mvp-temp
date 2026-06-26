@@ -22,7 +22,7 @@ export function createPlatformAdminRouter(db: DbClient) {
                 email: users.email,
                 plan: artisans.plan,
                 isActive: artisans.isActive,
-                ip: users.ip,
+                registrationIp: users.registrationIp,
                 createdAt: artisans.createdAt,
               })
               .from(artisans)
@@ -38,13 +38,19 @@ export function createPlatformAdminRouter(db: DbClient) {
       disable: platformAdminProcedure
         .input(z.object({ id: z.number().int() }))
         .mutation(async ({ input }) => {
-          await db.update(artisans).set({ isActive: false }).where(eq(artisans.id, input.id));
+          await Promise.all([
+            db.update(artisans).set({ isActive: false }).where(eq(artisans.id, input.id)),
+            db.update(users).set({ actif: false }).where(eq(users.artisanId, input.id)),
+          ]);
         }),
 
       enable: platformAdminProcedure
         .input(z.object({ id: z.number().int() }))
         .mutation(async ({ input }) => {
-          await db.update(artisans).set({ isActive: true }).where(eq(artisans.id, input.id));
+          await Promise.all([
+            db.update(artisans).set({ isActive: true }).where(eq(artisans.id, input.id)),
+            db.update(users).set({ actif: true }).where(eq(users.artisanId, input.id)),
+          ]);
         }),
     }),
     subscriptions: router({

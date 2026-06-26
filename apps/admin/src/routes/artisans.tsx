@@ -53,7 +53,7 @@ function ArtisansPage() {
               <td style={{ padding: "8px 12px", border: "1px solid #e2e8f0" }}>{a.siret ?? "—"}</td>
               <td style={{ padding: "8px 12px", border: "1px solid #e2e8f0" }}>{a.email ?? "—"}</td>
               <td style={{ padding: "8px 12px", border: "1px solid #e2e8f0" }}>{a.plan ?? "—"}</td>
-              <td style={{ padding: "8px 12px", border: "1px solid #e2e8f0", fontFamily: "monospace" }}>{a.ip ?? "—"}</td>
+              <td style={{ padding: "8px 12px", border: "1px solid #e2e8f0", fontFamily: "monospace" }}>{a.registrationIp ?? "—"}</td>
               <td style={{ padding: "8px 12px", border: "1px solid #e2e8f0" }}>
                 <span style={{
                   padding: "2px 8px",

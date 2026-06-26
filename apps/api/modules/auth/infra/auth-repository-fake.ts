@@ -86,7 +86,7 @@ export class FakeAuthRepository implements IAuthRepository {
     }
   }
 
-  async createUser(data: { email: string; passwordHash: string; name?: string | null }): Promise<{ id: number; email: string | null }> {
+  async createUser(data: { email: string; passwordHash: string; name?: string | null; registrationIp?: string | null }): Promise<{ id: number; email: string | null }> {
     const id = (this.users.reduce((m, u) => Math.max(m, u.id), 0) || 0) + 1;
     const u = this.seed({ id, email: data.email, password: data.passwordHash, name: data.name ?? null, role: "artisan" });
     return { id: u.id, email: u.email };
