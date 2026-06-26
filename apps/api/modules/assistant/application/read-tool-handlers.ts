@@ -21,7 +21,7 @@ export interface AgentClient {
 }
 export interface AgentFacture {
   readonly id: number;
-  readonly numero: string;
+  readonly numero: string | null;
   readonly clientId: number;
   readonly statut: string;
   readonly totalTTC: string;

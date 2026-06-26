@@ -10,7 +10,7 @@ import type { TenantContext } from "../../../shared/tenant";
 export interface FactureReadModel {
   readonly id: number;
   readonly artisanId: number;
-  readonly numero: string;
+  readonly numero: string | null;
   readonly dateFacture: Date;
   /** "facture" | "avoir" */
   readonly typeDocument: string;

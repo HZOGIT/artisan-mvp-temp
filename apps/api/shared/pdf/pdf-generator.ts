@@ -702,7 +702,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
     primaryColor: primary,
     artisan,
     title: isAvoir ? "AVOIR" : "FACTURE",
-    number: `N° ${facture.numero}`,
+    number: `N° ${facture.numero ?? ""}`,
     dateLines: [
       `Date : ${new Date(facture.dateFacture ?? "").toLocaleDateString("fr-FR")}`,
       /*

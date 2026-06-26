@@ -41,7 +41,7 @@ export const factures = pgTable("factures", {
   artisanId: integer("artisanId").notNull(),
   clientId: integer("clientId").notNull(),
   devisId: integer("devisId"),
-  numero: varchar("numero", { length: 50 }).notNull(),
+  numero: varchar("numero", { length: 50 }),
   dateFacture: timestamp("dateFacture").defaultNow().notNull(),
   dateEcheance: timestamp("dateEcheance"),
   statut: factureStatutEnum("statut").default("brouillon"),

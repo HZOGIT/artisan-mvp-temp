@@ -132,6 +132,13 @@ export async function envoyerFactureParEmail(
     throw new TooManyRequestsError("Trop d'envois de facture par email. Réessayez dans quelques minutes.");
   }
 
+  let factureNumero = facture.numero;
+  if (facture.statut === "brouillon" && !factureNumero) {
+    factureNumero = await repo.nextNumero(ctx);
+    await repo.assignNumero(ctx, facture.id, factureNumero);
+  }
+  const effectiveNumero = factureNumero ?? "";
+
   const artisanName = artisan.nomEntreprise || "Votre artisan";
   const clientName = client.prenom ? `${client.prenom} ${client.nom}` : client.nom;
   const totalTTC = `${round2(Number(facture.totalTTC) || 0).toFixed(2)} €`;
@@ -144,7 +151,7 @@ export async function envoyerFactureParEmail(
         {
           client_nom: clientName,
           client_prenom: client.prenom ?? "",
-          numero: facture.numero,
+          numero: effectiveNumero,
           montant_ttc: totalTTC,
           date_echeance: dateEcheance ?? "",
           nom_entreprise: artisanName,
@@ -154,7 +161,7 @@ export async function envoyerFactureParEmail(
     : buildFactureEmail({
         artisanName,
         clientName,
-        numero: facture.numero,
+        numero: effectiveNumero,
         objet: facture.objet,
         totalTTC,
         dateEcheance,
@@ -165,7 +172,7 @@ export async function envoyerFactureParEmail(
     ? await (async () => {
         const lignes = await repo.listLignes(ctx, facture.id);
         const pdf = await deps.pdf.render("facture", { facture: { ...facture, lignes }, artisan, client });
-        return [{ filename: `Facture_${facture.numero}.pdf`, content: pdf, contentType: "application/pdf" }];
+        return [{ filename: `Facture_${effectiveNumero}.pdf`, content: pdf, contentType: "application/pdf" }];
       })()
     : undefined;
 
@@ -177,5 +184,5 @@ export async function envoyerFactureParEmail(
   }
 
   const label = facture.typeDocument === "avoir" ? "Avoir" : "Facture";
-  return { success: true, message: `${label} ${facture.numero} envoyé(e) à ${client.email}` };
+  return { success: true, message: `${label} ${effectiveNumero} envoyé(e) à ${client.email}` };
 }

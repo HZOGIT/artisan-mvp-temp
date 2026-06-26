@@ -24,7 +24,7 @@ export interface DernierPaiement {
 /** Facture pour la création d'un Checkout (numéro + statut [garde de payabilité] + montant + client). */
 export interface FactureCheckout {
   readonly clientId: number;
-  readonly numero: string;
+  readonly numero: string | null;
   readonly statut: string;
   readonly totalTTC: string;
 }

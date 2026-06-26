@@ -5,7 +5,7 @@
 import type { NotificationType } from "./notification";
 export interface FactureEnRetard {
   readonly id: number;
-  readonly numero: string;
+  readonly numero: string | null;
   /** numeric PG en string (précision préservée) */
   readonly totalTTC: string;
   readonly dateEcheance: Date;

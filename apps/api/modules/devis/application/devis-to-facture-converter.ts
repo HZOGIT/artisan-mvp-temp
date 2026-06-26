@@ -3,7 +3,7 @@ import type { TenantContext } from "../../../shared/tenant";
 /** Référence de la facture créée par conversion d'un devis (le client navigue vers `/factures/{id}`). */
 export interface FactureCreeeRef {
   readonly id: number;
-  readonly numero: string;
+  readonly numero: string | null;
 }
 
 /*

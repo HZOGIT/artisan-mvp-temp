@@ -40,7 +40,7 @@ export interface Facture {
   readonly artisanId: number;
   readonly clientId: number;
   readonly devisId: number | null;
-  readonly numero: string;
+  readonly numero: string | null;
   readonly dateFacture: Date;
   readonly dateEcheance: Date | null;
   readonly statut: FactureStatut;
@@ -68,7 +68,7 @@ export interface Facture {
  */
 export interface CreateFactureInput {
   readonly clientId: number;
-  readonly numero: string;
+  readonly numero: string | null;
   readonly devisId?: number | null;
   readonly typeDocument?: FactureTypeDocument;
   readonly factureOrigineId?: number | null;

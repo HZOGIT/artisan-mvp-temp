@@ -99,7 +99,7 @@ export default function FactureDetailPage() {
   const handleExportPDF = () => {
     if (!facture || !facture.client) { toast.error(t("errPdf")); return; }
     generateFacturePDF(artisan ?? {}, facture.client, {
-      numero: facture.numero, dateCreation: facture.createdAt, dateEcheance: facture.dateEcheance, statut: facture.statut || "brouillon",
+      numero: facture.numero ?? "", dateCreation: facture.createdAt, dateEcheance: facture.dateEcheance, statut: facture.statut || "brouillon",
       objet: facture.objet, referenceClient: facture.referenceClient, lignes: pdfLignes(facture.lignes),
       totalHT: parseFloat(String(facture.totalHT)) || 0, totalTVA: parseFloat(String(facture.totalTVA)) || 0, totalTTC: parseFloat(String(facture.totalTTC)) || 0,
       montantPaye: parseFloat(String(facture.montantPaye)) || 0, conditions: facture.conditionsPaiement || null, isAvoir: isAvoirDoc(facture),
@@ -130,7 +130,7 @@ export default function FactureDetailPage() {
       F.createAvoir.mutate({ factureOrigineId: factureId, lignes: avoirLignes, objet: t("objetAvoirPartiel", { numero: facture.numero }), notes: avoirNotes || undefined }, { onSuccess: onAvoirOk, onError: (e) => toast.error(e.message) });
     }
   };
-  function onAvoirOk(data: { id: number; numero: string }) { inv(); setIsAvoirDialogOpen(false); toast.success(t("toastAvoirCree", { numero: data.numero })); window.location.href = `/factures/${data.id}`; }
+  function onAvoirOk(data: { id: number; numero: string | null }) { inv(); setIsAvoirDialogOpen(false); toast.success(t("toastAvoirCree", { numero: data.numero ?? "" })); window.location.href = `/factures/${data.id}`; }
 
   return (
     <div className="space-y-6">

@@ -12,7 +12,7 @@ import type { PortalAccessResolver } from "./portal-devis-pdf";
 export interface PortalFacturePdfDeps {
   readonly accessReader: PortalAccessResolver;
   readonly factureReader: {
-    getById(ctx: TenantContext, id: number): Promise<{ clientId: number; numero: string } | null>;
+    getById(ctx: TenantContext, id: number): Promise<{ clientId: number; numero: string | null } | null>;
     listLignes(ctx: TenantContext, id: number): Promise<unknown[]>;
   };
   readonly clientReader: { getById(ctx: TenantContext, id: number): Promise<unknown | null> };
@@ -38,5 +38,5 @@ export async function getPortalFacturePdf(deps: PortalFacturePdfDeps, token: str
   if (!client || !artisan) throw new NotFoundError("Données introuvables");
 
   const buffer = await deps.pdf.render("facture", { facture: { ...facture, lignes }, artisan, client, cgv });
-  return { buffer, filename: `Facture_${facture.numero}.pdf` };
+  return { buffer, filename: `Facture_${facture.numero ?? ""}.pdf` };
 }

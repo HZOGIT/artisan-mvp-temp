@@ -114,7 +114,7 @@ export class ImportErpRepositoryDrizzle implements IImportErpRepository {
   listFactureNumeros(ctx: TenantContext): Promise<string[]> {
     return withTenant(this.db, ctx, async (tx) => {
       const rows = await tx.select({ numero: facturesTable.numero }).from(facturesTable).where(eq(facturesTable.artisanId, ctx.artisanId));
-      return rows.map((r) => r.numero);
+      return rows.map((r) => r.numero).filter((n): n is string => n !== null);
     });
   }
 }

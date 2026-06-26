@@ -12,7 +12,7 @@ import { embedFacturXml } from "../../../shared/pdf/embed-facturx";
  */
 export interface FacturxReaderDeps {
   readonly factureReader: {
-    getById(ctx: TenantContext, id: number): Promise<{ clientId: number; numero: string } | null>;
+    getById(ctx: TenantContext, id: number): Promise<{ clientId: number; numero: string | null } | null>;
     listLignes(ctx: TenantContext, id: number): Promise<unknown[]>;
   };
   readonly clientReader: { getById(ctx: TenantContext, id: number): Promise<unknown | null> };
@@ -38,7 +38,7 @@ async function loadFacturxData(deps: FacturxReaderDeps, ctx: TenantContext, fact
 export async function getFacturxXml(deps: FacturxReaderDeps, ctx: TenantContext, factureId: number): Promise<{ xml: string; filename: string }> {
   const { facture, lignes, client, artisan } = await loadFacturxData(deps, ctx, factureId);
   const xml = generateFacturXML({ ...facture, lignes } as never, artisan as never, client as never);
-  return { xml, filename: `FacturX_${facture.numero}.xml` };
+  return { xml, filename: `FacturX_${facture.numero ?? ""}.xml` };
 }
 
 export async function getFacturxPdf(deps: FacturxPdfDeps, ctx: TenantContext, factureId: number): Promise<{ buffer: Buffer; filename: string }> {
@@ -46,5 +46,5 @@ export async function getFacturxPdf(deps: FacturxPdfDeps, ctx: TenantContext, fa
   const pdfBuffer = await deps.pdf.render("facture", { facture: { ...facture, lignes }, artisan, client });
   const xml = generateFacturXML({ ...facture, lignes } as never, artisan as never, client as never);
   const buffer = await embedFacturXml(pdfBuffer, xml);
-  return { buffer, filename: `Facture_${facture.numero}_FacturX.pdf` };
+  return { buffer, filename: `Facture_${facture.numero ?? ""}_FacturX.pdf` };
 }

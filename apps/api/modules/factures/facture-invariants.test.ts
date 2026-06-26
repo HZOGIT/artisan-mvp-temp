@@ -49,15 +49,21 @@ describe("factures — invariants métier (synthèse)", () => {
     expect(await listLignesFacture(repo, B, id)).toEqual([]);
   });
 
-  it("INV-2 : numérotation maîtrisée — FAC- auto scopé tenant, immuable via update", async () => {
+  it("INV-2 : numérotation maîtrisée — assignée à l'émission, scopée tenant, immuable via update", async () => {
     const repo = repoWithClient();
     repo.registerClient(B.artisanId, 200);
     const f1 = await creerFacture(repo, A, { clientId: 100 });
     const f2 = await creerFacture(repo, A, { clientId: 100 });
-    expect(f1.numero).toBe("FAC-00001");
-    expect(f2.numero).toBe("FAC-00002");
-    expect((await creerFacture(repo, B, { clientId: 200 })).numero).toBe("FAC-00001"); // scopé tenant
-    expect((await modifierFacture(repo, A, f1.id, { objet: "maj" })).numero).toBe("FAC-00001"); // immuable
+    expect(f1.numero).toBeNull();
+    expect(f2.numero).toBeNull();
+    const emise1 = await changerStatutFacture(repo, A, f1.id, "envoyee", undefined, fakeArtisanReader);
+    const emise2 = await changerStatutFacture(repo, A, f2.id, "envoyee", undefined, fakeArtisanReader);
+    expect(emise1.numero).toBe("FAC-00001");
+    expect(emise2.numero).toBe("FAC-00002");
+    const fB = await creerFacture(repo, B, { clientId: 200 });
+    const fakeArtisanReaderB = { getArtisan: async () => ({ id: 2, nomEntreprise: null, email: null, siret: "73282932000074" }) };
+    expect((await changerStatutFacture(repo, B, fB.id, "envoyee", undefined, fakeArtisanReaderB)).numero).toBe("FAC-00001");
+    expect((await getFacture(repo, A, emise1.id)).numero).toBe("FAC-00001");
   });
 
   it("INV-3 : TVA/totaux dérivés serveur — totalTTC = Σ lignes = totalHT + totalTVA ; section neutre", async () => {

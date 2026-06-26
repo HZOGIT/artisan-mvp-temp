@@ -16,7 +16,7 @@ export interface DashFacture {
   readonly datePaiement: Date | null;
   readonly createdAt: Date;
   readonly clientId: number;
-  readonly numero: string;
+  readonly numero: string | null;
   readonly id: number;
 }
 export interface DashDevis {
@@ -159,7 +159,7 @@ export function computeStats(factures: readonly DashFacture[], devis: readonly D
 export function computeRecentActivity(devis: readonly DashDevis[], factures: readonly DashFacture[], interventions: readonly DashIntervention[], clients: readonly DashClient[], limit: number): RecentActivityItem[] {
   const out: RecentActivityItem[] = [];
   for (const d of devis.slice(0, limit)) out.push({ type: "devis", titre: `Devis ${d.numero} créé`, date: new Date(d.createdAt), id: d.id });
-  for (const f of factures.slice(0, limit)) out.push({ type: "facture", titre: `Facture ${f.numero} ${f.statut === "payee" ? "payée" : "créée"}`, date: new Date(f.createdAt), id: f.id });
+  for (const f of factures.slice(0, limit)) out.push({ type: "facture", titre: `Facture ${f.numero ?? ""} ${f.statut === "payee" ? "payée" : "créée"}`, date: new Date(f.createdAt), id: f.id });
   for (const i of interventions.slice(0, limit)) out.push({ type: "intervention", titre: `Intervention "${i.titre}" planifiée`, date: new Date(i.createdAt), id: i.id });
   for (const c of clients.slice(0, limit)) out.push({ type: "client", titre: `Client ${c.prenom || ""} ${c.nom} ajouté`, date: new Date(c.createdAt), id: c.id });
   out.sort((a, b) => b.date.getTime() - a.date.getTime());

@@ -214,7 +214,7 @@ export class FakeFactureRepository implements IFactureRepository {
     const compteurParam = (this.compteur.get(ctx.artisanId) ?? 0) + 1;
     let maxFromDb = 0;
     for (const f of this.factureStore.filter((x) => x.artisanId === ctx.artisanId)) {
-      const m = f.numero.match(/-(\d+)$/);
+      const m = f.numero?.match(/-(\d+)$/);
       if (m) maxFromDb = Math.max(maxFromDb, parseInt(m[1], 10) + 1);
     }
     const compteur = Math.max(compteurParam, maxFromDb);
@@ -222,11 +222,17 @@ export class FakeFactureRepository implements IFactureRepository {
     return `FAC-${String(compteur).padStart(5, "0")}`;
   }
 
+  async assignNumero(ctx: TenantContext, id: number, numero: string): Promise<void> {
+    this.factureStore = this.factureStore.map((f) =>
+      f.id === id && f.artisanId === ctx.artisanId ? { ...f, numero, updatedAt: new Date() } : f,
+    );
+  }
+
   async nextNumeroAvoir(ctx: TenantContext): Promise<string> {
     const compteurParam = (this.avoirCompteur.get(ctx.artisanId) ?? 0) + 1;
     let maxFromDb = 0;
     for (const f of this.factureStore.filter((x) => x.artisanId === ctx.artisanId && x.typeDocument === "avoir")) {
-      const m = f.numero.match(/-(\d+)$/);
+      const m = f.numero?.match(/-(\d+)$/);
       if (m) maxFromDb = Math.max(maxFromDb, parseInt(m[1], 10) + 1);
     }
     const compteur = Math.max(compteurParam, maxFromDb);

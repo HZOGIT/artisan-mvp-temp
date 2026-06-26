@@ -300,6 +300,15 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
     });
   }
 
+  async assignNumero(ctx: TenantContext, id: number, numero: string): Promise<void> {
+    await withTenant(this.db, ctx, async (tx) => {
+      await tx
+        .update(factures)
+        .set({ numero, updatedAt: new Date() })
+        .where(and(eq(factures.id, id), eq(factures.artisanId, ctx.artisanId)));
+    });
+  }
+
   nextNumeroAvoir(ctx: TenantContext): Promise<string> {
     return withTenant(this.db, ctx, async (tx) => {
       /** Verrou advisory tenant (namespace 1) — sérialise l'allocation du numéro avoir. */

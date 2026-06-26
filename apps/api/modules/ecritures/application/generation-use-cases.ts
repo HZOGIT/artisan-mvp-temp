@@ -56,7 +56,7 @@ export async function genererEcrituresVente(
   const totalHT = Math.abs(Number(facture.totalHT) || 0);
   const totalTVA = Math.abs(Number(facture.totalTVA) || 0);
   const totalTTC = Math.abs(Number(facture.totalTTC) || 0);
-  const pieceRef = facture.numero;
+  const pieceRef = facture.numero ?? "";
   const dateEcriture = facture.dateFacture;
   const libelle = `${isAvoir ? "Avoir" : "Facture"} ${pieceRef}`;
 
@@ -109,7 +109,7 @@ export async function genererEcrituresEncaissement(
   if (facture.statut !== "payee" || ttc <= 0) return [];
 
   const dateEcriture = facture.datePaiement ?? facture.dateFacture;
-  const pieceRef = facture.numero;
+  const pieceRef = facture.numero ?? "";
   const libelle = `Règlement ${pieceRef}`;
   const lettrage = `VL${factureId}`;
   const base = { dateEcriture, journal: "BQ" as const, pieceRef, libelle, factureId, lettrage };

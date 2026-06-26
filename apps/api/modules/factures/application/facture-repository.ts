@@ -44,6 +44,8 @@ export interface IFactureRepository {
   enregistrerPaiement(ctx: TenantContext, id: number, patch: PaiementPatch): Promise<Facture | null>;
   /** Prochain numéro de facture, scopé tenant, généré serveur (parité `getNextFactureNumber`). */
   nextNumero(ctx: TenantContext): Promise<string>;
+  /** Assigne le numéro définitif à une facture (à l'émission brouillon→envoyee). */
+  assignNumero(ctx: TenantContext, id: number, numero: string): Promise<void>;
   /** Prochain numéro d'AVOIR (préfixe + compteur dédiés, parité `getNextAvoirNumber`). */
   nextNumeroAvoir(ctx: TenantContext): Promise<string>;
   /** Avoirs émis sur une facture d'origine (typeDocument='avoir'), scopés tenant. */
@@ -134,7 +136,7 @@ export interface CopiedLigneData {
 export interface CreateFromDevisInput {
   readonly devisId: number;
   readonly clientId: number;
-  readonly numero: string;
+  readonly numero: string | null;
   readonly objet: string | null;
   readonly referenceClient: string | null;
   readonly conditionsPaiement: string | null;

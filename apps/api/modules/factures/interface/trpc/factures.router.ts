@@ -152,8 +152,8 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
         });
         const result = await creerFacture(repo, ctx.tenant, { ...rest, dateEcheance: toDate(rest.dateEcheance), lignes });
         ctx.log.info({ event: "facture_created", factureId: result.id, clientId: rest.clientId }, "Facture créée");
-        push?.sendToUser(ctx.tenant.artisanId, { title: "Operioz", body: `Nouvelle facture ${result.numero} créée` }).catch(() => undefined);
-        eventBus?.publish({ type: "FACTURE_CREEE", aggregateType: "facture", aggregateId: String(result.id), payload: { artisanId: ctx.tenant.artisanId, clientId: rest.clientId, numero: result.numero }, occurredAt: new Date() }).catch(() => undefined);
+        push?.sendToUser(ctx.tenant.artisanId, { title: "Operioz", body: `Nouvelle facture créée (brouillon)` }).catch(() => undefined);
+        eventBus?.publish({ type: "FACTURE_CREEE", aggregateType: "facture", aggregateId: String(result.id), payload: { artisanId: ctx.tenant.artisanId, clientId: rest.clientId, numero: result.numero ?? null }, occurredAt: new Date() }).catch(() => undefined);
         return result;
       }),
 

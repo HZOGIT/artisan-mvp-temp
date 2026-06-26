@@ -57,7 +57,7 @@ describe("factures — conversion devis→facture", () => {
     const f = await convertirDevisEnFacture(repo, reader, A, 7);
     expect(f.typeDocument).toBe("facture");
     expect(f.statut).toBe("brouillon");
-    expect(f.numero).toBe("FAC-00001");
+    expect(f.numero).toBeNull();
     expect(f.devisId).toBe(7);
     expect(f.clientId).toBe(100);
     expect(f.referenceClient).toBe("CMD-42"); // report référence client
