@@ -5,6 +5,7 @@
  */
 import type { LlmPort, LlmCompleteOptions, LlmResult, LlmUsage, LlmStreamChunk } from "./llm";
 import type { VisionPort, VisionRequest, VisionMultiRequest } from "./vision";
+import type { AppLogger } from "./logger";
 
 /** Forme structurelle du usageMetadata retourné par le SDK @google/genai v1.52. */
 type GeminiUsageMeta = {
@@ -71,6 +72,8 @@ function buildUsage(
  * SDK n'est PAS tiré dans le typecheck de src/** ; on type structurellement ce qu'on utilise.
  */
 export class GeminiLlmAdapter implements LlmPort {
+  constructor(private readonly log?: AppLogger) {}
+
   private async client(): Promise<GenAiClient> {
     const mod = (await import(GENAI_MODULE)) as GenAiModule;
     return new mod.GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY ?? "" });
@@ -94,6 +97,7 @@ export class GeminiLlmAdapter implements LlmPort {
 
   async complete(prompt: string, opts?: LlmCompleteOptions): Promise<LlmResult> {
     const ai = await this.client();
+    const model = this.resolvedModel(opts);
     const req = this.request(prompt, opts);
     /*
      * Thinking models (gemini-3.x+) consomment le budget maxOutputTokens avec leurs tokens de
@@ -102,27 +106,49 @@ export class GeminiLlmAdapter implements LlmPort {
      */
     (req.config as Record<string, unknown>).thinkingConfig = { thinkingBudget: 0 };
     const t0 = Date.now();
-    const res = await ai.models.generateContent(req);
-    const durationMs = Date.now() - t0;
-    const finishReason = res.candidates?.[0]?.finishReason ?? "STOP";
-    return {
-      text: res.text ?? "",
-      usage: buildUsage(res.usageMetadata, this.resolvedModel(opts), durationMs, finishReason),
-    };
+    try {
+      const res = await ai.models.generateContent(req);
+      const durationMs = Date.now() - t0;
+      const finishReason = res.candidates?.[0]?.finishReason ?? "STOP";
+      const usage = buildUsage(res.usageMetadata, model, durationMs, finishReason);
+      this.log?.info({ event: "llm_call_complete", model, durationMs, promptTokens: usage.promptTokens, responseTokens: usage.responseTokens, finishReason }, "Appel LLM terminé");
+      return { text: res.text ?? "", usage };
+    } catch (err) {
+      const durationMs = Date.now() - t0;
+      if ((err as { status?: number }).status === 429) {
+        this.log?.warn({ event: "llm_rate_limit", model, durationMs, err }, "Rate limit Gemini");
+      } else {
+        this.log?.error({ event: "llm_call_error", model, durationMs, err }, "Erreur appel LLM");
+      }
+      throw err;
+    }
   }
 
   async *stream(prompt: string, opts?: LlmCompleteOptions): AsyncIterable<LlmStreamChunk> {
     const ai = await this.client();
     const model = this.resolvedModel(opts);
     const t0 = Date.now();
-    const s = await ai.models.generateContentStream(this.request(prompt, opts));
-    let lastMeta: GeminiUsageMeta | undefined;
-    let finishReason = "STREAM_END";
-    for await (const chunk of s) {
-      if (chunk.text) yield { kind: "text", text: chunk.text };
-      if (chunk.usageMetadata) lastMeta = chunk.usageMetadata;
+    try {
+      const s = await ai.models.generateContentStream(this.request(prompt, opts));
+      let lastMeta: GeminiUsageMeta | undefined;
+      let finishReason = "STREAM_END";
+      for await (const chunk of s) {
+        if (chunk.text) yield { kind: "text", text: chunk.text };
+        if (chunk.usageMetadata) lastMeta = chunk.usageMetadata;
+      }
+      const durationMs = Date.now() - t0;
+      const usage = buildUsage(lastMeta, model, durationMs, finishReason);
+      this.log?.info({ event: "llm_stream_complete", model, durationMs, promptTokens: usage.promptTokens, responseTokens: usage.responseTokens }, "Stream LLM terminé");
+      yield { kind: "done", usage };
+    } catch (err) {
+      const durationMs = Date.now() - t0;
+      if ((err as { status?: number }).status === 429) {
+        this.log?.warn({ event: "llm_rate_limit", model, durationMs, err }, "Rate limit Gemini");
+      } else {
+        this.log?.error({ event: "llm_call_error", model, durationMs, err }, "Erreur appel LLM");
+      }
+      throw err;
     }
-    yield { kind: "done", usage: buildUsage(lastMeta, model, Date.now() - t0, finishReason) };
   }
 }
 

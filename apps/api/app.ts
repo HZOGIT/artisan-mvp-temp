@@ -533,7 +533,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       devisRepo,
       stockRepo,
       articleRepo,
-      llm: deps.llm ?? new GeminiLlmAdapter(),
+      llm: deps.llm ?? new GeminiLlmAdapter(app.log),
       trackLlm: makeLlmUsageTracker(getDbHandle().db),
       rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
     },
@@ -620,7 +620,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     /** getDevisNonSignes : lecture signature (signatures_devis, scopée par le devis parent possédé). */
     signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db),
     /** genererLignesIA : LlmPort (Gemini) + rate-limiter IA dédié (budget horaire par artisan). */
-    ia: { llm: deps.llm ?? new GeminiLlmAdapter(), trackLlm: makeLlmUsageTracker(getDbHandle().db), rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000) },
+    ia: { llm: deps.llm ?? new GeminiLlmAdapter(app.log), trackLlm: makeLlmUsageTracker(getDbHandle().db), rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000) },
     push: pushAdapter,
     eventBus,
   });
@@ -663,7 +663,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
      * lecture du métier de l'artisan (contexte spécialisé). Injectables en test (FakeLlmPort).
      */
     ia: {
-      llm: deps.llm ?? new GeminiLlmAdapter(),
+      llm: deps.llm ?? new GeminiLlmAdapter(app.log),
       trackLlm: makeLlmUsageTracker(getDbHandle().db),
       rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
       artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
@@ -812,7 +812,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
    * Procédure RACINE `conseilsIA` (request/response, PAS de SSE). LlmPort Gemini (variable-path).
    */
   const conseilsIa = createConseilsIaModule({
-    llm: deps.llm ?? new GeminiLlmAdapter(),
+    llm: deps.llm ?? new GeminiLlmAdapter(app.log),
     trackLlm: makeLlmUsageTracker(getDbHandle().db),
     rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
     artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
@@ -862,7 +862,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const assistant = createAssistantModule({
     threadsRepo: new AssistantThreadsRepositoryDrizzle(getDbHandle().db),
     generators: {
-      llm: deps.llm ?? new GeminiLlmAdapter(),
+      llm: deps.llm ?? new GeminiLlmAdapter(app.log),
       trackLlm: makeLlmUsageTracker(getDbHandle().db),
       rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
       artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
@@ -942,7 +942,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     artisanInfoReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
     email: emailAdapter,
     rateLimiter: new SlidingWindowRateLimiter(5, 15 * 60 * 1000),
-    llm: deps.llm ?? new GeminiLlmAdapter(),
+    llm: deps.llm ?? new GeminiLlmAdapter(app.log),
     trackLlm: makeLlmUsageTracker(getDbHandle().db),
   });
   /*
