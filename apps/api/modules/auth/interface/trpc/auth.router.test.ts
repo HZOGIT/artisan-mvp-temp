@@ -82,7 +82,7 @@ describe.skipIf(!URL)("auth.router e2e (session + gardes)", () => {
   it("signin admin → 403 'portail administrateur'", async () => {
     const res = await injectTrpc(app, "POST", "auth.signin", { email: ADMIN_EMAIL, password: PASSWORD });
     expect(res.statusCode).toBe(403);
-    expect(res.json().error.message).toContain("portail administrateur");
+    expect(res.json().error.json.message).toContain("portail administrateur");
   });
 
   it("adminSignin admin → succès", async () => {
@@ -94,6 +94,6 @@ describe.skipIf(!URL)("auth.router e2e (session + gardes)", () => {
   it("adminSignin artisan → 403 'Accès réservé'", async () => {
     const res = await injectTrpc(app, "POST", "auth.adminSignin", { email: EMAIL, password: PASSWORD });
     expect(res.statusCode).toBe(403);
-    expect(res.json().error.message).toContain("Accès réservé");
+    expect(res.json().error.json.message).toContain("Accès réservé");
   });
 });
