@@ -18,3 +18,15 @@ output "staging_tunnel_token" {
     s = random_id.staging_tunnel_secret.b64_std
   }))
 }
+
+output "ovh_s3_access_key" {
+  description = "OVH S3 access key ID — à injecter dans OVH_S3_ACCESS_KEY sur le serveur"
+  value       = ovh_cloud_project_user_s3_credential.staging.access_key_id
+  sensitive   = true
+}
+
+output "ovh_s3_secret_key" {
+  description = "OVH S3 secret key — à injecter dans OVH_S3_SECRET_KEY sur le serveur"
+  value       = ovh_cloud_project_user_s3_credential.staging.secret_access_key
+  sensitive   = true
+}
