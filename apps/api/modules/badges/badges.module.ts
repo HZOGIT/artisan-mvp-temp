@@ -1,3 +1,4 @@
+import type { DbClient } from "../../shared/db";
 import type { IBadgeRepository } from "./application/badge-repository";
 import { createBadgesRouter } from "./interface/trpc/badges.router";
 
@@ -7,6 +8,8 @@ import { createBadgesRouter } from "./interface/trpc/badges.router";
  */
 export interface BadgesModuleDeps {
   readonly repository: IBadgeRepository;
+  /** Pool DB pour les transactions outbox (défaut : getDbHandle().db). */
+  readonly db?: DbClient;
 }
 
 export interface BadgesModule {
@@ -15,5 +18,5 @@ export interface BadgesModule {
 }
 
 export function createBadgesModule(deps: BadgesModuleDeps): BadgesModule {
-  return { deps, router: createBadgesRouter(deps.repository) };
+  return { deps, router: createBadgesRouter(deps.repository, deps.db) };
 }

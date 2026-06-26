@@ -308,6 +308,8 @@ export interface AppDeps extends ContextDeps {
   readonly ocrVision?: VisionPort;
   readonly lienBaseUrl?: string;
   readonly badgeRepo?: IBadgeRepository;
+  /** Pool DB pour les transactions outbox du module badges (défaut : getDbHandle().db). */
+  readonly badgesDb?: DbClient;
   readonly technicienRepo?: ITechnicienRepository;
   /** Pool DB pour les transactions outbox du module techniciens (défaut : getDbHandle().db). */
   readonly techniciensDb?: DbClient;
@@ -497,7 +499,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     },
   });
   const badgeRepo = deps.badgeRepo ?? new BadgeRepositoryDrizzle(getDbHandle().db);
-  const badges = createBadgesModule({ repository: badgeRepo });
+  const badges = createBadgesModule({ repository: badgeRepo, db: deps.badgesDb ?? getDbHandle().db });
   /*
    * Repo techniciens partagé : module techniciens + composé par interventions (getSuggestionsTechniciens :
    * positions GPS + dispo, scopé tenant). Hoisté avant interventions.

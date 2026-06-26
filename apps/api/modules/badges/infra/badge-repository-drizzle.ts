@@ -364,6 +364,10 @@ export class BadgeRepositoryDrizzle implements IBadgeRepository {
     });
   }
 
+  withDb(db: DbClient): BadgeRepositoryDrizzle {
+    return new BadgeRepositoryDrizzle(db, this.maintenant);
+  }
+
   /** Le badge appartient-il au tenant ? (RLS + filtre artisanId) */
   private async ownsBadge(tx: DbClient, ctx: TenantContext, badgeId: number): Promise<boolean> {
     const [row] = await tx

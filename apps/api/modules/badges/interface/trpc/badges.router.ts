@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import type { DbClient } from "../../../../shared/db";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
+import { withOutbox } from "../../../../shared/events/with-outbox";
 import type { IBadgeRepository } from "../../application/badge-repository";
 import { listBadges, listBadgesDuTechnicien, listObjectifsDuTechnicien, getClassementTechniciens } from "../../application/read-use-cases";
 import { creerBadge, modifierBadge, supprimerBadge, attribuerBadge, calculerClassement, verifierBadges } from "../../application/write-use-cases";
@@ -41,23 +44,39 @@ const updateSchema = z.object({
  * les Domain errors (NotFound→404, Validation→400). Repository injecté (DI) → testable.
  * La logique dérivée (verifierBadges / classement) est traitée à une étape ultérieure.
  */
-export function createBadgesRouter(repo: IBadgeRepository) {
+export function createBadgesRouter(repo: IBadgeRepository, db?: DbClient) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listBadges(repo, ctx.tenant)),
 
     create: protectedProcedure
       .input(createSchema)
-      .mutation(({ ctx, input }) => creerBadge(repo, ctx.tenant, input)),
+      .mutation(async ({ ctx, input }) => {
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await creerBadge(r, ctx.tenant, input);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "badge.cree", entityType: "badge", entityId: result.id, payload: { nom: result.nom, critere: result.condition, points: result.points } });
+          return result;
+        });
+      }),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int(), data: updateSchema }))
-      .mutation(({ ctx, input }) => modifierBadge(repo, ctx.tenant, input.id, input.data)),
+      .mutation(async ({ ctx, input }) => {
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await modifierBadge(r, ctx.tenant, input.id, input.data);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "badge.modifie", entityType: "badge", entityId: input.id, payload: input.data });
+          return result;
+        });
+      }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        await supprimerBadge(repo, ctx.tenant, input.id);
-        return { success: true };
+        return withOutbox(db, repo, async (r, tx) => {
+          const before = await r.getById(ctx.tenant, input.id);
+          await supprimerBadge(r, ctx.tenant, input.id);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "badge.supprime", entityType: "badge", entityId: input.id, payload: { snapshot: { nom: before?.nom } } });
+          return { success: true };
+        });
       }),
 
     getBadgesTechnicien: protectedProcedure
@@ -74,7 +93,13 @@ export function createBadgesRouter(repo: IBadgeRepository) {
 
     attribuerBadge: protectedProcedure
       .input(z.object({ technicienId: z.number().int(), badgeId: z.number().int(), valeurAtteinte: z.number().int().nullish() }))
-      .mutation(({ ctx, input }) => attribuerBadge(repo, ctx.tenant, input.technicienId, input.badgeId, input.valeurAtteinte)),
+      .mutation(async ({ ctx, input }) => {
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await attribuerBadge(r, ctx.tenant, input.technicienId, input.badgeId, input.valeurAtteinte);
+          if (tx && result) await outboxEvent(tx, ctx.tenant, { action: "badge.attribue", entityType: "badge", entityId: input.badgeId, payload: { technicienId: input.technicienId, obtenuLe: result.dateObtention, valeurAtteinte: result.valeurAtteinte } });
+          return result;
+        });
+      }),
 
     getClassement: protectedProcedure
       .input(z.object({ periode: z.enum(["semaine", "mois", "trimestre", "annee"]) }))
