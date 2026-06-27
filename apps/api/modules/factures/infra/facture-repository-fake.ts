@@ -176,6 +176,7 @@ export class FakeFactureRepository implements IFactureRepository {
       conditionsPaiement: input.conditionsPaiement !== undefined ? input.conditionsPaiement : f.conditionsPaiement,
       notes: input.notes !== undefined ? input.notes : f.notes,
       dateEcheance: input.dateEcheance !== undefined ? input.dateEcheance : f.dateEcheance,
+      nombreRelances: input.nombreRelances !== undefined ? input.nombreRelances : f.nombreRelances,
       updatedAt: new Date(),
     };
     this.factureStore = this.factureStore.map((x) => (x.id === id ? updated : x));

@@ -91,7 +91,7 @@ describe("buildRelanceEmail (pur)", () => {
     expect(body).toContain("délai de 8 jours");
     expect(body).toContain("article L. 441-10");
     expect(body).toContain("indemnité forfaitaire de 40 €");
-    expect(body).toContain("poursuites prévues par la loi");
+    expect(body).toContain("action en justice");
   });
 });
 
