@@ -414,6 +414,13 @@
       "when": 1782587173537,
       "tag": "20260627190613_email-outbox-idx",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1782601537107,
+      "tag": "20260627230537_fk-cascades-contrats",
+      "breakpoints": true
     }
   ]
 }

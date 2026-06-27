@@ -80,7 +80,7 @@ export type InsertContratMaintenance = typeof contratsMaintenance.$inferInsert;
 
 export const facturesRecurrentes = pgTable("factures_recurrentes", {
   id: serial("id").primaryKey(),
-  contratId: integer("contratId").notNull(),
+  contratId: integer("contratId").notNull().references(() => contratsMaintenance.id, { onDelete: "cascade" }),
   factureId: integer("factureId").notNull(),
   periodeDebut: timestamp("periodeDebut").notNull(),
   periodeFin: timestamp("periodeFin").notNull(),
@@ -92,7 +92,7 @@ export type InsertFactureRecurrente = typeof facturesRecurrentes.$inferInsert;
 
 export const interventionsContrat = pgTable("interventions_contrat", {
   id: serial("id").primaryKey(),
-  contratId: integer("contratId").notNull(),
+  contratId: integer("contratId").notNull().references(() => contratsMaintenance.id, { onDelete: "cascade" }),
   artisanId: integer("artisanId").notNull(),
   titre: varchar("titre", { length: 255 }).notNull(),
   description: text("description"),
@@ -121,7 +121,7 @@ export type InsertInterventionChantier = typeof interventionsChantier.$inferInse
 
 export const interventionsMobile = pgTable("interventions_mobile", {
   id: serial("id").primaryKey(),
-  interventionId: integer("interventionId").notNull(),
+  interventionId: integer("interventionId").notNull().references(() => interventions.id, { onDelete: "cascade" }),
   artisanId: integer("artisanId").notNull(),
   latitude: numeric("latitude", { precision: 10, scale: 7 }),
   longitude: numeric("longitude", { precision: 10, scale: 7 }),
@@ -140,7 +140,7 @@ export type InsertInterventionMobile = typeof interventionsMobile.$inferInsert;
 
 export const photosInterventions = pgTable("photos_interventions", {
   id: serial("id").primaryKey(),
-  interventionMobileId: integer("interventionMobileId").notNull(),
+  interventionMobileId: integer("interventionMobileId").notNull().references(() => interventionsMobile.id, { onDelete: "cascade" }),
   url: varchar("url", { length: 500 }).notNull(),
   description: varchar("description", { length: 255 }),
   type: photoInterventionTypeEnum("type").default("pendant"),
