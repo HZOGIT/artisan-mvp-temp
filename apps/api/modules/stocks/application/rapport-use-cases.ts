@@ -2,6 +2,7 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IStockRepository } from "./stock-repository";
 import type { IFournisseurRepository } from "../../fournisseurs/application/fournisseur-repository";
 import type { Fournisseur } from "../../fournisseurs/domain/fournisseur";
+import { round2 } from "../../../shared/money";
 
 /*
  * Rapport de réapprovisionnement (parité legacy `getRapportCommandeFournisseur`). **Cross-domaine** :
@@ -81,13 +82,13 @@ export async function genererRapportCommande(
         : null,
       quantiteACommander,
       prixUnitaire,
-      montantTotal: quantiteACommander * prixUnitaire,
+      montantTotal: round2(quantiteACommander * prixUnitaire),
     });
   }
 
   return Array.from(grouped.values(), (g) => ({
     fournisseur: g.fournisseur,
     lignes: g.lignes,
-    totalCommande: g.lignes.reduce((sum, l) => sum + l.montantTotal, 0),
+    totalCommande: round2(g.lignes.reduce((sum, l) => sum + l.montantTotal, 0)),
   }));
 }
