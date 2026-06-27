@@ -21,6 +21,7 @@ import {
   supprimerLigneFacture,
   changerStatutFacture,
   enregistrerPaiementFacture,
+  ajouterReglement,
   creerAvoir,
   convertirDevisEnFacture,
 } from "../../application/write-use-cases";
@@ -265,6 +266,28 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
           if (tx) await outboxEvent(tx, ctx.tenant, { action: "facture.paiement_enregistre", entityType: "facture", entityId: input.id, payload: { montant: input.montantPaye } });
           return result;
         });
+      }),
+
+    ajouterReglement: protectedProcedure
+      .input(z.object({
+        factureId: z.number().int(),
+        montant: decimal,
+        date: isoDate,
+        mode: z.enum(["cheque", "virement", "especes", "carte", "autre"]),
+        reference: z.string().max(100).optional(),
+        note: z.string().max(5000).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const result = await ajouterReglement(repo, ctx.tenant, {
+          factureId: input.factureId,
+          montant: input.montant,
+          date: toDate(input.date) as Date,
+          mode: input.mode,
+          reference: input.reference ?? null,
+          note: input.note ?? null,
+        });
+        ctx.log.info({ event: "reglement_ajoute", factureId: input.factureId, montant: Number(input.montant), mode: input.mode }, "Reglement ajouté");
+        return result;
       }),
 
     /*

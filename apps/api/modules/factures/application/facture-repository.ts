@@ -83,8 +83,32 @@ export interface IFactureRepository {
   updateLigne(ctx: TenantContext, ligneId: number, input: UpdateFactureLigneInput): Promise<FactureLigne | null>;
   /** false si la ligne ne relève pas d'une facture du tenant. */
   deleteLigne(ctx: TenantContext, ligneId: number): Promise<boolean>;
+  /** Ajoute un reglement et recalcule montantPaye de la facture. Retourne le reglement créé. */
+  ajouterReglement(ctx: TenantContext, input: CreateReglementInput): Promise<Reglement | null>;
   /** Retourne une instance du repo scopée à la transaction `db` (nécessaire pour withOutbox). */
   withDb(db: DbClient): IFactureRepository;
+}
+
+/** Reglement = paiement détaillé (cheque, virement, especes, etc.) */
+export interface Reglement {
+  readonly id: number;
+  readonly factureId: number;
+  readonly artisanId: number;
+  readonly montant: string;
+  readonly date: Date;
+  readonly mode: "cheque" | "virement" | "especes" | "carte" | "autre";
+  readonly reference?: string | null;
+  readonly note?: string | null;
+  readonly createdAt: Date;
+}
+
+export interface CreateReglementInput {
+  readonly factureId: number;
+  readonly montant: string;
+  readonly date: Date;
+  readonly mode: "cheque" | "virement" | "especes" | "carte" | "autre";
+  readonly reference?: string | null;
+  readonly note?: string | null;
 }
 
 /** Patch d'enregistrement de paiement (valeurs déjà calculées par le use-case). */

@@ -3,7 +3,7 @@ import type { TenantContext } from "../../../shared/tenant";
 import { TVA_CATEGORIES_MAP } from "../../../shared/tva/taux-tva-fr";
 import { round2 } from "../../../shared/money";
 import { factureCounter } from "../../../shared/observability/business-metrics";
-import type { IFactureRepository, AvoirLigneData, CopiedLigneData } from "./facture-repository";
+import type { IFactureRepository, AvoirLigneData, CopiedLigneData, Reglement } from "./facture-repository";
 import type { DbClient } from "../../../shared/db";
 import type { IDevisReader } from "./devis-reader";
 import type { ComptaPort } from "./compta-port";
@@ -235,6 +235,56 @@ export async function marquerFacturePayee(
     /** Échec de génération des écritures : ne casse pas le paiement (parité legacy try/catch). */
   }
   return updated;
+}
+
+/** Entrée pour ajouter un reglement */
+export type AjouterReglementInput = {
+  readonly factureId: number;
+  readonly montant: string;
+  readonly date: Date;
+  readonly mode: "cheque" | "virement" | "especes" | "carte" | "autre";
+  readonly reference?: string | null;
+  readonly note?: string | null;
+};
+
+/*
+ * Ajoute un reglement (paiement détaillé) à une facture. Recalcule montantPaye et met à jour
+ * le statut en `payee` si la facture est entièrement payée. ⚠️ Invariants :
+ *  - facture doit être émise (`envoyee`/`en_retard`) ;
+ *  - montant > 0 et anti-sur-paiement (cumul ≤ totalTTC) ;
+ *  - crée un enregistrement reglement + recalcule montantPaye de la facture.
+ */
+export async function ajouterReglement(
+  repo: IFactureRepository,
+  ctx: TenantContext,
+  input: AjouterReglementInput,
+): Promise<Reglement> {
+  const facture = await getFactureOwned(repo, ctx, input.factureId);
+  if (facture.statut !== "envoyee" && facture.statut !== "en_retard") {
+    throw new ConflictError("Seule une facture émise (envoyée ou en retard) peut recevoir un paiement");
+  }
+  const montant = Number(input.montant);
+  if (!Number.isFinite(montant) || montant <= 0) throw new ValidationError("Le montant du reglement doit être strictement positif");
+  const total = Number(facture.totalTTC) || 0;
+  const cumul = (Number(facture.montantPaye) || 0) + montant;
+  if (cumul > total + EPS) throw new ValidationError("Le montant payé dépasse le total TTC de la facture");
+
+  const reglement = await repo.ajouterReglement(ctx, {
+    factureId: input.factureId,
+    montant: montant.toFixed(2),
+    date: input.date,
+    mode: input.mode,
+    reference: input.reference ?? null,
+    note: input.note ?? null,
+  });
+  if (!reglement) throw new NotFoundError("Facture introuvable");
+
+  const soldee = total > 0 && cumul >= total - EPS;
+  if (soldee) {
+    await repo.setStatut(ctx, input.factureId, "payee");
+  }
+
+  return reglement;
 }
 
 /** Entrée de création d'un avoir (note de crédit) sur une facture d'origine. */

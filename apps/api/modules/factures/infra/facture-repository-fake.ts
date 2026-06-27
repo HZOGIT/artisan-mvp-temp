@@ -1,6 +1,6 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { DbClient } from "../../../shared/db";
-import type { IFactureRepository, PaiementPatch, CreateAvoirInput, CreateFromDevisInput } from "../application/facture-repository";
+import type { IFactureRepository, PaiementPatch, CreateAvoirInput, CreateFromDevisInput, Reglement, CreateReglementInput } from "../application/facture-repository";
 import type {
   Facture,
   FactureLigne,
@@ -21,8 +21,10 @@ import { calculerMontantsLigne, calculerTotaux } from "../application/montants";
 export class FakeFactureRepository implements IFactureRepository {
   private factureStore: Facture[] = [];
   private lignesStore: FactureLigne[] = [];
+  private reglementStore: Reglement[] = [];
   private seq = 0;
   private ligneSeq = 0;
+  private reglementSeq = 0;
   private compteur = new Map<number, number>();
   private avoirCompteur = new Map<number, number>();
   private ownedClients = new Set<string>();
@@ -213,6 +215,39 @@ export class FakeFactureRepository implements IFactureRepository {
     };
     this.factureStore = this.factureStore.map((x) => (x.id === id ? updated : x));
     return updated;
+  }
+
+  async ajouterReglement(ctx: TenantContext, input: CreateReglementInput): Promise<Reglement | null> {
+    const facture = await this.getById(ctx, input.factureId);
+    if (!facture) return null;
+
+    const reglement: Reglement = {
+      id: ++this.reglementSeq,
+      factureId: input.factureId,
+      artisanId: ctx.artisanId,
+      montant: input.montant,
+      date: input.date,
+      mode: input.mode,
+      reference: input.reference ?? null,
+      note: input.note ?? null,
+      createdAt: new Date(),
+    };
+
+    this.reglementStore.push(reglement);
+
+    const totalMontant = this.reglementStore
+      .filter((r) => r.factureId === input.factureId)
+      .reduce((sum, r) => sum + Number(r.montant), 0)
+      .toFixed(2);
+
+    const updated: Facture = {
+      ...facture,
+      montantPaye: totalMontant,
+      updatedAt: new Date(),
+    };
+    this.factureStore = this.factureStore.map((x) => (x.id === input.factureId ? updated : x));
+
+    return reglement;
   }
 
   async nextNumero(ctx: TenantContext): Promise<string> {
