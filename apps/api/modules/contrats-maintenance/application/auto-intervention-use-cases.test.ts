@@ -76,4 +76,23 @@ describe("autoGenererInterventionsContrats", () => {
     const result = await autoGenererInterventionsContrats(repo, [1, 2], new Date("2026-06-27T12:00:00Z"));
     expect(result).toEqual({ generees: 2, erreurs: 0 });
   });
+
+  it("idempotence — tick 1 génère, tick 2 → 0 car prochainPassage avancé", async () => {
+    const repo = new FakeContratRepository();
+    repo.seedClient(1, 100, "Dupont");
+    const contrat = await repo.create(
+      { artisanId: 1 },
+      base({ statut: "actif", prochainPassage: new Date("2026-06-26T00:00:00Z") }),
+      "CTR-00001"
+    );
+    const now = new Date("2026-06-27T12:00:00Z");
+    const result1 = await autoGenererInterventionsContrats(repo, [1], now);
+    expect(result1).toEqual({ generees: 1, erreurs: 0 });
+    const updated = await repo.getById({ artisanId: 1, userId: 0 }, contrat.id);
+    expect(updated?.prochainPassage).toEqual(new Date("2026-07-26T00:00:00Z"));
+    const result2 = await autoGenererInterventionsContrats(repo, [1], now);
+    expect(result2).toEqual({ generees: 0, erreurs: 0 });
+    const interventions = await repo.listInterventions({ artisanId: 1, userId: 0 }, contrat.id);
+    expect(interventions).toHaveLength(1);
+  });
 });

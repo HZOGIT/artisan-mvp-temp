@@ -1,13 +1,7 @@
+import { ConflictError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IContratRepository } from "./contrat-repository";
-import { addMonthsClamped } from "./interventions-use-cases";
-
-const MOIS_PAR_PERIODICITE: Record<string, number> = {
-  mensuel: 1,
-  trimestriel: 3,
-  semestriel: 6,
-  annuel: 12,
-};
+import { creerInterventionContratAvecAvance } from "./interventions-use-cases";
 
 export async function autoGenererInterventionsContrats(
   repo: IContratRepository,
@@ -27,20 +21,10 @@ export async function autoGenererInterventionsContrats(
     );
     for (const contrat of dues) {
       try {
-        const prochainPassage = contrat.prochainPassage;
-        if (!prochainPassage) continue;
-        await repo.createIntervention(ctx, {
-          contratId: contrat.id,
-          titre: `Visite — ${contrat.titre}`,
-          dateIntervention: prochainPassage,
-        });
-        const next = addMonthsClamped(
-          prochainPassage,
-          MOIS_PAR_PERIODICITE[contrat.periodicite] ?? 1
-        );
-        await repo.update(ctx, contrat.id, { prochainPassage: next });
+        await creerInterventionContratAvecAvance(repo, ctx, contrat.id, () => now);
         generees++;
       } catch (e) {
+        if (e instanceof ConflictError) continue;
         erreurs++;
       }
     }
