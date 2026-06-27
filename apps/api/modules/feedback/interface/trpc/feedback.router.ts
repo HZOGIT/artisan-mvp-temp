@@ -12,8 +12,10 @@ export function createFeedbackRouter(sink: IFeedbackSink) {
           page: z.string().optional(),
         }),
       )
-      .mutation(({ input, ctx }) =>
-        sink.submit({ type: input.type, message: input.message, page: input.page, email: ctx.claims?.email ?? "" }),
-      ),
+      .mutation(async ({ input, ctx }) => {
+        const result = await sink.submit({ type: input.type, message: input.message, page: input.page, email: ctx.claims?.email ?? "" });
+        if (!result.ok) ctx.log.warn({ event: "feedback_sink_rejected", type: input.type }, "notion feedback sink a rejeté la soumission");
+        return result;
+      }),
   });
 }

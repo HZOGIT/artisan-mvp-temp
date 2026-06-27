@@ -1,10 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createFeedbackModule } from "./feedback.module";
 import type { IFeedbackSink } from "./application/feedback-sink";
 import type { FeedbackInput } from "./domain/feedback";
 import type { AppContext } from "../../interface/trpc/context";
 
-const fakeLog = { child: () => fakeLog, info: () => {}, warn: () => {}, error: () => {} } as unknown as AppContext["log"];
+const warnSpy = vi.fn();
+const fakeLog = { child: () => fakeLog, info: () => {}, warn: warnSpy, error: () => {} } as unknown as AppContext["log"];
 const fakeTenant = { artisanId: 1, userId: 99 };
 const fakeClaims = { userId: 99, email: "artisan@t.fr" };
 const ctx = (over: Partial<AppContext> = {}): AppContext => ({
@@ -43,5 +44,24 @@ describe("createFeedbackModule", () => {
     await mod.router.createCaller(ctx()).submit({ type: "suggestion", message: "Mon idée", page: "/dashboard" });
     expect(sink.calls).toHaveLength(1);
     expect(sink.calls[0]).toMatchObject({ type: "suggestion", message: "Mon idée", page: "/dashboard", email: "artisan@t.fr" });
+  });
+
+  it("sink ok:false → log.warn déclenché", async () => {
+    const failSink: IFeedbackSink = { submit: async () => ({ ok: false }) };
+    const mod = createFeedbackModule({ sink: failSink });
+    warnSpy.mockClear();
+    const result = await mod.router.createCaller(ctx()).submit({ type: "bug", message: "err" });
+    expect(result).toEqual({ ok: false });
+    expect(warnSpy).toHaveBeenCalledOnce();
+  });
+
+  it("avec token + databaseId → expose syncSchema", () => {
+    const mod = createFeedbackModule({ notionToken: "tok", notionDatabaseId: "db" });
+    expect(typeof mod.syncSchema).toBe("function");
+  });
+
+  it("sans token → syncSchema undefined", () => {
+    const mod = createFeedbackModule({});
+    expect(mod.syncSchema).toBeUndefined();
   });
 });

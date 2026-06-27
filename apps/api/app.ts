@@ -1011,8 +1011,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   const feedback = createFeedbackModule({
     notionToken: process.env.NOTION_TOKEN,
-    notionDatabaseId: process.env.NOTION_DATABASE_ID,
+    notionDatabaseId: process.env.NOTION_FEEDBACK_DATABASE_ID,
+    notionEnvironment: process.env.APP_URL?.includes("staging") ? "Staging" : "Production",
   });
+  feedback.syncSchema?.().catch((err: unknown) => app.log.warn({ err }, "notion schema sync échoué — propriété Email peut manquer dans la DB feedback"));
   /** Module `devices` (appareils/sessions de l'utilisateur). Table HORS RLS scopée par userId. */
   const devices = createDevicesModule({ repo: new DeviceRepositoryDrizzle(getDbHandle().db) });
   /** Module `alertesPrevisions` (alertes du prévisionnel de trésorerie). Tables SOUS RLS (artisanId). */

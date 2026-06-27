@@ -13,7 +13,7 @@ for (const envFile of [".env.notion", ".env.local"]) {
 }
 
 const TOKEN = process.env.NOTION_TOKEN!;
-const DB_ID = process.env.NOTION_DATABASE_ID!;
+const DB_ID = process.env.NOTION_USECASES_DATABASE_ID!;
 
 async function notion(path: string, method: string, body?: unknown) {
   const res = await fetch(`https://api.notion.com/v1${path}`, {

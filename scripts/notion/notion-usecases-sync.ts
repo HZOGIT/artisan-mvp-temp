@@ -10,11 +10,11 @@
  *   pnpm tsx scripts/notion/notion-usecases-sync.ts --apply    # écrit dans Notion (token requis)
  *
  * Env :
- *   NOTION_TOKEN          secret de l'intégration Notion (requis pour --apply)
- *   NOTION_DATABASE_ID    DB cible existante (partagée avec l'intégration). Si absent ET
- *                         NOTION_PARENT_PAGE_ID fourni → la DB est créée puis son id est affiché.
- *   NOTION_PARENT_PAGE_ID page parente où créer la DB (si NOTION_DATABASE_ID absent)
- *   GIT_BRANCH            branche pour les permalinks GitHub (défaut: staging)
+ *   NOTION_TOKEN                  secret de l'intégration Notion (requis pour --apply)
+ *   NOTION_USECASES_DATABASE_ID   DB cible existante (partagée avec l'intégration). Si absent ET
+ *                                 NOTION_USECASES_PARENT_PAGE_ID fourni → la DB est créée puis son id est affiché.
+ *   NOTION_USECASES_PARENT_PAGE_ID page parente où créer la DB (si NOTION_USECASES_DATABASE_ID absent)
+ *   GIT_BRANCH                    branche pour les permalinks GitHub (défaut: staging)
  */
 
 import { readdirSync, statSync, readFileSync, writeFileSync } from "node:fs";
@@ -49,8 +49,8 @@ const GEMINI_MODEL = process.env.GEMINI_TEXT_MODEL ?? "gemini-2.0-flash";
 
 const NOTION_TOKEN = process.env.NOTION_TOKEN ?? "";
 const NOTION_VERSION = "2022-06-28";
-let NOTION_DATABASE_ID = process.env.NOTION_DATABASE_ID ?? "";
-const NOTION_PARENT_PAGE_ID = process.env.NOTION_PARENT_PAGE_ID ?? "";
+let NOTION_DATABASE_ID = process.env.NOTION_USECASES_DATABASE_ID ?? "";
+const NOTION_PARENT_PAGE_ID = process.env.NOTION_USECASES_PARENT_PAGE_ID ?? "";
 
 // Bloc Fonctionnel : regroupement métier des modules (éditable). Fallback = module titre-casé.
 const MODULE_TO_BLOC: Record<string, string> = {
@@ -363,14 +363,14 @@ async function ensureDatabase(): Promise<string> {
   }
   // Cas 2 : pas de DB mais une page parente → on crée la DB avec le bon schéma.
   if (!NOTION_PARENT_PAGE_ID) {
-    throw new Error("Ni NOTION_DATABASE_ID ni NOTION_PARENT_PAGE_ID — impossible de cibler/créer la DB.");
+    throw new Error("Ni NOTION_USECASES_DATABASE_ID ni NOTION_USECASES_PARENT_PAGE_ID — impossible de cibler/créer la DB.");
   }
   const db = await notion("/databases", "POST", {
     parent: { type: "page_id", page_id: NOTION_PARENT_PAGE_ID },
     title: [{ type: "text", text: { content: "Use-cases & Testing" } }],
     properties: databaseSchema(),
   });
-  console.log(`\n✅ DB Notion créée. Ajoute ceci à ton env :\n   NOTION_DATABASE_ID=${db.id}\n`);
+  console.log(`\n✅ DB Notion créée. Ajoute ceci à ton env :\n   NOTION_USECASES_DATABASE_ID=${db.id}\n`);
   return db.id;
 }
 
