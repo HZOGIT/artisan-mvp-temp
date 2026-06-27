@@ -11,6 +11,7 @@ export interface FecDepense {
   readonly montantTva: string;
   readonly montantTtc: string;
   readonly description: string | null;
+  readonly remboursable: boolean;
 }
 
 /** Configuration comptable du tenant (comptes + journal d'achats), avec valeurs par défaut PCG. */

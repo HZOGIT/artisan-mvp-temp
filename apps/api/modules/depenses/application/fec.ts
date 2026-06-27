@@ -41,7 +41,9 @@ export function genererFecAchats(depenses: readonly FecDepense[], config: Config
     const lib = `Achat ${d.numero} ${d.fournisseur ?? ""}`.trim();
     lines.push([config.journalAchats, "Achats", num, dateF, config.compteAchats, "Achats", "", "", d.numero, dateF, lib, fec(d.montantHt), "0,00", "", "", "", "", ""].join("\t"));
     lines.push([config.journalAchats, "Achats", num, dateF, config.compteTVADeductible, "TVA deductible", "", "", d.numero, dateF, lib, fec(d.montantTva), "0,00", "", "", "", "", ""].join("\t"));
-    lines.push([config.journalAchats, "Achats", num, dateF, config.compteFournisseurs, "Fournisseurs", "", "", d.numero, dateF, lib, "0,00", fec(d.montantTtc), "", "", "", "", ""].join("\t"));
+    const compteContrepartie = d.remboursable ? "425000" : config.compteFournisseurs;
+    const libContrepartie = d.remboursable ? "Personnel" : "Fournisseurs";
+    lines.push([config.journalAchats, "Achats", num, dateF, compteContrepartie, libContrepartie, "", "", d.numero, dateF, lib, "0,00", fec(d.montantTtc), "", "", "", "", ""].join("\t"));
     num++;
   }
   return lines.join("\n");
