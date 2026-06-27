@@ -38,7 +38,7 @@ export default function EinvoicingPage() {
       ? t("done")
       : statut?.statutProvisioning === "pending"
         ? t("pending")
-        : statut != null
+        : statut?.statutProvisioning != null
           ? t("error")
           : t("non_provisionne");
 
@@ -54,6 +54,11 @@ export default function EinvoicingPage() {
           <CardTitle>{t("statutSection")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {statut?.paDisponible === false && (
+            <div className="rounded-md bg-yellow-50 border border-yellow-300 px-4 py-3 text-sm text-yellow-800">
+              {t("pa_non_configure")}
+            </div>
+          )}
           {isLoadingStatut ? (
             <div className="h-5 w-36 bg-muted animate-pulse rounded" />
           ) : (
@@ -66,7 +71,7 @@ export default function EinvoicingPage() {
               )}
             </div>
           )}
-          {!isLoadingStatut && statut?.statutProvisioning !== "done" && (
+          {!isLoadingStatut && statut?.statutProvisioning !== "done" && statut?.paDisponible !== false && (
             <Button onClick={handleActivate} disabled={isOnboarding}>
               {isOnboarding ? t("activation_en_cours") : t("activate")}
             </Button>

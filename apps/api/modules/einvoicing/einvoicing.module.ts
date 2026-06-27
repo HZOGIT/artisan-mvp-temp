@@ -6,6 +6,7 @@ import { createEinvoicingRouter } from "./interface/trpc/einvoicing.router";
 
 export interface EinvoicingModule {
   readonly pa: PaPort;
+  readonly paDisponible: boolean;
   readonly router: ReturnType<typeof createEinvoicingRouter>;
 }
 
@@ -19,6 +20,7 @@ export interface EinvoicingEnv {
 
 export function buildEinvoicingModule(env: EinvoicingEnv, db: DbClient): EinvoicingModule {
   const provider = env.PA_PROVIDER ?? "fake";
+  const paDisponible = provider === "superpdp";
   let pa: PaPort;
   switch (provider) {
     case "superpdp":
@@ -31,5 +33,5 @@ export function buildEinvoicingModule(env: EinvoicingEnv, db: DbClient): Einvoic
     default:
       pa = new FakePaAdapter();
   }
-  return { pa, router: createEinvoicingRouter(pa, db) };
+  return { pa, paDisponible, router: createEinvoicingRouter(pa, db, paDisponible) };
 }
