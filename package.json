@@ -147,7 +147,7 @@
     "add": "^2.0.6",
     "autoprefixer": "^10.4.20",
     "concurrently": "^10.0.3",
-    "drizzle-kit": "^0.31.4",
+    "drizzle-kit": "^0.31.10",
     "esbuild": "^0.25.0",
     "eslint": "^10.5.0",
     "eslint-plugin-i18next": "^6.1.4",
