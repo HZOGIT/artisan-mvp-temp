@@ -17,6 +17,7 @@ const dep = (over: Partial<FecDepense> = {}): FecDepense => ({
   montantTva: "20.00",
   montantTtc: "120.00",
   description: "Fournitures",
+  remboursable: true,
   ...over,
 });
 
@@ -30,7 +31,7 @@ function totalColonne(fec: string, col: 11 | 12): number {
 
 describe("depenses — genererFecAchats (pur)", () => {
   it("3 lignes par dépense (Achats/TVA débit, Fournisseurs crédit) + en-tête 18 colonnes", () => {
-    const fec = genererFecAchats([dep()], CONFIG);
+    const fec = genererFecAchats([dep({ remboursable: false })], CONFIG);
     const lignes = fec.split("\n");
     expect(lignes[0].split("\t")).toHaveLength(18);
     expect(lignes).toHaveLength(4); // header + 3
@@ -39,10 +40,19 @@ describe("depenses — genererFecAchats (pur)", () => {
     expect(achats[11]).toBe("100,00"); // Débit HT
     expect(tva[4]).toBe("445660"); // TVA déductible
     expect(tva[11]).toBe("20,00"); // Débit TVA
-    expect(fourn[4]).toBe("401000"); // Fournisseurs
+    expect(fourn[4]).toBe("401000"); // Fournisseurs (remboursable=false)
     expect(fourn[12]).toBe("120,00"); // Crédit TTC
     expect(achats[0]).toBe("AC"); // JournalCode
     expect(achats[3]).toBe("20260315"); // EcritureDate YYYYMMDD
+  });
+
+  it("dépense remboursable=true crédite en 425000 (Personnel) au lieu de 401000 (Fournisseurs)", () => {
+    const fec = genererFecAchats([dep({ remboursable: true })], CONFIG);
+    const lignes = fec.split("\n");
+    const [, , personnel] = lignes.slice(1).map((l) => l.split("\t"));
+    expect(personnel[4]).toBe("425000"); // CompteNum Personnel
+    expect(personnel[5]).toBe("Personnel"); // CompteLib
+    expect(personnel[12]).toBe("120,00"); // Crédit TTC
   });
 
   it("⚠️ INVARIANT FEC : total Débit = total Crédit (équilibre comptable)", () => {
