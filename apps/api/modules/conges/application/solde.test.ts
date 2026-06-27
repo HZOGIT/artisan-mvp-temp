@@ -28,6 +28,16 @@ describe("calculerJoursConge (jours ouvrés, sam/dim exclus)", () => {
     expect(calculerJoursConge({ dateDebut: "2026-12-31", dateFin: "2027-01-02", demiJourneeDebut: false, demiJourneeFin: false }).annee).toBe(2026);
   });
 
+  it("jours fériés exclus — 25 dec (féié) exclut, donc tar 22 dec→sam 26 dec = 3 jours", () => {
+    /* 2026-12-22 (tar) → 2026-12-26 (sam, exclu) = tar/mer/jeu (25 dec féié) = 3 jours */
+    expect(calculerJoursConge({ dateDebut: "2026-12-22", dateFin: "2026-12-26", demiJourneeDebut: false, demiJourneeFin: false }).jours).toBe(3);
+  });
+
+  it("jours fériés mobiles exclus — Lundi de Pâques 2025 (21 avril) exclut dans congé 21-23 avril", () => {
+    /* 2025-04-21 (Lun Pâques) → 2025-04-23 (mer) : Lun de Pâques féié → jeu 22 + 23 = 2 jours (pas 3) */
+    expect(calculerJoursConge({ dateDebut: "2025-04-21", dateFin: "2025-04-23", demiJourneeDebut: false, demiJourneeFin: false }).jours).toBe(2);
+  });
+
   it("typeAffecteSolde : conge_paye/rtt oui, autres non", () => {
     expect(typeAffecteSolde("conge_paye")).toBe(true);
     expect(typeAffecteSolde("rtt")).toBe(true);
