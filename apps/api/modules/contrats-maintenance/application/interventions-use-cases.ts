@@ -157,3 +157,35 @@ export async function modifierInterventionContrat(
   if (!updated) throw new NotFoundError("Intervention introuvable");
   return updated;
 }
+
+/*
+ * Crée une intervention pour un contrat récurrent (scheduler). Idempotent via garde :
+ * si prochainPassage > now, le tick précédent l'a déjà traitée → ConflictError (attrapée par auto-use-case).
+ * Crée l'intervention et avance prochainPassage selon la périodicité en une seule unité logique.
+ */
+export async function creerInterventionContratAvecAvance(
+  repo: IContratRepository,
+  ctx: TenantContext,
+  contratId: number,
+  maintenant: () => Date = () => new Date(),
+): Promise<ContratIntervention> {
+  const contrat = await repo.getById(ctx, contratId);
+  if (!contrat) throw new NotFoundError("Contrat introuvable");
+
+  const now = maintenant();
+  if (!contrat.prochainPassage) throw new ConflictError("Pas de prochainPassage à traiter");
+  if (new Date(contrat.prochainPassage) > now) {
+    throw new ConflictError("La visite a déjà été générée pour cette période (prochaine visite non atteinte).");
+  }
+
+  const intervention = await repo.createIntervention(ctx, {
+    contratId: contrat.id,
+    titre: `Visite — ${contrat.titre}`,
+    dateIntervention: contrat.prochainPassage,
+  });
+
+  const next = addMonthsClamped(contrat.prochainPassage, MOIS_PAR_PERIODICITE[contrat.periodicite] ?? 1);
+  await repo.update(ctx, contratId, { prochainPassage: next });
+
+  return intervention;
+}
