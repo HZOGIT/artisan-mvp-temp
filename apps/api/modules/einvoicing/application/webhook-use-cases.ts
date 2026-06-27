@@ -1,9 +1,8 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { PaPort } from "./pa-port";
 import type { DbClient } from "../../../shared/db";
 import type { AppLogger } from "../../../shared/ports/logger";
 import { artisans, factures as facturesTable, facturesCycleVieEvents } from "../../../../../drizzle/schema.pg";
-import { withTenant } from "../../../shared/db/with-tenant";
 import type { InsertFactureCycleVieEvent } from "../../../../../drizzle/schema/einvoicing";
 
 export interface PaWebhookDeps {
@@ -42,7 +41,8 @@ async function handleStatutChange(
   const allArtisans = await deps.db.select({ id: artisans.id }).from(artisans);
   for (const { id: artisanId } of allArtisans) {
     let found = false;
-    await withTenant(deps.db, { artisanId }, async (tx) => {
+    await deps.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT set_config('app.tenant', ${String(artisanId)}, true)`);
       const [facture] = await tx
         .select({ id: facturesTable.id })
         .from(facturesTable)
