@@ -64,20 +64,25 @@ export function createArtisanRouter(repo: IArtisanRepository, security: ArtisanS
         const { currentPassword, ...profileInput } = input;
 
         let credEmail: string | null = null;
+        let ibanActuallyChanged = false;
         if (profileInput.iban !== undefined) {
-          if (!currentPassword) {
-            throw new ValidationError("Mot de passe requis pour modifier l'IBAN");
+          const current = await getProfile(repo, ctx.tenant);
+          ibanActuallyChanged = profileInput.iban !== (current?.iban ?? "");
+          if (ibanActuallyChanged) {
+            if (!currentPassword) {
+              throw new ValidationError("Mot de passe requis pour modifier l'IBAN");
+            }
+            const cred = await security.authRepo.findCredentialsById(ctx.tenant.userId);
+            if (!cred || !cred.actif || !cred.password || !(await security.hasher.verify(currentPassword, cred.password))) {
+              throw new UnauthorizedError("Mot de passe incorrect");
+            }
+            credEmail = cred.email;
           }
-          const cred = await security.authRepo.findCredentialsById(ctx.tenant.userId);
-          if (!cred || !cred.actif || !cred.password || !(await security.hasher.verify(currentPassword, cred.password))) {
-            throw new UnauthorizedError("Mot de passe incorrect");
-          }
-          credEmail = cred.email;
         }
 
         const result = await updateProfile(repo, ctx.tenant, profileInput);
 
-        if (profileInput.iban !== undefined && security.email && credEmail) {
+        if (ibanActuallyChanged && security.email && credEmail) {
           try {
             await security.email.send({ to: credEmail, subject: "Votre IBAN de facturation a été modifié", body: ibanChangedEmail() });
           } catch { /* best-effort */ }

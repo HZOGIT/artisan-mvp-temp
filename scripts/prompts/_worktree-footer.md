@@ -52,6 +52,28 @@ cd __MAIN_REPO__ && pnpm check:parallel &
 
 Le pre-commit hook utilise `check:parallel` (incremental). Sans ce warm-up, le premier commit compile tout from scratch (~2 min).
 
+### REGLE 4 — migrations Drizzle : nettoyer avant generate
+
+**Si ta tâche nécessite une migration**, vérifie d'abord que ton worktree ne contient PAS de fichiers `.sql` parasites (d'une autre branche) :
+
+```bash
+# Fichiers sql trackés sur origin/staging :
+git -C /tmp/wt-__SESSION_NAME__ diff origin/staging --name-only -- drizzle/pg/
+
+# Fichiers sql non commités dans le worktree :
+git -C /tmp/wt-__SESSION_NAME__ status --short drizzle/pg/
+```
+
+Si des `.sql` apparaissent qui n'appartiennent PAS à ta feature → les supprimer AVANT `drizzle-kit generate` :
+```bash
+# Exemple : supprimer un fichier étranger
+rm /tmp/wt-__SESSION_NAME__/drizzle/pg/0059_fichier-etranger.sql
+```
+
+Puis générer et vérifier que **seuls TES fichiers** apparaissent dans `git diff origin/staging -- drizzle/pg/`.
+
+**Ne jamais commiter de migrations d'une autre branche.** Le reviewer rejettera tout journal incohérent.
+
 ### Vérifier avant la PR
 
 ```bash
