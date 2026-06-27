@@ -17,6 +17,7 @@ import { sql } from "drizzle-orm";
 import { artisans } from "./artisans";
 import { users } from "./users";
 import { alerteEnvoiStatutEnum } from "./rh";
+import { interventions } from "./contrats";
 
 export const stockArticleTypeEnum = pgEnum("stock_article_type", ["bibliotheque", "artisan"]);
 export const mouvementTypeEnum = pgEnum("mouvement_type", ["entree", "sortie", "ajustement"]);
@@ -355,7 +356,7 @@ export const demandesAvis = pgTable("demandes_avis", {
   id: serial("id").primaryKey(),
   artisanId: integer("artisanId").notNull(),
   clientId: integer("clientId").notNull(),
-  interventionId: integer("interventionId").notNull(),
+  interventionId: integer("interventionId").notNull().references(() => interventions.id, { onDelete: "cascade" }),
   tokenDemande: varchar("tokenDemande", { length: 64 }).notNull().unique(),
   emailEnvoyeAt: timestamp("emailEnvoyeAt"),
   avisRecuAt: timestamp("avisRecuAt"),
