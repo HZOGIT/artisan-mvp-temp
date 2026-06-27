@@ -174,6 +174,7 @@ import { genererAlertesRetardLivraison } from "./modules/commandes/application/a
 import { genererAlertesReconductionContrats } from "./modules/contrats-maintenance/application/alertes-reconduction-use-cases";
 import { artisans as artisansTable, paOutbox } from "../../drizzle/schema.pg";
 import { alertesPrevisionsCronPlugin } from "./shared/infra/alertes-previsions-cron";
+import { contratsFacturesCronPlugin } from "./shared/infra/contrats-factures-cron";
 import { ensureStripeWebhookEndpoint } from "./shared/infra/stripe-webhook-setup";
 import { WebhookPaymentWriterDrizzle } from "./modules/subscription/infra/webhook-payment-writer-drizzle";
 import { SubscriptionEventNotifierDrizzle } from "./modules/subscription/infra/subscription-event-notifier-drizzle";
@@ -1243,6 +1244,13 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   /** Cron alertes CA — tick horaire, liste tous les artisans (hors RLS) puis verifierEtEnvoyer par tenant. */
   app.register(alertesPrevisionsCronPlugin, {
     repo: new AlertesPrevisionsRepositoryDrizzle(getDbHandle().db),
+    db: getDbHandle().db,
+  });
+
+  /** Cron factures contrats — tick horaire, génère les factures récurrentes dues (prochainFacturation <= now). */
+  app.register(contratsFacturesCronPlugin, {
+    repo: contratRepo,
+    factureGen: new FacturesContratFactureGenerator(factureRepo),
     db: getDbHandle().db,
   });
 
