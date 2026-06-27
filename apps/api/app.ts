@@ -156,6 +156,7 @@ import { registerIcalRoute } from "./interface/http/ical-route";
 import { IcalPublicReaderDrizzle } from "./modules/calendrier/infra/ical-public-reader-drizzle";
 import { registerStripeWebhookRoute } from "./interface/http/stripe-webhook-route";
 import { registerResendWebhookRoute } from "./interface/http/resend-webhook-route";
+import { registerPaWebhookRoute } from "./interface/http/pa-webhook-route";
 import { registerBillingSchedulerRoute } from "./interface/http/billing-scheduler-route";
 import { handleBillingWebhookEvent } from "./modules/billing/interface/http/billing-webhook-handler";
 import fastifySchedule from "@fastify/schedule";
@@ -1151,6 +1152,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   if (resendSecret) {
     registerResendWebhookRoute(app, { resendWebhookSecret: resendSecret });
   }
+
+  /** Webhook PA signé `/api/einvoicing/webhook` — vérif signature fail-closed → dispatch cycle de vie. */
+  registerPaWebhookRoute(app, { pa: einvoicing.pa, db: getDbHandle().db });
 
   /** Scheduler billing maison — `POST /internal/billing/tick` sécurisé par x-scheduler-secret. */
   const billingNotifier = new SubscriptionEventNotifierDrizzle(getDbHandle().db, emailAdapter);

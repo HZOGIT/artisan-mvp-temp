@@ -8,6 +8,7 @@ import { FakePaAdapter } from "./infra/fake-pa-adapter";
 import { ensureArtisanEntity } from "./application/ensure-artisan-entity";
 import { createEinvoicingRouter } from "./interface/trpc/einvoicing.router";
 import { pollInbound } from "../../shared/infra/pa-inbound-poller";
+import { processPaWebhook } from "./application/webhook-use-cases";
 import { mapToPayload } from "./application/facture-mapper";
 import type { Facture, FactureLigne, Artisan, Client } from "../../../../drizzle/schema.pg";
 
@@ -37,8 +38,10 @@ function makeFakeTx(selectRows: unknown[] = [], onInsert?: () => void) {
     insert: () => ({
       values: () => ({
         onConflictDoUpdate: () => { onInsert?.(); return Promise.resolve(); },
+        onConflictDoNothing: () => Promise.resolve(),
       }),
     }),
+    update: () => ({ set: () => ({ where: () => Promise.resolve() }) }),
   };
 }
 
@@ -334,5 +337,43 @@ describe("facturesEntrantes.lire", () => {
     const result = await r.createCaller(ctx()).facturesEntrantes.lire({ id: 7 });
     expect(result.lu).toBe(true);
     expect(updated).toBe(true);
+  });
+});
+
+describe("processPaWebhook", () => {
+  it("retourne 400 si signature invalide", async () => {
+    const pa = new FakePaAdapter();
+    pa.verifyWebhook = () => { throw new Error("sig invalide"); };
+    const result = await processPaWebhook({ pa, db: {} as DbClient }, { rawBody: Buffer.from(""), signature: undefined });
+    expect(result).toEqual({ http: 400, body: "Signature invalide" });
+  });
+
+  it("retourne 200 pong pour un ping", async () => {
+    const pa = new FakePaAdapter();
+    const result = await processPaWebhook({ pa, db: {} as DbClient }, { rawBody: Buffer.from(""), signature: "x" });
+    expect(result).toEqual({ http: 200, body: "pong" });
+  });
+
+  it("statut_change → insère facturesCycleVieEvents (idempotent) + met à jour statutCycleVie", async () => {
+    const pa = new FakePaAdapter();
+    pa.verifyWebhook = () => ({ type: "statut_change", paDocumentId: "doc-123", statut: "approuvee", paEventId: "evt-456" });
+
+    let insertCalled = false;
+    let updateCalled = false;
+    const fakeTx = {
+      execute: () => Promise.resolve({ rows: [] }),
+      select: () => ({ from: () => ({ where: () => ({ limit: () => Promise.resolve([{ id: 7 }]) }) }) }),
+      insert: () => ({ values: () => ({ onConflictDoNothing: () => { insertCalled = true; return Promise.resolve(); } }) }),
+      update: () => ({ set: () => ({ where: () => { updateCalled = true; return Promise.resolve(); } }) }),
+    };
+    const fakeDb = {
+      select: () => ({ from: () => Promise.resolve([{ id: 1 }]) }),
+      transaction: (fn: (tx: unknown) => Promise<unknown>) => fn(fakeTx),
+    } as unknown as DbClient;
+
+    const result = await processPaWebhook({ pa, db: fakeDb }, { rawBody: Buffer.from(""), signature: "x" });
+    expect(result).toEqual({ http: 200, body: "OK" });
+    expect(insertCalled).toBe(true);
+    expect(updateCalled).toBe(true);
   });
 });

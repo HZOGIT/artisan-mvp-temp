@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { paEntites, facturesEntrantes } from "../../../../../../drizzle/schema/einvoicing";
+import { factures as facturesTable } from "../../../../../../drizzle/schema/factures";
 import type { DbClient } from "../../../../shared/db";
 import { withTenant } from "../../../../shared/db/with-tenant";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
@@ -37,7 +38,11 @@ export function createEinvoicingRouter(pa: PaPort, db: DbClient) {
           });
         }
 
-        return await pa.submitInvoice({ paEntityId: entite.paEntityId, invoiceId: input.factureId });
+        const result = await pa.submitInvoice({ paEntityId: entite.paEntityId, invoiceId: input.factureId });
+        await withTenant(db, ctx.tenant, (tx) =>
+          tx.update(facturesTable).set({ paDocumentId: result.paDocumentId }).where(eq(facturesTable.id, input.factureId)).then(() => {}),
+        );
+        return result;
       }),
 
     statutDocument: protectedProcedure
