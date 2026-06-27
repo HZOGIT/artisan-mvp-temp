@@ -1,17 +1,18 @@
 import { describe, it, expect } from "vitest";
-import { TRPCError } from "@trpc/server";
 import { isTerminal } from "../../../../drizzle/schema/einvoicing";
 import { isValidSiret } from "../../../../packages/contract/validation";
 import type { AppContext } from "../../interface/trpc/context";
+import type { TenantContext } from "../../shared/tenant";
+import type { DbClient } from "../../shared/db";
 import { FakePaAdapter } from "./infra/fake-pa-adapter";
 import { ensureArtisanEntity } from "./application/ensure-artisan-entity";
 import { createEinvoicingRouter } from "./interface/trpc/einvoicing.router";
-import type { DbClient } from "../../shared/db";
 
 const fakeLog = { child: () => fakeLog, info: () => {}, warn: () => {}, error: () => {} } as unknown as AppContext["log"];
+const tenant = (artisanId = 1): TenantContext => ({ artisanId, userId: 99 });
 const ctx = (artisanId = 1): AppContext => ({
   claims: { userId: 99, email: "t@t.fr" },
-  tenant: { artisanId, userId: 99 },
+  tenant: tenant(artisanId),
   role: null,
   permissions: [],
   res: null,
@@ -20,13 +21,22 @@ const ctx = (artisanId = 1): AppContext => ({
   log: fakeLog,
 });
 
-function makeSelectDb(rows: unknown[]) {
-  const chain = { where: () => chain, limit: () => Promise.resolve(rows) };
-  return { from: () => chain };
+function makeSelectChain(rows: unknown[]) {
+  const chain = { from: () => chain, where: () => chain, limit: () => Promise.resolve(rows) };
+  return chain;
 }
 
-function makeInsertDb() {
-  return { values: () => ({ onConflictDoUpdate: () => Promise.resolve() }) };
+function makeFakeTx(selectRows: unknown[] = [], onInsert?: () => void) {
+  const chain = makeSelectChain(selectRows);
+  return {
+    execute: () => Promise.resolve({ rows: [] }),
+    select: () => chain,
+    insert: () => ({
+      values: () => ({
+        onConflictDoUpdate: () => { onInsert?.(); return Promise.resolve(); },
+      }),
+    }),
+  };
 }
 
 describe("isTerminal", () => {
@@ -58,21 +68,19 @@ describe("isValidSiret", () => {
 describe("einvoicing.emettre", () => {
   it("lève PRECONDITION_FAILED si aucune entité PA active en base", async () => {
     const db = {
-      select: () => makeSelectDb([]),
+      transaction: (fn: (tx: unknown) => unknown) => fn(makeFakeTx([])),
     } as unknown as DbClient;
-    const pa = new FakePaAdapter();
-    const router = createEinvoicingRouter(pa, db);
-    await expect(router.createCaller(ctx()).emettre({ factureId: 1 }))
+    const r = createEinvoicingRouter(new FakePaAdapter(), db);
+    await expect(r.createCaller(ctx()).emettre({ factureId: 1 }))
       .rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
   });
 
   it("soumet la facture si une entité PA active existe", async () => {
     const db = {
-      select: () => makeSelectDb([{ paEntityId: "fake-entity-abc" }]),
+      transaction: (fn: (tx: unknown) => unknown) => fn(makeFakeTx([{ paEntityId: "fake-entity-abc" }])),
     } as unknown as DbClient;
-    const pa = new FakePaAdapter();
-    const router = createEinvoicingRouter(pa, db);
-    const result = await router.createCaller(ctx()).emettre({ factureId: 42 });
+    const r = createEinvoicingRouter(new FakePaAdapter(), db);
+    const result = await r.createCaller(ctx()).emettre({ factureId: 42 });
     expect(result.paDocumentId).toBeDefined();
     expect(result.statut).toBe("soumis");
   });
@@ -81,23 +89,19 @@ describe("einvoicing.emettre", () => {
 describe("ensureArtisanEntity", () => {
   it("lève une erreur si l'artisan n'a pas de SIRET", async () => {
     const db = {
-      select: () => makeSelectDb([{ siret: null, nomEntreprise: "Test", email: "t@t.fr" }]),
+      select: () => makeSelectChain([{ siret: null, nomEntreprise: "Test", email: "t@t.fr" }]),
     } as unknown as DbClient;
-    await expect(ensureArtisanEntity(db, new FakePaAdapter(), 1))
+    await expect(ensureArtisanEntity(db, new FakePaAdapter(), tenant()))
       .rejects.toThrow("SIRET manquant");
   });
 
   it("retourne paEntityId et kybStatut via FakePaAdapter et upserte pa_entites", async () => {
     let upserted = false;
     const db = {
-      select: () => makeSelectDb([{ siret: "83814693700027", nomEntreprise: "ACME", email: "a@a.fr" }]),
-      insert: () => ({
-        values: () => ({
-          onConflictDoUpdate: () => { upserted = true; return Promise.resolve(); },
-        }),
-      }),
+      select: () => makeSelectChain([{ siret: "83814693700027", nomEntreprise: "ACME", email: "a@a.fr" }]),
+      transaction: (fn: (tx: unknown) => unknown) => fn(makeFakeTx([], () => { upserted = true; })),
     } as unknown as DbClient;
-    const result = await ensureArtisanEntity(db, new FakePaAdapter(), 1);
+    const result = await ensureArtisanEntity(db, new FakePaAdapter(), tenant());
     expect(result.paEntityId).toBe("fake-entity-83814693700027");
     expect(result.kybStatut).toBe("validé");
     expect(upserted).toBe(true);
