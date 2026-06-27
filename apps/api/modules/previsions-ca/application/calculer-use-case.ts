@@ -2,6 +2,7 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IPrevisionCARepository } from "./prevision-ca-repository";
 import type { FacturesCAReader } from "./factures-ca-reader";
 import type { HistoriqueCA, PrevisionMethode, PredictionMois, CalculPrevisionsResult } from "../domain/prevision-ca";
+import { round2 } from "../../../shared/money";
 
 /*
  * Use-case `calculer` (forecasting). Recalcule l'historique de CA depuis les factures PAYÉES du
@@ -31,7 +32,7 @@ export function computePredictions(historique: readonly HistoriqueCA[], methode:
     m.count++;
     moyenneParMois.set(h.mois, m);
   }
-  const overallAvg = historique.length > 0 ? historique.reduce((s, h) => s + num(h.caTotal), 0) / historique.length : 0;
+  const overallAvg = historique.length > 0 ? round2(historique.reduce((s, h) => s + num(h.caTotal), 0) / historique.length) : 0;
 
   const predictions: PredictionMois[] = [];
   for (let mois = 1; mois <= 12; mois++) {
