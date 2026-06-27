@@ -221,6 +221,35 @@ Puis le serveur **refuse de démarrer** si le rôle runtime peut contourner la R
 - **Public-token** : éditer `drizzle/rls/public-token.sql` (référence) puis créer une migration custom à la main
   (cf. `0004`). `drizzle-kit generate --custom --name=… ` crée le fichier vide + l'entrée `_journal.json` à remplir.
 
+## Setup & Seeding
+
+Le script `scripts/seed-data.ts` crée un jeu de données démo complet et idempotent (purge avant réinsertion).
+
+### Seed simple (Plomberie Martin & Fils, Paris)
+
+```bash
+DATABASE_URL=postgres://artisan_user:artisan_password@localhost:5432/artisan_mvp \
+pnpm exec tsx scripts/seed-data.ts
+```
+
+Crée 1 artisan + 10 clients + 5 techniciens + 15 articles + 8 devis + 5 factures + 4 chantiers + 12 interventions + 3 contrats + 4 fournisseurs + 5 notifications. **Mode défaut** — graphe tenant simple sans lignes de documents ni stocks.
+
+### Seed riche (Plomberie Démo Lyon)
+
+```bash
+DATABASE_URL=postgres://artisan_user:artisan_password@localhost:5432/artisan_mvp \
+pnpm exec tsx scripts/seed-data.ts --riche
+```
+
+Crée 1 artisan + 3 clients + 4 fournisseurs + 8 devis **avec lignes** + 6 factures **avec lignes** + 8 interventions + 4 commandes fournisseurs **avec lignes** + 15 stocks. **Mode complet** — graphe tenant avec documents structurés (invariants TVA vérifiés) et gestion stock.
+
+### Propriétés
+
+- **Idempotence** : chaque run purge l'ancien graphe du user démo AVANT réinsertion (repéré par `openId` unique)
+- **Isolation** : chaque profil utilise un `openId` différent (seed simple ≠ seed riche), zéro risque de doublons croisés
+- **Invariants financiers** : Σ(lignes.montantHT) = totalHT, TVA = 20 % (seed riche only)
+- **Non destructif** : les autres comptes (artisans prod, test-data-user2, électricien, etc.) restent intacts
+
 ## Communication inter-agents
 
 Tu peux faire partie d'une « Agentic Factory » : plusieurs sessions Claude Code
