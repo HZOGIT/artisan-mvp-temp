@@ -346,3 +346,27 @@ screen -ls
 > 3. Le worktree est **vieux** (pas créé dans les dernières minutes — recoupe avec l'horodatage `screen -ls`).
 >
 > Au moindre doute (pas de PR du tout, worktree récent, screen présent) → **laisser**. Ne JAMAIS toucher : `/tmp/wt-build-admin`, les worktrees d'autres rôles infra, ou tout ce qui n'est pas clairement un worker de PR mergée.
+
+### 🌿 Ménage des branches distantes — après chaque merge + balayage périodique
+
+Supprimer une branche distante `feat/*` (ou `fix/*`, `infra/*`) **dès que sa PR est `MERGED` ou `CLOSED`** :
+- **Après chaque merge** : `gh pr merge <n> --squash` peut échouer à supprimer la branche locale tant que le worktree existe ; la branche **distante** est supprimée par `--delete-branch`. Si le `--delete-branch` n'a pas pris (worktree present), supprimer explicitement : `git push origin --delete feat/<session>` après cleanup du worktree.
+- **Balayage périodique** (à un cycle cron sur quelques-uns, pas chaque tick) : classer chaque branche distante par état de PR, puis batch-delete les MERGED/CLOSED :
+
+```bash
+cd /home/developer/artisan-mvp-temp && git fetch origin --prune -q
+declare -A ST
+while IFS=$'\t' read -r ref s; do
+  [ "$s" = MERGED ] || [ "${ST[$ref]}" = MERGED ] && ST[$ref]=MERGED || ST[$ref]="${ST[$ref]:-$s}"
+done < <(gh pr list --state all --limit 300 --json state,headRefName --jq '.[]|"\(.headRefName)\t\(.state)"')
+DEL=()
+for b in $(git branch -r | grep -v HEAD | sed 's|origin/||'); do
+  case " main staging old-main " in *" $b "*) continue;; esac   # PROTÉGÉES — jamais
+  [ "${ST[$b]}" = MERGED ] || [ "${ST[$b]}" = CLOSED ] && DEL+=("$b")
+done
+[ ${#DEL[@]} -gt 0 ] && git push origin --delete "${DEL[@]}"
+```
+
+> 🔒 **PROTÉGÉES — ne JAMAIS supprimer** : `main`, `staging`, **`old-main`** (archive pré-refonte volontaire, cf. CLAUDE.md). Exclues même si elles apparaissent « mergées »/ancêtres de staging.
+>
+> ⚠️ **Branche sans PR du tout** (`PR_STATE=NONE`) → **ne pas supprimer d'office**, la signaler à l'humain. Une branche peut porter du travail non encore ouvert en PR ; seul un état `MERGED`/`CLOSED` garantit qu'il n'y a rien à perdre.
