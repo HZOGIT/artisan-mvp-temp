@@ -2,6 +2,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { ZodError } from "zod";
 import superjson from "superjson";
 import { Counter } from "prom-client";
+import { trace } from "@opentelemetry/api";
 import type { AppContext } from "./context";
 import type { TenantContext } from "../../shared/tenant";
 import { NotFoundError, ForbiddenError, ValidationError, ConflictError, TooManyRequestsError, UnauthorizedError } from "../../shared/errors";
@@ -78,6 +79,10 @@ const mapDomainErrors = t.middleware(async ({ next, ctx, path }) => {
  * { procedure } comme champ indexé dans BetterStack — filtrable sans chercher dans le message.
  */
 const logProcedureTiming = t.middleware(async ({ next, path, ctx }) => {
+  trace.getActiveSpan()?.setAttributes({
+    "trpc.procedure": path,
+    ...(ctx.tenant?.artisanId ? { "tenant.id": ctx.tenant.artisanId } : {}),
+  });
   const log = ctx.log?.child({ procedure: path }) ?? ctx.log;
   const t0 = Date.now();
   const result = await next({ ctx: { ...ctx, log } });
