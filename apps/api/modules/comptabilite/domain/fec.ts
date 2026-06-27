@@ -6,6 +6,8 @@
  * 100% PUR (aucune I/O) → testable (invariant d'équilibre + parité de format).
  */
 
+import { compareAmounts } from "../../../shared/money";
+
 export interface FecConfig {
   readonly compteVentes: string;
   readonly compteClients: string;
@@ -180,7 +182,7 @@ export function buildFec(input: FecInput, config: FecConfig): FecResult {
     num++;
     const auxNum = `C${String(f.clientId).padStart(5, "0")}`;
     const auxLib = `${f.clientPrenom || ""} ${f.clientNom || ""}`.trim() || `Client ${f.clientId}`;
-    const isAvoir = f.typeDocument === "avoir" || n(f.totalTTC) < 0;
+    const isAvoir = f.typeDocument === "avoir" || compareAmounts(n(f.totalTTC), 0) < 0;
     const piece = f.numero || `F-${f.id}`;
     const lib = `${isAvoir ? "Avoir" : "Facture"} ${piece}`;
     const ht = Math.abs(n(f.totalHT));
@@ -228,7 +230,7 @@ export function buildFec(input: FecInput, config: FecConfig): FecResult {
     const auxNum = `C${String(p.clientId).padStart(5, "0")}`;
     const auxLib = `${p.clientPrenom || ""} ${p.clientNom || ""}`.trim() || `Client ${p.clientId}`;
     const piece = p.numero || `F-${p.id}`;
-    const isAvoir = p.typeDocument === "avoir" || n(p.totalTTC) < 0;
+    const isAvoir = p.typeDocument === "avoir" || compareAmounts(n(p.totalTTC), 0) < 0;
     const lib = `${isAvoir ? "Remboursement" : "Reglement"} ${piece}`;
     const ttc = Math.abs(n(p.totalTTC));
     const lettre = `VL${p.id}`;
