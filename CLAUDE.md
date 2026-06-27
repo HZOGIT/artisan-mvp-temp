@@ -427,3 +427,26 @@ autres agents ») — non redétaillée ici.
   (`scripts/agents/ntfy-pub.sh`), (4) **bus inter-agents** (`scripts/agents/notify.sh`). Helper unique
   pour 1+3+4 : [`scripts/testing-loop/broadcast.sh`](scripts/testing-loop/broadcast.sh)
   `<tag> <titre> <message>`.
+
+## Vérifier l'usage Claude en temps réel
+
+Pour connaître l'état des quotas (fenêtre 5h + limite hebdomadaire) depuis n'importe quel terminal — sans interrompre les sessions actives :
+
+```bash
+SESSION="_usage_$$" && \
+screen -dmS "$SESSION" bash -c "claude --model claude-haiku-4-5-20251001 --permission-mode auto" && \
+sleep 9 && \
+screen -S "$SESSION" -X stuff "/usage\r" && \
+sleep 3 && \
+screen -S "$SESSION" -X hardcopy /tmp/_usage_out.txt && \
+cat /tmp/_usage_out.txt && \
+screen -S "$SESSION" -X quit 2>/dev/null
+```
+
+**Ce que ça affiche :**
+- Fenêtre 5h en cours : % utilisé + heure de reset
+- Semaine en cours (tous modèles) : % utilisé + date de reset
+
+**Pourquoi haiku :** modèle le plus léger, consomme le moins de quota pour cette vérification.
+
+**Utilisation recommandée :** avant de lancer des sessions intensives (multi-agents, reviewer, sessions sonnet/opus longues) pour ajuster la charge si le quota hebdo est > 80%.
