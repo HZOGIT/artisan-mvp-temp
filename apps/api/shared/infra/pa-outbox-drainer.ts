@@ -5,7 +5,9 @@ import type { FastifyInstance } from "fastify";
 import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import type { PaPort } from "../../modules/einvoicing/application/pa-port";
 import type { DbClient } from "../db";
-import { paOutbox, artisans as artisansTable } from "../../../../drizzle/schema.pg";
+import { paOutbox, artisans as artisansTable, paEntites } from "../../../../drizzle/schema.pg";
+import type { PaInvoicePayload } from "../../modules/einvoicing/domain/einvoicing";
+import { buildPaPayload } from "../../modules/einvoicing/application/facture-mapper";
 
 const LOCK_ID = BigInt("0xb111d0cc");
 export const MAX_TENTATIVES = 3;
@@ -24,9 +26,17 @@ export async function drainEntry(
   entry: { id: number; artisanId: number; factureId: number; tentatives: number | null },
   pa: PaPort,
   update: (id: number, set: OutboxUpdate) => Promise<void>,
+  loadPayload: (factureId: number) => Promise<PaInvoicePayload>,
+  loadPaEntityId: (artisanId: number) => Promise<string | null>,
 ): Promise<void> {
   try {
-    await pa.submitInvoice({ paEntityId: String(entry.artisanId), invoiceId: entry.factureId });
+    const paEntityId = await loadPaEntityId(entry.artisanId);
+    if (!paEntityId) {
+      await update(entry.id, { statut: "dead", derniereErreur: "artisan non provisionné PA" });
+      return;
+    }
+    const payload = await loadPayload(entry.factureId);
+    await pa.submitInvoice({ paEntityId, invoiceId: entry.factureId, payload });
     await update(entry.id, { statut: "sent", traiteeAt: new Date() });
   } catch (err) {
     const tentatives = (entry.tentatives ?? 0) + 1;
@@ -66,8 +76,17 @@ export const paOutboxDrainerPlugin = fp(
                   .where(and(inArray(paOutbox.statut, ["pending", "failed"]), lt(sql`coalesce(${paOutbox.tentatives}, 0)`, MAX_TENTATIVES)))
                   .limit(10);
                 for (const entry of pending) {
-                  await drainEntry(entry, opts.pa, (id, set) =>
-                    tx.update(paOutbox).set(set).where(eq(paOutbox.id, id)).then(() => {}),
+                  await drainEntry(
+                    entry,
+                    opts.pa,
+                    (id, set) => tx.update(paOutbox).set(set).where(eq(paOutbox.id, id)).then(() => {}),
+                    (factureId) => buildPaPayload(opts.db, factureId),
+                    (artisanId) =>
+                      opts.db
+                        .select({ paEntityId: paEntites.paEntityId })
+                        .from(paEntites)
+                        .where(eq(paEntites.artisanId, artisanId))
+                        .then((rows) => rows[0]?.paEntityId ?? null),
                   );
                 }
                 totalProcessed += pending.length;
