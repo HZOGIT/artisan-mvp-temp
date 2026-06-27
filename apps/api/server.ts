@@ -1,3 +1,4 @@
+import "./otel.js";
 import v8 from "node:v8";
 import { PgBoss } from "pg-boss";
 import { buildApp } from "./app";
