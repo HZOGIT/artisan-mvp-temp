@@ -17,7 +17,7 @@ export async function autoGenererFacturesContrats(
     const aFacturer = await repo.listAFacturer(ctx);
     for (const contrat of aFacturer) {
       try {
-        await genererFactureContrat(repo, factureGen, ctx, contrat.id, () => now);
+        await genererFactureContrat(repo, factureGen, ctx, contrat.id, () => now, undefined, true);
         generees++;
       } catch (e) {
         if (e instanceof ConflictError) continue;

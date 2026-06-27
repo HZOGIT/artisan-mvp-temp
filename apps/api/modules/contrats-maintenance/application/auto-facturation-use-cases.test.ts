@@ -61,6 +61,16 @@ describe("autoGenererFacturesContrats", () => {
     expect(result).toEqual({ generees: 0, erreurs: 0 });
   });
 
+  it("chemin cron → facture récurrente enregistrée avec genereeAutomatiquement: true", async () => {
+    const repo = new FakeContratRepository();
+    repo.seedClient(1, 100, "Dupont");
+    await repo.create({ artisanId: 1 }, base({ prochainFacturation: new Date("2026-06-26T00:00:00Z") }), "CTR-00001");
+    const gen = new FakeFactureGen();
+    await autoGenererFacturesContrats(repo, gen, [1], new Date("2026-06-27T12:00:00Z"));
+    expect(repo.facturesRecurrentes).toHaveLength(1);
+    expect(repo.facturesRecurrentes[0].genereeAutomatiquement).toBe(true);
+  });
+
   it("2 artisans × 1 contrat dû chacun → generees: 2", async () => {
     const repo = new FakeContratRepository();
     repo.seedClient(1, 100, "Dupont");
