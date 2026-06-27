@@ -16,5 +16,6 @@
   "montant": "Montant TTC",
   "date": "Date",
   "statut": "Statut",
-  "erreur_activation": "Erreur lors de l'activation"
+  "erreur_activation": "Erreur lors de l'activation",
+  "pa_non_configure": "Aucun fournisseur de dématérialisation externe n'est encore branché — contacter l'administrateur"
 }

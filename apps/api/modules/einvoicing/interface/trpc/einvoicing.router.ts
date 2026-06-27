@@ -8,12 +8,14 @@ import { withTenant } from "../../../../shared/db/with-tenant";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import { ensureArtisanEntity } from "../../application/ensure-artisan-entity";
 import type { PaPort } from "../../application/pa-port";
+import { ValidationError } from "../../../../shared/errors";
 
-export function createEinvoicingRouter(pa: PaPort, db: DbClient) {
+export function createEinvoicingRouter(pa: PaPort, db: DbClient, paDisponible: boolean) {
   return router({
-    onboardEntity: protectedProcedure.mutation(({ ctx }) =>
-      ensureArtisanEntity(db, pa, ctx.tenant),
-    ),
+    onboardEntity: protectedProcedure.mutation(({ ctx }) => {
+      if (!paDisponible) throw new ValidationError("Aucune plateforme de dématérialisation configurée");
+      return ensureArtisanEntity(db, pa, ctx.tenant);
+    }),
 
     statutEntite: protectedProcedure.query(({ ctx }) =>
       withTenant(db, ctx.tenant, (tx) =>
@@ -27,7 +29,7 @@ export function createEinvoicingRouter(pa: PaPort, db: DbClient) {
           .from(paEntites)
           .where(eq(paEntites.artisanId, ctx.tenant.artisanId))
           .limit(1)
-          .then((rows) => rows[0] ?? null),
+          .then((rows) => ({ ...rows[0], paDisponible })),
       ),
     ),
 
