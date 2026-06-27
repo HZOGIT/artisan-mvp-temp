@@ -7,6 +7,7 @@ import type { DbClient } from "../../shared/db";
 import { FakePaAdapter } from "./infra/fake-pa-adapter";
 import { ensureArtisanEntity } from "./application/ensure-artisan-entity";
 import { createEinvoicingRouter } from "./interface/trpc/einvoicing.router";
+import { pollInbound } from "../../shared/infra/pa-inbound-poller";
 import { mapToPayload } from "./application/facture-mapper";
 import type { Facture, FactureLigne, Artisan, Client } from "../../../../drizzle/schema.pg";
 
@@ -293,5 +294,44 @@ describe("mapToPayload", () => {
       [ligne20],
     );
     expect(payload.mentionLegale).toBe("Auto-entrepreneur non soumis à TVA — art. 293B CGI");
+  });
+});
+
+describe("pollInbound", () => {
+  it("FakePaAdapter retourne [] → 0 insertions, pas d'erreur", async () => {
+    const fakeDb = {
+      select: () => ({ from: () => ({ where: () => Promise.resolve([]) }) }),
+      execute: () => Promise.resolve({ rows: [] }),
+    } as unknown as DbClient;
+    const result = await pollInbound(new FakePaAdapter(), fakeDb);
+    expect(result).toBe(0);
+  });
+});
+
+describe("facturesEntrantes.lire", () => {
+  it("marque lu = true sur une facture non lue", async () => {
+    const fakeFe = { id: 7, artisanId: 1, paDocumentId: "doc-1", lu: false, emetteurSiret: "00000000000000", montantTTC: "120.00", date: new Date(), fetchedAt: new Date(), facturxBase64: null };
+    let updated = false;
+    let callIndex = 0;
+    const makeTx = () => ({
+      execute: () => Promise.resolve({ rows: [] }),
+      select: () => ({
+        from: () => ({
+          where: () => ({ limit: () => Promise.resolve([fakeFe]) }),
+        }),
+      }),
+      update: () => ({
+        set: () => ({
+          where: () => { updated = true; return Promise.resolve(); },
+        }),
+      }),
+    });
+    const fakeDb = {
+      transaction: (fn: (tx: unknown) => unknown) => { callIndex++; return fn(makeTx()); },
+    } as unknown as DbClient;
+    const r = createEinvoicingRouter(new FakePaAdapter(), fakeDb);
+    const result = await r.createCaller(ctx()).facturesEntrantes.lire({ id: 7 });
+    expect(result.lu).toBe(true);
+    expect(updated).toBe(true);
   });
 });
