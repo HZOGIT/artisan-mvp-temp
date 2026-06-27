@@ -285,6 +285,8 @@ import type { EmailPort, RateLimiterPort, LlmPort, VisionPort } from "./shared/p
 import type { EventBusPort } from "./shared/ports/event-bus";
 import { FakeEventBus } from "./shared/ports/fakes";
 import { ResendEmailAdapter, SlidingWindowRateLimiter, GeminiLlmAdapter, GeminiVisionAdapter } from "./shared/ports";
+import { EmailOutboxAdapter } from "./shared/email/email-outbox-adapter";
+import { emailOutboxDrainerPlugin } from "./shared/infra/email-outbox-drainer";
 import type { StoragePort } from "./shared/ports/storage";
 import { OvhS3Adapter } from "./shared/storage/ovh-s3-adapter";
 import { makeLlmUsageTracker } from "./shared/ports/llm-usage-tracker";
@@ -482,8 +484,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     done();
   });
 
-  /** Adapter email partagé — reçoit app.log pour que succès/erreurs d'envoi arrivent dans BetterStack. */
-  const emailAdapter = deps.emailPort ?? new ResendEmailAdapter(app.log as unknown as AppLogger);
+  const resendAdapter = new ResendEmailAdapter(app.log as unknown as AppLogger);
+  /** Adapter email partagé — enqueue dans email_outbox, le drainer envoie via Resend avec retry. */
+  const emailAdapter = deps.emailPort ?? new EmailOutboxAdapter(getDbHandle().db, app.log as unknown as AppLogger);
 
   /** Adapter push web (VAPID). No-op silencieux si VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY absents. */
   const pushAdapter = deps.pushPort ?? new WebPushAdapter(getDbHandle().db);
@@ -1181,6 +1184,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   /** Cron billing maison — tick toutes les heures, lock pg_advisory_xact pour éviter les doublons multi-réplica. */
   app.register(billingCronPlugin, { schedulerDeps: billingSchedulerDeps, db: getDbHandle().db, dbUrl: getDbHandle().pool.options.connectionString ?? "", onCritical: (msg) => app.log.fatal({ event: "billing_tick_critical" }, msg) });
 
+  /** Drainer email outbox — toutes les 2 min, envoie les emails pending via Resend avec retries. */
+  app.register(emailOutboxDrainerPlugin, { db: getDbHandle().db, sender: resendAdapter });
   /** Drainer PA outbox — toutes les 30s, envoie les factures pending à la PA avec retries. */
   app.register(paOutboxDrainerPlugin, { pa: einvoicing.pa, db: getDbHandle().db, dbUrl: getDbHandle().pool.options.connectionString ?? "" });
   /** Poller PA inbound — toutes les heures, récupère les factures fournisseurs entrantes. */

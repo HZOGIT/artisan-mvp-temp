@@ -407,6 +407,13 @@
       "when": 1782535831000,
       "tag": "0057_factures-nombre-relances",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1782587173537,
+      "tag": "20260627190613_email-outbox-idx",
+      "breakpoints": true
     }
   ]
 }
