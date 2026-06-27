@@ -1080,7 +1080,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     bibliotheque: deps.bibliothequeReader ?? new BibliothequeReaderDrizzle(getDbHandle().db),
   });
 
-  const einvoicing = buildEinvoicingModule({ PA_PROVIDER: process.env.PA_PROVIDER });
+  const einvoicing = buildEinvoicingModule({ PA_PROVIDER: process.env.PA_PROVIDER }, getDbHandle().db);
 
   const billingRepo = new BillingRepositoryDrizzle(getDbHandle().db);
   const billing = createBillingModule({
