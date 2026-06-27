@@ -38,4 +38,4 @@ COPY --from=builder /app/drizzle/pg ./drizzle/pg
 # Tini-less : on lance node directement ; le nouveau stack gère son arrêt.
 USER node
 EXPOSE 3001
-CMD ["node", "dist-newstack/server.mjs"]
+CMD ["node", "--import", "@opentelemetry/instrumentation/hook.mjs", "dist-newstack/server.mjs"]
