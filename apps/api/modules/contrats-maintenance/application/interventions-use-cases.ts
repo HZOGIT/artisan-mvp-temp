@@ -96,6 +96,7 @@ export async function genererFactureContrat(
   contratId: number,
   maintenant: () => Date = () => new Date(),
   artisanRepo?: IArtisanRepository,
+  genereeAutomatiquement = false,
 ): Promise<FactureGenereeRef> {
   const contrat = await repo.getById(ctx, contratId);
   if (!contrat) throw new NotFoundError("Contrat introuvable");
@@ -132,7 +133,7 @@ export async function genererFactureContrat(
     factureId: facture.id,
     periodeDebut: now,
     periodeFin,
-    genereeAutomatiquement: false,
+    genereeAutomatiquement,
   });
   await repo.update(ctx, contratId, { prochainFacturation: periodeFin });
   return facture;
