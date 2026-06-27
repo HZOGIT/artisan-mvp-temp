@@ -74,4 +74,5 @@ export interface WebhookEvent {
   type: "statut_change" | "inbound" | "ping";
   paDocumentId?: string;
   statut?: string;
+  paEventId?: string;
 }

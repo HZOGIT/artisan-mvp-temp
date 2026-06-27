@@ -5,7 +5,7 @@ import type { FastifyInstance } from "fastify";
 import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import type { PaPort } from "../../modules/einvoicing/application/pa-port";
 import type { DbClient } from "../db";
-import { paOutbox, artisans as artisansTable, paEntites } from "../../../../drizzle/schema.pg";
+import { paOutbox, artisans as artisansTable, paEntites, factures as facturesTable } from "../../../../drizzle/schema.pg";
 import type { PaInvoicePayload } from "../../modules/einvoicing/domain/einvoicing";
 import { buildPaPayload } from "../../modules/einvoicing/application/facture-mapper";
 
@@ -28,6 +28,7 @@ export async function drainEntry(
   update: (id: number, set: OutboxUpdate) => Promise<void>,
   loadPayload: (factureId: number) => Promise<PaInvoicePayload>,
   loadPaEntityId: (artisanId: number) => Promise<string | null>,
+  onSuccess?: (factureId: number, paDocumentId: string) => Promise<void>,
 ): Promise<void> {
   try {
     const paEntityId = await loadPaEntityId(entry.artisanId);
@@ -36,8 +37,9 @@ export async function drainEntry(
       return;
     }
     const payload = await loadPayload(entry.factureId);
-    await pa.submitInvoice({ paEntityId, invoiceId: entry.factureId, payload });
+    const result = await pa.submitInvoice({ paEntityId, invoiceId: entry.factureId, payload });
     await update(entry.id, { statut: "sent", traiteeAt: new Date() });
+    await onSuccess?.(entry.factureId, result.paDocumentId);
   } catch (err) {
     const tentatives = (entry.tentatives ?? 0) + 1;
     await update(entry.id, {
@@ -87,6 +89,8 @@ export const paOutboxDrainerPlugin = fp(
                         .from(paEntites)
                         .where(eq(paEntites.artisanId, artisanId))
                         .then((rows) => rows[0]?.paEntityId ?? null),
+                    (factureId, paDocumentId) =>
+                      tx.update(facturesTable).set({ paDocumentId }).where(eq(facturesTable.id, factureId)).then(() => {}),
                   );
                 }
                 totalProcessed += pending.length;
