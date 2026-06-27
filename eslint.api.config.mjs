@@ -40,6 +40,13 @@ export default tseslint.config(
     "no-warning-comments": ["error", { terms: ["TODO", "FIXME", "HACK", "XXX", "OPE-"], location: "anywhere" }],
     "local/comments-jsdoc-only": "error",
     "multiline-comment-style": ["error", "starred-block"],
+    "no-restricted-syntax": [
+      "warn",
+      {
+        "selector": "CallExpression[callee.property.name='toFixed']",
+        "message": "Préférer round2() depuis shared/money.ts pour les montants monétaires. toFixed() est autorisé pour l'affichage non-monétaire (km, %, etc.)"
+      }
+    ],
     "no-console": ["error", { allow: ["warn", "error"] }],
     "local/module-layer-structure": "error",
     "local/module-layer-imports": "error",
