@@ -2,10 +2,10 @@ import fp from "fastify-plugin";
 import { AsyncTask, SimpleIntervalJob } from "toad-scheduler";
 import pg from "pg";
 import type { FastifyInstance } from "fastify";
-import { eq, max, sql } from "drizzle-orm";
+import { and, eq, max, sql } from "drizzle-orm";
 import type { PaPort } from "../../modules/einvoicing/application/pa-port";
 import type { DbClient } from "../db";
-import { paEntites, facturesEntrantes } from "../../../../drizzle/schema.pg";
+import { artisans as artisansTable, paEntites, facturesEntrantes } from "../../../../drizzle/schema.pg";
 
 /* ponytail: lock différent du drainer outbox (0xb111d0cc) — lock session-level évite le double-poll multi-réplica */
 const LOCK_ID = BigInt("0xb111d1bb");
@@ -16,41 +16,54 @@ export interface PaInboundPollerOptions {
   readonly dbUrl: string;
 }
 
-/** Exécute un tick de poll pour tous les artisans PA provisionnés. Exporté pour test L1. */
+/** Exécute un tick de poll pour tous les artisans PA provisionnés. Exporté pour test L1/L2. */
 export async function pollInbound(pa: PaPort, db: DbClient): Promise<number> {
-  const entites = await db
-    .select({ artisanId: paEntites.artisanId, paEntityId: paEntites.paEntityId })
-    .from(paEntites)
-    .where(eq(paEntites.statutProvisioning, "done"));
+  /* artisans = table RLS-OFF → lecture cross-tenant sûre (pattern identique à pa-outbox-drainer.ts) */
+  const artisanRows = await db.select({ id: artisansTable.id }).from(artisansTable);
 
   let fetched = 0;
-  for (const { artisanId, paEntityId } of entites) {
-    if (!paEntityId) continue;
-    await db.execute(sql`SELECT set_config('app.tenant', ${String(artisanId)}, true)`);
+  for (const { id: artisanId } of artisanRows) {
+    await db.transaction(async (tx) => {
+      /* set_config transaction-local : RLS activée pour toutes les requêtes suivantes dans ce tx */
+      await tx.execute(sql`SELECT set_config('app.tenant', ${String(artisanId)}, true)`);
 
-    const [lastRow] = await db
-      .select({ lastFetch: max(facturesEntrantes.fetchedAt) })
-      .from(facturesEntrantes)
-      .where(eq(facturesEntrantes.artisanId, artisanId));
+      const [entite] = await tx
+        .select({ paEntityId: paEntites.paEntityId })
+        .from(paEntites)
+        .where(
+          and(
+            eq(paEntites.artisanId, artisanId),
+            eq(paEntites.statutProvisioning, "done"),
+          ),
+        )
+        .limit(1);
 
-    const since = lastRow?.lastFetch ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const inbounds = await pa.listInbound(paEntityId, since);
+      if (!entite?.paEntityId) return;
 
-    for (const doc of inbounds) {
-      const full = await pa.fetchInbound(doc.paDocumentId);
-      await db
-        .insert(facturesEntrantes)
-        .values({
-          artisanId,
-          paDocumentId: full.paDocumentId,
-          emetteurSiret: full.emetteurSiret,
-          montantTTC: full.montantTTC,
-          date: full.date,
-          facturxBase64: full.facturxBase64,
-        })
-        .onConflictDoNothing();
-      fetched++;
-    }
+      const [lastRow] = await tx
+        .select({ lastFetch: max(facturesEntrantes.fetchedAt) })
+        .from(facturesEntrantes)
+        .where(eq(facturesEntrantes.artisanId, artisanId));
+
+      const since = lastRow?.lastFetch ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const inbounds = await pa.listInbound(entite.paEntityId, since);
+
+      for (const doc of inbounds) {
+        const full = await pa.fetchInbound(doc.paDocumentId);
+        await tx
+          .insert(facturesEntrantes)
+          .values({
+            artisanId,
+            paDocumentId: full.paDocumentId,
+            emetteurSiret: full.emetteurSiret,
+            montantTTC: full.montantTTC,
+            date: full.date,
+            facturxBase64: full.facturxBase64,
+          })
+          .onConflictDoNothing();
+        fetched++;
+      }
+    });
   }
   return fetched;
 }

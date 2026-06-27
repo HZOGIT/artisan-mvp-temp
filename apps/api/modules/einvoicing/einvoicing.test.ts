@@ -299,9 +299,10 @@ describe("mapToPayload", () => {
 
 describe("pollInbound", () => {
   it("FakePaAdapter retourne [] → 0 insertions, pas d'erreur", async () => {
+    const selectChain = { from: () => Promise.resolve([]) };
     const fakeDb = {
-      select: () => ({ from: () => ({ where: () => Promise.resolve([]) }) }),
-      execute: () => Promise.resolve({ rows: [] }),
+      select: () => selectChain,
+      transaction: (_fn: (tx: unknown) => unknown) => Promise.resolve(),
     } as unknown as DbClient;
     const result = await pollInbound(new FakePaAdapter(), fakeDb);
     expect(result).toBe(0);
