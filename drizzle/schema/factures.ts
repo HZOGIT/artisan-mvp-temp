@@ -63,6 +63,7 @@ export const factures = pgTable("factures", {
   paId: varchar("paId", { length: 100 }),
   paDocumentId: varchar("paDocumentId", { length: 100 }),
   paFormat: varchar("paFormat", { length: 50 }),
+  nombreRelances: integer("nombreRelances").default(0).notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 export type Facture = typeof factures.$inferSelect;
