@@ -15,6 +15,22 @@ export function createEinvoicingRouter(pa: PaPort, db: DbClient) {
       ensureArtisanEntity(db, pa, ctx.tenant),
     ),
 
+    statutEntite: protectedProcedure.query(({ ctx }) =>
+      withTenant(db, ctx.tenant, (tx) =>
+        tx
+          .select({
+            statutProvisioning: paEntites.statutProvisioning,
+            kybStatut: paEntites.kybStatut,
+            paEntityId: paEntites.paEntityId,
+            derniereErreur: paEntites.derniereErreur,
+          })
+          .from(paEntites)
+          .where(eq(paEntites.artisanId, ctx.tenant.artisanId))
+          .limit(1)
+          .then((rows) => rows[0] ?? null),
+      ),
+    ),
+
     emettre: protectedProcedure
       .input(z.object({ factureId: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {

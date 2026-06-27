@@ -1,0 +1,20 @@
+{
+  "title": "Facturation électronique",
+  "subtitle": "Conformité e-invoicing (réforme 2026)",
+  "statutSection": "Statut Plateforme de Dématérialisation",
+  "non_provisionne": "Non activé",
+  "pending": "En cours d'activation",
+  "done": "Activé",
+  "error": "Erreur de provisioning",
+  "activate": "Activer la facturation électronique",
+  "activation_en_cours": "Activation en cours…",
+  "factures_entrantes": "Factures fournisseurs reçues",
+  "aucune_facture": "Aucune facture reçue pour l'instant.",
+  "lu": "Lu",
+  "non_lu": "Non lu",
+  "emetteur": "Émetteur (SIRET)",
+  "montant": "Montant TTC",
+  "date": "Date",
+  "statut": "Statut",
+  "erreur_activation": "Erreur lors de l'activation"
+}

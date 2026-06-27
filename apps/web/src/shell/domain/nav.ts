@@ -4,7 +4,7 @@ import {
   RefreshCw, Users, Upload, Star, Globe, MessageCircle, Clock, Calendar, CalendarDays, Wrench, MapPin,
   HardHat, Route, Truck, Car, Package, Boxes, ShoppingCart, Building2, Calculator, Bell, CalendarOff,
   Trophy, Medal, Wallet, PiggyBank, BarChart3, Wand2, Settings, BookOpen, HelpCircle, User, LayoutGrid,
-  Mail, Briefcase, Activity,
+  Mail, Briefcase, Activity, Zap,
 } from "lucide-react";
 
 /*
@@ -78,6 +78,7 @@ export const NAV_GROUPS: NavGroup[] = [
     { icon: Wand2, label: "Règles auto", path: "/regles-depenses" },
   ] },
   { id: "parametres", title: "Paramètres", icon: Settings, color: "slate", items: [
+    { icon: Zap, label: "Facturation électronique", path: "/facturation-electronique" },
     { icon: BookOpen, label: "Guide d'utilisation", path: "/documentation" },
     { icon: HelpCircle, label: "Support", path: "/support" },
     { icon: User, label: "Mon profil", path: "/profil" },
@@ -105,6 +106,7 @@ export const pathPermissionMap: Record<string, string> = {
   "/fournisseurs": "articles.voir", "/rapports": "exports.voir", "/comptabilite": "comptabilite.voir",
   "/previsions": "comptabilite.voir", "/parametres": "parametres.voir", "/ma-vitrine": "vitrine.gerer",
   "/modeles-email": "parametres.voir", "/modeles-email-transactionnels": "parametres.voir",
+  "/facturation-electronique": "parametres.voir",
   "/utilisateurs": "utilisateurs.gerer", "/profil": "", "/assistant": "", "/notifications": "",
   "/documentation": "", "/mobile": "interventions.voir", "/integrations-comptables": "comptabilite.voir",
   "/devis-ia": "devis.creer", "/calendrier-chantiers": "chantiers.voir", "/tableau-bord-sync-comptable": "comptabilite.voir",
