@@ -11,19 +11,22 @@ import type { Artisan } from "../../../../../drizzle/schema.pg";
 import type { Client } from "../../../../../drizzle/schema.pg";
 import type { PaInvoicePayload, PaLine, PaParty, PaTvaBreakdown } from "../domain/einvoicing";
 
+const ZERO = BigInt(0);
+const HUNDRED = BigInt(100);
+
 function toCents(s: string | null | undefined): bigint {
-  if (!s) return 0n;
+  if (!s) return ZERO;
   const dot = s.indexOf(".");
-  if (dot === -1) return BigInt(s) * 100n;
+  if (dot === -1) return BigInt(s) * HUNDRED;
   const int = s.slice(0, dot) || "0";
   const dec = (s.slice(dot + 1) + "00").slice(0, 2);
-  return BigInt(int) * 100n + BigInt(dec);
+  return BigInt(int) * HUNDRED + BigInt(dec);
 }
 
 function fromCents(c: bigint): string {
-  const neg = c < 0n;
+  const neg = c < ZERO;
   const abs = neg ? -c : c;
-  return `${neg ? "-" : ""}${abs / 100n}.${String(abs % 100n).padStart(2, "0")}`;
+  return `${neg ? "-" : ""}${abs / HUNDRED}.${String(abs % HUNDRED).padStart(2, "0")}`;
 }
 
 /** Pure mapping — testable without DB. */
@@ -66,10 +69,10 @@ export function mapToPayload(
   const byTaux = new Map<string, [bigint, bigint]>();
   for (const l of produits) {
     const taux = l.tauxTVA ?? "20.00";
-    const prev = byTaux.get(taux) ?? [0n, 0n];
+    const prev = byTaux.get(taux) ?? [ZERO, ZERO];
     byTaux.set(taux, [prev[0] + toCents(l.montantHT), prev[1] + toCents(l.montantTVA)]);
   }
-  const tvaBreakdown: PaTvaBreakdown[] = [...byTaux.entries()].map(([taux, [ht, tva]]) => ({
+  const tvaBreakdown: PaTvaBreakdown[] = Array.from(byTaux.entries()).map(([taux, [ht, tva]]) => ({
     taux,
     baseHT: fromCents(ht),
     montantTva: fromCents(tva),

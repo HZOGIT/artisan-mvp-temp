@@ -47,7 +47,8 @@ export interface EntityInput {
 export interface SubmitInvoiceInput {
   paEntityId: string;
   invoiceId: number;
-  payload: PaInvoicePayload;
+  /** Payload structuré — fourni par le drainer ; absent sur les appels directs legacy. */
+  payload?: PaInvoicePayload;
   facturxBase64?: string;
 }
 
