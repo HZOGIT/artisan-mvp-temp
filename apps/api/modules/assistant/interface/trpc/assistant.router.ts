@@ -147,7 +147,7 @@ export function createAssistantRouter(
           }
 
           let resolvedThreadId = input.threadId;
-          for await (const ev of runAssistantAgent(agentDeps, tenant, { ...input, userCanWriteDevis: canDevis, userCanWriteFactures: canFactures, attachments })) {
+          for await (const ev of runAssistantAgent(agentDeps, tenant, { ...input, userCanWriteDevis: canDevis, userCanWriteFactures: canFactures, attachments, isAdmin: ctx.role === "admin" })) {
             const validated = assistantStreamEventSchema.parse(ev);
             if ("threadId" in validated) {
               resolvedThreadId = validated.threadId;

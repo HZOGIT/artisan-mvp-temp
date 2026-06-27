@@ -149,4 +149,22 @@ describe("runAssistantAgent", () => {
     expect(names).not.toContain("creer_devis");
     expect(names).toContain("creer_client");
   });
+
+  it("enabledFor : outil admin-only absent pour non-admin, présent pour admin", async () => {
+    const stocksTool = findTool("verifier_stocks")!;
+    const writer = new FakeAssistantThreadWriter();
+    const baseArtisan = new FakeArtisan();
+
+    const llmUser = new FakeLlmAgenticPort([{ text: ["ok"] }]);
+    const regUser = new FakeAssistantToolRegistry([stocksTool]);
+    const depsUser = { llm: llmUser, registry: regUser, rateLimiter: allow, artisanReader: baseArtisan, statsReader: stats, threadWriter: writer };
+    await collect(runAssistantAgent(depsUser, ctx(1), { message: "stocks?" }));
+    expect(llmUser.turnInputs[0].tools).toEqual([]);
+
+    const llmAdmin = new FakeLlmAgenticPort([{ text: ["ok"] }]);
+    const regAdmin = new FakeAssistantToolRegistry([stocksTool]);
+    const depsAdmin = { llm: llmAdmin, registry: regAdmin, rateLimiter: allow, artisanReader: baseArtisan, statsReader: stats, threadWriter: writer };
+    await collect(runAssistantAgent(depsAdmin, ctx(1), { message: "stocks?", isAdmin: true }));
+    expect(llmAdmin.turnInputs[0].tools).toEqual([stocksTool]);
+  });
 });

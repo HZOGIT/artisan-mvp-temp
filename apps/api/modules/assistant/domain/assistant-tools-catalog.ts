@@ -19,11 +19,16 @@ export interface ToolParamSchema {
   readonly required?: readonly string[];
 }
 
+/** Attributs de l'utilisateur utilisés pour filtrer le catalogue d'outils par profil. */
+export type ToolContext = { readonly isAdmin: boolean };
+
 /** Déclaration d'un outil exposé au modèle (function-calling). `parameters` a toujours un objet racine. */
 export interface ToolSchema {
   readonly name: string;
   readonly description: string;
   readonly parameters: ToolParamSchema;
+  /** Prédicat d'activation — absent = accessible à tous (rétrocompat). */
+  readonly enabledFor?: (ctx: ToolContext) => boolean;
 }
 
 /** Helpers de construction (concision sans perte de fidélité au schéma legacy). */
@@ -197,6 +202,8 @@ export const ASSISTANT_TOOLS: readonly ToolSchema[] = [
     description:
       "Vérifie tous les niveaux de stock. Retourne la liste des articles avec leur quantité, seuil d'alerte et statut (rupture | alerte | ok), ainsi qu'un récapitulatif des articles à réapprovisionner.",
     parameters: obj({}),
+    /* ponytail: PoC enabledFor — admin-only ; retirer la gate dès qu'un vrai outil de diagnostic existe */
+    enabledFor: ({ isAdmin }) => isAdmin,
   },
   {
     name: "creer_commande_fournisseur",
