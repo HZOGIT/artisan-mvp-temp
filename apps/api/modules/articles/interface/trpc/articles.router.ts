@@ -31,6 +31,7 @@ const createSchema = z.object({
   description: z.string().max(5000).nullish(),
   unite: z.string().max(20).optional(),
   tauxTVA: decimal.optional(),
+  prixRevientHT: decimal.optional(),
   categorie: z.string().max(100).nullish(),
 });
 
@@ -41,6 +42,7 @@ const updateSchema = z.object({
   description: z.string().max(5000).nullish(),
   unite: z.string().max(20).optional(),
   tauxTVA: decimal.optional(),
+  prixRevientHT: decimal.optional(),
   categorie: z.string().max(100).nullish(),
 });
 

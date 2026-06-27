@@ -18,6 +18,7 @@ function toArticle(r: ArticleRow): Article {
     unite: r.unite ?? "unité",
     prixUnitaireHT: r.prixUnitaireHT ?? "0.00",
     tauxTVA: r.tauxTVA ?? "20.00",
+    prixRevientHT: r.prixRevientHT ?? null,
     categorie: r.categorie ?? null,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
@@ -76,6 +77,7 @@ export class ArticleRepositoryDrizzle implements IArticleRepository {
           description: input.description ?? null,
           unite: input.unite ?? undefined,
           tauxTVA: input.tauxTVA ?? undefined,
+          prixRevientHT: input.prixRevientHT ?? undefined,
           categorie: input.categorie ?? null,
         })
         .returning();
@@ -93,6 +95,7 @@ export class ArticleRepositoryDrizzle implements IArticleRepository {
       if (input.description !== undefined) set.description = input.description;
       if (input.unite !== undefined) set.unite = input.unite;
       if (input.tauxTVA !== undefined) set.tauxTVA = input.tauxTVA;
+      if (input.prixRevientHT !== undefined) set.prixRevientHT = input.prixRevientHT;
       if (input.categorie !== undefined) set.categorie = input.categorie;
       if (Object.keys(set).length === 0) {
         const [row] = await tx

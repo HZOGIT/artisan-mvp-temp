@@ -18,6 +18,7 @@ export interface Article {
   /** numeric PG en string */
   readonly prixUnitaireHT: string;
   readonly tauxTVA: string;
+  readonly prixRevientHT: string | null;
   readonly categorie: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
@@ -30,6 +31,7 @@ export interface CreateArticleInput {
   readonly description?: string | null;
   readonly unite?: string;
   readonly tauxTVA?: string;
+  readonly prixRevientHT?: string | null;
   readonly categorie?: string | null;
 }
 
@@ -40,5 +42,6 @@ export interface UpdateArticleInput {
   readonly description?: string | null;
   readonly unite?: string;
   readonly tauxTVA?: string;
+  readonly prixRevientHT?: string | null;
   readonly categorie?: string | null;
 }
