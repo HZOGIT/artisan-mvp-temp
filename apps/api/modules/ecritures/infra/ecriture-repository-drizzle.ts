@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { ecrituresComptables } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
@@ -23,6 +23,7 @@ function toEcriture(r: EcritureRow): EcritureComptable {
     factureId: r.factureId ?? null,
     lettrage: r.lettrage ?? null,
     pointage: r.pointage ?? false,
+    statut: r.statut as EcritureComptable["statut"],
     createdAt: r.createdAt,
   };
 }
@@ -103,6 +104,38 @@ export class EcritureRepositoryDrizzle implements IEcritureRepository {
         )
         .returning({ id: ecrituresComptables.id });
       return deleted.length;
+    });
+  }
+
+  hasValidatedEcritures(ctx: TenantContext, factureId: number): Promise<boolean> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const result = await tx
+        .select({ count: sql<number>`count(*)` })
+        .from(ecrituresComptables)
+        .where(
+          and(
+            eq(ecrituresComptables.artisanId, ctx.artisanId),
+            eq(ecrituresComptables.factureId, factureId),
+            eq(ecrituresComptables.statut, "validee"),
+          ),
+        );
+      return (result[0]?.count ?? 0) > 0;
+    });
+  }
+
+  validateByFacture(ctx: TenantContext, factureId: number): Promise<number> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const updated = await tx
+        .update(ecrituresComptables)
+        .set({ statut: "validee" })
+        .where(
+          and(
+            eq(ecrituresComptables.artisanId, ctx.artisanId),
+            eq(ecrituresComptables.factureId, factureId),
+          ),
+        )
+        .returning({ id: ecrituresComptables.id });
+      return updated.length;
     });
   }
 }

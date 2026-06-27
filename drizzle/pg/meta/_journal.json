@@ -428,6 +428,13 @@
       "when": 1782603030760,
       "tag": "20260627233030_articles-artisan-prix-revient",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1782604480166,
+      "tag": "20260627235440_ecritures-statut-inalterable",
+      "breakpoints": true
     }
   ]
 }

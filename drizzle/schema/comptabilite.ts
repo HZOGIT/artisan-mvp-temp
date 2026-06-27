@@ -13,6 +13,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 export const ecritureJournalEnum = pgEnum("ecriture_journal", ["VE", "AC", "BQ", "OD"]);
+export const ecritureStatutEnum = pgEnum("ecriture_statut", ["brouillon", "validee"]);
 export const compteTypeEnum = pgEnum("compte_type", ["actif", "passif", "charge", "produit"]);
 export const previsionMethodeEnum = pgEnum("prevision_methode", ["moyenne_mobile", "regression_lineaire", "saisonnalite", "manuel"]);
 export const comptaLogicielEnum = pgEnum("compta_logiciel", ["sage", "quickbooks", "ciel", "ebp", "autre"]);
@@ -40,6 +41,7 @@ export const ecrituresComptables = pgTable("ecritures_comptables", {
   factureId: integer("factureId"),
   lettrage: varchar("lettrage", { length: 10 }),
   pointage: boolean("pointage").default(false),
+  statut: ecritureStatutEnum("statut").default("brouillon").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type EcritureComptable = typeof ecrituresComptables.$inferSelect;

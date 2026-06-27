@@ -24,4 +24,8 @@ export interface IEcritureRepository {
    * l'encaissement [BQ] sans toucher la vente [VE]) — nb de lignes supprimées.
    */
   deleteByFactureJournal(ctx: TenantContext, factureId: number, journal: JournalComptable): Promise<number>;
+  /** Vérifie si la facture possède au moins une écriture validée. */
+  hasValidatedEcritures(ctx: TenantContext, factureId: number): Promise<boolean>;
+  /** Marque toutes les écritures d'une facture comme validées — nb de lignes mises à jour. */
+  validateByFacture(ctx: TenantContext, factureId: number): Promise<number>;
 }

@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { FakeEcritureRepository } from "../infra/ecriture-repository-fake";
 import { FakeFactureReader } from "../infra/facture-reader-fake";
-import { genererEcrituresVente, genererEcrituresEncaissement } from "./generation-use-cases";
+import { genererEcrituresVente, genererEcrituresEncaissement, validerEcritures } from "./generation-use-cases";
 import type { EcritureComptable } from "../domain/ecriture";
 import type { TenantContext } from "../../../shared/tenant";
+import { ConflictError } from "../../../shared/errors";
 import type { FactureReadModel } from "./facture-reader";
 
 const A: TenantContext = { artisanId: 1, userId: 10 };
@@ -134,5 +135,66 @@ describe("ecritures — génération écritures d'ENCAISSEMENT (FEC)", () => {
     const all = await repo.listByFacture(A, 501);
     expect(all.filter((e) => e.journal === "VE").length).toBe(3); // VE intacte
     expect(all.filter((e) => e.journal === "BQ").length).toBe(2); // BQ régénérée (pas doublée)
+  });
+});
+
+describe("ecritures — inaltérabilité (statut validée) — OPE-118", () => {
+  it("validerEcritures marque toutes les écritures comme validées", async () => {
+    const repo = new FakeEcritureRepository();
+    const reader = new FakeFactureReader();
+    reader.register(facture(), [{ tauxTVA: "20.00", montantTVA: "20.00" }]);
+    await genererEcrituresVente(repo, reader, A, 501);
+    const countValidated = await validerEcritures(repo, A, 501);
+    expect(countValidated).toBe(3);
+    const validated = await repo.listByFacture(A, 501);
+    expect(validated.every((e) => e.statut === "validee")).toBe(true);
+  });
+
+  it("genererEcrituresVente échoue (ConflictError) si écritures validées existent", async () => {
+    const repo = new FakeEcritureRepository();
+    const reader = new FakeFactureReader();
+    reader.register(facture(), [{ tauxTVA: "20.00", montantTVA: "20.00" }]);
+    await genererEcrituresVente(repo, reader, A, 501); // génère VE
+    await validerEcritures(repo, A, 501); // valide
+    await expect(
+      genererEcrituresVente(repo, reader, A, 501), // tentative de régénération
+    ).rejects.toThrow(ConflictError);
+  });
+
+  it("validerEcritures ne marque que les écritures du tenant", async () => {
+    const repo = new FakeEcritureRepository();
+    const reader = new FakeFactureReader();
+    reader.register(facture(), [{ tauxTVA: "20.00", montantTVA: "20.00" }]);
+    await genererEcrituresVente(repo, reader, A, 501); // artisan A
+    const countA = await validerEcritures(repo, A, 501);
+    expect(countA).toBe(3);
+    const beforeB = await repo.listByFacture(B, 501);
+    expect(beforeB).toEqual([]); // artisan B n'a rien
+  });
+
+  it("hasValidatedEcritures retourne true après validation, false sinon", async () => {
+    const repo = new FakeEcritureRepository();
+    const reader = new FakeFactureReader();
+    reader.register(facture(), [{ tauxTVA: "20.00", montantTVA: "20.00" }]);
+    let has = await repo.hasValidatedEcritures(A, 501);
+    expect(has).toBe(false);
+    await genererEcrituresVente(repo, reader, A, 501);
+    has = await repo.hasValidatedEcritures(A, 501);
+    expect(has).toBe(false); // pas encore validées
+    await validerEcritures(repo, A, 501);
+    has = await repo.hasValidatedEcritures(A, 501);
+    expect(has).toBe(true);
+  });
+
+  it("genererEcrituresEncaissement se régénère même après validation VE (BQ indépendant)", async () => {
+    const repo = new FakeEcritureRepository();
+    const reader = new FakeFactureReader();
+    reader.register(facture({ statut: "payee" }), [{ tauxTVA: "20.00", montantTVA: "20.00" }]);
+    await genererEcrituresVente(repo, reader, A, 501); // VE
+    await validerEcritures(repo, A, 501); // valide VE
+    await genererEcrituresEncaissement(repo, reader, A, 501); // BQ (ne dépend pas de la validation VE)
+    const all = await repo.listByFacture(A, 501);
+    expect(all.filter((e) => e.journal === "VE" && e.statut === "validee").length).toBe(3);
+    expect(all.filter((e) => e.journal === "BQ" && e.statut === "brouillon").length).toBe(2);
   });
 });

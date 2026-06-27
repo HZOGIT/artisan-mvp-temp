@@ -1,4 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
+import { ConflictError } from "../../../shared/errors";
 import type { IEcritureRepository } from "./ecriture-repository";
 import type { IFactureReader } from "./facture-reader";
 import type { EcritureComptable, CreateEcritureInput } from "../domain/ecriture";
@@ -80,7 +81,10 @@ export async function genererEcrituresVente(
     lignes.push({ ...base, numeroCompte: t.compte, libelleCompte: t.lib, ...creditFacture(t.montant) });
   }
 
-  /** Idempotence : purge puis réinsertion de la pièce. */
+  if (await ecritureRepo.hasValidatedEcritures(ctx, factureId)) {
+    throw new ConflictError("Écritures comptables déjà validées — non modifiables");
+  }
+
   await ecritureRepo.deleteByFacture(ctx, factureId);
   return ecritureRepo.createMany(ctx, lignes);
 }
@@ -119,4 +123,17 @@ export async function genererEcrituresEncaissement(
     { ...base, numeroCompte: COMPTE_CLIENT.compte, libelleCompte: COMPTE_CLIENT.lib, credit: montant },
   ];
   return ecritureRepo.createMany(ctx, lignes);
+}
+
+/*
+ * Valide (verrouille) les écritures d'une facture — passage du statut brouillon → validée.
+ * Une fois validées, elles ne peuvent plus être supprimées/réécrites (guard dans genererEcrituresVente).
+ * Typiquement appelé quand une facture passe en statut payée / en retard.
+ */
+export async function validerEcritures(
+  ecritureRepo: IEcritureRepository,
+  ctx: TenantContext,
+  factureId: number,
+): Promise<number> {
+  return ecritureRepo.validateByFacture(ctx, factureId);
 }
