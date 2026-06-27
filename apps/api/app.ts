@@ -745,6 +745,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     outboxInTx: (artisanId, factureId, tx) =>
       tx.insert(paOutbox).values({ artisanId, factureId, statut: "pending", tentatives: 0 }).then(() => {}),
     db: deps.facturesDb ?? getDbHandle().db,
+    stockRepo,
   });
   /*
    * Domaine compta/écritures — lecture seule (balance/grand-livre/FEC). La génération est

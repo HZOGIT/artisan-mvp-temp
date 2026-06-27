@@ -65,6 +65,7 @@ function toLigne(r: LigneRow): FactureLigne {
     id: r.id,
     factureId: r.factureId,
     ordre: r.ordre ?? 0,
+    articleId: r.articleId ?? null,
     reference: r.reference ?? null,
     designation: r.designation,
     description: r.description ?? null,
@@ -526,6 +527,7 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
         .values({
           factureId,
           ordre: input.ordre ?? 0,
+          articleId: isDisplay ? null : (input.articleId ?? null),
           reference: isDisplay ? null : input.reference ?? null,
           designation: input.designation,
           description: input.description ?? null,

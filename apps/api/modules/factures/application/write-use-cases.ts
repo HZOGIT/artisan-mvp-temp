@@ -9,6 +9,7 @@ import type { IDevisReader } from "./devis-reader";
 import type { ComptaPort } from "./compta-port";
 import { NOOP_COMPTA } from "./compta-port";
 import type { ArtisanReader } from "./contact-readers";
+import type { IStockRepository } from "../../stocks/application/stock-repository";
 import { calculerMontantsAvoirLigne } from "./montants";
 import type {
   Facture,
@@ -394,6 +395,7 @@ export async function changerStatutFacture(
   compta: ComptaPort = NOOP_COMPTA,
   artisanReader?: ArtisanReader,
   outboxInTx?: (artisanId: number, factureId: number, tx: DbClient) => Promise<void>,
+  stockRepo?: IStockRepository,
 ): Promise<Facture> {
   const facture = await getFactureOwned(repo, ctx, id);
   /** idempotent */
@@ -420,6 +422,21 @@ export async function changerStatutFacture(
   if (cible === "envoyee") {
     factureCounter.inc({ action: "emitted" });
     await compta.genererEcrituresVente(ctx, id);
+    if (stockRepo) {
+      const lignes = await repo.listLignes(ctx, id);
+      for (const ligne of lignes) {
+        if (!ligne.articleId) continue;
+        const stock = await stockRepo.findByArticleId(ctx, ligne.articleId);
+        if (!stock) continue;
+        /* ponytail: silencieux — insufficient_stock ou not_found = article non suivi en stock */
+        await stockRepo.adjustQuantity(ctx, stock.id, {
+          type: "sortie",
+          quantite: ligne.quantite,
+          motif: "Facturation automatique",
+          reference: facture.numero ?? undefined,
+        });
+      }
+    }
   }
   return updated;
 }

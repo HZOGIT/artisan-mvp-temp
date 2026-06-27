@@ -28,6 +28,8 @@ export type AdjustStockResult =
 export interface IStockRepository {
   list(ctx: TenantContext): Promise<Stock[]>;
   getById(ctx: TenantContext, id: number): Promise<Stock | null>;
+  /** null si aucun stock lié à cet article pour ce tenant. */
+  findByArticleId(ctx: TenantContext, articleId: number): Promise<Stock | null>;
   create(ctx: TenantContext, input: CreateStockInput): Promise<Stock>;
   /** null si le stock n'appartient pas au tenant. */
   update(ctx: TenantContext, id: number, input: UpdateStockInput): Promise<Stock | null>;

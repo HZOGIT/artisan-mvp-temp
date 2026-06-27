@@ -7,6 +7,7 @@ import type { ComptaPort } from "../../application/compta-port";
 import type { FactureMailingDeps } from "../../application/envoyer-facture-email";
 import type { PushPort } from "../../../../shared/push/web-push-adapter";
 import type { DbClient } from "../../../../shared/db";
+import type { IStockRepository } from "../../../stocks/application/stock-repository";
 import { outboxEvent } from "../../../../shared/events/outbox-event";
 import { withOutbox } from "../../../../shared/events/with-outbox";
 import { envoyerFactureParEmail } from "../../application/envoyer-facture-email";
@@ -42,6 +43,7 @@ const ligneCreateSchema = z.object({
   quantite: decimal.optional(),
   unite: z.string().max(20).optional(),
   tvaCategorieId: tvaCategorieEnum.optional(),
+  articleId: z.number().int().nullish(),
   reference: z.string().max(50).nullish(),
   description: z.string().max(5000).nullish(),
   ordre: z.number().int().optional(),
@@ -117,7 +119,7 @@ const avoirInputSchema = z.object({
  * use-cases (scoping tenant + numérotation serveur + anti-IDOR-FK + immutabilité post-émission),
  * laisse remonter les Domain errors (NotFound→404, Validation→400, Conflict→409).
  */
-export function createFacturesRouter(repo: IFactureRepository, devisReader: IDevisReader, compta: ComptaPort, mailing: FactureMailingDeps, push?: PushPort, outboxInTx?: (artisanId: number, factureId: number, tx: DbClient) => Promise<void>, db?: DbClient) {
+export function createFacturesRouter(repo: IFactureRepository, devisReader: IDevisReader, compta: ComptaPort, mailing: FactureMailingDeps, push?: PushPort, outboxInTx?: (artisanId: number, factureId: number, tx: DbClient) => Promise<void>, db?: DbClient, stockRepo?: IStockRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listFactures(repo, ctx.tenant)),
 
@@ -206,7 +208,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         return withOutbox(db, repo, async (r, tx) => {
-          const result = await changerStatutFacture(r, ctx.tenant, input.id, "envoyee", compta, mailing.artisanReader, outboxInTx);
+          const result = await changerStatutFacture(r, ctx.tenant, input.id, "envoyee", compta, mailing.artisanReader, outboxInTx, stockRepo);
           ctx.log.info({ event: "facture_envoyee", factureId: input.id }, "Facture envoyée au client");
           if (tx) await outboxEvent(tx, ctx.tenant, { action: "facture.envoyee", entityType: "facture", entityId: input.id, payload: {} });
           return result;

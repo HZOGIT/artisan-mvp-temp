@@ -72,6 +72,7 @@ export const facturesLignes = pgTable("factures_lignes", {
   id: serial("id").primaryKey(),
   factureId: integer("factureId").notNull(),
   ordre: integer("ordre").default(0),
+  articleId: integer("articleId"),
   reference: varchar("reference", { length: 50 }),
   designation: varchar("designation", { length: 500 }).notNull(),
   description: text("description"),

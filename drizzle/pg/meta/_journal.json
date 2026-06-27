@@ -393,6 +393,13 @@
       "when": 1782523611979,
       "tag": "0055_factures-entrantes-rls",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1782532255609,
+      "tag": "0056_broad_oracle",
+      "breakpoints": true
     }
   ]
 }

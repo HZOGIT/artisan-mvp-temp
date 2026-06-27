@@ -20,6 +20,7 @@ export interface FactureLigne {
   readonly id: number;
   readonly factureId: number;
   readonly ordre: number;
+  readonly articleId: number | null;
   readonly reference: string | null;
   readonly designation: string;
   readonly description: string | null;
@@ -101,6 +102,7 @@ export interface CreateFactureLigneInput {
   readonly unite?: string;
   readonly tauxTVA?: string;
   readonly tvaCategorieId?: string | null;
+  readonly articleId?: number | null;
   readonly reference?: string | null;
   readonly description?: string | null;
   readonly ordre?: number;
