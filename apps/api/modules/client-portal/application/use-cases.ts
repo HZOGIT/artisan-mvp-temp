@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NotFoundError, UnauthorizedError, ValidationError, TooManyRequestsError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
+import { portailCounter } from "../../../shared/observability/business-metrics";
 import type { IPortalAccessRepository } from "./portal-access-repository";
 import { buildAccessEmailBody, buildPortalUrl, clientNomComplet, computeExpiry, type ArtisanPortalInfo, type ClientPortalInfo, type PortalAccessStatus } from "../domain/portal-access";
 
@@ -34,6 +35,8 @@ export async function generateAccess(deps: ClientPortalAdminDeps, ctx: TenantCon
   const token = (deps.genToken ?? randomUUID)();
   const expiresAt = computeExpiry(now);
   await deps.access.createAccess(ctx, { clientId: client.id, token, email: client.email, expiresAt });
+
+  portailCounter.inc({ action: "access_generated" });
 
   const artisan = await deps.access.getArtisanPublic(ctx.artisanId);
   const portalUrl = buildPortalUrl(origin, token);
@@ -73,6 +76,7 @@ export async function verifyAccess(deps: { access: IPortalAccessRepository }, to
 
   const ctx = tokenScope(access.artisanId);
   await deps.access.touchLastAccess(ctx, access.id, now);
+  portailCounter.inc({ action: "access_verified" });
   const [client, artisan] = await Promise.all([deps.access.getClientInfo(ctx, access.clientId), deps.access.getArtisanPublic(access.artisanId)]);
   return { valid: true, client: client ?? null, artisan: artisan ?? null };
 }

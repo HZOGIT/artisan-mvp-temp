@@ -3,6 +3,7 @@ import { NotFoundError, ValidationError, TooManyRequestsError } from "../../../s
 import type { EmailPort } from "../../../shared/ports/email";
 import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { TenantContext } from "../../../shared/tenant";
+import { signatureCounter } from "../../../shared/observability/business-metrics";
 import type { Signature } from "../domain/signature";
 import { buildSignedDevisArtisanEmail, buildRefusedDevisArtisanEmail } from "../domain/signature";
 import type { SignaturePublicReader, SignatureDevisView } from "./signature-public-reader";
@@ -193,6 +194,8 @@ export async function signDevis(
     documentHash,
     documentHashedAt,
   });
+
+  signatureCounter.inc({ action: "signed" });
 
   if (deps.eventBus) emitEvent(deps.eventBus, ctx, { type: "devis.signe", entityType: "devis", entityId: resolution.devisId, payload: { devisId: resolution.devisId } });
 
