@@ -39,6 +39,10 @@ export class FakeStockRepository implements IStockRepository {
     return this.store.find((s) => s.id === id && s.artisanId === ctx.artisanId) ?? null;
   }
 
+  async findByArticleId(ctx: TenantContext, articleId: number): Promise<Stock | null> {
+    return this.store.find((s) => s.artisanId === ctx.artisanId && s.articleId === articleId) ?? null;
+  }
+
   async create(ctx: TenantContext, input: CreateStockInput): Promise<Stock> {
     const now = new Date();
     /** Mirroir du formatage PG numeric(_,2) (ex. "3" stocké → "3.00") pour fidélité au repo réel. */

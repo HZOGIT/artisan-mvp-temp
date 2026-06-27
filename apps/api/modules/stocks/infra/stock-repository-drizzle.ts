@@ -87,6 +87,17 @@ export class StockRepositoryDrizzle implements IStockRepository {
     });
   }
 
+  findByArticleId(ctx: TenantContext, articleId: number): Promise<Stock | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .select()
+        .from(stocks)
+        .where(and(eq(stocks.artisanId, ctx.artisanId), eq(stocks.articleId, articleId)))
+        .limit(1);
+      return row ? toStock(row) : null;
+    });
+  }
+
   create(ctx: TenantContext, input: CreateStockInput): Promise<Stock> {
     return withTenant(this.db, ctx, async (tx) => {
       const [row] = await tx
@@ -141,10 +152,12 @@ export class StockRepositoryDrizzle implements IStockRepository {
        * jamais l'ajuster pour un stock hors tenant. Lecture + maj + log dans la MÊME
        * transaction (atomicité : pas de mouvement sans maj de quantité, ni l'inverse).
        */
+      /* ponytail: FOR UPDATE sérialise les décréments concurrents (facturation mobile parallèle) */
       const [stock] = await tx
         .select()
         .from(stocks)
         .where(and(eq(stocks.id, stockId), eq(stocks.artisanId, ctx.artisanId)))
+        .for("update")
         .limit(1);
       if (!stock) return { status: "not_found" };
 

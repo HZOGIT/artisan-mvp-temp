@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { FakeFactureRepository } from "../infra/facture-repository-fake";
+import { FakeStockRepository } from "../../stocks/infra/stock-repository-fake";
 import {
   creerFacture,
   modifierFacture,
@@ -256,5 +257,36 @@ describe("factures — use-cases d'écriture", () => {
     /* avoir d'une ligne 100 × 1 × (1-10%) = 90 → montantHT = -90 */
     const lignes = await repo.listLignes(A, avoir.id);
     expect(lignes[0]?.montantHT).toBe("-90.00");
+  });
+
+  it("changerStatutFacture envoyee — décrément stock auto sur les lignes avec articleId", async () => {
+    const repo = repoWithClient(A, 100);
+    const stockRepo = new FakeStockRepository();
+    const stock = await stockRepo.create(A, { articleId: 42, reference: "ART-42", designation: "Peinture", quantiteEnStock: "10.00", articleType: "bibliotheque" });
+
+    const f = await creerFacture(repo, A, {
+      clientId: 100,
+      lignes: [
+        { designation: "Peinture", prixUnitaireHT: "50.00", quantite: "3", articleId: 42 },
+        { designation: "Main d'œuvre", prixUnitaireHT: "80.00", quantite: "1" },
+      ],
+    });
+    await changerStatutFacture(repo, A, f.id, "envoyee", undefined, fakeArtisanReader, undefined, stockRepo);
+
+    const stockApres = await stockRepo.getById(A, stock.id);
+    expect(stockApres?.quantiteEnStock).toBe("7.00");
+  });
+
+  it("changerStatutFacture envoyee — ligne sans articleId ou article sans stock = silencieux", async () => {
+    const repo = repoWithClient(A, 100);
+    const stockRepo = new FakeStockRepository();
+
+    const f = await creerFacture(repo, A, {
+      clientId: 100,
+      lignes: [{ designation: "Fourniture", prixUnitaireHT: "20.00", quantite: "5", articleId: 99 }],
+    });
+    await expect(
+      changerStatutFacture(repo, A, f.id, "envoyee", undefined, fakeArtisanReader, undefined, stockRepo),
+    ).resolves.not.toThrow();
   });
 });
