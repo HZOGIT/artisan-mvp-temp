@@ -14,6 +14,8 @@ export interface ArtisanInfo {
   readonly nomEntreprise: string | null;
   readonly email: string | null;
   readonly siret?: string | null;
+  readonly delaiPaiementJours?: number | null;
+  readonly delaiPaiementType?: string | null;
   readonly [key: string]: unknown;
 }
 

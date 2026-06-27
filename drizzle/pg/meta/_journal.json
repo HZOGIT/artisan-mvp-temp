@@ -407,6 +407,13 @@
       "when": 1782535831000,
       "tag": "0057_factures-nombre-relances",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1782538284472,
+      "tag": "20260627053124_artisans-delai-paiement-add",
+      "breakpoints": true
     }
   ]
 }

@@ -30,8 +30,8 @@ function toParametres(r: ParametresRow): ParametresArtisan {
     conditionsGenerales: r.conditionsGenerales ?? null,
     mediateurConsommation: r.mediateurConsommation ?? null,
     conditionsPaiementDefaut: r.conditionsPaiementDefaut ?? null,
-    delaiPaiementJours: r.delaiPaiementJours ?? null,
-    delaiPaiementType: r.delaiPaiementType ?? D.delaiPaiementType,
+    delaiPaiementJours: null,
+    delaiPaiementType: "net",
     notificationsEmail: r.notificationsEmail ?? D.notificationsEmail,
     rappelDevisJours: r.rappelDevisJours ?? D.rappelDevisJours,
     rappelFactureJours: r.rappelFactureJours ?? D.rappelFactureJours,
@@ -56,8 +56,6 @@ function toConfigSet(input: UpdateParametresInput): Partial<ParametresInsert> {
   if (input.conditionsGenerales !== undefined) set.conditionsGenerales = input.conditionsGenerales;
   if (input.mediateurConsommation !== undefined) set.mediateurConsommation = input.mediateurConsommation;
   if (input.conditionsPaiementDefaut !== undefined) set.conditionsPaiementDefaut = input.conditionsPaiementDefaut;
-  if (input.delaiPaiementJours !== undefined) set.delaiPaiementJours = input.delaiPaiementJours;
-  if (input.delaiPaiementType !== undefined) set.delaiPaiementType = input.delaiPaiementType as ParametresInsert["delaiPaiementType"];
   if (input.notificationsEmail !== undefined) set.notificationsEmail = input.notificationsEmail;
   if (input.rappelDevisJours !== undefined) set.rappelDevisJours = input.rappelDevisJours;
   if (input.rappelFactureJours !== undefined) set.rappelFactureJours = input.rappelFactureJours;

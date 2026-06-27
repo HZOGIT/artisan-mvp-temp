@@ -305,4 +305,29 @@ describe("factures — use-cases d'écriture", () => {
     const stockApres = await stockRepo.getById(A, stock.id);
     expect(stockApres?.quantiteEnStock).toBe("7.00");
   });
+
+  it("changerStatutFacture envoyee — auto-calcul dateEcheance : net (30j)", async () => {
+    const repo = repoWithClient(A, 100);
+    const f = await creerFacture(repo, A, { clientId: 100 });
+    const base = f.createdAt;
+    const expected = new Date(base);
+    expected.setDate(expected.getDate() + 30);
+    const artisanReader = { getArtisan: async () => ({ id: A.artisanId, nomEntreprise: "Test", email: "test@test.com", siret: "12345678901234", delaiPaiementJours: 30, delaiPaiementType: "net" }) };
+    await changerStatutFacture(repo, A, f.id, "envoyee", undefined, artisanReader);
+    const updated = await repo.getById(A, f.id);
+    expect(updated?.dateEcheance?.getDate()).toEqual(expected.getDate());
+  });
+
+  it("changerStatutFacture envoyee — auto-calcul dateEcheance : fin_de_mois (eom+15j)", async () => {
+    const repo = repoWithClient(A, 100);
+    const f = await creerFacture(repo, A, { clientId: 100 });
+    const base = f.createdAt;
+    const finMois = new Date(base.getFullYear(), base.getMonth() + 1, 0);
+    const expected = new Date(finMois);
+    expected.setDate(expected.getDate() + 15);
+    const artisanReader = { getArtisan: async () => ({ id: A.artisanId, nomEntreprise: "Test", email: "test@test.com", siret: "12345678901234", delaiPaiementJours: 15, delaiPaiementType: "fin_de_mois" }) };
+    await changerStatutFacture(repo, A, f.id, "envoyee", undefined, artisanReader);
+    const updated = await repo.getById(A, f.id);
+    expect(updated?.dateEcheance?.getDate()).toEqual(expected.getDate());
+  });
 });

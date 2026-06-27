@@ -59,6 +59,18 @@ function assertLigneValide(designation: string | undefined, prixUnitaireHT?: str
   }
 }
 
+export function calculerDateEcheance(base: Date, jours: number, type: "net" | "fin_de_mois"): Date {
+  if (type === "fin_de_mois") {
+    const finMois = new Date(base.getFullYear(), base.getMonth() + 1, 0);
+    const resultat = new Date(finMois);
+    resultat.setDate(resultat.getDate() + jours);
+    return resultat;
+  }
+  const resultat = new Date(base);
+  resultat.setDate(resultat.getDate() + jours);
+  return resultat;
+}
+
 export async function creerFacture(repo: IFactureRepository, ctx: TenantContext, input: CreerFactureInput): Promise<Facture> {
   /** Anti-IDOR-FK : client (et devis lié) du tenant uniquement (ne révèle pas l'existence). */
   if (!(await repo.ownsClient(ctx, input.clientId))) throw new NotFoundError("Client introuvable");
@@ -420,6 +432,16 @@ export async function changerStatutFacture(
   if (!updated) throw new NotFoundError("Facture introuvable");
   /** À l'émission (passage `envoyee`) : génère la pièce de vente FEC (411/706/445). Idempotent. */
   if (cible === "envoyee") {
+    if (artisanReader && !facture.dateEcheance) {
+      const artisan = await artisanReader.getArtisan(ctx);
+      if (artisan?.delaiPaiementJours != null && artisan.delaiPaiementJours > 0) {
+        const jours = artisan.delaiPaiementJours;
+        const type = (artisan.delaiPaiementType ?? "net") as "net" | "fin_de_mois";
+        const base = facture.dateFacture ?? facture.createdAt ?? new Date();
+        const dateEcheance = calculerDateEcheance(base, jours, type);
+        await repo.update(ctx, id, { dateEcheance });
+      }
+    }
     factureCounter.inc({ action: "emitted" });
     await compta.genererEcrituresVente(ctx, id);
     if (stockRepo) {
