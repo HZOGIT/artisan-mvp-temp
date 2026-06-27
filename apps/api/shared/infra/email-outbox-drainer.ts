@@ -1,7 +1,7 @@
 import fp from "fastify-plugin";
 import { AsyncTask, SimpleIntervalJob } from "toad-scheduler";
 import type { FastifyInstance } from "fastify";
-import { and, eq, lt, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { EmailPort, EmailMessage } from "../ports/email";
 import type { DbClient } from "../db";
 import { emailOutbox } from "../../../../drizzle/schema.pg";
@@ -13,8 +13,19 @@ export interface EmailOutboxDrainerOptions {
   readonly sender: EmailPort;
 }
 
+type OutboxRow = {
+  id: number;
+  toEmail: string;
+  subject: string;
+  html: string;
+  fromName: string | null;
+  replyTo: string | null;
+  attachments: unknown;
+  tentatives: number;
+};
+
 export async function drainEmailEntry(
-  entry: { id: number; toEmail: string; subject: string; html: string; fromName: string | null; replyTo: string | null; attachments: unknown; tentatives: number },
+  entry: OutboxRow,
   sender: EmailPort,
   update: (id: number, set: Record<string, unknown>) => Promise<void>,
 ): Promise<void> {
@@ -43,24 +54,46 @@ export const emailOutboxDrainerPlugin = fp(
     const task = new AsyncTask(
       "email-outbox-drain",
       async () => {
-        const pending = await opts.db
-          .select()
-          .from(emailOutbox)
-          .where(and(eq(emailOutbox.statut, "pending"), lt(sql`coalesce(${emailOutbox.tentatives}, 0)`, MAX_TENTATIVES)))
-          .limit(10);
+        await opts.db.transaction(async (tx) => {
+          /* ponytail: FOR UPDATE SKIP LOCKED — un seul replica traite chaque ligne, pas d'envoi double */
+          const { rows } = await tx.execute<{
+            id: number;
+            to_email: string;
+            subject: string;
+            html: string;
+            from_name: string | null;
+            reply_to: string | null;
+            attachments: unknown;
+            tentatives: number;
+          }>(sql`
+            SELECT id, to_email, subject, html, from_name, reply_to, attachments, tentatives
+            FROM email_outbox
+            WHERE statut = 'pending' AND coalesce(tentatives, 0) < ${MAX_TENTATIVES}
+            LIMIT 10
+            FOR UPDATE SKIP LOCKED
+          `);
 
-        let processed = 0;
-        for (const entry of pending) {
-          await drainEmailEntry(
-            entry,
-            opts.sender,
-            (id, set) => opts.db.update(emailOutbox).set(set).where(eq(emailOutbox.id, id)).then(() => {}),
-          );
-          processed++;
-        }
-        if (processed > 0) {
-          app.log.info({ event: "email_outbox_drain_done", processed }, "Email outbox drainée");
-        }
+          if (!rows.length) return;
+
+          for (const row of rows) {
+            await drainEmailEntry(
+              {
+                id: row.id,
+                toEmail: row.to_email,
+                subject: row.subject,
+                html: row.html,
+                fromName: row.from_name,
+                replyTo: row.reply_to,
+                attachments: row.attachments,
+                tentatives: row.tentatives,
+              },
+              opts.sender,
+              (id, set) => tx.update(emailOutbox).set(set).where(eq(emailOutbox.id, id)).then(() => {}),
+            );
+          }
+
+          app.log.info({ event: "email_outbox_drain_done", processed: rows.length }, "Email outbox drainée");
+        });
       },
       (err) => {
         app.log.error({ event: "email_outbox_drain_error", error: err instanceof Error ? err.message : String(err) }, "Erreur drainer email outbox");

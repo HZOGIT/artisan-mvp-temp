@@ -11,7 +11,9 @@ import {
   numeric,
   jsonb,
   primaryKey,
+  index,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { artisans } from "./artisans";
 import { users } from "./users";
 import { alerteEnvoiStatutEnum } from "./rh";
@@ -620,19 +622,23 @@ export const llmUsage = pgTable("llm_usage", {
 export type LlmUsageRow = typeof llmUsage.$inferSelect;
 export type InsertLlmUsage = typeof llmUsage.$inferInsert;
 
-export const emailOutbox = pgTable("email_outbox", {
-  id: serial("id").primaryKey(),
-  toEmail: text("to_email").notNull(),
-  subject: text("subject").notNull(),
-  html: text("html").notNull(),
-  fromName: text("from_name"),
-  replyTo: text("reply_to"),
-  attachments: jsonb("attachments"),
-  tentatives: integer("tentatives").notNull().default(0),
-  statut: text("statut").notNull().default("pending"),
-  derniereErreur: text("derniere_erreur"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  traiteeAt: timestamp("traitee_at", { withTimezone: true }),
-});
+export const emailOutbox = pgTable(
+  "email_outbox",
+  {
+    id: serial("id").primaryKey(),
+    toEmail: text("to_email").notNull(),
+    subject: text("subject").notNull(),
+    html: text("html").notNull(),
+    fromName: text("from_name"),
+    replyTo: text("reply_to"),
+    attachments: jsonb("attachments"),
+    tentatives: integer("tentatives").notNull().default(0),
+    statut: text("statut").notNull().default("pending"),
+    derniereErreur: text("derniere_erreur"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    traiteeAt: timestamp("traitee_at", { withTimezone: true }),
+  },
+  (t) => [index("email_outbox_pending_idx").on(t.statut, t.createdAt).where(sql`${t.statut} = 'pending'`)],
+);
 export type EmailOutboxRow = typeof emailOutbox.$inferSelect;
 export type InsertEmailOutbox = typeof emailOutbox.$inferInsert;
