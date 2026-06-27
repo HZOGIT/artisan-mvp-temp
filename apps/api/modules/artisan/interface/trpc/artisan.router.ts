@@ -70,15 +70,20 @@ export function createArtisanRouter(repo: IArtisanRepository, security: ArtisanS
           if (!cred || !cred.actif) {
             throw new UnauthorizedError("Compte inactif");
           }
-          if (!currentPassword) {
-            throw new ValidationError("Mot de passe requis pour modifier l'IBAN");
-          }
-          if (!cred.password || !(await security.hasher.verify(currentPassword, cred.password))) {
-            throw new UnauthorizedError("Mot de passe incorrect");
-          }
-          credEmail = cred.email;
+
           const current = await getProfile(repo, ctx.tenant);
-          ibanActuallyChanged = profileInput.iban !== (current?.iban ?? "");
+          const currentIban = current?.iban ?? "";
+          ibanActuallyChanged = profileInput.iban !== currentIban;
+
+          if (ibanActuallyChanged) {
+            if (!currentPassword) {
+              throw new ValidationError("Mot de passe requis pour modifier l'IBAN");
+            }
+            if (!cred.password || !(await security.hasher.verify(currentPassword, cred.password))) {
+              throw new UnauthorizedError("Mot de passe incorrect");
+            }
+            credEmail = cred.email;
+          }
         }
 
         const result = await updateProfile(repo, ctx.tenant, profileInput);
