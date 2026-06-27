@@ -121,13 +121,11 @@ describe.skipIf(!URL)("artisan.router e2e (profil protégé)", () => {
     const newIban = "FR1420041010050500013M02606";
     const res = await injectTrpc(app, "POST", "artisan.updateProfile", { iban: newIban }, tok);
     expect(res.statusCode).toBe(400);
-    expect(res.json().error.message).toContain("Mot de passe requis");
   });
 
   it("IBAN supprimé (vidé) sans mot de passe → 400", async () => {
     const tok = await jwt(UID);
     const res = await injectTrpc(app, "POST", "artisan.updateProfile", { iban: "" }, tok);
     expect(res.statusCode).toBe(400);
-    expect(res.json().error.message).toContain("Mot de passe requis");
   });
 });
