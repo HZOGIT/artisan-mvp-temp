@@ -1,6 +1,7 @@
 import { ConflictError, NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ArtisanReader } from "../../../shared/readers/contact-readers";
+import { devisCounter } from "../../../shared/observability/business-metrics";
 import type { IDevisRepository } from "./devis-repository";
 import type {
   Devis,
@@ -55,7 +56,9 @@ export async function creerDevis(repo: IDevisRepository, ctx: TenantContext, inp
   /** Anti-IDOR-FK : le client doit appartenir au tenant (ne révèle pas l'existence cross-tenant). */
   if (!(await repo.ownsClient(ctx, input.clientId))) throw new NotFoundError("Client introuvable");
   const numero = await repo.nextNumero(ctx);
-  return repo.create(ctx, { ...input, numero });
+  const devis = await repo.create(ctx, { ...input, numero });
+  devisCounter.inc({ action: "created" });
+  return devis;
 }
 
 export async function modifierDevis(
@@ -144,6 +147,9 @@ export async function changerStatutDevis(
   }
   const updated = await repo.setStatut(ctx, id, cible);
   if (!updated) throw new NotFoundError("Devis introuvable");
+  if (cible === "accepte" || cible === "refuse" || cible === "expire") {
+    devisCounter.inc({ action: cible });
+  }
   return updated;
 }
 

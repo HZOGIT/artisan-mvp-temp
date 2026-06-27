@@ -2,6 +2,7 @@ import { ConflictError, NotFoundError, ValidationError } from "../../../shared/e
 import type { TenantContext } from "../../../shared/tenant";
 import { TVA_CATEGORIES_MAP } from "../../../shared/tva/taux-tva-fr";
 import { round2 } from "../../../shared/money";
+import { factureCounter } from "../../../shared/observability/business-metrics";
 import type { IFactureRepository, AvoirLigneData, CopiedLigneData } from "./facture-repository";
 import type { DbClient } from "../../../shared/db";
 import type { IDevisReader } from "./devis-reader";
@@ -62,8 +63,11 @@ export async function creerFacture(repo: IFactureRepository, ctx: TenantContext,
   if (!(await repo.ownsClient(ctx, input.clientId))) throw new NotFoundError("Client introuvable");
   if (input.devisId != null && !(await repo.ownsDevis(ctx, input.devisId))) throw new NotFoundError("Devis introuvable");
   const { lignes, ...header } = input;
-  if (lignes && lignes.length > 0) return repo.createWithLignes(ctx, { ...header, numero: null }, lignes);
-  return repo.create(ctx, { ...header, numero: null });
+  const facture = lignes && lignes.length > 0
+    ? await repo.createWithLignes(ctx, { ...header, numero: null }, lignes)
+    : await repo.create(ctx, { ...header, numero: null });
+  factureCounter.inc({ action: "created" });
+  return facture;
 }
 
 export async function modifierFacture(
@@ -181,6 +185,7 @@ export async function enregistrerPaiementFacture(
    * compta (no-op tant que le domaine compta n'est pas porté — seam d'effet de bord).
    */
   if (soldee) {
+    factureCounter.inc({ action: "paid" });
     await compta.genererEcrituresVente(ctx, id);
     await compta.genererEcrituresEncaissement(ctx, id);
   }
@@ -221,6 +226,7 @@ export async function marquerFacturePayee(
     statut: "payee",
   });
   if (!updated) throw new NotFoundError("Facture introuvable");
+  factureCounter.inc({ action: "paid" });
   try {
     await compta.genererEcrituresVente(ctx, id);
     await compta.genererEcrituresEncaissement(ctx, id);
@@ -376,6 +382,7 @@ export async function convertirDevisEnFacture(
     lignes,
   });
   if (!facture) throw new NotFoundError("Client du devis introuvable");
+  factureCounter.inc({ action: "created" });
   return facture;
 }
 
@@ -410,7 +417,10 @@ export async function changerStatutFacture(
   const updated = await repo.setStatut(ctx, id, cible, inTx);
   if (!updated) throw new NotFoundError("Facture introuvable");
   /** À l'émission (passage `envoyee`) : génère la pièce de vente FEC (411/706/445). Idempotent. */
-  if (cible === "envoyee") await compta.genererEcrituresVente(ctx, id);
+  if (cible === "envoyee") {
+    factureCounter.inc({ action: "emitted" });
+    await compta.genererEcrituresVente(ctx, id);
+  }
   return updated;
 }
 
