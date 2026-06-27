@@ -289,4 +289,20 @@ describe("factures — use-cases d'écriture", () => {
       changerStatutFacture(repo, A, f.id, "envoyee", undefined, fakeArtisanReader, undefined, stockRepo),
     ).resolves.not.toThrow();
   });
+
+  it("changerStatutFacture envoyee — idempotent : re-trigger ne re-décrémente pas (garde statut)", async () => {
+    const repo = repoWithClient(A, 100);
+    const stockRepo = new FakeStockRepository();
+    const stock = await stockRepo.create(A, { articleId: 42, reference: "ART-42", designation: "Peinture", quantiteEnStock: "10.00", articleType: "bibliotheque" });
+
+    const f = await creerFacture(repo, A, {
+      clientId: 100,
+      lignes: [{ designation: "Peinture", prixUnitaireHT: "50.00", quantite: "3", articleId: 42 }],
+    });
+    await changerStatutFacture(repo, A, f.id, "envoyee", undefined, fakeArtisanReader, undefined, stockRepo);
+    await changerStatutFacture(repo, A, f.id, "envoyee", undefined, fakeArtisanReader, undefined, stockRepo);
+
+    const stockApres = await stockRepo.getById(A, stock.id);
+    expect(stockApres?.quantiteEnStock).toBe("7.00");
+  });
 });
