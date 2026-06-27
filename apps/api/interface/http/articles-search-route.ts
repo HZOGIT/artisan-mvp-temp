@@ -28,6 +28,7 @@ export function registerArticlesSearchRoute(app: FastifyInstance, deps: Articles
 
     const f = (req.query ?? {}) as Record<string, unknown>;
     const rows = await deps.reader.search(query, { metier: str(f.metier), categorie: str(f.categorie), sousCategorie: str(f.sous_categorie) });
+    req.log.info({ event: "articles_searched", nbResults: rows.length }, "Articles recherchés");
     return reply.send(rows);
   });
 }

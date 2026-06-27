@@ -36,6 +36,7 @@ export function registerIcalRoute(app: FastifyInstance, deps: IcalRouteDeps): vo
     if (!feed) return reply.code(404).type("text/plain").send("Calendrier introuvable");
 
     const ics = buildIcalFeed({ calName: feed.calName, events: feed.events });
+    req.log.info({ event: "ical_exported", nbEvents: feed.events.length }, "iCal exporté");
     return reply
       .header("Content-Type", "text/calendar; charset=utf-8")
       .header("Content-Disposition", 'inline; filename="operioz.ics"')
