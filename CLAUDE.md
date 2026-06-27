@@ -301,6 +301,11 @@ Plusieurs agents poussent **en parallèle sur la même branche `staging`**. Règ
   cours d'édition d'un autre agent (prompts `scripts/prompts/`, audits `docs/billing/`,
   `docs/testing/`, etc.). Un `git status` peut montrer des `M`/`??` qui ne sont **pas à toi** —
   laisse-les.
+- **Pousse toi-même par défaut, sans demander.** Une fois ton commit chirurgical fait, `git push`
+  directement — pas besoin de valider avec l'humain. **N'attends et ne demande que si tu vois un
+  risque** : `pnpm check`/lint rouge, propriété de fichier incertaine, réécriture d'historique,
+  ou changement difficilement réversible / à effet externe. Rappel : un push sur `staging`
+  **déclenche le déploiement frontend CF Pages** — c'est un push *et* un déploiement, garde-le en tête.
 - **Ne réécris jamais l'historique partagé.** Pas de `git reset --hard`, `rebase`, `commit --amend`
   ni `push --force` sur `staging` : tu ferais disparaître les commits des autres.
 - **Revérifie `origin` après push.** Un reset concurrent peut faire disparaître TON commit de la
