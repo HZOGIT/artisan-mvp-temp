@@ -73,7 +73,10 @@ export function createArtisanRouter(repo: IArtisanRepository, security: ArtisanS
               throw new ValidationError("Mot de passe requis pour modifier l'IBAN");
             }
             const cred = await security.authRepo.findCredentialsById(ctx.tenant.userId);
-            if (!cred || !cred.actif || !cred.password || !(await security.hasher.verify(currentPassword, cred.password))) {
+            if (!cred || !cred.actif) {
+              throw new UnauthorizedError("Compte inactif");
+            }
+            if (!cred.password || !(await security.hasher.verify(currentPassword, cred.password))) {
               throw new UnauthorizedError("Mot de passe incorrect");
             }
             credEmail = cred.email;
