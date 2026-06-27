@@ -175,6 +175,7 @@ import { genererAlertesReconductionContrats } from "./modules/contrats-maintenan
 import { artisans as artisansTable, paOutbox } from "../../drizzle/schema.pg";
 import { alertesPrevisionsCronPlugin } from "./shared/infra/alertes-previsions-cron";
 import { contratsFacturesCronPlugin } from "./shared/infra/contrats-factures-cron";
+import { contratsVisitesCronPlugin } from "./shared/infra/contrats-visites-cron";
 import { ensureStripeWebhookEndpoint } from "./shared/infra/stripe-webhook-setup";
 import { WebhookPaymentWriterDrizzle } from "./modules/subscription/infra/webhook-payment-writer-drizzle";
 import { SubscriptionEventNotifierDrizzle } from "./modules/subscription/infra/subscription-event-notifier-drizzle";
@@ -1256,6 +1257,12 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   app.register(contratsFacturesCronPlugin, {
     repo: contratRepo,
     factureGen: new FacturesContratFactureGenerator(factureRepo),
+    db: getDbHandle().db,
+  });
+
+  /** Cron visites contrats — tick horaire, génère les interventions récurrentes dues (prochainPassage <= now). */
+  app.register(contratsVisitesCronPlugin, {
+    repo: contratRepo,
     db: getDbHandle().db,
   });
 
