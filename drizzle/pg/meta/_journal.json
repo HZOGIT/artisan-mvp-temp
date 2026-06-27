@@ -379,6 +379,20 @@
       "when": 1782496987534,
       "tag": "0053_rls-message-files",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1782523539604,
+      "tag": "0054_factures-entrantes",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1782523611979,
+      "tag": "0055_factures-entrantes-rls",
+      "breakpoints": true
     }
   ]
 }

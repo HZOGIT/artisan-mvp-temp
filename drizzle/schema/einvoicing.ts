@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, varchar, text, timestamp, unique } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, varchar, text, timestamp, unique, boolean } from "drizzle-orm/pg-core";
 import { artisans } from "./artisans";
 import { cycleVieEnum, factures } from "./factures";
 
@@ -44,6 +44,22 @@ export const paOutbox = pgTable("pa_outbox", {
 });
 export type PaOutbox = typeof paOutbox.$inferSelect;
 export type InsertPaOutbox = typeof paOutbox.$inferInsert;
+
+export const facturesEntrantes = pgTable("factures_entrantes", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull().references(() => artisans.id),
+  paDocumentId: varchar("paDocumentId", { length: 100 }).notNull(),
+  emetteurSiret: varchar("emetteurSiret", { length: 14 }),
+  montantTTC: varchar("montantTTC", { length: 20 }),
+  date: timestamp("date"),
+  facturxBase64: text("facturxBase64"),
+  fetchedAt: timestamp("fetchedAt").defaultNow().notNull(),
+  lu: boolean("lu").default(false).notNull(),
+}, (t) => ({
+  uqArtisanDocument: unique("fe_artisan_document").on(t.artisanId, t.paDocumentId),
+}));
+export type FactureEntrante = typeof facturesEntrantes.$inferSelect;
+export type InsertFactureEntrante = typeof facturesEntrantes.$inferInsert;
 
 export function isTerminal(statut: string): boolean {
   return statut === "refusee" || statut === "rejetee";

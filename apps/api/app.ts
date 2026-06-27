@@ -162,6 +162,7 @@ import { handleBillingWebhookEvent } from "./modules/billing/interface/http/bill
 import fastifySchedule from "@fastify/schedule";
 import { billingCronPlugin } from "./shared/infra/billing-cron";
 import { paOutboxDrainerPlugin } from "./shared/infra/pa-outbox-drainer";
+import { paInboundPollerPlugin } from "./shared/infra/pa-inbound-poller";
 import { eventOutboxDrainerPlugin } from "./shared/events/outbox-drainer";
 import { geoPurgeCronPlugin } from "./shared/infra/geo-purge-cron";
 import { rgpdCronPlugin } from "./shared/infra/rgpd-cron";
@@ -1171,6 +1172,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   /** Drainer PA outbox — toutes les 30s, envoie les factures pending à la PA avec retries. */
   app.register(paOutboxDrainerPlugin, { pa: einvoicing.pa, db: getDbHandle().db, dbUrl: getDbHandle().pool.options.connectionString ?? "" });
+  /** Poller PA inbound — toutes les heures, récupère les factures fournisseurs entrantes. */
+  app.register(paInboundPollerPlugin, { pa: einvoicing.pa, db: getDbHandle().db, dbUrl: getDbHandle().pool.options.connectionString ?? "" });
   app.register(eventOutboxDrainerPlugin, { db: getDbHandle().db });
 
   /** Cron CNIL — purge des positions GPS expirées toutes les 6 h (rétention 8 h par position). */

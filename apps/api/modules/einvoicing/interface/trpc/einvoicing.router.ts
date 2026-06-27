@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { paEntites } from "../../../../../../drizzle/schema/einvoicing";
+import { paEntites, facturesEntrantes } from "../../../../../../drizzle/schema/einvoicing";
 import { factures as facturesTable } from "../../../../../../drizzle/schema/factures";
 import type { DbClient } from "../../../../shared/db";
 import { withTenant } from "../../../../shared/db/with-tenant";
@@ -48,5 +48,60 @@ export function createEinvoicingRouter(pa: PaPort, db: DbClient) {
     statutDocument: protectedProcedure
       .input(z.object({ paDocumentId: z.string().min(1) }))
       .query(({ input }) => pa.getLifecycle(input.paDocumentId)),
+
+    facturesEntrantes: router({
+      liste: protectedProcedure
+        .input(z.object({ page: z.number().int().min(1).default(1) }))
+        .query(({ ctx, input }) =>
+          withTenant(db, ctx.tenant, (tx) =>
+            tx
+              .select({
+                id: facturesEntrantes.id,
+                paDocumentId: facturesEntrantes.paDocumentId,
+                emetteurSiret: facturesEntrantes.emetteurSiret,
+                montantTTC: facturesEntrantes.montantTTC,
+                date: facturesEntrantes.date,
+                fetchedAt: facturesEntrantes.fetchedAt,
+                lu: facturesEntrantes.lu,
+              })
+              .from(facturesEntrantes)
+              .where(eq(facturesEntrantes.artisanId, ctx.tenant.artisanId))
+              .orderBy(desc(facturesEntrantes.date))
+              .limit(20)
+              .offset((input.page - 1) * 20),
+          ),
+        ),
+
+      lire: protectedProcedure
+        .input(z.object({ id: z.number().int().positive() }))
+        .query(async ({ ctx, input }) => {
+          const rows = await withTenant(db, ctx.tenant, (tx) =>
+            tx
+              .select()
+              .from(facturesEntrantes)
+              .where(
+                and(
+                  eq(facturesEntrantes.id, input.id),
+                  eq(facturesEntrantes.artisanId, ctx.tenant.artisanId),
+                ),
+              )
+              .limit(1),
+          );
+
+          const facture = rows[0];
+          if (!facture) throw new TRPCError({ code: "NOT_FOUND" });
+
+          if (!facture.lu) {
+            await withTenant(db, ctx.tenant, (tx) =>
+              tx
+                .update(facturesEntrantes)
+                .set({ lu: true })
+                .where(eq(facturesEntrantes.id, input.id)),
+            );
+          }
+
+          return { ...facture, lu: true };
+        }),
+    }),
   });
 }
