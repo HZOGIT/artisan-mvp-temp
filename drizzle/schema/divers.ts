@@ -74,6 +74,7 @@ export const articlesArtisan = pgTable("articles_artisan", {
   unite: varchar("unite", { length: 20 }).default("unité"),
   prixUnitaireHT: numeric("prixUnitaireHT", { precision: 10, scale: 2 }).notNull(),
   tauxTVA: numeric("tauxTVA", { precision: 5, scale: 2 }).default("20.00"),
+  prixRevientHT: numeric("prixRevientHT", { precision: 10, scale: 2 }),
   categorie: varchar("categorie", { length: 100 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),

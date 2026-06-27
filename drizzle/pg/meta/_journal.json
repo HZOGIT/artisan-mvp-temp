@@ -421,6 +421,13 @@
       "when": 1782601537107,
       "tag": "20260627230537_fk-cascades-contrats",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1782603030760,
+      "tag": "20260627233030_articles-artisan-prix-revient",
+      "breakpoints": true
     }
   ]
 }

@@ -34,6 +34,7 @@ export class FakeArticleRepository implements IArticleRepository {
       unite: input.unite ?? "unité",
       prixUnitaireHT: input.prixUnitaireHT,
       tauxTVA: input.tauxTVA ?? "20.00",
+      prixRevientHT: input.prixRevientHT ?? null,
       categorie: input.categorie ?? null,
       createdAt: now,
       updatedAt: now,
