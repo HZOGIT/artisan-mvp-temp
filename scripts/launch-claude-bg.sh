@@ -96,8 +96,12 @@ if $USE_WORKTREE; then
     exit 1
   fi
 
-  echo "Creating worktree at ${WORKTREE_PATH} on branch feat/${SESSION_NAME}..."
-  git -C "$MAIN_REPO" worktree add "$WORKTREE_PATH" -b "feat/${SESSION_NAME}" \
+  echo "Fetching origin/staging before worktree creation..."
+  git -C "$MAIN_REPO" fetch origin staging \
+    || { echo "WARNING: git fetch failed, using local HEAD." >&2; }
+
+  echo "Creating worktree at ${WORKTREE_PATH} on branch feat/${SESSION_NAME} from origin/staging..."
+  git -C "$MAIN_REPO" worktree add "$WORKTREE_PATH" -b "feat/${SESSION_NAME}" origin/staging \
     || { echo "ERROR: git worktree add failed." >&2; exit 1; }
 
   WORKDIR="$WORKTREE_PATH"
