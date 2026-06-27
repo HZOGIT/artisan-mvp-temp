@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { isTerminal } from "../../../../drizzle/schema/einvoicing";
+import { SuperPdpPaAdapter, mapAfnorStatut } from "../../shared/ports/superpdp-pa-adapter";
 import { isValidSiret } from "../../../../packages/contract/validation";
 import type { AppContext } from "../../interface/trpc/context";
 import type { TenantContext } from "../../shared/tenant";
@@ -338,6 +339,23 @@ describe("facturesEntrantes.lire", () => {
     expect(result.lu).toBe(true);
     expect(updated).toBe(true);
   });
+});
+
+describe("SuperPdpPaAdapter", () => {
+  it("verifyWebhook lève une erreur (pas de webhook SuperPDP)", () => {
+    const adapter = new SuperPdpPaAdapter("id", "secret", "https://sandbox.superpdp.tech");
+    expect(() => adapter.verifyWebhook(Buffer.from(""), undefined)).toThrow(
+      "SuperPDP ne supporte pas les webhooks",
+    );
+  });
+});
+
+describe("mapAfnorStatut", () => {
+  it("fr:200 → deposee", () => { expect(mapAfnorStatut("fr:200")).toBe("deposee"); });
+  it("fr:210 → refusee", () => { expect(mapAfnorStatut("fr:210")).toBe("refusee"); });
+  it("fr:212 → encaissee", () => { expect(mapAfnorStatut("fr:212")).toBe("encaissee"); });
+  it("fr:213 → rejetee", () => { expect(mapAfnorStatut("fr:213")).toBe("rejetee"); });
+  it("code inconnu → prise_en_charge", () => { expect(mapAfnorStatut("fr:999")).toBe("prise_en_charge"); });
 });
 
 describe("processPaWebhook", () => {

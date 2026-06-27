@@ -1082,7 +1082,13 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     bibliotheque: deps.bibliothequeReader ?? new BibliothequeReaderDrizzle(getDbHandle().db),
   });
 
-  const einvoicing = buildEinvoicingModule({ PA_PROVIDER: process.env.PA_PROVIDER }, getDbHandle().db);
+  const einvoicing = buildEinvoicingModule({
+    PA_PROVIDER: process.env.PA_PROVIDER,
+    SUPERPDP_CLIENT_ID: process.env.SUPERPDP_CLIENT_ID,
+    SUPERPDP_CLIENT_SECRET: process.env.SUPERPDP_CLIENT_SECRET,
+    SUPERPDP_BASE_URL: process.env.SUPERPDP_BASE_URL,
+    NODE_ENV: process.env.NODE_ENV,
+  }, getDbHandle().db);
 
   const billingRepo = new BillingRepositoryDrizzle(getDbHandle().db);
   const billing = createBillingModule({
