@@ -61,6 +61,7 @@ export interface Facture {
   readonly modePaiement: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
+  readonly nombreRelances: number;
 }
 
 /*
@@ -93,6 +94,7 @@ export interface UpdateFactureInput {
   readonly conditionsPaiement?: string | null;
   readonly notes?: string | null;
   readonly dateEcheance?: Date | null;
+  readonly nombreRelances?: number;
 }
 
 export interface CreateFactureLigneInput {

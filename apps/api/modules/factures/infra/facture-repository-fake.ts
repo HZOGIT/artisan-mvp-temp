@@ -94,6 +94,7 @@ export class FakeFactureRepository implements IFactureRepository {
       modePaiement: null,
       createdAt: now,
       updatedAt: now,
+      nombreRelances: 0,
     };
     this.factureStore.push(f);
     return f;
@@ -155,6 +156,7 @@ export class FakeFactureRepository implements IFactureRepository {
       modePaiement: null,
       createdAt: now,
       updatedAt: now,
+      nombreRelances: 0,
     };
     this.factureStore.push(facture);
     for (const { ligne } of processedLignes) {
@@ -283,6 +285,7 @@ export class FakeFactureRepository implements IFactureRepository {
       modePaiement: null,
       createdAt: now,
       updatedAt: now,
+      nombreRelances: 0,
     };
     this.factureStore.push(avoir);
     input.lignes.forEach((l, i) => {
@@ -343,6 +346,7 @@ export class FakeFactureRepository implements IFactureRepository {
       modePaiement: null,
       createdAt: now,
       updatedAt: now,
+      nombreRelances: 0,
     };
     this.factureStore.push(facture);
     input.lignes.forEach((l) => {

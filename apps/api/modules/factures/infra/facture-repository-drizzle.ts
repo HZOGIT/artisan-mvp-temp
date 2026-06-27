@@ -57,6 +57,7 @@ function toFacture(r: FactureRow): Facture {
     modePaiement: r.modePaiement ?? null,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
+    nombreRelances: r.nombreRelances ?? 0,
   };
 }
 
@@ -216,6 +217,7 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
       if (input.conditionsPaiement !== undefined) set.conditionsPaiement = input.conditionsPaiement;
       if (input.notes !== undefined) set.notes = input.notes;
       if (input.dateEcheance !== undefined) set.dateEcheance = input.dateEcheance;
+      if (input.nombreRelances !== undefined) set.nombreRelances = input.nombreRelances;
       const [row] = await tx
         .update(factures)
         .set(set)

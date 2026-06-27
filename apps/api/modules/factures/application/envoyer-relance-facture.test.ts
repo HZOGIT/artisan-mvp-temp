@@ -46,6 +46,53 @@ describe("buildRelanceEmail (pur)", () => {
     expect(body).toContain("Merci &lt;b&gt;de régler&lt;/b&gt;");
     expect(body).not.toContain("<b>de régler</b>");
   });
+
+  it("niveau 1 (défaut) : sujet amiable, pas de mention légale", () => {
+    const { subject, body } = buildRelanceEmail({
+      artisanName: "ACME",
+      clientName: "Marie Durand",
+      factureNumero: "FAC-00001",
+      totalTTC: "120.00 €",
+      joursRetard: 12,
+      niveau: 1,
+    });
+    expect(subject).toBe("Rappel : facture FAC-00001 en attente de règlement");
+    expect(body).toContain("Nous vous serions reconnaissants");
+    expect(body).not.toContain("Mise en demeure");
+    expect(body).not.toContain("article L. 441-10");
+  });
+
+  it("niveau 2 : sujet ferme, pas de mention légale", () => {
+    const { subject, body } = buildRelanceEmail({
+      artisanName: "ACME",
+      clientName: "Marie Durand",
+      factureNumero: "FAC-00001",
+      totalTTC: "120.00 €",
+      joursRetard: 15,
+      niveau: 2,
+    });
+    expect(subject).toBe("2ème rappel : règlement urgent — facture FAC-00001");
+    expect(body).toContain("Nous vous serions reconnaissants");
+    expect(body).not.toContain("Mise en demeure");
+    expect(body).not.toContain("article L. 441-10");
+  });
+
+  it("niveau 3+ : sujet mise en demeure, paragraphe légal (L441-10 + délai 8j + indemnité 40€)", () => {
+    const { subject, body } = buildRelanceEmail({
+      artisanName: "ACME",
+      clientName: "Marie Durand",
+      factureNumero: "FAC-00001",
+      totalTTC: "120.00 €",
+      joursRetard: 30,
+      niveau: 3,
+    });
+    expect(subject).toBe("Mise en demeure : facture FAC-00001 — règlement immédiat requis");
+    expect(body).toContain("Mise en demeure");
+    expect(body).toContain("délai de 8 jours");
+    expect(body).toContain("article L. 441-10");
+    expect(body).toContain("indemnité forfaitaire de 40 €");
+    expect(body).toContain("poursuites prévues par la loi");
+  });
 });
 
 describe("joursDeRetard", () => {
@@ -68,6 +115,30 @@ describe("envoyerRelanceFacture", () => {
     expect(email.sent).toHaveLength(1);
     expect(email.sent[0].attachments ?? []).toHaveLength(0); // pas de PDF
     expect((await repo.getById(A, f.id))!.statut).toBe("brouillon"); // statut inchangé
+  });
+
+  it("incrémente nombreRelances : 0 → 1, puis 1 → 2, etc.", async () => {
+    const repo = new FakeFactureRepository();
+    const f = await seedFacture(repo, A, new Date(Date.now() - 5 * 86400000));
+    const email = new FakeEmailPort();
+    const deps = makeDeps({ email });
+
+    expect((await repo.getById(A, f.id))!.nombreRelances).toBe(0);
+
+    /** 1ère relance */
+    await envoyerRelanceFacture(repo, deps, A, { factureId: f.id });
+    expect(email.sent[0].subject).toContain("Rappel");
+    expect((await repo.getById(A, f.id))!.nombreRelances).toBe(1);
+
+    /** 2ème relance */
+    await envoyerRelanceFacture(repo, deps, A, { factureId: f.id });
+    expect(email.sent[1].subject).toContain("2ème rappel");
+    expect((await repo.getById(A, f.id))!.nombreRelances).toBe(2);
+
+    /** 3ème relance : mise en demeure */
+    await envoyerRelanceFacture(repo, deps, A, { factureId: f.id });
+    expect(email.sent[2].subject).toContain("Mise en demeure");
+    expect((await repo.getById(A, f.id))!.nombreRelances).toBe(3);
   });
 
   it("facture d'un autre tenant → NotFound (anti-IDOR)", async () => {

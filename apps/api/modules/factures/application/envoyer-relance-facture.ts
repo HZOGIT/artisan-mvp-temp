@@ -57,12 +57,20 @@ export function buildRelanceEmail(params: {
   factureNumero: string;
   totalTTC: string;
   joursRetard: number;
+  niveau?: number;
   customMessage?: string | null;
 }): { subject: string; body: string } {
-  const { factureNumero, totalTTC, joursRetard } = params;
+  const { factureNumero, totalTTC, joursRetard, niveau = 1 } = params;
   const artisanName = escapeHtml(params.artisanName);
   const clientName = escapeHtml(params.clientName);
-  const subject = `Rappel : facture ${factureNumero} en attente de règlement`;
+  let subject: string;
+  if (niveau === 1) {
+    subject = `Rappel : facture ${factureNumero} en attente de règlement`;
+  } else if (niveau === 2) {
+    subject = `2ème rappel : règlement urgent — facture ${factureNumero}`;
+  } else {
+    subject = `Mise en demeure : facture ${factureNumero} — règlement immédiat requis`;
+  }
   const note = params.customMessage
     ? `<tr><td colspan="2" style="padding:16px 0 0 0;font-size:14px;color:#6b7280;font-style:italic;border-top:1px solid #e5e7eb;">${escapeHtml(params.customMessage)}</td></tr>`
     : "";
@@ -92,7 +100,8 @@ export function buildRelanceEmail(params: {
           </table>
         </td></tr>
         <tr><td style="padding:0 40px 36px 40px;">
-          <p style="margin:0 0 14px 0;font-size:15px;color:#374151;line-height:1.6;">Nous vous serions reconnaissants de bien vouloir procéder au règlement dans les meilleurs délais.</p>
+          ${niveau >= 3 ? `<p style="margin:0 0 16px 0;font-size:15px;color:#dc2626;line-height:1.6;font-weight:600;">Mise en demeure</p>
+          <p style="margin:0 0 14px 0;font-size:14px;color:#374151;line-height:1.6;">Faute de règlement dans un délai de 8 jours à compter de la présente mise en demeure, nous serons contraints d'engager une action en justice conformément aux dispositions du Code de commerce. Vous serez alors redevable de pénalités de retard et d'une indemnité forfaitaire de 40 € (article L. 441-10 du Code de commerce).</p>` : `<p style="margin:0 0 14px 0;font-size:15px;color:#374151;line-height:1.6;">Nous vous serions reconnaissants de bien vouloir procéder au règlement dans les meilleurs délais.</p>`}
           <p style="margin:0 0 4px 0;font-size:15px;color:#374151;">Cordialement,</p>
           <p style="margin:0;font-size:15px;color:#111827;font-weight:600;">${artisanName}</p>
         </td></tr>
@@ -136,6 +145,7 @@ export async function envoyerRelanceFacture(
   const clientName = client.prenom ? `${client.prenom} ${client.nom}` : client.nom;
   const totalTTC = `${round2(Number(facture.totalTTC) || 0).toFixed(2)} €`;
   const joursRetard = joursDeRetard(facture.dateEcheance, Date.now());
+  const niveau = (facture.nombreRelances ?? 0) + 1;
 
   const modele = deps.modeleEmailRepo ? await deps.modeleEmailRepo.getDefaultByType(ctx, "rappel_paiement") : null;
   const { subject, body } = modele
@@ -157,10 +167,14 @@ export async function envoyerRelanceFacture(
         factureNumero: facture.numero ?? "",
         totalTTC,
         joursRetard,
+        niveau,
         customMessage: input.customMessage ?? null,
       });
 
   await deps.email.send({ to: client.email, subject, body, fromName: artisan.nomEntreprise ?? undefined, replyTo: artisan.email ?? undefined });
 
-  return { success: true, message: `Relance envoyée à ${client.email} — facture ${facture.numero ?? ""}, ${joursRetard} j de retard` };
+  /** Incrémenter le compteur de relances après envoi réussi. */
+  await repo.update(ctx, input.factureId, { nombreRelances: niveau });
+
+  return { success: true, message: `Relance envoyée à ${client.email} — facture ${facture.numero ?? ""}, ${joursRetard} j de retard (niveau ${niveau})` };
 }
