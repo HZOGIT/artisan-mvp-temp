@@ -104,6 +104,10 @@ if $USE_WORKTREE; then
   git -C "$MAIN_REPO" worktree add "$WORKTREE_PATH" -b "feat/${SESSION_NAME}" origin/staging \
     || { echo "ERROR: git worktree add failed." >&2; exit 1; }
 
+  echo "Installing deps in worktree (pnpm — shared store, hardlinked → fast)..."
+  ( cd "$WORKTREE_PATH" && pnpm install --prefer-offline ) \
+    || { echo "ERROR: pnpm install in worktree failed." >&2; exit 1; }
+
   WORKDIR="$WORKTREE_PATH"
 fi
 
@@ -116,9 +120,10 @@ if [[ -n "${LINEAR_ISSUE:-}" ]]; then
   if $USE_WORKTREE; then
     WORKTREE_NOTICE="
 WORKTREE ISOLE : tu travailles dans /tmp/wt-${SESSION_NAME} (branche feat/${SESSION_NAME}).
-JAMAIS dans ${MAIN_REPO} pour editer des fichiers.
+JAMAIS dans ${MAIN_REPO} (ni edition, ni pnpm).
 Tous tes Edit/Write/Read utilisent des chemins absolus sous /tmp/wt-${SESSION_NAME}/...
-Le repo principal ${MAIN_REPO} sert UNIQUEMENT a lancer pnpm (node_modules).
+Le worktree est AUTONOME (ses propres node_modules, installes au lancement) : lance TOUTES tes
+commandes (pnpm exec ..., drizzle-kit, tsc, vite, gh) DEPUIS /tmp/wt-${SESSION_NAME}, jamais depuis ${MAIN_REPO}.
 Lance d'abord : git -C /tmp/wt-${SESSION_NAME} branch --show-current  -> doit afficher feat/${SESSION_NAME}
 "
   else

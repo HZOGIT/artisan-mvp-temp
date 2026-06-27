@@ -8,13 +8,16 @@ Tu travailles dans un **worktree Git dédié, séparé du repo principal**.
 |---|---|
 | **Ton répertoire de travail** | `/tmp/wt-__SESSION_NAME__` |
 | **Ta branche** | `feat/__SESSION_NAME__` |
-| **Repo principal (pnpm UNIQUEMENT)** | `__MAIN_REPO__` |
+| **Repo principal — NE PAS TOUCHER** | `__MAIN_REPO__` |
 
-### REGLE 1 — jamais editer dans le repo principal
+### REGLE 1 — tout se passe dans le worktree (édition ET pnpm)
 
-Tous tes fichiers (`Edit`, `Write`, `Read`, `git add`, `git commit`) **sont dans `/tmp/wt-__SESSION_NAME__`**.
+Ton worktree est **autonome** : il a ses propres `node_modules` (installés au lancement). Tous tes
+fichiers (`Edit`, `Write`, `Read`, `git add`, `git commit`) **ET toutes tes commandes**
+(`pnpm exec …`, `drizzle-kit`, `tsc`, `vite`, `gh`) se lancent **depuis `/tmp/wt-__SESSION_NAME__`**.
 
-Le repo `__MAIN_REPO__` sert **uniquement** à lancer `pnpm` (node_modules y vivent). Tu n'y modifies rien, tu n'y commites rien.
+Tu ne touches **JAMAIS** `__MAIN_REPO__` — ni pour éditer, ni pour lancer `pnpm`. Lancer `pnpm` depuis
+le repo principal écrirait tes migrations/artefacts **dans le mauvais repo** et lirait un schéma périmé.
 
 Chemin correct pour tout fichier :
 ```
@@ -47,25 +50,34 @@ Jamais `git add -A`, jamais `git add .`, jamais `git commit -a`. Jamais `git res
 ### Préchauffer le cache TypeScript (background, dès le début)
 
 ```bash
-cd __MAIN_REPO__ && pnpm check:parallel &
+cd /tmp/wt-__SESSION_NAME__ && pnpm check:parallel &
 ```
 
 Le pre-commit hook utilise `check:parallel` (incremental). Sans ce warm-up, le premier commit compile tout from scratch (~2 min).
 
-### REGLE 4 — migrations Drizzle : convention au merge (prefix timestamp)
+### REGLE 4 — migrations Drizzle : GÉNÉRER DEPUIS LE WORKTREE
 
-Les migrations sont générées avec `prefix: 'timestamp'` → noms uniques par worker, zéro collision de fichier entre PRs parallèles.
+**Génère toujours depuis ton worktree**, jamais depuis le repo principal :
+```bash
+cd /tmp/wt-__SESSION_NAME__ && DATABASE_URL=… pnpm exec drizzle-kit generate --name=<nom>
+```
+Ainsi drizzle-kit lit **ton** schéma (tes edits) et écrit dans **ton** `drizzle/pg/`. Lancé depuis
+`__MAIN_REPO__`, il lirait le schéma périmé du repo principal et y écrirait la migration → contenu faux + fichier orphelin dans le mauvais repo.
 
-Au merge, si deux workers ont généré une migration au même `idx` dans `_journal.json` :
-1. Garder les deux entries
-2. Renumber le second : `idx` → `idx+1`
-3. Trier les entries par `when` croissant
-4. Le fichier `.sql` timestamp le plus récent s'applique en dernier — ordre naturel ✓
+**Vérifie après generate** :
+```bash
+git -C /tmp/wt-__SESSION_NAME__ status -- drizzle/pg/        # tes .sql/snapshot/_journal sont ICI
+git -C __MAIN_REPO__ status -- drizzle/pg/                   # DOIT être vide (rien dans le repo principal)
+```
+
+Convention au merge (prefix `timestamp` → noms uniques, zéro collision entre PRs) : si deux workers ont
+généré une entrée au même `idx` dans `_journal.json`, garder les deux, renumber le second (`idx`→`idx+1`),
+trier par `when` croissant ; le `.sql` timestamp le plus récent s'applique en dernier — ordre naturel ✓
 
 ### Vérifier avant la PR
 
 ```bash
-cd __MAIN_REPO__ && pnpm check
+cd /tmp/wt-__SESSION_NAME__ && pnpm check
 ```
 
 Si `pnpm check` échoue, corriger avant de continuer.
@@ -73,7 +85,7 @@ Si `pnpm check` échoue, corriger avant de continuer.
 ### Créer la Pull Request
 
 ```bash
-cd __MAIN_REPO__ && gh pr create \
+cd /tmp/wt-__SESSION_NAME__ && gh pr create \
   --base staging \
   --head feat/__SESSION_NAME__ \
   --title "<titre court — max 70 car.>" \
@@ -95,21 +107,21 @@ EOF
 ### Notifier le reviewer
 
 ```bash
-__MAIN_REPO__/scripts/agents/notify.sh reviewer PR_READY \
-  "PR prête — __SESSION_NAME__ — $(cd __MAIN_REPO__ && gh pr view feat/__SESSION_NAME__ --json url -q .url)"
+/tmp/wt-__SESSION_NAME__/scripts/agents/notify.sh reviewer PR_READY \
+  "PR prête — __SESSION_NAME__ — $(cd /tmp/wt-__SESSION_NAME__ && gh pr view feat/__SESSION_NAME__ --json url -q .url)"
 ```
 
 ### Corrections reviewer (REVIEW_FEEDBACK)
 
 ```bash
-__MAIN_REPO__/scripts/agents/listen.sh __SESSION_NAME__ --drain
+/tmp/wt-__SESSION_NAME__/scripts/agents/listen.sh __SESSION_NAME__ --drain
 ```
 
 Applique les corrections **dans le worktree** (`/tmp/wt-__SESSION_NAME__/...`), pousse, puis :
 
 ```bash
-__MAIN_REPO__/scripts/agents/notify.sh reviewer PR_READY \
-  "Corrections appliquées — __SESSION_NAME__ — $(cd __MAIN_REPO__ && gh pr view feat/__SESSION_NAME__ --json url -q .url)"
+/tmp/wt-__SESSION_NAME__/scripts/agents/notify.sh reviewer PR_READY \
+  "Corrections appliquées — __SESSION_NAME__ — $(cd /tmp/wt-__SESSION_NAME__ && gh pr view feat/__SESSION_NAME__ --json url -q .url)"
 ```
 
 ### Fin
