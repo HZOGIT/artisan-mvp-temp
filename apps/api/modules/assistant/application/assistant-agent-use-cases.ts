@@ -4,7 +4,7 @@ import type { ArtisanReader } from "../../../shared/readers/contact-readers";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ConseilsStatsReader } from "../../conseils-ia/application/conseils-stats-reader";
 import type { LlmUsageTracker } from "../../../shared/ports/llm-usage-tracker";
-import { isWriteTool, TOOL_INVALIDATIONS } from "../domain/assistant-tools-catalog";
+import { isWriteTool, TOOL_INVALIDATIONS, type ToolContext } from "../domain/assistant-tools-catalog";
 import { buildAssistantSystemPrompt } from "../domain/system-prompt";
 import type {
   AgenticFunctionCall,
@@ -46,6 +46,7 @@ export interface AssistantAgentInput {
   readonly userCanWriteDevis?: boolean;
   readonly userCanWriteFactures?: boolean;
   readonly attachments?: ReadonlyArray<{ data: Buffer; mimeType: string }>;
+  readonly isAdmin?: boolean;
 }
 
 /** Évènements émis vers la couche transport (SSE). **Noms alignés sur le contrat client** (`useAssistantStream` */
@@ -126,12 +127,14 @@ export async function* runAssistantAgent(
     messages.push(userMessage(input.message));
   }
 
+  const toolCtx: ToolContext = { isAdmin: input.isAdmin ?? false };
   let full = "";
   for (let turn = 0; turn < MAX_AGENT_TURNS; turn++) {
     const calls: AgenticFunctionCall[] = [];
     let modelMessage: AgenticMessage | null = null;
 
     for await (const ev of deps.llm.streamTurn({ system, tools: deps.registry.tools.filter(t => {
+      if (t.enabledFor && !t.enabledFor(toolCtx)) return false;
       if (!isWriteTool(t.name)) return true;
       if (["creer_devis", "envoyer_devis", "creer_et_envoyer_devis"].includes(t.name)) return input.userCanWriteDevis !== false;
       if (["creer_facture", "envoyer_facture", "envoyer_relance"].includes(t.name)) return input.userCanWriteFactures !== false;

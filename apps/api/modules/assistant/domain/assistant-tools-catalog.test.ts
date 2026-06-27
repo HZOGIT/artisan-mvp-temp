@@ -6,6 +6,7 @@ import {
   isWriteTool,
   findTool,
   type ToolParamSchema,
+  type ToolContext,
 } from "./assistant-tools-catalog";
 
 // Parité de surface avec le legacy `server/_core/assistantTools.ts` : tout drift de ce catalogue
@@ -103,5 +104,20 @@ describe("assistant-tools-catalog", () => {
   it("findTool : connu → schéma ; inconnu → null", () => {
     expect(findTool("creer_devis")?.name).toBe("creer_devis");
     expect(findTool("inexistant")).toBeNull();
+  });
+
+  it("verifier_stocks : enabledFor admin-only (PoC gating par profil)", () => {
+    const tool = findTool("verifier_stocks");
+    expect(tool).not.toBeNull();
+    const admin: ToolContext = { isAdmin: true };
+    const user: ToolContext = { isAdmin: false };
+    expect(tool!.enabledFor!(admin)).toBe(true);
+    expect(tool!.enabledFor!(user)).toBe(false);
+  });
+
+  it("outils sans enabledFor accessibles à tous — rétrocompat 22/23", () => {
+    const gated = ASSISTANT_TOOLS.filter((t) => t.enabledFor);
+    expect(gated.map((t) => t.name)).toEqual(["verifier_stocks"]);
+    expect(ASSISTANT_TOOLS.filter((t) => !t.enabledFor)).toHaveLength(22);
   });
 });
