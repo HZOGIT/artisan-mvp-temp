@@ -12,9 +12,9 @@ Stack **100 % PostgreSQL**. Le schéma ET la sécurité niveau ligne (RLS) sont 
 
 ```
 drizzle/
-  <timestamp>_<nom>.sql           # migrations (SQL appliqué au boot)
-  meta/_journal.json              # index des migrations (tag/idx/when) — géré par drizzle-kit
-  meta/<timestamp>_snapshot.json  # snapshot du schéma TS après chaque migration
+  <timestamp>_<nom>.sql           # migrations (SQL appliqué au boot, triées par nom = ordre chronologique)
+  meta/_journal.json              # index drizzle-kit (tag/idx/when) — cosmétique runtime depuis Option D
+  meta/<timestamp>_snapshot.json  # snapshot du schéma TS après chaque migration (pour drizzle-kit diff)
   schema.pg.ts                    # point d'entrée du schéma TS (réexporte schema/*)
   schema/*.ts                     # pgTable : tables, colonnes, FK, index, enums
 ```
@@ -22,8 +22,32 @@ drizzle/
 > ⚠️ Les migrations sont dans **`drizzle/`** (plus de sous-dossier `pg/` — squashé 2026-06-28).
 > Config : `drizzle.config.ts` → `out: "./drizzle"`, `schema: "./drizzle/schema.pg.ts"`,
 > `migrations.prefix: "timestamp"`. Si tu déplaces ce dossier, mets à jour **4** endroits :
-> `drizzle.config.ts`, `apps/api/shared/db/run-migrations.ts` (`MIGRATIONS_DIR`), `infra/Dockerfile`
+> `drizzle.config.ts`, `apps/api/shared/db/run-migrations.ts` (`migrationsDir()`), `infra/Dockerfile`
 > (`COPY --from=builder /app/drizzle ./drizzle`), `scripts/rls/generate-tenant-rls.mjs` (`PG_DIR`).
+
+### Runner maison (Option D) — comment les migrations s'appliquent
+
+> Détail exhaustif : `docs/architecture/migration-runner-option-d.md` §7.
+
+Le serveur appelle `runMigrations(ownerPool)` (dans `apps/api/shared/db/run-migrations.ts`) :
+
+1. Crée la table `__migrations` (filename + checksum SHA-256 + `applied_at`) si absente.
+2. Lit tous les `.sql` de `migrationsDir()` (défaut `"drizzle"`, surchargeable via `MIGRATIONS_DIR`)
+   triés par **nom** → ordre chronologique garanti par le timestamp dans le nom.
+3. **Bascule unique depuis Drizzle** (BDD héritées 5432/5433) : si `drizzle.__drizzle_migrations`
+   existe, inscrit au ledger les migrations dont le `when` (`_journal.json`) est ≤ au
+   `max(created_at)` du ledger Drizzle — **sans ré-exécuter le SQL** (critère `folderMillis`,
+   PAS le checksum). `_journal.json` est lu **uniquement** lors de cette bascule.
+4. Pour chaque fichier absent du ledger : `BEGIN` → exécute le SQL → `INSERT __migrations` →
+   `COMMIT` (connexion dédiée — atomique par fichier). Mode `-- no-transaction` disponible pour
+   `CREATE INDEX CONCURRENTLY`.
+5. Fichier déjà au ledger mais checksum divergent → **throw** (on ne réécrit jamais une migration
+   appliquée).
+
+**Collision entre worktrees résolue** : deux worktrees parallèles produisent
+`20260628HHMMSSa_<nom>.sql` et `20260628HHMMSSb_<autre>.sql` — noms uniques → aucun conflit
+git ni runtime. Si conflit textuel sur `_journal.json` au merge → résolution triviale (garder
+les deux entrées) : `_journal.json` est cosmétique runtime, le runner n'en dépend pas.
 
 ## 2. Faire évoluer le schéma — `generate` = BROUILLON, revue manuelle OBLIGATOIRE
 
