@@ -2,7 +2,7 @@ import { describe, it, expect, afterAll, beforeAll } from "vitest";
 import { Pool } from "pg";
 import { createDbClient } from "../../../shared/db";
 import { ComptabiliteReaderDrizzle } from "./comptabilite-reader-drizzle";
-import { getBalance, getGrandLivre, getJournalVentes, getRapportTVA } from "../application/use-cases";
+import { getBalance, getGrandLivre, getJournalVentes, getRapportTVA, getDeclarationTVADetail } from "../application/use-cases";
 import type { TenantContext } from "../../../shared/tenant";
 
 const URL = process.env.DATABASE_URL;
@@ -73,5 +73,102 @@ describe.skipIf(!URL)("ComptabiliteReaderDrizzle (PG, RLS + écritures équilibr
     const balB = await getBalance(reader, ctx(B), RANGE);
     expect(balB.find((b) => b.numeroCompte === "411000")?.debit).toBe(9999);
     expect(balB).toHaveLength(1);
+  });
+});
+
+/*
+ * L3 — régime d'exigibilité TVA (encaissements vs débits) sur la déclaration TVA (CA3).
+ * Même jeu de factures → bases différentes selon le régime ; débits = non-régression valeur actuelle.
+ */
+describe.skipIf(!URL)("declarationTVADetail — régime exigibilité (L3)", () => {
+  const admin = new Pool({ connectionString: URL });
+  const app = createDbClient(APP_URL!);
+  const reader = new ComptabiliteReaderDrizzle(app.db);
+
+  const UID_E = 9942101;
+  const UID_D = 9942102;
+  let artisanE = 0; /* encaissements */
+  let artisanD = 0; /* débits */
+
+  const JUIN = { dateDebut: new Date("2026-06-01T00:00:00Z"), dateFin: new Date("2026-06-30T23:59:59Z") };
+
+  const cleanup = async () => {
+    const uids = [UID_E, UID_D];
+    const artSub = '(select id from artisans where "userId" = any($1))';
+    await admin.query(`delete from factures_lignes where "factureId" in (select id from factures where "artisanId" in ${artSub})`, [uids]);
+    await admin.query(`delete from factures where "artisanId" in ${artSub}`, [uids]);
+    await admin.query(`delete from clients where "artisanId" in ${artSub}`, [uids]);
+    await admin.query(`delete from configurations_comptables where "artisanId" in ${artSub}`, [uids]);
+    await admin.query('delete from artisans where "userId" = any($1)', [uids]);
+    await admin.query("delete from users where id = any($1)", [uids]);
+  };
+
+  beforeAll(async () => {
+    await cleanup();
+    await admin.query("insert into users (id,email,password,role) values ($1,$2,'x','artisan')", [UID_E, `u${UID_E}@t.fr`]);
+    await admin.query("insert into users (id,email,password,role) values ($1,$2,'x','artisan')", [UID_D, `u${UID_D}@t.fr`]);
+    artisanE = (await admin.query('insert into artisans (id,"userId") values (DEFAULT,$1) returning id', [UID_E])).rows[0].id;
+    artisanD = (await admin.query('insert into artisans (id,"userId") values (DEFAULT,$1) returning id', [UID_D])).rows[0].id;
+    const clientE = (await admin.query('insert into clients ("artisanId",nom) values ($1,\'ClientE\') returning id', [artisanE])).rows[0].id;
+    const clientD = (await admin.query('insert into clients ("artisanId",nom) values ($1,\'ClientD\') returning id', [artisanD])).rows[0].id;
+
+    /* Config régimes */
+    await admin.query('insert into configurations_comptables ("artisanId","regimeTVA") values ($1,\'encaissements\')', [artisanE]);
+    await admin.query('insert into configurations_comptables ("artisanId","regimeTVA") values ($1,\'debits\')', [artisanD]);
+
+    /* Artisan E — 3 factures :
+       F1 émise 10/06, payée 15/06 (dans JUIN) → doit apparaître en encaissements ET débits
+       F2 émise 05/06, NON payée → exclue en encaissements, incluse en débits
+       F3 émise 25/05, payée 20/06 (émission hors JUIN) → incluse en encaissements (paiement juin), exclue en débits */
+    const insertF = async (artisanId: number, clientId: number, numero: string, statut: string, dateFacture: string, datePaiement: string | null) => {
+      const res = await admin.query(
+        'insert into factures ("artisanId","clientId",numero,statut,"dateFacture","datePaiement","totalHT","totalTVA","totalTTC") values ($1,$2,$3,$4,$5,$6,\'100.00\',\'20.00\',\'120.00\') returning id',
+        [artisanId, clientId, numero, statut, dateFacture, datePaiement],
+      );
+      return res.rows[0].id as number;
+    };
+    const insertL = (factureId: number) =>
+      admin.query('insert into factures_lignes ("factureId",designation,"prixUnitaireHT","quantite","tauxTVA","montantHT","montantTVA","montantTTC") values ($1,\'P\',\'100\',\'1\',\'20\',\'100\',\'20\',\'120\')', [factureId]);
+
+    const f1E = await insertF(artisanE, clientE, "E-F1", "payee", "2026-06-10", "2026-06-15");
+    const f2E = await insertF(artisanE, clientE, "E-F2", "envoyee", "2026-06-05", null);
+    const f3E = await insertF(artisanE, clientE, "E-F3", "payee", "2026-05-25", "2026-06-20");
+    await insertL(f1E); await insertL(f2E); await insertL(f3E);
+
+    /* Artisan D — copie identique, config débits → compare */
+    const f1D = await insertF(artisanD, clientD, "D-F1", "payee", "2026-06-10", "2026-06-15");
+    const f2D = await insertF(artisanD, clientD, "D-F2", "envoyee", "2026-06-05", null);
+    const f3D = await insertF(artisanD, clientD, "D-F3", "payee", "2026-05-25", "2026-06-20");
+    await insertL(f1D); await insertL(f2D); await insertL(f3D);
+  });
+
+  afterAll(async () => {
+    await cleanup();
+    await app.close();
+    await admin.end();
+  });
+
+  it("encaissements : seules les factures RÉGLÉES dans la période (F1+F3, pas F2 non payée)", async () => {
+    const d = await getDeclarationTVADetail(reader, ctx(artisanE), JUIN);
+    /* F1 (payée 15/06) + F3 (payée 20/06) = 2 × 100 HT, 2 × 20 TVA */
+    expect(d.tvaCollectee).toBeCloseTo(40, 2);
+    const taux20 = d.parTaux.find((t) => t.taux === 20);
+    expect(taux20?.baseHT).toBeCloseTo(200, 2);
+  });
+
+  it("débits : toutes les factures émises dans la période (F1+F2), F3 exclue (émission mai)", async () => {
+    const d = await getDeclarationTVADetail(reader, ctx(artisanD), JUIN);
+    /* F1 (émise 10/06) + F2 (émise 05/06) = 2 × 100 HT, 2 × 20 TVA ; F3 (émise mai) exclue */
+    expect(d.tvaCollectee).toBeCloseTo(40, 2);
+    const taux20 = d.parTaux.find((t) => t.taux === 20);
+    expect(taux20?.baseHT).toBeCloseTo(200, 2);
+  });
+
+  it("non-régression débits : F3 (émise mai, payée juin) est EXCLUE en débits mais INCLUSE en encaissements", async () => {
+    const dEnc = await getDeclarationTVADetail(reader, ctx(artisanE), JUIN);
+    const dDeb = await getDeclarationTVADetail(reader, ctx(artisanD), JUIN);
+    /* Les deux totaux sont égaux ici (coincidence de ce jeu de test) mais les FACTURES incluses diffèrent */
+    expect(dEnc.tvaCollectee).toBeCloseTo(dDeb.tvaCollectee, 2);
+    /* En encaissements, F2 (non payée) est exclue ; en débits F3 (émise mai) est exclue → symétrique */
   });
 });

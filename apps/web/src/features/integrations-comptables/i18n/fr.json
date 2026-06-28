@@ -64,6 +64,16 @@
   "journalVentes": "Journal ventes",
   "journalAchats": "Journal achats",
   "journalBanque": "Journal banque",
+  "regimeTVATitre": "Régime de TVA",
+  "regimeTVALabel": {
+    "encaissements": "Encaissements (sur les paiements reçus)",
+    "debits": "Débits (sur les factures émises)"
+  },
+  "regimeTVADesc": {
+    "encaissements": "La TVA est déclarée quand le client paie (régime courant pour les prestataires de services).",
+    "debits": "La TVA est déclarée quand la facture est émise."
+  },
+  "mentionTVAEncaissements": "Mention légale obligatoire sur vos factures : « TVA acquittée sur les encaissements » (CGI ann. II art. 41 quater)",
   "sauvegarderConfig": "Sauvegarder la configuration",
   "journalTitre": "Journal de synchronisation",
   "journalDesc": "Historique des synchronisations et exports",

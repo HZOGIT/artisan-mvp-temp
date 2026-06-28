@@ -14,6 +14,7 @@ const saveConfigSchema = z.object({
   compteBanque: z.string().optional(), compteCaisse: z.string().optional(),
   journalVentes: z.string().optional(), journalAchats: z.string().optional(), journalBanque: z.string().optional(),
   prefixeFacture: z.string().optional(), prefixeAvoir: z.string().optional(), exerciceDebut: z.number().optional(), actif: z.boolean().optional(),
+  regimeTVA: z.enum(["encaissements", "debits"]).optional(),
 });
 
 const saveSyncConfigSchema = z.object({

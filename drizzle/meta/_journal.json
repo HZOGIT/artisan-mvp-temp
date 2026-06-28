@@ -57,6 +57,13 @@
       "when": 1782671468532,
       "tag": "20260628183108_email-optouts",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1782673794760,
+      "tag": "20260628190954_regime-tva-exigibilite",
+      "breakpoints": true
     }
   ]
 }

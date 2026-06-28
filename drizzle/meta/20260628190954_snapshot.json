@@ -1,6 +1,6 @@
 {
-  "id": "51e451e2-3936-4be6-875f-fb76e90df625",
-  "prevId": "09e5d04a-f644-4f15-961d-fe74e6df15e1",
+  "id": "890f0c99-b4f2-47a2-94f9-2de1881795ea",
+  "prevId": "51e451e2-3936-4be6-875f-fb76e90df625",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -5476,6 +5476,14 @@
           "notNull": false,
           "default": 1
         },
+        "regimeTVA": {
+          "name": "regimeTVA",
+          "type": "regime_tva",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'encaissements'"
+        },
         "actif": {
           "name": "actif",
           "type": "boolean",
@@ -6540,6 +6548,12 @@
         },
         "depense_id": {
           "name": "depense_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "facture_id": {
+          "name": "facture_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
@@ -12229,6 +12243,14 @@
         "regression_lineaire",
         "saisonnalite",
         "manuel"
+      ]
+    },
+    "public.regime_tva": {
+      "name": "regime_tva",
+      "schema": "public",
+      "values": [
+        "encaissements",
+        "debits"
       ]
     },
     "public.releve_statut": {

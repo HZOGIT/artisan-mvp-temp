@@ -85,6 +85,16 @@ describe.skipIf(!URL)("IntegrationsComptablesRepositoryDrizzle (RLS)", () => {
     expect(await repo.listFacturesForIIF(ctx(artisanB), new Date("2026-02-01"), new Date("2026-02-28"))).toEqual([]);
   });
 
+  it("saveConfig regimeTVA : persist + round-trip + isolation tenant (L2)", async () => {
+    const c = await repo.saveConfig(ctx(artisanA), { regimeTVA: "debits" });
+    expect(c?.regimeTVA).toBe("debits");
+    const read = await repo.getConfig(ctx(artisanA));
+    expect(read?.regimeTVA).toBe("debits");
+    await repo.saveConfig(ctx(artisanA), { regimeTVA: "encaissements" });
+    expect((await repo.getConfig(ctx(artisanA)))?.regimeTVA).toBe("encaissements");
+    expect(await repo.getConfig(ctx(artisanB))).toBeNull(); // isolation B inchangé
+  });
+
   it("listPendingItems : facture émise non couverte par un export terminé chevauchant", async () => {
     const pendingBefore = await repo.listPendingItems(ctx(artisanA));
     expect(pendingBefore.some((p) => p.numero === "IIF-1")).toBe(true); // pas encore couverte
