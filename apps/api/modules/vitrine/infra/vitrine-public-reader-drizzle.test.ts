@@ -38,8 +38,10 @@ describe.skipIf(!URL)("VitrinePublicReaderDrizzle (lecture publique, RLS scopée
     await admin.query('insert into parametres_artisan ("artisanId","vitrineActive","vitrineDescription","vitrineExperience") values ($1,true,$2,$3)', [artisanA, "Artisan de confiance", 12]);
     const c1 = (await admin.query('insert into clients ("artisanId",nom,prenom) values ($1,$2,$3) returning id', [artisanA, "Petit", "Marc"])).rows[0].id;
     const c2 = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [artisanA, "Grand"])).rows[0].id;
-    // avis : un publié (visible) + un en_attente (exclu)
-    await admin.query('insert into avis_clients ("artisanId","clientId",note,commentaire,statut,"createdAt") values ($1,$2,5,$3,$4,$5)', [artisanA, c1, "Super", "publie", "2026-06-10T10:00:00Z"]);
+    const iA = (await admin.query('insert into interventions ("artisanId","clientId",titre,"dateDebut",statut) values ($1,$2,$3,$4,$5) returning id', [artisanA, c1, "Fuite", "2026-06-01T08:00:00Z", "terminee"])).rows[0].id;
+    // avis : un publié avec interventionId (vérifié), un masque (exclu), un en_attente (exclu)
+    await admin.query('insert into avis_clients ("artisanId","clientId","interventionId",note,commentaire,statut,"createdAt") values ($1,$2,$3,5,$4,$5,$6)', [artisanA, c1, iA, "Super", "publie", "2026-06-10T10:00:00Z"]);
+    await admin.query('insert into avis_clients ("artisanId","clientId",note,statut) values ($1,$2,2,$3)', [artisanA, c2, "masque"]);
     await admin.query('insert into avis_clients ("artisanId","clientId",note,statut) values ($1,$2,2,$3)', [artisanA, c2, "en_attente"]);
     // interventions : une terminée (comptée) + une planifiée (exclue des stats)
     await admin.query('insert into interventions ("artisanId","clientId",titre,"dateDebut",statut) values ($1,$2,$3,$4,$5)', [artisanA, c1, "I1", "2026-06-01T08:00:00Z", "terminee"]);
@@ -70,17 +72,29 @@ describe.skipIf(!URL)("VitrinePublicReaderDrizzle (lecture publique, RLS scopée
     expect(await reader.getVitrineParams(artisanB)).toBeNull();
   });
 
-  it("getPublishedAvis : uniquement les avis publiés, nom client formaté", async () => {
+  it("getPublishedAvis : publie seul exposé (masque+en_attente exclus), verifie+date présents", async () => {
     const avis = await reader.getPublishedAvis(artisanA);
-    expect(avis).toHaveLength(1); // en_attente exclu
+    expect(avis).toHaveLength(1); // masque + en_attente exclus
     expect(avis[0].note).toBe(5);
     expect(avis[0].clientNom).toBe("Marc Petit");
+    expect(avis[0].interventionId).toBeTypeOf("number"); // avis vérifié
+    expect(avis[0].createdAt).toBeInstanceOf(Date);
+  });
+
+  it("getPublishedAvis : avis sans interventionId → interventionId null (non vérifié)", async () => {
+    const c3 = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [artisanA, "Sans"])).rows[0].id;
+    await admin.query('insert into avis_clients ("artisanId","clientId",note,statut) values ($1,$2,4,$3)', [artisanA, c3, "publie"]);
+    const avis = await reader.getPublishedAvis(artisanA);
+    const nonVerifie = avis.find((a) => a.clientNom === "Sans");
+    expect(nonVerifie?.interventionId).toBeNull();
+    await admin.query('delete from avis_clients where "artisanId"=$1 and "clientId"=$2', [artisanA, c3]);
+    await admin.query('delete from clients where id=$1', [c3]);
   });
 
   it("getPublicStats : total clients + interventions terminées uniquement", async () => {
     const stats = await reader.getPublicStats(artisanA);
     expect(stats.totalClients).toBe(2);
-    expect(stats.totalInterventions).toBe(1); // seule la terminée
+    expect(stats.totalInterventions).toBe(2); // iA (seed avis) + I1, toutes deux terminées
   });
 
   it("getArticleCategories : catégories distinctes non nulles", async () => {
