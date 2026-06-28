@@ -32,6 +32,7 @@ export class FactureReaderDrizzle implements IFactureReader {
         totalHT: r.totalHT ?? "0.00",
         totalTVA: r.totalTVA ?? "0.00",
         totalTTC: r.totalTTC ?? "0.00",
+        regimeTVA: r.regimeTVA ?? "normal",
       };
     });
   }

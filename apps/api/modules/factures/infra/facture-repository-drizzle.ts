@@ -15,7 +15,7 @@ import type {
   UpdateFactureLigneInput,
   AuditLogEntry,
 } from "../domain/facture";
-import { calculerMontantsLigne, calculerTotaux } from "../application/montants";
+import { calculerMontantsLigne, calculerTotaux, appliquerRegimeTVA } from "../application/montants";
 
 type FactureRow = typeof factures.$inferSelect;
 type LigneRow = typeof facturesLignes.$inferSelect;
@@ -59,6 +59,7 @@ function toFacture(r: FactureRow): Facture {
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
     nombreRelances: r.nombreRelances ?? 0,
+    regimeTVA: (r.regimeTVA ?? "normal") as Facture["regimeTVA"],
   };
 }
 
@@ -152,6 +153,7 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
           notes: input.notes ?? null,
           dateEcheance: input.dateEcheance ?? null,
           statut: "brouillon",
+          regimeTVA: input.regimeTVA ?? "normal",
           totalHT: "0.00",
           totalTVA: "0.00",
           totalTTC: "0.00",
@@ -180,6 +182,7 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
           notes: header.notes ?? null,
           dateEcheance: header.dateEcheance ?? null,
           statut: "brouillon",
+          regimeTVA: header.regimeTVA ?? "normal",
           totalHT: "0.00",
           totalTVA: "0.00",
           totalTTC: "0.00",
@@ -219,7 +222,8 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
         if (inTx) await inTx(tx);
         return toFacture(row);
       }
-      const totaux = calculerTotaux(insertedMontants);
+      const totauxBruts = calculerTotaux(insertedMontants);
+      const totaux = appliquerRegimeTVA(totauxBruts, header.regimeTVA ?? "normal");
       const [updated] = await tx
         .update(factures)
         .set({ totalHT: totaux.totalHT, totalTVA: totaux.totalTVA, totalTTC: totaux.totalTTC, updatedAt: new Date() })
@@ -241,6 +245,7 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
       if (input.notes !== undefined) set.notes = input.notes;
       if (input.dateEcheance !== undefined) set.dateEcheance = input.dateEcheance;
       if (input.nombreRelances !== undefined) set.nombreRelances = input.nombreRelances;
+      if (input.regimeTVA !== undefined) set.regimeTVA = input.regimeTVA;
       const [row] = await tx
         .update(factures)
         .set(set)
@@ -679,15 +684,21 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
 
   /** Recalcule les totaux de la facture à partir de SES lignes (source de vérité). Server-side. */
   private async recalculerTotaux(tx: DbClient, factureId: number): Promise<void> {
+    const [facture] = await tx
+      .select({ regimeTVA: factures.regimeTVA })
+      .from(factures)
+      .where(eq(factures.id, factureId))
+      .limit(1);
     const lignes = await tx
       .select({ montantHT: facturesLignes.montantHT, montantTVA: facturesLignes.montantTVA, montantTTC: facturesLignes.montantTTC })
       .from(facturesLignes)
       .where(eq(facturesLignes.factureId, factureId));
-    const totaux = calculerTotaux(lignes.map((l) => ({
+    const totauxBruts = calculerTotaux(lignes.map((l) => ({
       montantHT: l.montantHT ?? "0.00",
       montantTVA: l.montantTVA ?? "0.00",
       montantTTC: l.montantTTC ?? "0.00",
     })));
+    const totaux = appliquerRegimeTVA(totauxBruts, facture?.regimeTVA ?? "normal");
     await tx
       .update(factures)
       .set({ totalHT: totaux.totalHT, totalTVA: totaux.totalTVA, totalTTC: totaux.totalTTC, updatedAt: new Date() })

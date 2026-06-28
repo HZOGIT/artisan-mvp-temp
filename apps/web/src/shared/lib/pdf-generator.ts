@@ -295,6 +295,7 @@ interface FactureData {
   montantPaye?: number | null;
   conditions?: string | null;
   isAvoir?: boolean;
+  regimeTVA?: string | null;
 }
 
 interface PdfOptions {
@@ -689,7 +690,8 @@ export function generateFacturePDF(artisan: Artisan, client: Client, facture: Fa
 
   yPos = addDocumentInfo(doc, facture, "facture", yPos);
   yPos = addLignesTable(doc, facture.lignes, yPos);
-  addTotals(doc, facture.totalHT, facture.totalTVA, facture.totalTTC, yPos, facture.montantPaye);
+  const isAutoliquidation = facture.regimeTVA === "autoliquidation_btp";
+  addTotals(doc, facture.totalHT, isAutoliquidation ? 0 : facture.totalTVA, isAutoliquidation ? facture.totalHT : facture.totalTTC, yPos, facture.montantPaye);
   /*
    * Conditions réelles + mentions légales sur une facture (pas un avoir).
    * Ajoute les mentions de RETARD DE PAIEMENT (pénalités + indemnité forfaitaire
@@ -697,6 +699,9 @@ export function generateFacturePDF(artisan: Artisan, client: Client, facture: Fa
    * Parité avec le générateur PDF serveur (portail) qui les affiche déjà : le PDF client
    * (téléchargé/envoyé par l'artisan) les omettait → divergence corrigée.
    */
+  const autoliquidationMention = isAutoliquidation
+    ? "Autoliquidation — TVA due par le preneur (CGI art. 283-2 nonies)"
+    : null;
   const factureConditions = isAvoir
     ? facture.conditions
     : [
@@ -708,7 +713,7 @@ export function generateFacturePDF(artisan: Artisan, client: Client, facture: Fa
         .join("\n");
   const factureTvaMention = tvaMentionsFromLignes(facture.lignes);
   const factureMediateur = options?.mediateurConsommation ? `Médiateur de la consommation : ${options.mediateurConsommation}` : null;
-  const factureMentions = [options?.mentionsLegales, factureTvaMention, factureMediateur].filter(Boolean).join("\n") || null;
+  const factureMentions = [autoliquidationMention, options?.mentionsLegales, factureTvaMention, factureMediateur].filter(Boolean).join("\n") || null;
   addFooter(doc, factureConditions, factureMentions);
 
   /*

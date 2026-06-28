@@ -12,6 +12,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 export const factureStatutEnum = pgEnum("facture_statut", ["brouillon", "validee", "envoyee", "payee", "en_retard", "annulee"]);
+export const regimeTVAFactureEnum = pgEnum("regime_tva_facture", ["normal", "autoliquidation_btp", "exonere"]);
 export const cycleVieEnum = pgEnum("facture_cycle_vie", [
   "non_soumise", "deposee", "emise", "recue", "mise_a_dispo", "prise_en_charge",
   "approuvee", "en_litige", "refusee", "rejetee", "encaissee", "paiement_transmis",
@@ -66,6 +67,7 @@ export const factures = pgTable("factures", {
   paDocumentId: varchar("paDocumentId", { length: 100 }),
   paFormat: varchar("paFormat", { length: 50 }),
   nombreRelances: integer("nombreRelances").default(0).notNull(),
+  regimeTVA: regimeTVAFactureEnum("regimeTVA").default("normal"),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 export type Facture = typeof factures.$inferSelect;

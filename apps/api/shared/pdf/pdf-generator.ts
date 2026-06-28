@@ -785,14 +785,16 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   const tva = parseFloat(String(facture.totalTVA ?? "0")) || 0;
   const totalTTC = parseFloat(String(facture.totalTTC ?? "0")) || 0;
 
+  const isAutoliquidation = facture.regimeTVA === "autoliquidation_btp";
   const tvaParTauxF = new Map<number, number>();
   for (const l of facture.lignes) {
     const taux = Number(l.tauxTVA) || 0;
     const montantTVA = l.montantTVA != null ? Number(l.montantTVA) : (Number(l.montantHT) || 0) * (taux / 100);
     if (taux > 0) tvaParTauxF.set(taux, (tvaParTauxF.get(taux) ?? 0) + montantTVA);
   }
-  const tvaRowsF: { label: string; value: string }[] =
-    tvaParTauxF.size > 1
+  const tvaRowsF: { label: string; value: string }[] = isAutoliquidation
+    ? [{ label: "TVA", value: "Autoliquidation" }]
+    : tvaParTauxF.size > 1
       ? Array.from(tvaParTauxF.entries())
           .sort(([a], [b]) => a - b)
           .map(([taux, montant]) => ({ label: `TVA (${taux}%)`, value: `${montant.toFixed(2)} €` }))
@@ -804,8 +806,8 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
     primary,
     totalsStartY,
     [{ label: "Sous-total HT", value: `${sousTotal.toFixed(2)} €` }, ...tvaRowsF],
-    "TOTAL TTC",
-    `${totalTTC.toFixed(2)} €`,
+    isAutoliquidation ? "TOTAL HT" : "TOTAL TTC",
+    `${(isAutoliquidation ? sousTotal : totalTTC).toFixed(2)} €`,
   );
 
   /** Statut */
@@ -892,7 +894,18 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
     fy = fyPenalty + 8;
   }
 
-  /** Mentions légales TVA (franchise en base, autoliquidation) si applicable */
+  /** Mention obligatoire autoliquidation BTP (CGI art. 283-2 nonies) — placée en premier si applicable. */
+  let factureMentionY = fy + 6;
+  if (isAutoliquidation) {
+    doc.setFontSize(8);
+    doc.setFont("Roboto", "bold");
+    doc.setTextColor(...TEXT_BODY);
+    doc.text("Autoliquidation — TVA due par le preneur (CGI art. 283-2 nonies)", MARGIN, factureMentionY);
+    factureMentionY += 5;
+    doc.setFont("Roboto", "normal");
+  }
+
+  /** Mentions légales TVA (franchise en base, autoliquidation catégorie) si applicable */
   const tvaFactureMentions = Array.from(
     new Set(
       facture.lignes
@@ -902,7 +915,6 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
         .filter((m): m is string => !!m),
     ),
   );
-  let factureMentionY = fy + 6;
   if (tvaFactureMentions.length > 0) {
     doc.setFontSize(8);
     doc.setFont("Roboto", "bold");

@@ -20,6 +20,7 @@ export interface FactureReadModel {
   readonly totalHT: string;
   readonly totalTVA: string;
   readonly totalTTC: string;
+  readonly regimeTVA?: string | null;
 }
 
 export interface FactureLigneReadModel {

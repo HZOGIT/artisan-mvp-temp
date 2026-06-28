@@ -104,7 +104,7 @@ export default function FactureDetailPage() {
       numero: facture.numero ?? "", dateCreation: facture.createdAt, dateEcheance: facture.dateEcheance, statut: facture.statut || "brouillon",
       objet: facture.objet, referenceClient: facture.referenceClient, lignes: pdfLignes(facture.lignes),
       totalHT: parseFloat(String(facture.totalHT)) || 0, totalTVA: parseFloat(String(facture.totalTVA)) || 0, totalTTC: parseFloat(String(facture.totalTTC)) || 0,
-      montantPaye: parseFloat(String(facture.montantPaye)) || 0, conditions: facture.conditionsPaiement || null, isAvoir: isAvoirDoc(facture),
+      montantPaye: parseFloat(String(facture.montantPaye)) || 0, conditions: facture.conditionsPaiement || null, isAvoir: isAvoirDoc(facture), regimeTVA: facture.regimeTVA,
     }, { mentionsLegales: parametres?.mentionsLegales || null, cgv: parametres?.conditionsGenerales || null, mediateurConsommation: parametres?.mediateurConsommation || null });
     toast.success(t("toastPdfOk"));
   };
@@ -257,6 +257,28 @@ export default function FactureDetailPage() {
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Receipt className="h-4 w-4" />{t("date")}</CardTitle></CardHeader><CardContent><p className="font-medium">{format(new Date(facture.createdAt), "dd MMMM yyyy", { locale: fr })}</p>{facture.dateEcheance && (<p className="text-sm text-muted-foreground">{t("echeance", { date: format(new Date(facture.dateEcheance), "dd/MM/yyyy", { locale: fr }) })}</p>)}</CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">{t("totalTTC")}</CardTitle></CardHeader><CardContent><p className={`text-2xl font-bold ${avoir ? "text-red-600" : "text-primary"}`}>{formatCurrency(facture.totalTTC)}</p><p className="text-sm text-muted-foreground">{t("htLabel", { montant: formatCurrency(facture.totalHT) })}</p></CardContent></Card>
       </div>
+
+      {!isLocked && !avoir && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">{t("regimeTVALabel", { defaultValue: "Régime TVA" })}</CardTitle></CardHeader>
+          <CardContent>
+            <Select
+              value={facture.regimeTVA ?? "normal"}
+              onValueChange={(v) => F.update.mutate({ id: factureId, regimeTVA: v as "normal" | "autoliquidation_btp" | "exonere" }, { onError: (e) => toast.error(e.message) })}
+            >
+              <SelectTrigger className="w-full max-w-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="normal">{t("regimeTVANormal", { defaultValue: "Normal (TVA collectée)" })}</SelectItem>
+                <SelectItem value="autoliquidation_btp">{t("regimeTVAAutoliquidation", { defaultValue: "Autoliquidation BTP (CGI art. 283-2 nonies)" })}</SelectItem>
+                <SelectItem value="exonere">{t("regimeTVAExonere", { defaultValue: "Exonéré de TVA" })}</SelectItem>
+              </SelectContent>
+            </Select>
+            {(facture.regimeTVA === "autoliquidation_btp") && (
+              <p className="mt-2 text-xs text-amber-700">{t("autoliquidationHint", { defaultValue: "TVA due par le preneur — mention obligatoire sur la facture" })}</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

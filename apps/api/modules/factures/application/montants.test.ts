@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calculerMontantsLigne, calculerTotaux, calculerMontantsAvoirLigne, necessite_attestation_tva_reduite } from "./montants";
+import { calculerMontantsLigne, calculerTotaux, calculerMontantsAvoirLigne, necessite_attestation_tva_reduite, appliquerRegimeTVA } from "./montants";
 
 describe("factures — calcul des montants de ligne (pur)", () => {
   it("ligne produit : HT = q×pu, TVA = HT×taux/100, TTC = HT+TVA", () => {
@@ -112,5 +112,34 @@ describe("necessite_attestation_tva_reduite (L1 — pur)", () => {
 
   it("renvoie false pour une liste vide", () => {
     expect(necessite_attestation_tva_reduite([])).toBe(false);
+  });
+});
+
+describe("appliquerRegimeTVA (L1 — garde autoliquidation BTP)", () => {
+  const totaux = { totalHT: "1000.00", totalTVA: "200.00", totalTTC: "1200.00" };
+
+  it("autoliquidation_btp : TVA → 0, TTC = HT, HT inchangé", () => {
+    expect(appliquerRegimeTVA(totaux, "autoliquidation_btp")).toEqual({
+      totalHT: "1000.00",
+      totalTVA: "0.00",
+      totalTTC: "1000.00",
+    });
+  });
+
+  it("exonere : même résultat que autoliquidation (TVA 0, TTC = HT)", () => {
+    expect(appliquerRegimeTVA(totaux, "exonere")).toEqual({
+      totalHT: "1000.00",
+      totalTVA: "0.00",
+      totalTTC: "1000.00",
+    });
+  });
+
+  it("normal : totaux inchangés", () => {
+    expect(appliquerRegimeTVA(totaux, "normal")).toEqual(totaux);
+  });
+
+  it("null/undefined : totaux inchangés (fallback normal)", () => {
+    expect(appliquerRegimeTVA(totaux, null)).toEqual(totaux);
+    expect(appliquerRegimeTVA(totaux, undefined)).toEqual(totaux);
   });
 });

@@ -48,6 +48,7 @@ export interface Facture {
   typeDocument?: string | null;
   objet?: string | null;
   conditionsPaiement?: string | null;
+  regimeTVA?: string | null;
 }
 
 export interface Artisan {

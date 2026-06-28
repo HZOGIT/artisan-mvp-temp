@@ -33,6 +33,7 @@ export function useFactureDetail(id: number) {
     activites: activitesQ.data ?? [], refetchActivites: activitesQ.refetch,
     avoirs: avoirsQ.data ?? [], auditLogs: auditQ.data ?? [], inv,
     attestations: attestationsQ.data ?? [],
+    update: trpc.factures.update.useMutation({ onSuccess: inv }),
     envoyer: trpc.factures.envoyer.useMutation(),
     marquerEnRetard: trpc.factures.marquerEnRetard.useMutation(),
     addLigne: trpc.factures.addLigne.useMutation({ onSuccess: () => utils.factures.getById.invalidate({ id }) }),

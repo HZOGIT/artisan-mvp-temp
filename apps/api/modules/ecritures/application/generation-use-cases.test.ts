@@ -223,3 +223,35 @@ describe("ecritures — inaltérabilité (statut validée) — OPE-118", () => {
     expect(final.filter((e) => e.journal === "BQ" && e.statut === "brouillon").length).toBe(2);
   });
 });
+
+describe("ecritures — autoliquidation BTP (CGI art. 283-2 nonies)", () => {
+  it("autoliquidation_btp : seulement 411+706 (pas de 445 collectée) ; Σdébit=Σcrédit", async () => {
+    const repo = new FakeEcritureRepository();
+    const reader = new FakeFactureReader();
+    reader.register(
+      facture({ totalTVA: "0.00", totalTTC: "100.00", regimeTVA: "autoliquidation_btp" }),
+      [{ tauxTVA: "20.00", montantTVA: "20.00" }],
+    );
+    const ecr = await genererEcrituresVente(repo, reader, A, 501);
+    expect(ecr.length).toBe(2);
+    expect(ecr.some((e) => e.numeroCompte.startsWith("445"))).toBe(false);
+    const c411 = ecr.find((e) => e.numeroCompte === "411000")!;
+    const c706 = ecr.find((e) => e.numeroCompte === "706000")!;
+    expect(c411.debit).toBe("100.00");
+    expect(c706.credit).toBe("100.00");
+    assertEquilibre(ecr);
+  });
+
+  it("normal avec TVA 20% : garde les 3 écritures dont 445 (non-régression)", async () => {
+    const repo = new FakeEcritureRepository();
+    const reader = new FakeFactureReader();
+    reader.register(
+      facture({ totalHT: "100.00", totalTVA: "20.00", totalTTC: "120.00", regimeTVA: "normal" }),
+      [{ tauxTVA: "20.00", montantTVA: "20.00" }],
+    );
+    const ecr = await genererEcrituresVente(repo, reader, A, 501);
+    expect(ecr.length).toBe(3);
+    expect(ecr.some((e) => e.numeroCompte.startsWith("445"))).toBe(true);
+    assertEquilibre(ecr);
+  });
+});
