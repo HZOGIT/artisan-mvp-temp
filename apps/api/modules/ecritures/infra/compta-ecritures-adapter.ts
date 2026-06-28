@@ -21,8 +21,8 @@ export class ComptaEcrituresAdapter implements ComptaPort {
     await genererEcrituresVente(this.ecritureRepo, this.factureReader, ctx, factureId);
   }
 
-  async genererEcrituresEncaissement(ctx: TenantContext, factureId: number): Promise<void> {
-    await genererEcrituresEncaissement(this.ecritureRepo, this.factureReader, ctx, factureId);
+  async genererEcrituresEncaissement(ctx: TenantContext, factureId: number, facture?: any): Promise<void> {
+    await genererEcrituresEncaissement(this.ecritureRepo, this.factureReader, ctx, factureId, facture);
   }
 
   async validerEcritures(ctx: TenantContext, factureId: number): Promise<void> {

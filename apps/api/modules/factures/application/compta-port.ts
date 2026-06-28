@@ -11,7 +11,7 @@ import type { TenantContext } from "../../../shared/tenant";
  */
 export interface ComptaPort {
   genererEcrituresVente(ctx: TenantContext, factureId: number): Promise<void>;
-  genererEcrituresEncaissement(ctx: TenantContext, factureId: number): Promise<void>;
+  genererEcrituresEncaissement(ctx: TenantContext, factureId: number, facture?: any): Promise<void>;
   validerEcritures(ctx: TenantContext, factureId: number): Promise<void>;
 }
 

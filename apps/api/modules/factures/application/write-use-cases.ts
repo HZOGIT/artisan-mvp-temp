@@ -188,7 +188,7 @@ export async function enregistrerPaiementFacture(
   if (soldee) {
     factureCounter.inc({ action: "paid" });
     await compta.genererEcrituresVente(ctx, id);
-    await compta.genererEcrituresEncaissement(ctx, id);
+    await compta.genererEcrituresEncaissement(ctx, id, updated);
   }
   return updated;
 }
@@ -230,7 +230,7 @@ export async function marquerFacturePayee(
   factureCounter.inc({ action: "paid" });
   try {
     await compta.genererEcrituresVente(ctx, id);
-    await compta.genererEcrituresEncaissement(ctx, id);
+    await compta.genererEcrituresEncaissement(ctx, id, updated);
   } catch {
     /** Échec de génération des écritures : ne casse pas le paiement (parité legacy try/catch). */
   }

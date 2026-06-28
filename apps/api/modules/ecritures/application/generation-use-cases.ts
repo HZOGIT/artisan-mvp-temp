@@ -100,19 +100,20 @@ export async function genererEcrituresEncaissement(
   factureReader: IFactureReader,
   ctx: TenantContext,
   factureId: number,
+  facture?: any,
 ): Promise<EcritureComptable[]> {
-  const facture = await factureReader.getFacture(ctx, factureId);
-  if (!facture) return [];
+  const _facture = facture ?? (await factureReader.getFacture(ctx, factureId));
+  if (!_facture) return [];
 
   /** Idempotence sélective (BQ uniquement — on ne touche pas la vente VE). */
   await ecritureRepo.deleteByFactureJournal(ctx, factureId, "BQ");
 
-  const ttc = Number(facture.totalTTC) || 0;
+  const ttc = Number(_facture.totalTTC) || 0;
   /** pas réglée / avoir → pas d'encaissement */
-  if (facture.statut !== "payee" || ttc <= 0) return [];
+  if (_facture.statut !== "payee" || ttc <= 0) return [];
 
-  const dateEcriture = facture.datePaiement ?? facture.dateFacture;
-  const pieceRef = facture.numero ?? "";
+  const dateEcriture = _facture.datePaiement ?? _facture.dateFacture;
+  const pieceRef = _facture.numero ?? "";
   const libelle = `Règlement ${pieceRef}`;
   const lettrage = `VL${factureId}`;
   const base = { dateEcriture, journal: "BQ" as const, pieceRef, libelle, factureId, lettrage };
