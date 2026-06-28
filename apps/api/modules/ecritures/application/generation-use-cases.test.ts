@@ -197,4 +197,24 @@ describe("ecritures — inaltérabilité (statut validée) — OPE-118", () => {
     expect(all.filter((e) => e.journal === "VE" && e.statut === "validee").length).toBe(3);
     expect(all.filter((e) => e.journal === "BQ" && e.statut === "brouillon").length).toBe(2);
   });
+
+  it("intégration : facture émise → genererEcrituresVente + validerEcritures → régénération refusée (OPE-118 conformité 286 CGI)", async () => {
+    const repo = new FakeEcritureRepository();
+    const reader = new FakeFactureReader();
+    reader.register(facture(), [{ tauxTVA: "20.00", montantTVA: "20.00" }]);
+
+    const ecrInit = await genererEcrituresVente(repo, reader, A, 501);
+    expect(ecrInit.every((e) => e.statut === "brouillon")).toBe(true);
+
+    await validerEcritures(repo, A, 501);
+    const afterValidate = await repo.listByFacture(A, 501);
+    expect(afterValidate.every((e) => e.statut === "validee")).toBe(true);
+
+    await expect(
+      genererEcrituresVente(repo, reader, A, 501),
+    ).rejects.toThrow(ConflictError);
+
+    const afterRegenFail = await repo.listByFacture(A, 501);
+    expect(afterRegenFail).toEqual(afterValidate);
+  });
 });

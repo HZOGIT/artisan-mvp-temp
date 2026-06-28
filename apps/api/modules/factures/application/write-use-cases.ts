@@ -418,10 +418,11 @@ export async function changerStatutFacture(
     : undefined;
   const updated = await repo.setStatut(ctx, id, cible, inTx);
   if (!updated) throw new NotFoundError("Facture introuvable");
-  /** À l'émission (passage `envoyee`) : génère la pièce de vente FEC (411/706/445). Idempotent. */
+  /** À l'émission (passage `envoyee`) : génère la pièce de vente FEC (411/706/445) + valide (verrouille) les écritures. Idempotent. */
   if (cible === "envoyee") {
     factureCounter.inc({ action: "emitted" });
     await compta.genererEcrituresVente(ctx, id);
+    await compta.validerEcritures(ctx, id);
     if (stockRepo) {
       const lignes = await repo.listLignes(ctx, id);
       for (const ligne of lignes) {

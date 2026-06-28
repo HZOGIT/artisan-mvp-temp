@@ -1,16 +1,18 @@
 import type { TenantContext } from "../../../shared/tenant";
 
 /*
- * Port d'effet de bord vers la **comptabilité** (génération des écritures FEC). Le domaine
+ * Port d'effet de bord vers la **comptabilité** (génération des écritures FEC + inaltérabilité). Le domaine
  * compta (écritures, journaux VE/BQ, balance, grand livre, export FEC, invariant Σdébit=Σcrédit)
  * est un **domaine à part entière** non encore migré → factures dépend d'une **abstraction** :
  *  - `genererEcrituresVente` : écritures de vente (411 Client / 706 Ventes / 445 TVA) à l'émission ;
- *  - `genererEcrituresEncaissement` : écritures de règlement (512 Banque / 411 lettré) au paiement.
+ *  - `genererEcrituresEncaissement` : écritures de règlement (512 Banque / 411 lettré) au paiement ;
+ *  - `validerEcritures` : verrouille les écritures (statut brouillon → validee), anti-fraude TVA.
  * Impl par défaut = no-op (la vraie génération sera fournie par le module compta porté plus tard).
  */
 export interface ComptaPort {
   genererEcrituresVente(ctx: TenantContext, factureId: number): Promise<void>;
   genererEcrituresEncaissement(ctx: TenantContext, factureId: number): Promise<void>;
+  validerEcritures(ctx: TenantContext, factureId: number): Promise<void>;
 }
 
 /*
@@ -20,6 +22,7 @@ export interface ComptaPort {
 export class NoopComptaPort implements ComptaPort {
   async genererEcrituresVente(): Promise<void> {}
   async genererEcrituresEncaissement(): Promise<void> {}
+  async validerEcritures(): Promise<void> {}
 }
 
 /** Singleton réutilisable (la valeur par défaut des use-cases). */
