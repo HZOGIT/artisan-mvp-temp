@@ -307,6 +307,11 @@ alter table "rdv_en_ligne" force row level security;
 drop policy if exists tenant_isolation on "rdv_en_ligne";
 create policy tenant_isolation on "rdv_en_ligne" using ("artisanId" = nullif(current_setting('app.tenant', true), '')::int) with check ("artisanId" = nullif(current_setting('app.tenant', true), '')::int);
 
+alter table "reglements" enable row level security;
+alter table "reglements" force row level security;
+drop policy if exists tenant_isolation on "reglements";
+create policy tenant_isolation on "reglements" using ("artisanId" = nullif(current_setting('app.tenant', true), '')::int) with check ("artisanId" = nullif(current_setting('app.tenant', true), '')::int);
+
 alter table "regles_categorisation" enable row level security;
 alter table "regles_categorisation" force row level security;
 drop policy if exists tenant_isolation on "regles_categorisation";
