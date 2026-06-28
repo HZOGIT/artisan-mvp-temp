@@ -189,8 +189,11 @@ contourner la RLS. Une base neuve n'a besoin d'aucun script manuel.
 - `APP_DATABASE_URL` = `app_tenant` (non-superuser, RLS) → pool runtime qui sert **toutes** les requêtes.
 
 **Règles** (recettes détaillées dans la skill) :
-- **Migration auto** : `pnpm drizzle-kit generate` → `drizzle/<ts>_<nom>.sql` + journal + snapshot (atomique).
-  **Jamais** de `.sql` ni d'édition de `drizzle/meta/_journal.json` à la main.
+- 🔴 **`generate` = BROUILLON, pas une migration finie.** `pnpm drizzle-kit generate` produit un `.sql`
+  **indicatif** — le migrateur **DOIT le relire ligne par ligne et appliquer nos conventions manquantes**
+  (RLS, index, CHECK, FK `ON DELETE`, sûreté sur données existantes) avant de committer. drizzle-kit oublie
+  **systématiquement** la RLS et la plupart des index/contraintes. Une migration générée non relue/complétée
+  = à rejeter. (Checklist : skill `migrations` §2.) **Jamais** de `.sql` ni d'édition de `_journal.json` à la main.
 - **Migration custom** (ce que drizzle-kit ne génère PAS : RLS, CHECK, index partiels `WHERE`, triggers,
   self-ref FK) : `drizzle-kit generate --custom --name=<nom>` puis remplir le SQL. RLS tenant :
   `node scripts/rls/generate-tenant-rls.mjs`. RLS public-token : SQL canonique dans la skill.

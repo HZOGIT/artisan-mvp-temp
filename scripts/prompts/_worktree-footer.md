@@ -70,6 +70,13 @@ git -C /tmp/wt-__SESSION_NAME__ status -- drizzle/        # tes .sql/snapshot/_j
 git -C __MAIN_REPO__ status -- drizzle/                   # DOIT être vide (rien dans le repo principal)
 ```
 
+🔴 **La migration générée est un BROUILLON — relis-la et complète-la.** `drizzle-kit generate` ne voit que
+le schéma TS : il **oublie systématiquement la RLS** et la plupart des index/CHECK. Avant de committer, relis
+le `.sql` ligne par ligne et applique nos conventions manquantes : **RLS** (nouvelle table à `artisanId`/`artisan_id`
+→ `node scripts/rls/generate-tenant-rls.mjs` ; accès public par token → policy public-token), **index** (FK, colonnes
+filtrées/triées, partiels), **CHECK** (statuts, invariants), **FK `ON DELETE`**, **sûreté sur données existantes**
+(`NOT VALID`/backfill). Détail + checklist : **skill `migrations` §2/§3**. Une migration générée non complétée sera **rejetée** par le reviewer.
+
 Convention au merge (prefix `timestamp` → noms uniques, zéro collision entre PRs) : si deux workers ont
 généré une entrée au même `idx` dans `_journal.json`, garder les deux, renumber le second (`idx`→`idx+1`),
 trier par `when` croissant ; le `.sql` timestamp le plus récent s'applique en dernier — ordre naturel ✓

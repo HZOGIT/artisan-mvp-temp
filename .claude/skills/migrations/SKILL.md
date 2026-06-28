@@ -25,16 +25,32 @@ drizzle/
 > `drizzle.config.ts`, `apps/api/shared/db/run-migrations.ts` (`MIGRATIONS_DIR`), `infra/Dockerfile`
 > (`COPY --from=builder /app/drizzle ./drizzle`), `scripts/rls/generate-tenant-rls.mjs` (`PG_DIR`).
 
-## 2. Faire évoluer le schéma (cas auto)
+## 2. Faire évoluer le schéma — `generate` = BROUILLON, revue manuelle OBLIGATOIRE
+
+> 🔴 **Règle stricte** (BDD devenue grosse & complexe : beaucoup de tables, RLS, index, invariants).
+> `drizzle-kit generate` produit un **brouillon indicatif**, **jamais** une migration finie. Le migrateur
+> **DOIT relire le `.sql` généré ligne par ligne** et y **appliquer nos conventions manquantes** avant de
+> committer. drizzle-kit ne voit que le schéma TS (cf. §3) → il **oublie systématiquement la RLS** et la
+> plupart des index/CHECK. **Une migration générée non relue/complétée = à rejeter.**
 
 1. Éditer `drizzle/schema/*.ts`.
-2. Générer (diff TS ↔ dernier snapshot) :
+2. Générer le brouillon :
    ```bash
    DATABASE_URL=postgres://artisan_user:artisan_password@localhost:5432/artisan_mvp \
      pnpm drizzle-kit generate --name=<nom>
    # → drizzle/<ts>_<nom>.sql + _journal.json + meta/<ts>_snapshot.json (ATOMIQUE)
    ```
-3. Déployer : `./scripts/deploy-backend.sh`. Appliqué **au boot** (cf. §4).
+3. **RELIRE & COMPLÉTER** le `.sql` généré — checklist conventions :
+   - [ ] **RLS** — nouvelle table à `artisanId`/`artisan_id` ? → RLS tenant (`generate-tenant-rls.mjs`, §3a).
+     Accès public par token ? → policy public-token (§3b). Table identité/journal global ? → denylist (RLS off).
+     **drizzle ne génère JAMAIS la RLS.**
+   - [ ] **Index** — colonnes FK indexées ? colonnes filtrées/triées (statut, dates, `WHERE deleted_at IS NULL`) ?
+     index partiels là où ça compte ?
+   - [ ] **CHECK** — colonnes texte type-enum (statuts), invariants métier (montants ≥ 0…) ?
+   - [ ] **Sûreté données existantes** — `ADD CHECK/NOT NULL/UNIQUE` sec ? → `NOT VALID`/backfill (sinon crash-loop boot).
+   - [ ] **FK** — `ON DELETE` correct (cascade / restrict / set null) ?
+   Ce qui n'est pas auto-générable va dans une **migration custom** (`generate --custom`, §3) ou s'append au `.sql`.
+4. Déployer : `./scripts/deploy-backend.sh`. Appliqué **au boot** (cf. §4).
 
 **Règles dures**
 - **Jamais** de `.sql` à la main ni d'édition manuelle de `_journal.json`/snapshot pour le cas auto —
