@@ -117,5 +117,17 @@
   "toastPdfOk": "PDF généré avec succès",
   "toastRappelAjoute": "Rappel ajouté",
   "errTitreRequis": "Le titre est requis",
-  "errEcheanceRequise": "L'échéance est requise"
+  "errEcheanceRequise": "L'échéance est requise",
+  "alerteAttestationTva": "Attestation TVA requise",
+  "alerteAttestationTvaDetail": "Ce document contient des lignes au taux TVA réduit (10 % ou 5,5 %). Une attestation signée par le client est requise (CGI art. 279-0 bis).",
+  "attestationTvaTitle": "Attestation TVA réduite travaux",
+  "nonSignee": "Non signée",
+  "genererAttestation": "Générer l'attestation TVA réduite",
+  "toastAttestationGeneree": "Attestation générée — le PDF s'ouvre dans un nouvel onglet",
+  "attestationSignee": "Attestation signée",
+  "attestationGeneree": "Attestation générée (non signée)",
+  "uploaderSignee": "Uploader signée",
+  "uploaderSigneeTitre": "Importer l'attestation signée",
+  "uploaderSigneeDesc": "Importez le PDF de l'attestation signé par le client.",
+  "toastAttestationSigneeUplodee": "Attestation signée enregistrée"
 }

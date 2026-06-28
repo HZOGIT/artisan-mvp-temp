@@ -24,11 +24,15 @@ export function useFactureDetail(id: number) {
   const avoirsQ = trpc.factures.getAvoirsByFacture.useQuery(enabled && facture ? { factureId: id } : skipToken);
   const auditQ = trpc.factures.getAuditLog.useQuery(enabled && facture ? { factureId: id } : skipToken);
 
+  const invAttestation = () => utils.factures.attestationTva.getByFacture.invalidate({ factureId: id });
+  const attestationsQ = trpc.factures.attestationTva.getByFacture.useQuery(enabled && facture ? { factureId: id } : skipToken);
+
   return {
     facture, isLoading: factureQ.isLoading,
     artisan: artisanQ.data, parametres: parametresQ.data,
     activites: activitesQ.data ?? [], refetchActivites: activitesQ.refetch,
     avoirs: avoirsQ.data ?? [], auditLogs: auditQ.data ?? [], inv,
+    attestations: attestationsQ.data ?? [],
     envoyer: trpc.factures.envoyer.useMutation(),
     marquerEnRetard: trpc.factures.marquerEnRetard.useMutation(),
     addLigne: trpc.factures.addLigne.useMutation({ onSuccess: () => utils.factures.getById.invalidate({ id }) }),
@@ -38,5 +42,7 @@ export function useFactureDetail(id: number) {
     createRappel: trpc.activites.create.useMutation(),
     toggleRappel: trpc.activites.toggleFait.useMutation(),
     deleteRappel: trpc.activites.delete.useMutation(),
+    genererAttestation: trpc.factures.attestationTva.generer.useMutation({ onSuccess: () => { inv(); invAttestation(); } }),
+    attacherSigneeAttestation: trpc.factures.attestationTva.attacherSignee.useMutation({ onSuccess: () => { inv(); invAttestation(); } }),
   };
 }

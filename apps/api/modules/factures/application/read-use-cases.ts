@@ -3,6 +3,8 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IFactureRepository } from "./facture-repository";
 import type { ClientReader, ClientInfo } from "./contact-readers";
 import type { Facture, FactureLigne, AuditLogEntry } from "../domain/facture";
+import type { IAttestationTvaRepository } from "./attestation-tva-repository";
+import { necessite_attestation_tva_reduite } from "./montants";
 
 /*
  * Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté par le
@@ -28,20 +30,28 @@ export function listLignesFacture(repo: IFactureRepository, ctx: TenantContext, 
 /*
  * Facture enrichie pour l'affichage détail (parité legacy `factures.getById` qui renvoie
  * `{ ...facture, lignes, client }` — consommé par `FactureDetail` côté client). `client` peut être
- * null (client supprimé). Le scoping tenant est porté par le repo/reader (404 si hors tenant).
+ * null (client supprimé). `alerteTvaReduiteNonSignee` = taux réduit présent ET pas d'attestation signée.
  */
-export type FactureDetail = Facture & { readonly lignes: FactureLigne[]; readonly client: ClientInfo | null };
+export type FactureDetail = Facture & {
+  readonly lignes: FactureLigne[];
+  readonly client: ClientInfo | null;
+  /** true si ≥1 ligne à 10% ou 5,5% et aucune attestation TVA signée. */
+  readonly alerteTvaReduiteNonSignee: boolean;
+};
 
 export async function getFactureDetail(
   repo: IFactureRepository,
   clientReader: ClientReader,
   ctx: TenantContext,
   id: number,
+  attestationRepo?: IAttestationTvaRepository,
 ): Promise<FactureDetail> {
   const facture = await repo.getById(ctx, id);
   if (!facture) throw new NotFoundError("Facture introuvable");
   const [lignes, client] = await Promise.all([repo.listLignes(ctx, id), clientReader.getClient(ctx, facture.clientId)]);
-  return { ...facture, lignes, client };
+  const tvaReduite = necessite_attestation_tva_reduite(lignes);
+  const hasSigned = tvaReduite && attestationRepo ? await attestationRepo.hasSigned(ctx, id) : false;
+  return { ...facture, lignes, client, alerteTvaReduiteNonSignee: tvaReduite && !hasSigned };
 }
 
 /*

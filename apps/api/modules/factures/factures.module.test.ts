@@ -81,6 +81,7 @@ describe("factures.module", () => {
     expect(procedures).toEqual([
       "addLigne",
       "ajouterReglement",
+      "attestationTva",
       "convertirDepuisDevis",
       "create",
       "createAvoir",
