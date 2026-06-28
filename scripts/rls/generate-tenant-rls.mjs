@@ -3,7 +3,7 @@
 // EXISTS avant CREATE.
 //
 // Workflow (option b) : introspecte la base → si l'ensemble des policies tenant a changé depuis
-// la dernière migration `*_rls-tenant-isolation.sql` de drizzle/pg/, crée une NOUVELLE migration
+// la dernière migration `*_rls-tenant-isolation.sql` de drizzle/, crée une NOUVELLE migration
 // custom (drizzle-kit generate --custom) et y écrit le SQL. Sinon : no-op (rien à régénérer).
 // On n'édite JAMAIS une migration déjà appliquée : un changement = un nouveau fichier append.
 //

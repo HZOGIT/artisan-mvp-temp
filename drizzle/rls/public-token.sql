@@ -3,7 +3,7 @@
 -- `app.public_token` ne voit QUE la ligne correspondante. Policy PERMISSIVE (s'OR avec
 -- `tenant_isolation` → le tenant garde son accès normal ; un public ne voit rien sans le bon token).
 -- Idempotent. Source de référence (écrite à la main) ; figée dans la migration
--- drizzle/pg/0004_rls-public-token.sql et appliquée par `drizzle-kit migrate` (plus de script d'apply).
+-- la migration baseline drizzle/ et appliquée par `drizzle-kit migrate` (plus de script d'apply).
 -- Pour modifier ces policies : éditer ici PUIS créer une nouvelle migration custom (cf. 0004).
 
 -- demandes_avis : lecture publique de LA demande dont le token est présenté (portail d'avis client).
