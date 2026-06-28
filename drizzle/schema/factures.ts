@@ -8,6 +8,7 @@ import {
   timestamp,
   boolean,
   numeric,
+  date,
 } from "drizzle-orm/pg-core";
 
 export const factureStatutEnum = pgEnum("facture_statut", ["brouillon", "validee", "envoyee", "payee", "en_retard", "annulee"]);
@@ -22,6 +23,7 @@ export const paiementStatutEnum = pgEnum("paiement_statut", ["en_attente", "comp
 export const relanceTypeEnum = pgEnum("relance_type", ["email", "notification"]);
 export const relanceStatutEnum = pgEnum("relance_statut", ["envoye", "echec"]);
 export const modeleEmailTypeEnum = pgEnum("modele_email_type", ["relance_devis", "envoi_devis", "envoi_facture", "rappel_paiement", "autre"]);
+export const reglementModeEnum = pgEnum("reglement_mode", ["cheque", "virement", "especes", "carte", "autre"]);
 
 export const tvaCategories = pgTable("tva_categories", {
   id: varchar("id", { length: 30 }).primaryKey(),
@@ -167,3 +169,17 @@ export const emailsLog = pgTable("emails_log", {
 });
 export type EmailLog = typeof emailsLog.$inferSelect;
 export type InsertEmailLog = typeof emailsLog.$inferInsert;
+
+export const reglements = pgTable("reglements", {
+  id: serial("id").primaryKey(),
+  factureId: integer("factureId").notNull().references(() => factures.id, { onDelete: "cascade" }),
+  artisanId: integer("artisanId").notNull(),
+  montant: numeric("montant", { precision: 10, scale: 2 }).notNull(),
+  date: date("date").notNull(),
+  mode: reglementModeEnum("mode").notNull(),
+  reference: varchar("reference", { length: 100 }),
+  note: text("note"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type Reglement = typeof reglements.$inferSelect;
+export type InsertReglement = typeof reglements.$inferInsert;

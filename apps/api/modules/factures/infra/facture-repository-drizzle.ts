@@ -1,9 +1,10 @@
-import { and, asc, desc, eq, sql } from "drizzle-orm";
-import { factures, facturesLignes, clients, devis, parametresArtisan, eventLog } from "../../../../../drizzle/schema.pg";
+import { and, asc, desc, eq, sql, sum } from "drizzle-orm";
+import { factures, facturesLignes, clients, devis, parametresArtisan, eventLog, reglements } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
-import type { IFactureRepository, PaiementPatch, CreateAvoirInput, CreateFromDevisInput } from "../application/facture-repository";
+import { ValidationError } from "../../../shared/errors";
+import type { IFactureRepository, PaiementPatch, CreateAvoirInput, CreateFromDevisInput, Reglement, CreateReglementInput } from "../application/facture-repository";
 import type {
   Facture,
   FactureLigne,
@@ -80,6 +81,24 @@ function toLigne(r: LigneRow): FactureLigne {
     montantTVA: r.montantTVA ?? "0.00",
     montantTTC: r.montantTTC ?? "0.00",
     type: (r.type ?? "produit") as FactureLigne["type"],
+  };
+}
+
+type ReglementRow = typeof reglements.$inferSelect;
+
+function toReglement(r: ReglementRow): Reglement {
+  const dateStr = r.date;
+  const dateObj = typeof dateStr === "string" ? new Date(dateStr + "T00:00:00Z") : dateStr;
+  return {
+    id: r.id,
+    factureId: r.factureId,
+    artisanId: r.artisanId,
+    montant: r.montant ?? "0.00",
+    date: dateObj,
+    mode: (r.mode || "autre") as "cheque" | "virement" | "especes" | "carte" | "autre",
+    reference: r.reference ?? null,
+    note: r.note ?? null,
+    createdAt: r.createdAt,
   };
 }
 
@@ -266,6 +285,64 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
         .where(and(eq(factures.id, id), eq(factures.artisanId, ctx.artisanId)))
         .returning();
       return row ? toFacture(row) : null;
+    });
+  }
+
+  async ajouterReglement(ctx: TenantContext, input: CreateReglementInput): Promise<Reglement | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [facture] = await tx
+        .select()
+        .from(factures)
+        .where(and(eq(factures.id, input.factureId), eq(factures.artisanId, ctx.artisanId)))
+        .limit(1);
+
+      if (!facture) return null;
+
+      await tx.execute(sql`SELECT * FROM "factures" WHERE id = ${input.factureId} FOR UPDATE`);
+
+      const [sumResult] = await tx
+        .select({ total: sum(reglements.montant) })
+        .from(reglements)
+        .where(eq(reglements.factureId, input.factureId));
+
+      const currentSum = sumResult?.total ? Number(sumResult.total) : 0;
+      const montantNum = Number(input.montant);
+      const totalTTC = Number(facture.totalTTC) || 0;
+      const cumul = currentSum + montantNum;
+
+      if (cumul > totalTTC + 0.005) throw new ValidationError("Le montant payé dépasse le total TTC de la facture");
+
+      const isoDate = input.date.toISOString().split("T")[0];
+
+      const [reglement] = await tx
+        .insert(reglements)
+        .values({
+          factureId: input.factureId,
+          artisanId: ctx.artisanId,
+          montant: input.montant,
+          date: isoDate,
+          mode: input.mode,
+          reference: input.reference,
+          note: input.note,
+          createdAt: new Date(),
+        })
+        .returning();
+
+      if (!reglement) return null;
+
+      const newMontantPaye = cumul.toFixed(2);
+      const soldee = totalTTC > 0 && cumul >= totalTTC - 0.005;
+
+      await tx
+        .update(factures)
+        .set({
+          montantPaye: newMontantPaye,
+          statut: soldee ? "payee" : facture.statut,
+          updatedAt: new Date(),
+        })
+        .where(eq(factures.id, input.factureId));
+
+      return toReglement(reglement);
     });
   }
 

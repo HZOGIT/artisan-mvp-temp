@@ -8,6 +8,20 @@
       "when": 1782659680253,
       "tag": "20260628151440_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1782664810521,
+      "tag": "20260628164010_reglements",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782664887503,
+      "tag": "20260628164127_rls-tenant-isolation",
+      "breakpoints": true
     }
   ]
 }

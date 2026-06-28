@@ -10,6 +10,7 @@ import {
   supprimerLigneFacture,
   changerStatutFacture,
   enregistrerPaiementFacture,
+  ajouterReglement,
   creerAvoir,
 } from "./write-use-cases";
 import { expectCrossTenantDenied } from "../../../shared/testing";
@@ -304,5 +305,105 @@ describe("factures — use-cases d'écriture", () => {
 
     const stockApres = await stockRepo.getById(A, stock.id);
     expect(stockApres?.quantiteEnStock).toBe("7.00");
+  });
+
+  it("ajouterReglement — facture non-émise → Conflict", async () => {
+    const repo = repoWithClient(A, 100);
+    const f = await creerFacture(repo, A, { clientId: 100, lignes: [{ designation: "L", prixUnitaireHT: "100.00" }] });
+    await expect(
+      ajouterReglement(repo, A, { factureId: f.id, montant: "50.00", date: new Date(), mode: "cheque" }),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("ajouterReglement — montant négatif/zéro → ValidationError", async () => {
+    const repo = repoWithClient(A, 100);
+    const f = await creerFacture(repo, A, { clientId: 100, lignes: [{ designation: "L", prixUnitaireHT: "100.00" }] });
+    await changerStatutFacture(repo, A, f.id, "envoyee", undefined, fakeArtisanReader);
+    await expect(ajouterReglement(repo, A, { factureId: f.id, montant: "0", date: new Date(), mode: "cheque" })).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+    await expect(ajouterReglement(repo, A, { factureId: f.id, montant: "-50", date: new Date(), mode: "cheque" })).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+  });
+
+  it("ajouterReglement — sur-paiement → ValidationError", async () => {
+    const repo = repoWithClient(A, 100);
+    const f = await creerFacture(repo, A, {
+      clientId: 100,
+      lignes: [{ designation: "L", prixUnitaireHT: "100.00" }],
+    });
+    await changerStatutFacture(repo, A, f.id, "envoyee", undefined, fakeArtisanReader);
+    await expect(ajouterReglement(repo, A, { factureId: f.id, montant: "121.00", date: new Date(), mode: "cheque" })).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+  });
+
+  it("ajouterReglement — règlement unique = totalTTC → statut payee", async () => {
+    const repo = repoWithClient(A, 100);
+    const f = await creerFacture(repo, A, {
+      clientId: 100,
+      lignes: [
+        { designation: "L1", prixUnitaireHT: "50.00" },
+        { designation: "L2", prixUnitaireHT: "50.00" },
+      ],
+    });
+    await changerStatutFacture(repo, A, f.id, "envoyee", undefined, fakeArtisanReader);
+
+    const reglement = await ajouterReglement(repo, A, { factureId: f.id, montant: "120.00", date: new Date(), mode: "virement" });
+    expect(reglement.id).toBeDefined();
+    expect(reglement.montant).toBe("120.00");
+    expect(reglement.mode).toBe("virement");
+
+    const updated = await repo.getById(A, f.id);
+    expect(updated?.montantPaye).toBe("120.00");
+    expect(updated?.statut).toBe("payee");
+  });
+
+  it("ajouterReglement — deux règlements cumulés → montantPaye = somme", async () => {
+    const repo = repoWithClient(A, 100);
+    const f = await creerFacture(repo, A, {
+      clientId: 100,
+      lignes: [{ designation: "L", prixUnitaireHT: "100.00" }],
+    });
+    await changerStatutFacture(repo, A, f.id, "envoyee", undefined, fakeArtisanReader);
+
+    const r1 = await ajouterReglement(repo, A, { factureId: f.id, montant: "60.00", date: new Date("2026-06-01"), mode: "cheque" });
+    expect(r1.montant).toBe("60.00");
+
+    const r2 = await ajouterReglement(repo, A, { factureId: f.id, montant: "60.00", date: new Date("2026-06-15"), mode: "virement" });
+    expect(r2.montant).toBe("60.00");
+
+    const updated = await repo.getById(A, f.id);
+    expect(updated?.montantPaye).toBe("120.00");
+    expect(updated?.statut).toBe("payee");
+  });
+
+  it("ajouterReglement — cross-tenant → NotFoundError", async () => {
+    const repo = repoWithClient(A, 100);
+    const f = await creerFacture(repo, A, { clientId: 100, lignes: [{ designation: "L", prixUnitaireHT: "100.00" }] });
+    await changerStatutFacture(repo, A, f.id, "envoyee", undefined, fakeArtisanReader);
+    await expectCrossTenantDenied(() =>
+      ajouterReglement(repo, B, { factureId: f.id, montant: "50.00", date: new Date(), mode: "cheque" }),
+    );
+  });
+
+  it("ajouterReglement — cumul de deux règlements qui soldent la facture", async () => {
+    const repo = repoWithClient(A, 100);
+    const f = await creerFacture(repo, A, {
+      clientId: 100,
+      lignes: [{ designation: "L", prixUnitaireHT: "100.00" }],
+    });
+    await changerStatutFacture(repo, A, f.id, "envoyee", undefined, fakeArtisanReader);
+
+    const r1 = await ajouterReglement(repo, A, { factureId: f.id, montant: "60.00", date: new Date("2026-06-01"), mode: "cheque" });
+    expect(r1.montant).toBe("60.00");
+
+    const r2 = await ajouterReglement(repo, A, { factureId: f.id, montant: "60.00", date: new Date("2026-06-15"), mode: "virement" });
+    expect(r2.montant).toBe("60.00");
+
+    const updated = await repo.getById(A, f.id);
+    expect(updated?.montantPaye).toBe("120.00");
+    expect(updated?.statut).toBe("payee");
   });
 });
