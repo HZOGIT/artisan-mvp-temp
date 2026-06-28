@@ -58,8 +58,8 @@ describe.skipIf(!URL)("DevisReaderDrizzle — updateMontantDejaFacture (PG + RLS
   });
 
   it("isolation RLS : tenant B ne peut pas mettre à jour le devis de A", async () => {
-    await reader.updateMontantDejaFacture(ctx(B), devisA, "9999.00");
-    /** Le devis de A est inchangé (RLS empêche l'update du tenant B). */
+    await expect(reader.updateMontantDejaFacture(ctx(B), devisA, "9999.00")).rejects.toThrow(/introuvable/i);
+    /** Le devis de A est inchangé. */
     const d = await reader.getDevis(ctx(A), devisA);
     expect(d?.montantDejaFacture).toBe("360.00");
   });
