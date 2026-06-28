@@ -25,6 +25,8 @@
   "doublonTitre": "Doublon probable : {{count}} dépense(s) déjà saisie(s) avec le même montant, la même date et le même fournisseur.",
   "doublonAvertissement": "Vérifiez qu'il ne s'agit pas d'un double remboursement. Vous pouvez quand même enregistrer si c'est volontaire.",
   "tvaDeductible": "TVA déductible",
+  "coeffDeductibilite": "Coefficient de déductibilité TVA (%)",
+  "coeffDeductibiliteDesc": "80 % = carburant essence/véhicule tourisme, 100 % = totalement déductible",
   "paiement": "Paiement",
   "modePaiement": "Mode de paiement",
   "depenseRemboursable": "Dépense remboursable",

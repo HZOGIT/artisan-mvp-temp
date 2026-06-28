@@ -12,6 +12,8 @@ export interface FecDepense {
   readonly montantTtc: string;
   readonly description: string | null;
   readonly remboursable: boolean;
+  /** Coefficient de déductibilité TVA en % (0–100, défaut 100). */
+  readonly coeffDeductibilite: string;
 }
 
 /** Configuration comptable du tenant (comptes + journal d'achats), avec valeurs par défaut PCG. */

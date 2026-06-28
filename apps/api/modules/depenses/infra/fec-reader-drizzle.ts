@@ -30,6 +30,7 @@ export class FecReaderDrizzle implements FecReader {
           montantTtc: depenses.montant_ttc,
           description: depenses.description,
           remboursable: depenses.remboursable,
+          coeffDeductibilite: depenses.coeff_deductibilite,
         })
         .from(depenses)
         .where(and(eq(depenses.artisan_id, ctx.artisanId), between(depenses.date_depense, dateDebut, dateFin), eq(depenses.tva_deductible, true)))
@@ -44,6 +45,7 @@ export class FecReaderDrizzle implements FecReader {
         montantTtc: r.montantTtc ?? "0",
         description: r.description ?? null,
         remboursable: r.remboursable ?? true,
+        coeffDeductibilite: r.coeffDeductibilite ?? "100",
       }));
     });
   }

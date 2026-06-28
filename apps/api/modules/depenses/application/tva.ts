@@ -11,6 +11,11 @@ export interface MontantsTva {
   readonly montantTtc: string;
 }
 
+/** TVA déductible retenue = montantTva × coeff/100, arrondie au centime. */
+export function tvaDeduite(montantTva: string, coeff: string): string {
+  return round2(Number(montantTva) * Number(coeff) / 100).toFixed(2);
+}
+
 export function calculerTva(montantHt: string, tauxTva: string): MontantsTva {
   const ht = Number(montantHt) || 0;
   const taux = Number(tauxTva) || 0;

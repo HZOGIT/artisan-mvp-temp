@@ -71,6 +71,7 @@ const createSchema = z.object({
   frequenceRecurrence: frequenceEnum.nullish(),
   prochaineOccurrence: isoDate.nullish(),
   tvaDeductible: z.boolean().optional(),
+  coeffDeductibilite: decimal.optional(),
 });
 
 /*
@@ -97,6 +98,7 @@ const updateSchema = z.object({
   frequenceRecurrence: frequenceEnum.nullish(),
   prochaineOccurrence: isoDate.nullish(),
   tvaDeductible: z.boolean().optional(),
+  coeffDeductibilite: decimal.optional(),
 });
 
 /*

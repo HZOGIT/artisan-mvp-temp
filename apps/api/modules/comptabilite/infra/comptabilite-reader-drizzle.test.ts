@@ -172,3 +172,56 @@ describe.skipIf(!URL)("declarationTVADetail — régime exigibilité (L3)", () =
     /* En encaissements, F2 (non payée) est exclue ; en débits F3 (émise mai) est exclue → symétrique */
   });
 });
+
+/*
+ * L3 — TVA déductible avec coeffDeductibilite (0/80/100) dans declarationTVADetail.
+ * Vérifie que la TVA déclarée = SUM(montant_tva × coeff/100) et que coeff=100 est non-régressif.
+ */
+describe.skipIf(!URL)("declarationTVADetail — coeffDeductibilite sur TVA déductible (L3)", () => {
+  const admin = new Pool({ connectionString: URL });
+  const app = createDbClient(APP_URL!);
+  const reader = new ComptabiliteReaderDrizzle(app.db);
+
+  const UID_C = 9942201;
+  let artisanC = 0;
+
+  const JUIN = { dateDebut: new Date("2026-06-01T00:00:00Z"), dateFin: new Date("2026-06-30T23:59:59Z") };
+
+  const cleanup = async () => {
+    const sub = '(select id from artisans where "userId" = $1)';
+    await admin.query(`delete from depenses where artisan_id in ${sub}`, [UID_C]);
+    await admin.query(`delete from configurations_comptables where "artisanId" in ${sub}`, [UID_C]);
+    await admin.query(`delete from artisans where "userId" = $1`, [UID_C]);
+    await admin.query("delete from users where id = $1", [UID_C]);
+  };
+
+  beforeAll(async () => {
+    await cleanup();
+    await admin.query("insert into users (id,email,password,role) values ($1,$2,'x','artisan')", [UID_C, `u${UID_C}@t.fr`]);
+    artisanC = (await admin.query('insert into artisans (id,"userId") values (DEFAULT,$1) returning id', [UID_C])).rows[0].id;
+    await admin.query('insert into configurations_comptables ("artisanId","regimeTVA") values ($1,\'debits\')', [artisanC]);
+    let depSeq = 0;
+    const depQ = (coeff: number, tvaDeductible: boolean) => {
+      depSeq++;
+      return admin.query(
+        'insert into depenses (artisan_id, user_id, numero, date_depense, categorie, montant_ht, taux_tva, montant_tva, montant_ttc, tva_deductible, coeff_deductibilite) values ($1,$2,$3,\'2026-06-15\',\'Carburant\',\'100.00\',\'20\',\'20.00\',\'120.00\',$4,$5)',
+        [artisanC, UID_C, `TC-${depSeq}`, tvaDeductible, String(coeff)],
+      );
+    };
+    await depQ(100, true);  /* dépense 1 : coeff 100 → 20 × 100% = 20 */
+    await depQ(80, true);   /* dépense 2 : coeff 80  → 20 × 80%  = 16 */
+    await depQ(0, true);    /* dépense 3 : coeff 0   → 20 × 0%   = 0  */
+    await depQ(100, false); /* dépense 4 : non déductible → exclu de la somme */
+  });
+
+  afterAll(async () => {
+    await cleanup();
+    await app.close();
+    await admin.end();
+  });
+
+  it("TVA déductible = Σ(montant_tva × coeff/100) sur déductibles uniquement (20+16+0=36)", async () => {
+    const d = await getDeclarationTVADetail(reader, ctx(artisanC), JUIN);
+    expect(d.tvaDeductible).toBeCloseTo(36, 2);
+  });
+});

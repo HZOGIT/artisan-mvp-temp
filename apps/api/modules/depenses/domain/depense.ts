@@ -47,6 +47,8 @@ export interface Depense {
   readonly frequenceRecurrence: DepenseFrequence | null;
   readonly prochaineOccurrence: string | null;
   readonly tvaDeductible: boolean;
+  /** Coefficient de déductibilité TVA en % (0–100). 100 = totalement déductible, 80 = carburant. */
+  readonly coeffDeductibilite: string;
   readonly createdAt: Date | null;
   readonly updatedAt: Date | null;
 }
@@ -75,6 +77,7 @@ export interface CreateDepenseInput {
   readonly frequenceRecurrence?: DepenseFrequence | null;
   readonly prochaineOccurrence?: string | null;
   readonly tvaDeductible?: boolean;
+  readonly coeffDeductibilite?: string;
 }
 
 export interface UpdateDepenseInput {
@@ -104,6 +107,7 @@ export interface UpdateDepenseInput {
   readonly frequenceRecurrence?: DepenseFrequence | null;
   readonly prochaineOccurrence?: string | null;
   readonly tvaDeductible?: boolean;
+  readonly coeffDeductibilite?: string;
 }
 
 /** ── Détection de doublons (aide à la saisie) ────────────────────────────────────────────────── */

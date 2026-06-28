@@ -61,6 +61,10 @@ export interface FecDepenseLine {
   readonly montantHT: string | number | null;
   readonly montantTVA: string | number | null;
   readonly montantTTC: string | number | null;
+  /** false = non déductible (TVA → charge). */
+  readonly tvaDeductible?: boolean | null;
+  /** Coefficient de déductibilité TVA en % (0–100, défaut 100). */
+  readonly coeffDeductibilite?: string | number | null;
 }
 export interface FecEncaissement {
   readonly id: number;
@@ -214,11 +218,12 @@ export function buildFec(input: FecInput, config: FecConfig): FecResult {
     num++;
     const piece = d.numero || `D-${d.id}`;
     const lib = `Achat ${piece}${d.fournisseur ? " - " + d.fournisseur : ""}`;
-    const ht = n(d.montantHT);
-    const tvaD = n(d.montantTVA);
+    const coeff = d.tvaDeductible === false ? 0 : n(d.coeffDeductibilite ?? 100);
+    const tvaD = Math.round(n(d.montantTVA) * coeff / 100 * 100) / 100;
+    const chargeHt = Math.round((n(d.montantHT) + n(d.montantTVA) - tvaD) * 100) / 100;
     const ttc = n(d.montantTTC);
     const charge = compteChargeDepense(d.categorie);
-    push({ journal: jAC, journalLib: "Journal des achats", num, date: d.dateDepense, compte: charge.compte, compteLib: charge.lib, piece, pieceDate: d.dateDepense, lib, debit: ht, credit: 0, valid: d.dateDepense });
+    push({ journal: jAC, journalLib: "Journal des achats", num, date: d.dateDepense, compte: charge.compte, compteLib: charge.lib, piece, pieceDate: d.dateDepense, lib, debit: chargeHt, credit: 0, valid: d.dateDepense });
     if (tvaD > 0) push({ journal: jAC, journalLib: "Journal des achats", num, date: d.dateDepense, compte: cTvaDed, compteLib: "TVA deductible", piece, pieceDate: d.dateDepense, lib, debit: tvaD, credit: 0, valid: d.dateDepense });
     push({ journal: jAC, journalLib: "Journal des achats", num, date: d.dateDepense, compte: cFourn, compteLib: "Fournisseurs", auxNum: d.fournisseur ? `F${String(d.id).padStart(5, "0")}` : "", auxLib: d.fournisseur || "", piece, pieceDate: d.dateDepense, lib, debit: 0, credit: ttc, valid: d.dateDepense });
     nbEcritures++;

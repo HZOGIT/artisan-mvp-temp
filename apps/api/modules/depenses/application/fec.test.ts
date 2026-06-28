@@ -18,6 +18,7 @@ const dep = (over: Partial<FecDepense> = {}): FecDepense => ({
   montantTtc: "120.00",
   description: "Fournitures",
   remboursable: true,
+  coeffDeductibilite: "100",
   ...over,
 });
 
@@ -62,6 +63,26 @@ describe("depenses — genererFecAchats (pur)", () => {
     );
     expect(totalColonne(fec, 11)).toBeCloseTo(totalColonne(fec, 12), 2); // 180 == 180
     expect(totalColonne(fec, 11)).toBeCloseTo(180, 2);
+  });
+
+  it("coeff 80 → charge HT augmentée, TVA réduite, TTC inchangé (carburant)", () => {
+    const fec = genererFecAchats([dep({ remboursable: false, coeffDeductibilite: "80" })], CONFIG);
+    const lignes = fec.split("\n");
+    const [achats, tva, fourn] = lignes.slice(1).map((l) => l.split("\t"));
+    expect(tva[11]).toBe("16,00");   // 20 × 0.80 = 16
+    expect(achats[11]).toBe("104,00"); // 100 + 20 - 16 = 104
+    expect(fourn[12]).toBe("120,00");  // TTC inchangé
+    expect(totalColonne(fec, 11)).toBeCloseTo(totalColonne(fec, 12), 2);
+  });
+
+  it("coeff 0 → TVA non déductible : charge = TTC, TVA = 0 (véhicule de tourisme)", () => {
+    const fec = genererFecAchats([dep({ remboursable: false, coeffDeductibilite: "0" })], CONFIG);
+    const lignes = fec.split("\n");
+    const [achats, tva, fourn] = lignes.slice(1).map((l) => l.split("\t"));
+    expect(tva[11]).toBe("0,00");
+    expect(achats[11]).toBe("120,00");
+    expect(fourn[12]).toBe("120,00");
+    expect(totalColonne(fec, 11)).toBeCloseTo(totalColonne(fec, 12), 2);
   });
 
   it("EcritureNum incrémente par dépense ; aucune dépense → en-tête seul", () => {

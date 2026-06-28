@@ -73,6 +73,7 @@ export class FakeDepenseRepository implements IDepenseRepository {
       frequenceRecurrence: input.frequenceRecurrence ?? null,
       prochaineOccurrence: input.prochaineOccurrence ?? null,
       tvaDeductible: input.tvaDeductible ?? true,
+      coeffDeductibilite: input.coeffDeductibilite ?? "100",
       createdAt: now,
       updatedAt: now,
     };

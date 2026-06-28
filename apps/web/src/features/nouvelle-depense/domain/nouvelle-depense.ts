@@ -35,6 +35,7 @@ export const CAT_IA_MAP: Record<string, string> = {
 export type DepenseForm = {
   dateDepense: string; fournisseur: string; categorie: string; sousCategorie: string; description: string;
   montantHt: string; tauxTva: string; modePaiement: ModePaiement; remboursable: boolean; tvaDeductible: boolean;
+  coeffDeductibilite: string;
   notes: string; chantierId: number | undefined; clientId: number | undefined;
   recurrente: boolean; frequenceRecurrence: Frequence;
 };
@@ -43,7 +44,7 @@ export function defaultForm(): DepenseForm {
   return {
     dateDepense: new Date().toISOString().slice(0, 10), fournisseur: "", categorie: "", sousCategorie: "",
     description: "", montantHt: "", tauxTva: "20", modePaiement: "carte", remboursable: true,
-    tvaDeductible: true, notes: "", chantierId: undefined, clientId: undefined, recurrente: false, frequenceRecurrence: "mensuelle",
+    tvaDeductible: true, coeffDeductibilite: "100", notes: "", chantierId: undefined, clientId: undefined, recurrente: false, frequenceRecurrence: "mensuelle",
   };
 }
 
@@ -100,6 +101,7 @@ export function buildPayload(form: DepenseForm, extras: PayloadExtras): CreateIn
     sousCategorie: form.sousCategorie || undefined, description: form.description || undefined,
     montantHt: form.montantHt, tauxTva: form.tauxTva || undefined,
     modePaiement: form.modePaiement, remboursable: form.remboursable, tvaDeductible: form.tvaDeductible,
+    coeffDeductibilite: form.coeffDeductibilite !== "100" ? form.coeffDeductibilite : undefined,
     notes: form.notes || undefined, chantierId: form.chantierId, clientId: form.clientId,
     justificatifUrl: extras.photoDataUrl || undefined, justificatifNom: extras.photoNom,
     recurrente: form.recurrente, frequenceRecurrence: form.recurrente ? form.frequenceRecurrence : undefined,
