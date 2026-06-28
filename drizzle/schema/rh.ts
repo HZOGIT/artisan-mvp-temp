@@ -214,6 +214,7 @@ export const historiqueDeplacements = pgTable("historique_deplacements", {
   longitudeArrivee: numeric("longitudeArrivee", { precision: 11, scale: 8 }),
   adresseDepart: text("adresseDepart"),
   adresseArrivee: text("adresseArrivee"),
+  depenseId: integer("depenseId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type HistoriqueDeplacement = typeof historiqueDeplacements.$inferSelect;

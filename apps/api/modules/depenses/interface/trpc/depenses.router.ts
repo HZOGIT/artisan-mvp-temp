@@ -5,7 +5,8 @@ import { outboxEvent } from "../../../../shared/events/outbox-event";
 import { withOutbox } from "../../../../shared/events/with-outbox";
 import type { IDepenseRepository } from "../../application/depense-repository";
 import { listDepenses, getDepense, checkDoublons, getDepensesStats } from "../../application/read-use-cases";
-import { creerDepense, modifierDepense, supprimerDepense, creerIndemniteKm } from "../../application/write-use-cases";
+import { creerDepense, modifierDepense, supprimerDepense, creerIndemniteKm, convertirTrajetEnIndemnite } from "../../application/write-use-cases";
+import type { IDeplacementRepository } from "../../application/deplacement-repository";
 /*
  * Composition : le client appelle les catégories de dépense via `trpc.depenses.getCategories/...`
  * (le legacy les expose sous le routeur `depenses`). On délègue aux use-cases du domaine
@@ -138,6 +139,7 @@ export function createDepensesRouter(
   fecReader: FecReader,
   db?: DbClient,
   ocr?: { vision: VisionPort; rateLimiter: RateLimiterPort },
+  deplacementRepo?: IDeplacementRepository,
 ) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listDepenses(repo, ctx.tenant)),
@@ -471,5 +473,33 @@ export function createDepensesRouter(
           ? analyserJustificatif({ vision: ocr.vision, rateLimiter: ocr.rateLimiter, depenseRepo: repo }, ctx.tenant, input)
           : Promise.resolve({ success: false, data: {}, error: "OCR non disponible" }),
       ),
+
+    /** ── Trajets (historique_deplacements) : liste + conversion en indemnité kilométrique ─────────── */
+    listTrajets: protectedProcedure.query(({ ctx }) =>
+      deplacementRepo ? deplacementRepo.listParTenant(ctx.tenant) : Promise.resolve([]),
+    ),
+
+    /**
+     * Convertit un trajet enregistré en dépense IK. Idempotent : 2e appel sur le même trajet
+     * retourne la dépense existante sans doublon.
+     */
+    convertirTrajet: protectedProcedure
+      .input(
+        z.object({
+          deplacementId: z.number().int(),
+          tarifKm: z.number().positive().optional(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        if (!deplacementRepo) throw new Error("Module déplacements non configuré");
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await convertirTrajetEnIndemnite(r, deplacementRepo, ctx.tenant, {
+            deplacementId: input.deplacementId,
+            tarifKm: input.tarifKm,
+          });
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "depense.trajet_converti", entityType: "depense", entityId: result.id, payload: { depenseId: result.id, deplacementId: input.deplacementId } });
+          return result;
+        });
+      }),
   });
 }

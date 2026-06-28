@@ -8,6 +8,7 @@ import type { ITransactionBancaireRepository } from "./application/transaction-b
 import type { IFactureLettrerPort } from "./application/facture-lettreur-port";
 import type { FecReader } from "./application/fec-reader";
 import type { VisionPort, RateLimiterPort } from "../../shared/ports";
+import type { IDeplacementRepository } from "./application/deplacement-repository";
 import { createDepensesRouter } from "./interface/trpc/depenses.router";
 
 /*
@@ -31,6 +32,7 @@ export interface DepensesModuleDeps {
    * procédure renvoie une dégradation `{success:false}`.
    */
   readonly ocr?: { readonly vision: VisionPort; readonly rateLimiter: RateLimiterPort };
+  readonly deplacementRepository?: IDeplacementRepository;
 }
 
 export interface DepensesModule {
@@ -52,6 +54,7 @@ export function createDepensesModule(deps: DepensesModuleDeps): DepensesModule {
       deps.fecReader,
       deps.db,
       deps.ocr,
+      deps.deplacementRepository,
     ),
   };
 }

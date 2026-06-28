@@ -6,6 +6,7 @@ import type { RouterOutputs } from "@/shared/trpc";
  */
 
 export type Depense = RouterOutputs["depenses"]["list"][number];
+export type Trajet = RouterOutputs["depenses"]["listTrajets"][number];
 export type DepenseStats = RouterOutputs["depenses"]["stats"];
 export type Categorie = RouterOutputs["depenses"]["getCategories"][number];
 export type Budget = RouterOutputs["depenses"]["getBudgets"][number];

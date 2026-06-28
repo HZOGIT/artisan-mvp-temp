@@ -33,6 +33,7 @@ const updateSchema = z.object({
   objectifClients: z.number().int().min(0).optional(),
   couleurPrincipale: couleur.optional(),
   couleurSecondaire: couleur.optional(),
+  tauxIndemniteKm: z.string().regex(/^\d+(\.\d{1,3})?$/, "Taux kilométrique invalide (ex: 0.529)").nullish(),
 });
 
 /*

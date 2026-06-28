@@ -1,6 +1,7 @@
 import { NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IDepenseRepository, DepenseRefKind } from "./depense-repository";
+import type { IDeplacementRepository } from "./deplacement-repository";
 import type { Depense, CreateDepenseInput, UpdateDepenseInput } from "../domain/depense";
 import { calculerTva } from "./tva";
 import { round2 } from "../../../shared/money";
@@ -155,4 +156,40 @@ export async function creerIndemniteKm(repo: IDepenseRepository, ctx: TenantCont
     chantierId: input.chantierId ?? null,
     clientId: input.clientId ?? null,
   });
+}
+
+/**
+ * Convertit un trajet enregistré en dépense « indemnité kilométrique ». Idempotent : si le trajet
+ * porte déjà un `depenseId`, retourne la dépense existante sans rien créer.
+ */
+export async function convertirTrajetEnIndemnite(
+  repo: IDepenseRepository,
+  deplacementRepo: IDeplacementRepository,
+  ctx: TenantContext,
+  input: { deplacementId: number; tarifKm?: number },
+): Promise<Depense> {
+  const trajet = await deplacementRepo.getParTenant(ctx, input.deplacementId);
+  if (!trajet) throw new NotFoundError("Trajet introuvable");
+
+  if (trajet.depenseId != null) {
+    const existing = await repo.getById(ctx, trajet.depenseId);
+    if (existing) return existing;
+  }
+
+  if (!trajet.distanceKm || Number(trajet.distanceKm) <= 0) {
+    throw new ValidationError("Le trajet ne comporte pas de distance kilométrique");
+  }
+
+  const dateDepense = trajet.dateDebut.toISOString().slice(0, 10);
+  const motif = [trajet.adresseDepart, trajet.adresseArrivee].filter(Boolean).join(" → ") || undefined;
+
+  const depense = await creerIndemniteKm(repo, ctx, {
+    dateDepense,
+    kilometres: Number(trajet.distanceKm),
+    tarifKm: input.tarifKm,
+    motif,
+  });
+
+  await deplacementRepo.setDepenseId(ctx, trajet.id, depense.id);
+  return depense;
 }
