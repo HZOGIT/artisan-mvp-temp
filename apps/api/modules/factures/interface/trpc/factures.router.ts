@@ -29,6 +29,7 @@ import {
   ajouterReglement,
   creerAvoir,
   convertirDevisEnFacture,
+  facturerSituation,
 } from "../../application/write-use-cases";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
@@ -232,6 +233,18 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
       .mutation(async ({ ctx, input }) => {
         const result = await convertirDevisEnFacture(repo, devisReader, ctx.tenant, input.devisId);
         ctx.log.info({ event: "facture_depuis_devis", factureId: result.id, devisId: input.devisId }, "Devis converti en facture");
+        return result;
+      }),
+
+    /** Facturer une situation de travaux sur un devis accepté (avancement partiel). */
+    facturerSituation: protectedProcedure
+      .input(z.object({
+        devisId: z.number().int(),
+        pourcentageCumule: z.number().min(0.01).max(100),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const result = await facturerSituation(repo, devisReader, ctx.tenant, input);
+        ctx.log.info({ event: "situation_facturee", factureId: result.id, devisId: input.devisId, pourcentage: input.pourcentageCumule }, "Situation de travaux facturée");
         return result;
       }),
 

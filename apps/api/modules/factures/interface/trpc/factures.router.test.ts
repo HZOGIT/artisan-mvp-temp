@@ -377,4 +377,50 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
       await admin.query('update artisans set "franchiseTVA"=false where id=$1', [artisanA]);
     }
   });
+
+  it("facturerSituation : crée une facture au bon montant + met à jour montantDejaFacture (L3)", async () => {
+    const tA = await token(UA);
+    /** Devis accepté : totalHT=1000, totalTTC=1200 (TVA 20%). */
+    const devisRow = await admin.query(
+      'insert into devis ("artisanId","clientId",numero,statut,"totalHT","totalTVA","totalTTC","montantDejaFacture") values ($1,$2,$3,$4,$5,$6,$7,$8) returning id',
+      [artisanA, clientA, "DEV-SIT-L3", "accepte", "1000.00", "200.00", "1200.00", "0.00"],
+    );
+    const devisId = devisRow.rows[0].id as number;
+
+    /** Situation 1 : 30% → TTC attendu = 360. */
+    const r1 = await callMutation(server, "factures.facturerSituation", { devisId, pourcentageCumule: 30 }, tA);
+    expect(r1.statusCode).toBe(200);
+    const f1 = r1.json().result.data as { totalTTC: string; devisId: number; statut: string };
+    expect(f1.statut).toBe("brouillon");
+    expect(f1.devisId).toBe(devisId);
+    expect(f1.totalTTC).toBe("360.00");
+
+    const cumul1 = (await admin.query('select "montantDejaFacture" from devis where id=$1', [devisId])).rows[0].montantDejaFacture;
+    expect(cumul1).toBe("360.00");
+
+    /** Situation 2 : 70% cumulé → TTC attendu = 840 - 360 = 480. */
+    const r2 = await callMutation(server, "factures.facturerSituation", { devisId, pourcentageCumule: 70 }, tA);
+    expect(r2.statusCode).toBe(200);
+    expect((r2.json().result.data as { totalTTC: string }).totalTTC).toBe("480.00");
+
+    const cumul2 = (await admin.query('select "montantDejaFacture" from devis where id=$1', [devisId])).rows[0].montantDejaFacture;
+    expect(cumul2).toBe("840.00");
+  });
+
+  it("facturerSituation : devis non accepté → 409 ; pourcentage > 100 → 400 (L3)", async () => {
+    const tA = await token(UA);
+    const devisRow = await admin.query(
+      'insert into devis ("artisanId","clientId",numero,statut,"totalHT","totalTVA","totalTTC") values ($1,$2,$3,$4,$5,$6,$7) returning id',
+      [artisanA, clientA, "DEV-SIT-L3b", "envoye", "1000.00", "200.00", "1200.00"],
+    );
+    const devisId = devisRow.rows[0].id as number;
+    expect((await callMutation(server, "factures.facturerSituation", { devisId, pourcentageCumule: 30 }, tA)).statusCode).toBe(409);
+    expect((await callMutation(server, "factures.facturerSituation", { devisId: 99999999, pourcentageCumule: 30 }, tA)).statusCode).toBe(404);
+    /** Devis d'un autre artisan → 404 (anti-IDOR). */
+    const devisB2 = (await admin.query(
+      'insert into devis ("artisanId","clientId",numero,statut,"totalHT","totalTVA","totalTTC") values ($1,$2,$3,$4,$5,$6,$7) returning id',
+      [artisanB, clientB, "DEV-SIT-B-L3", "accepte", "500.00", "100.00", "600.00"],
+    )).rows[0].id as number;
+    expect((await callMutation(server, "factures.facturerSituation", { devisId: devisB2, pourcentageCumule: 30 }, tA)).statusCode).toBe(404);
+  });
 });

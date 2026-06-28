@@ -162,7 +162,7 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
     });
   }
 
-  createWithLignes(ctx: TenantContext, header: CreateFactureInput, lignes: readonly CreateFactureLigneInput[]): Promise<Facture> {
+  createWithLignes(ctx: TenantContext, header: CreateFactureInput, lignes: readonly CreateFactureLigneInput[], inTx?: (tx: DbClient) => Promise<void>): Promise<Facture> {
     return withTenant(this.db, ctx, async (tx) => {
       const [row] = await tx
         .insert(factures)
@@ -215,13 +215,17 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
         });
         insertedMontants.push(montants);
       }
-      if (insertedMontants.length === 0) return toFacture(row);
+      if (insertedMontants.length === 0) {
+        if (inTx) await inTx(tx);
+        return toFacture(row);
+      }
       const totaux = calculerTotaux(insertedMontants);
       const [updated] = await tx
         .update(factures)
         .set({ totalHT: totaux.totalHT, totalTVA: totaux.totalTVA, totalTTC: totaux.totalTTC, updatedAt: new Date() })
         .where(eq(factures.id, row.id))
         .returning();
+      if (inTx) await inTx(tx);
       return toFacture(updated);
     });
   }

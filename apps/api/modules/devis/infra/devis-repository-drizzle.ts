@@ -34,6 +34,7 @@ function toDevis(r: DevisRow): Devis {
     totalHT: r.totalHT ?? "0.00",
     totalTVA: r.totalTVA ?? "0.00",
     totalTTC: r.totalTTC ?? "0.00",
+    montantDejaFacture: r.montantDejaFacture ?? "0.00",
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };

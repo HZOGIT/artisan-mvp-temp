@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db/client";
 import type { TenantContext } from "../../../shared/tenant";
 
 /*
@@ -21,6 +22,7 @@ export interface DevisReadModel {
   readonly totalHT: string;
   readonly totalTVA: string;
   readonly totalTTC: string;
+  readonly montantDejaFacture: string;
 }
 
 export interface DevisLigneReadModel {
@@ -46,4 +48,8 @@ export interface IDevisReader {
   getDevis(ctx: TenantContext, devisId: number): Promise<DevisReadModel | null>;
   /** [] si le devis n'appartient pas au tenant (scope via le devis parent). */
   getLignes(ctx: TenantContext, devisId: number): Promise<DevisLigneReadModel[]>;
+  /** Met à jour montantDejaFacture (TTC cumulé des situations émises). Scopé tenant. */
+  updateMontantDejaFacture(ctx: TenantContext, devisId: number, montant: string): Promise<void>;
+  /** Intra-transaction (SELECT FOR UPDATE) : ajoute delta TTC au cumul courant + valide anti-dépassement. */
+  updateMontantDejaFactureTx(tx: DbClient, ctx: TenantContext, devisId: number, delta: string): Promise<void>;
 }
