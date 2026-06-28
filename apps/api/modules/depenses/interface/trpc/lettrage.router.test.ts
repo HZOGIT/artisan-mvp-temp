@@ -18,7 +18,15 @@ const jwt = () =>
     .setExpirationTime("1h")
     .sign(new TextEncoder().encode(SECRET));
 
-/** L3 e2e : router depenses.rapprocher + getSuggestionsRapprochement */
+/**
+ * L3 e2e : router depenses.rapprocher + getSuggestionsRapprochement.
+ *
+ * La facture est créée via le flux tRPC complet (create→addLigne→envoyer) afin que les
+ * écritures de vente (VE) soient générées ET validées — exactement comme en production.
+ * Conséquence : rapprocher→payer→marquerFacturePayee appelle genererEcrituresVente sur des
+ * écritures déjà validées → 409 tant qu'OPE-666 n'est pas mergée. Ces tests sont donc
+ * intentionnellement ROUGES avant OPE-666 et VERTS après.
+ */
 describe.skipIf(!URL || !APP_URL)("lettrage.router L3", () => {
   const admin = new Pool({ connectionString: URL });
   let app: ReturnType<typeof buildApp>;
@@ -28,6 +36,7 @@ describe.skipIf(!URL || !APP_URL)("lettrage.router L3", () => {
 
   const cleanup = async () => {
     await admin.query("delete from ecritures_comptables where \"artisanId\"=$1", [ARTISAN_ID]);
+    await admin.query("delete from factures_lignes where \"factureId\" in (select id from factures where \"artisanId\"=$1)", [ARTISAN_ID]);
     await admin.query("delete from transactions_bancaires where artisan_id=$1", [ARTISAN_ID]);
     await admin.query("delete from factures where \"artisanId\"=$1", [ARTISAN_ID]);
     await admin.query("delete from clients where \"artisanId\"=$1", [ARTISAN_ID]);
@@ -47,21 +56,36 @@ describe.skipIf(!URL || !APP_URL)("lettrage.router L3", () => {
       [ARTISAN_ID, "Client Rapprochement", "client@test.fr"],
     );
     const clientId = (cRows[0] as { id: number }).id;
-    /** Facture envoyée (état classique pour rapprochement) */
-    const { rows: fRows } = await admin.query(
-      `insert into factures ("artisanId","clientId","dateFacture",statut,"totalHT","totalTVA","totalTTC","montantPaye","typeDocument")
-       values ($1,$2,now(),'envoyee','1000.00','200.00','1200.00','0.00','facture') returning id`,
-      [ARTISAN_ID, clientId],
-    );
-    factureId = (fRows[0] as { id: number }).id;
-    /** Transaction créditrice non rapprochée */
+
+    app = buildApp({ jwtSecret: SECRET });
+    token = await jwt();
+
+    /**
+     * Création de la facture via flux tRPC complet (create → addLigne → envoyer).
+     * Ceci génère ET valide les écritures de vente (VE) — identique au chemin de production.
+     * Ne pas substituer par un INSERT SQL brut : aucune écriture ne serait créée, le test
+     * deviendrait false-green (pas de 409 au rapprochement).
+     */
+    const created = await injectTrpc(app, "POST", "factures.create", { clientId, objet: "Travaux test lettrage" }, token);
+    expect(created.statusCode).toBe(200);
+    factureId = (created.json().result.data as { id: number }).id;
+
+    await injectTrpc(app, "POST", "factures.addLigne", {
+      factureId,
+      designation: "Main d'œuvre",
+      quantite: "1",
+      prixUnitaireHT: "1000.00",
+      tauxTVA: "20",
+    }, token);
+
+    const envoyee = await injectTrpc(app, "POST", "factures.envoyer", { id: factureId }, token);
+    expect(envoyee.statusCode).toBe(200);
+
     const { rows: tRows } = await admin.query(
       "insert into transactions_bancaires (artisan_id,date_transaction,libelle,montant,type_transaction,ignoree) values ($1,'2026-06-15','VIR CLIENT','1200.00','credit',false) returning id",
       [ARTISAN_ID],
     );
     transactionId = (tRows[0] as { id: number }).id;
-    app = buildApp({ jwtSecret: SECRET });
-    token = await jwt();
   });
 
   afterAll(async () => {
@@ -76,27 +100,27 @@ describe.skipIf(!URL || !APP_URL)("lettrage.router L3", () => {
     const data = res.json().result.data as Array<{ transaction: { id: number }; suggestions: Array<{ id: number; score: number }> }>;
     const item = data.find((d) => d.transaction.id === transactionId);
     expect(item).toBeDefined();
-    /** Montant exact → meilleure suggestion est notre facture */
     const best = item?.suggestions[0];
     expect(best?.id).toBe(factureId);
     expect(best?.score).toBeGreaterThanOrEqual(100);
   });
 
-  it("rapprocher → facture payée, transaction.factureId posé, écritures générées", async () => {
+  /**
+   * Intentionnellement ROUGE avant OPE-666 (fix genererEcrituresVente sur écritures validées).
+   * VERT après : facture payée, transaction.factureId posé, pièce BQ générée.
+   */
+  it("rapprocher → facture payée, transaction.factureId posé, écritures BQ générées", async () => {
     const res = await injectTrpc(app, "POST", "depenses.rapprocher", { transactionId, factureId }, token);
     expect(res.statusCode).toBe(200);
     expect(res.json().result.data).toEqual({ success: true });
 
-    /** Facture est maintenant payée */
     const { rows: fRows } = await admin.query("select statut, \"montantPaye\" from factures where id=$1", [factureId]);
     expect((fRows[0] as { statut: string }).statut).toBe("payee");
     expect(Number((fRows[0] as { montantPaye: string }).montantPaye)).toBeCloseTo(1200);
 
-    /** Transaction a son factureId posé */
     const { rows: tRows } = await admin.query("select facture_id from transactions_bancaires where id=$1", [transactionId]);
     expect((tRows[0] as { facture_id: number }).facture_id).toBe(factureId);
 
-    /** Écritures d'encaissement générées (BQ) */
     const { rows: eRows } = await admin.query(
       "select count(*) as n from ecritures_comptables where \"artisanId\"=$1 and journal='BQ' and \"factureId\"=$2",
       [ARTISAN_ID, factureId],
@@ -104,14 +128,13 @@ describe.skipIf(!URL || !APP_URL)("lettrage.router L3", () => {
     expect(Number((eRows[0] as { n: string }).n)).toBeGreaterThanOrEqual(2);
   });
 
-  it("rapprocher idempotent : ré-appel avec même factureId → success sans doublons", async () => {
+  it("rapprocher idempotent : ré-appel avec même factureId → success sans doublons BQ", async () => {
     const before = await admin.query(
       "select count(*) as n from ecritures_comptables where \"artisanId\"=$1 and journal='BQ' and \"factureId\"=$2",
       [ARTISAN_ID, factureId],
     );
     const res = await injectTrpc(app, "POST", "depenses.rapprocher", { transactionId, factureId }, token);
     expect(res.statusCode).toBe(200);
-    /** Pas de doublon d'écritures : l'idempotence vient de genererEcrituresEncaissement (purge+réinsert) */
     const after = await admin.query(
       "select count(*) as n from ecritures_comptables where \"artisanId\"=$1 and journal='BQ' and \"factureId\"=$2",
       [ARTISAN_ID, factureId],
