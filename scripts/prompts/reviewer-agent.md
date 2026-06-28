@@ -40,7 +40,6 @@ Variables : `B=origin/feat/<session>` (fetch d'abord : `git fetch origin feat/<s
 - [ ] **Idempotence** des effets de bord sur transition (décrément stock, écritures, envoi) : gardé contre le re-déclenchement (ex. early-return si `statut === cible`) + **test qui le prouve**.
 - [ ] **Argent** : jamais de concat de strings de montants ; arrondis via le helper money. **Dates** : attention au mix `toISOString()` (UTC) / `getDay()` (local) — cohérent seulement si runtime UTC.
 - [ ] **Convention** : pas de `//` dans `apps/api`/`apps/web/src` ; pas de `OPE-XXX` en commentaire de code (OK en commit) ; fan-out events = template outbox.
-- [ ] **Findings Greptile** valides traités (cf. §b-bis).
 
 ### G4 — Merge → cleanup → deploy (séquencé, JAMAIS batché)
 - [ ] `gh pr merge <n> --squash` **PUIS vérifier `state == MERGED`** AVANT tout cleanup. Un merge `CONFLICTING` échoue silencieusement ; supprimer la branche derrière fermerait la PR (recovery via le sha de l'objet).
@@ -136,59 +135,9 @@ depuis le worktree (`DATABASE_URL=… APP_DATABASE_URL=… pnpm exec tsx apps/ap
 une migration au même numéro depuis la création de la PR, demande au worker de **rebaser sur `origin/staging`
 puis RÉGÉNÉRER** sa migration via `drizzle-kit generate` (jamais éditer `_journal.json` à la main).
 
-#### b-bis. Traiter les findings Greptile (revue automatique)
-
-Greptile analyse chaque PR et classe ses findings par sévérité (P0/P1/P2/P3). **Tu dois les lire et
-t'assurer qu'ils sont traités** avant tout merge. Deux sources, complémentaires :
-
-**(A) CLI `greptile` — RECOMMANDÉ, plus rapide sur le HEAD courant.** Le CLI est installé et connecté
-(`greptile whoami` → `dev@operioz.com`, org Operioz). Il review la branche **courante** contre sa base,
-donc lance-le **depuis le worktree** de la PR (sur la branche `feat/<session>`) :
-
-```bash
-cd /tmp/wt-<session>
-greptile review -b staging --agent          # sortie texte parsable (alias de --text, pour agents)
-# ou, pour parser programmatiquement :
-greptile review -b staging --agent --json
-```
-
-- `--agent` = sortie plate sans couleurs/animations (idéale pour toi). `--json` = findings structurés.
-- Avantage vs le bot GitHub : tu obtiens les findings sur le **dernier commit** sans attendre que le bot
-  re-poste (utile aux rounds 2+ juste après un push worker).
-- ⚠️ Une review CLI peut prendre **1 à 4 min** (indexation/analyse). Lance-la **une seule fois par round**,
-  en parallèle de tes gates (tsc/lint/tests) pendant qu'elle tourne — ne la relance pas en boucle.
-- `greptile review --resume` reprend une review interrompue ; `greptile review show <id>` rouvre une review passée.
-
-**(B) Commentaires du bot GitHub `greptile-apps[bot]`** — fallback / recoupement (le bot tourne
-automatiquement à chaque push, ses commentaires sont déjà sur la PR) :
-
-```bash
-# Corps de la review Greptile (résumé + score de confiance)
-gh api repos/HZOGIT/artisan-mvp-temp/pulls/<numero>/reviews \
-  --jq '.[] | select(.user.login=="greptile-apps") | {state, body}'
-
-# Commentaires inline (les findings concrets, avec sévérité Pn et suggestions de code)
-gh api repos/HZOGIT/artisan-mvp-temp/pulls/<numero>/comments \
-  --jq '.[] | select(.user.login=="greptile-apps[bot]") | {path, line, body}'
-```
-
-Utilise (A) en premier pour la rapidité ; recoupe avec (B) si le bot a déjà commenté. Dans les deux cas,
-**évalue chaque finding toi-même** (cf. ci-dessous) — ne l'applique jamais aveuglément.
-
-Pour chaque finding Greptile :
-- **Évalue-le toi-même** (Greptile peut se tromper ou flagger du pré-existant hors périmètre — ne l'applique pas aveuglément).
-- S'il est **valide et pertinent** (bug, incohérence client/serveur, sécurité, etc.) → il fait partie des
-  **corrections demandées** (étape c) : liste-le explicitement dans ton commentaire et demande au worker de le traiter.
-- S'il est **non applicable** (faux positif, hors périmètre, choix assumé) → note-le dans ton commentaire de review
-  avec la justification, et n'en fais pas un blocage.
-
-**Vérifie que le worker a bien traité les commentaires Greptile** : au tour suivant, contrôle que chaque finding
-valide a été soit corrigé dans le code, soit explicitement résolu/répondu sur GitHub. Ne merge pas tant qu'un finding
-Greptile valide reste ouvert et non justifié.
-
 #### c. Décision : corrections nécessaires
 
-Si tu trouves des problèmes (tsc échoue, lint error, bug logique, violation d'architecture, règle `//` dans le code, **finding Greptile valide non traité**, etc.) :
+Si tu trouves des problèmes (tsc échoue, lint error, bug logique, violation d'architecture, règle `//` dans le code, etc.) :
 
 **1. Poster un commentaire GitHub détaillé :**
 ```bash
@@ -225,7 +174,7 @@ Puis passe à la PR suivante — tu reviendras sur celle-ci à la prochaine ité
 
 #### d. Décision : PR approuvée
 
-Si tsc passe, lint sans `error`, **les findings Greptile valides sont traités (corrigés ou justifiés)**, et le code est correct :
+Si tsc passe, lint sans `error`, et le code est correct :
 
 **1. Merger (squash) — depuis le repo principal.**
 ```bash
