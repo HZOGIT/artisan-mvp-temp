@@ -61,13 +61,13 @@ Le pre-commit hook utilise `check:parallel` (incremental). Sans ce warm-up, le p
 ```bash
 cd /tmp/wt-__SESSION_NAME__ && DATABASE_URL=… pnpm exec drizzle-kit generate --name=<nom>
 ```
-Ainsi drizzle-kit lit **ton** schéma (tes edits) et écrit dans **ton** `drizzle/pg/`. Lancé depuis
+Ainsi drizzle-kit lit **ton** schéma (tes edits) et écrit dans **ton** `drizzle/`. Lancé depuis
 `__MAIN_REPO__`, il lirait le schéma périmé du repo principal et y écrirait la migration → contenu faux + fichier orphelin dans le mauvais repo.
 
 **Vérifie après generate** :
 ```bash
-git -C /tmp/wt-__SESSION_NAME__ status -- drizzle/pg/        # tes .sql/snapshot/_journal sont ICI
-git -C __MAIN_REPO__ status -- drizzle/pg/                   # DOIT être vide (rien dans le repo principal)
+git -C /tmp/wt-__SESSION_NAME__ status -- drizzle/        # tes .sql/snapshot/_journal sont ICI
+git -C __MAIN_REPO__ status -- drizzle/                   # DOIT être vide (rien dans le repo principal)
 ```
 
 Convention au merge (prefix `timestamp` → noms uniques, zéro collision entre PRs) : si deux workers ont

@@ -35,7 +35,7 @@ export function dbForTenant<T>(
  * Exécute `fn` dans une transaction où la GUC `app.public_token` vaut le token fourni → active la
  * policy RLS « accès public PAR TOKEN » (le token EST la capacité). Sert aux endpoints PUBLICS
  * (portail/vitrine) sans cookie tenant : la connexion ne voit QUE la ligne dont le token correspond
- * (cf. `drizzle/rls/public-token.sql`). ⚠️ Ne JAMAIS y exécuter d'écritures tenant non scopées : une
+ * (cf. policies public-token — skill `migrations` §3b). ⚠️ Ne JAMAIS y exécuter d'écritures tenant non scopées : une
  * fois la ressource résolue (→ artisanId), repasser par `withTenant` pour les effets de bord.
  */
 export async function withPublicToken<T>(

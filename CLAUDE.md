@@ -7,7 +7,7 @@ Instructions et conventions pour les agents Claude Code travaillant sur ce proje
 Le plugin [ponytail](https://github.com/DietrichGebert/ponytail) est installé globalement sur ce serveur.
 Il injecte automatiquement une règle YAGNI dans chaque session agent via 3 hooks : `SessionStart` (démarrage), `SubagentStart` (sous-agents Task-spawned), `UserPromptSubmit` (commandes `/ponytail` et `stop ponytail` — léger, exit silencieux si pas de commande ponytail).
 
-**Principe** : avant d'écrire du code, grimper l'échelle — YAGNI → stdlib → plateforme native → dépendance existante → une ligne → minimum viable. Détail : `.claude/skills/ponytail.md`.
+**Principe** : avant d'écrire du code, grimper l'échelle — YAGNI → stdlib → plateforme native → dépendance existante → une ligne → minimum viable. Détail : `docs/ponytail.md`.
 
 **Commandes** : `/ponytail`, `/ponytail lite|full|ultra`, `/ponytail-review`, `stop ponytail`.
 
@@ -15,7 +15,7 @@ Il injecte automatiquement une règle YAGNI dans chaque session agent via 3 hook
 
 ## Lancer une session agent
 
-Voir le skill → `.claude/skills/launch-agent.md`
+Voir le skill → `.claude/skills/launch-agent/SKILL.md` (ou `/launch-agent`)
 
 **Principe** : le plan détaillé d'une tâche vit dans un **commentaire Linear** (pas dans un fichier
 `.md` commité). Le script génère un bootstrap prompt qui dit à la session d'aller le lire.
@@ -176,50 +176,27 @@ tsc -p tsconfig.web.json --noEmit   # frontend seul (strict)
 
 ## Provisionner la base (schéma + RLS)
 
-Stack 100% PostgreSQL. Le schéma **ET** la sécurité niveau ligne (RLS) sont provisionnés par
-**une seule chaîne de migrations Drizzle** (`drizzle/pg/`) — y compris l'isolation multi-tenant
-(`0003_rls-tenant-isolation`) et l'accès public par token (`0004_rls-public-token`). Une base neuve
-n'a donc plus besoin d'aucun script RLS manuel.
+> 📖 **Détail complet** (générer une migration, RLS en SQL custom, squash en préservant les données,
+> pg-boss, migrer la BDD de test e2e) → skill **`migrations`** : `.claude/skills/migrations/SKILL.md`.
 
-**⚠️ Créer une migration — TOUJOURS via drizzle-kit, JAMAIS à la main**
-
-**Règle : deux migrations pour toute évolution de schéma significative**
-
-1. **Migration auto** (tables, colonnes, FK simples, UNIQUE standards) — drizzle-kit diff automatique :
-   ```bash
-   DATABASE_URL=postgres://artisan_user:artisan_password@localhost:5432/artisan_mvp \
-     pnpm drizzle-kit generate
-   # → drizzle/pg/XXXX_<nom-auto>.sql + entrée journal automatique
-   ```
-
-2. **Migration custom** (ce que Drizzle ne peut PAS auto-générer : index partiels `WHERE`, CHECK constraints, triggers, self-ref FK, RLS) :
-   ```bash
-   DATABASE_URL=... pnpm drizzle-kit generate --custom --name=<même-nom>-extras
-   # → drizzle/pg/XXXX_<nom>-extras.sql VIDE + entrée journal
-   # Remplir le SQL, puis : pnpm check ; redémarre le stack (task stack:restart) → appliqué au boot
-   ```
-
-Ne jamais créer un fichier `.sql` à la main ni éditer `drizzle/pg/meta/_journal.json` manuellement — drizzle-kit gère l'idx, le timestamp et l'entrée journal de façon atomique.
-
-**Provision = AUTOMATIQUE au boot du serveur** (plus aucune étape manuelle oubliable). Au démarrage,
-`apps/api/shared/db/provision-database.ts` exécute, sous un `pg_advisory_lock` (sûr en multi-réplicas)
-et via la connexion OWNER (`DATABASE_URL`) :
-1. **migrations** (schéma + RLS) par le SDK Drizzle `migrate()` ;
-2. **(ré)assure le rôle applicatif** `app_tenant` (non-superuser, GRANTs + `ALTER DEFAULT PRIVILEGES`),
-   provisionné à partir des identifiants de `APP_DATABASE_URL` (**source unique** du secret app).
-Puis le serveur **refuse de démarrer** si le rôle runtime peut contourner la RLS (fail-closed).
+Stack 100% PostgreSQL. Schéma **ET** RLS = **une seule chaîne de migrations Drizzle** (dossier **`drizzle/`**),
+appliquée **automatiquement au boot** par `apps/api/shared/db/provision-database.ts` (sous `pg_advisory_lock`) :
+`migrate()` (schéma + RLS) → (ré)assure le rôle `app_tenant` → **fail-closed** si le rôle runtime peut
+contourner la RLS. Une base neuve n'a besoin d'aucun script manuel.
 
 **Deux rôles, deux URLs** (nommées par rôle, jamais croisées) :
 - `DATABASE_URL` = `artisan_user` (owner) → provision au boot (migrations + grants). Connexion **éphémère**.
 - `APP_DATABASE_URL` = `app_tenant` (non-superuser, RLS) → pool runtime qui sert **toutes** les requêtes.
 
-**⚠️ Ne JAMAIS appliquer les migrations manuellement.** Après `drizzle-kit generate`, il suffit de déployer : `./scripts/deploy-backend.sh` reconstruit le conteneur et les migrations s'appliquent automatiquement au boot. Pas de `drizzle-kit migrate`, pas de `psql`, pas de `task stack:restart` pour ça.
-
-**Faire évoluer la RLS** (ne JAMAIS éditer une migration appliquée — toujours une nouvelle migration custom append) :
-- **Tenant** (nouvelle table avec `artisanId`/`artisan_id`) : `node scripts/rls/generate-tenant-rls.mjs`
-  réintrospecte et crée une nouvelle migration custom **seulement si l'ensemble a changé** (sinon no-op).
-- **Public-token** : éditer `drizzle/rls/public-token.sql` (référence) puis créer une migration custom à la main
-  (cf. `0004`). `drizzle-kit generate --custom --name=… ` crée le fichier vide + l'entrée `_journal.json` à remplir.
+**Règles** (recettes détaillées dans la skill) :
+- **Migration auto** : `pnpm drizzle-kit generate` → `drizzle/<ts>_<nom>.sql` + journal + snapshot (atomique).
+  **Jamais** de `.sql` ni d'édition de `drizzle/meta/_journal.json` à la main.
+- **Migration custom** (ce que drizzle-kit ne génère PAS : RLS, CHECK, index partiels `WHERE`, triggers,
+  self-ref FK) : `drizzle-kit generate --custom --name=<nom>` puis remplir le SQL. RLS tenant :
+  `node scripts/rls/generate-tenant-rls.mjs`. RLS public-token : SQL canonique dans la skill.
+- **Ne JAMAIS appliquer à la main** (`drizzle-kit migrate`/`psql`/`task stack:restart`) : déployer suffit
+  (`./scripts/deploy-backend.sh`). BDD de **test** en retard (gate L2/L3/e2e → `column … does not exist`) :
+  **`task db:provision`**.
 
 ## Setup & Seeding
 
