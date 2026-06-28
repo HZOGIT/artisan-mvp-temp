@@ -1,4 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
+import type { FactureReadModel } from "../../ecritures/application/facture-reader";
 
 /*
  * Port d'effet de bord vers la **comptabilité** (génération des écritures FEC + inaltérabilité). Le domaine
@@ -11,7 +12,7 @@ import type { TenantContext } from "../../../shared/tenant";
  */
 export interface ComptaPort {
   genererEcrituresVente(ctx: TenantContext, factureId: number): Promise<void>;
-  genererEcrituresEncaissement(ctx: TenantContext, factureId: number): Promise<void>;
+  genererEcrituresEncaissement(ctx: TenantContext, factureId: number, facture?: FactureReadModel): Promise<void>;
   validerEcritures(ctx: TenantContext, factureId: number): Promise<void>;
 }
 

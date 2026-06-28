@@ -1,7 +1,7 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { ComptaPort } from "../../factures/application/compta-port";
 import type { IEcritureRepository } from "../application/ecriture-repository";
-import type { IFactureReader } from "../application/facture-reader";
+import type { IFactureReader, FactureReadModel } from "../application/facture-reader";
 import { genererEcrituresVente, genererEcrituresEncaissement, validerEcritures } from "../application/generation-use-cases";
 
 /*
@@ -21,8 +21,8 @@ export class ComptaEcrituresAdapter implements ComptaPort {
     await genererEcrituresVente(this.ecritureRepo, this.factureReader, ctx, factureId);
   }
 
-  async genererEcrituresEncaissement(ctx: TenantContext, factureId: number): Promise<void> {
-    await genererEcrituresEncaissement(this.ecritureRepo, this.factureReader, ctx, factureId);
+  async genererEcrituresEncaissement(ctx: TenantContext, factureId: number, facture?: FactureReadModel): Promise<void> {
+    await genererEcrituresEncaissement(this.ecritureRepo, this.factureReader, ctx, factureId, facture);
   }
 
   async validerEcritures(ctx: TenantContext, factureId: number): Promise<void> {

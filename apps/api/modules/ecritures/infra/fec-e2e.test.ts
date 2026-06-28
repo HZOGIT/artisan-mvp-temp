@@ -58,8 +58,8 @@ describe.skipIf(!URL)("FEC e2e (facture → écritures comptables équilibrées 
       await purge(uid);
       await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [uid, `u${uid}@t.fr`]);
     }
-    artisanA = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UA])).rows[0].id;
-    artisanB = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UB])).rows[0].id;
+    artisanA = (await admin.query('insert into artisans ("userId", "siret") values ($1, $2) returning id', [UA, '12345678901234'])).rows[0].id;
+    artisanB = (await admin.query('insert into artisans ("userId", "siret") values ($1, $2) returning id', [UB, '12345678901235'])).rows[0].id;
     clientA = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [artisanA, "Client A"])).rows[0].id;
     // ⚠️ adapter sur app.db (même connexion app_tenant que le repo factures) → la lecture facture voit le seed.
     const compta = new ComptaEcrituresAdapter(ecritureRepo, new FactureReaderDrizzle(app.db));

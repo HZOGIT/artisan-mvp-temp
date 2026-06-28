@@ -1,7 +1,6 @@
 import type { TenantContext } from "../../../shared/tenant";
-import { ConflictError } from "../../../shared/errors";
 import type { IEcritureRepository } from "./ecriture-repository";
-import type { IFactureReader } from "./facture-reader";
+import type { IFactureReader, FactureReadModel } from "./facture-reader";
 import type { EcritureComptable, CreateEcritureInput } from "../domain/ecriture";
 import { COMPTE_CLIENT, COMPTE_VENTES, COMPTE_BANQUE, compteTvaCollectee } from "./comptes";
 
@@ -82,7 +81,7 @@ export async function genererEcrituresVente(
   }
 
   if (await ecritureRepo.hasValidatedEcritures(ctx, factureId)) {
-    throw new ConflictError("Écritures comptables déjà validées — non modifiables");
+    return [];
   }
 
   await ecritureRepo.deleteByFacture(ctx, factureId);
@@ -101,19 +100,20 @@ export async function genererEcrituresEncaissement(
   factureReader: IFactureReader,
   ctx: TenantContext,
   factureId: number,
+  facture?: FactureReadModel,
 ): Promise<EcritureComptable[]> {
-  const facture = await factureReader.getFacture(ctx, factureId);
-  if (!facture) return [];
+  const _facture = facture ?? (await factureReader.getFacture(ctx, factureId));
+  if (!_facture) return [];
 
   /** Idempotence sélective (BQ uniquement — on ne touche pas la vente VE). */
   await ecritureRepo.deleteByFactureJournal(ctx, factureId, "BQ");
 
-  const ttc = Number(facture.totalTTC) || 0;
+  const ttc = Number(_facture.totalTTC) || 0;
   /** pas réglée / avoir → pas d'encaissement */
-  if (facture.statut !== "payee" || ttc <= 0) return [];
+  if (_facture.statut !== "payee" || ttc <= 0) return [];
 
-  const dateEcriture = facture.datePaiement ?? facture.dateFacture;
-  const pieceRef = facture.numero ?? "";
+  const dateEcriture = _facture.datePaiement ?? _facture.dateFacture;
+  const pieceRef = _facture.numero ?? "";
   const libelle = `Règlement ${pieceRef}`;
   const lettrage = `VL${factureId}`;
   const base = { dateEcriture, journal: "BQ" as const, pieceRef, libelle, factureId, lettrage };
