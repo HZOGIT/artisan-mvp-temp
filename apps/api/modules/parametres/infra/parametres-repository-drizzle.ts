@@ -40,6 +40,7 @@ function toParametres(r: ParametresRow): ParametresArtisan {
     objectifClients: r.objectifClients ?? D.objectifClients,
     couleurPrincipale: r.couleurPrincipale ?? D.couleurPrincipale,
     couleurSecondaire: r.couleurSecondaire ?? D.couleurSecondaire,
+    tauxIndemniteKm: r.tauxIndemniteKm ?? null,
   };
 }
 
@@ -66,6 +67,7 @@ function toConfigSet(input: UpdateParametresInput): Partial<ParametresInsert> {
   if (input.objectifClients !== undefined) set.objectifClients = input.objectifClients;
   if (input.couleurPrincipale !== undefined) set.couleurPrincipale = input.couleurPrincipale;
   if (input.couleurSecondaire !== undefined) set.couleurSecondaire = input.couleurSecondaire;
+  if (input.tauxIndemniteKm !== undefined) set.tauxIndemniteKm = input.tauxIndemniteKm;
   return set;
 }
 

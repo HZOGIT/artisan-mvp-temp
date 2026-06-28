@@ -1,10 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { FakeDepenseRepository } from "../infra/depense-repository-fake";
-import { creerDepense, modifierDepense, supprimerDepense, creerIndemniteKm } from "./write-use-cases";
+import { creerDepense, modifierDepense, supprimerDepense, creerIndemniteKm, convertirTrajetEnIndemnite } from "./write-use-cases";
 import type { CreerDepenseInput } from "./write-use-cases";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import { NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
+import type { IDeplacementRepository, Trajet } from "./deplacement-repository";
+import type { DbClient } from "../../../shared/db";
 
 const A: TenantContext = { artisanId: 1, userId: 10 };
 const B: TenantContext = { artisanId: 2, userId: 20 };
@@ -185,5 +187,73 @@ describe("depenses — creerIndemniteKm", () => {
     repo.registerRef(1, "client", 555);
     const d = await creerIndemniteKm(repo, A, { dateDepense: "2026-06-15", kilometres: 10, clientId: 555 });
     expect(d.clientId).toBe(555);
+  });
+});
+
+/** Fake minimal pour les tests de convertirTrajetEnIndemnite (L1 — sans DB). */
+class FakeDeplacementRepository implements IDeplacementRepository {
+  private store: Trajet[] = [];
+  private depenseIds = new Map<number, number>();
+
+  seed(t: Trajet) { this.store.push(t); }
+
+  async getParTenant(_ctx: TenantContext, id: number): Promise<Trajet | null> {
+    const t = this.store.find((x) => x.id === id) ?? null;
+    if (!t) return null;
+    return { ...t, depenseId: this.depenseIds.get(id) ?? t.depenseId };
+  }
+
+  async listParTenant(_ctx: TenantContext): Promise<Trajet[]> { return this.store; }
+
+  async setDepenseId(_ctx: TenantContext, id: number, depenseId: number): Promise<void> {
+    this.depenseIds.set(id, depenseId);
+  }
+
+  withDb(_db: DbClient): FakeDeplacementRepository { return this; }
+}
+
+const trajetBase = (): Trajet => ({
+  id: 1,
+  technicienId: 10,
+  interventionId: null,
+  dateDebut: new Date("2026-06-15"),
+  distanceKm: "42.5",
+  adresseDepart: "Paris",
+  adresseArrivee: "Lyon",
+  depenseId: null,
+});
+
+describe("convertirTrajetEnIndemnite", () => {
+  it("L1 — calcule le montant (km × taux) et crée la dépense IK", async () => {
+    const repo = new FakeDepenseRepository();
+    const deplRepo = new FakeDeplacementRepository();
+    deplRepo.seed(trajetBase());
+    const d = await convertirTrajetEnIndemnite(repo, deplRepo, A, { deplacementId: 1, tarifKm: 0.5 });
+    expect(d.montantHt).toBe("21.25"); // round2(42.5 × 0.5)
+    expect(d.tvaDeductible).toBe(false);
+    expect(d.remboursable).toBe(true);
+  });
+
+  it("L1 — idempotent : 2e appel retourne la même dépense, pas de doublon", async () => {
+    const repo = new FakeDepenseRepository();
+    const deplRepo = new FakeDeplacementRepository();
+    deplRepo.seed(trajetBase());
+    const d1 = await convertirTrajetEnIndemnite(repo, deplRepo, A, { deplacementId: 1, tarifKm: 0.5 });
+    const d2 = await convertirTrajetEnIndemnite(repo, deplRepo, A, { deplacementId: 1, tarifKm: 0.5 });
+    expect(d2.id).toBe(d1.id);
+    expect((await repo.list(A)).length).toBe(1);
+  });
+
+  it("L1 — trajet introuvable → NotFoundError", async () => {
+    const repo = new FakeDepenseRepository();
+    const deplRepo = new FakeDeplacementRepository();
+    await expect(convertirTrajetEnIndemnite(repo, deplRepo, A, { deplacementId: 99 })).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("L1 — trajet sans distanceKm → ValidationError", async () => {
+    const repo = new FakeDepenseRepository();
+    const deplRepo = new FakeDeplacementRepository();
+    deplRepo.seed({ ...trajetBase(), distanceKm: null });
+    await expect(convertirTrajetEnIndemnite(repo, deplRepo, A, { deplacementId: 1 })).rejects.toBeInstanceOf(ValidationError);
   });
 });

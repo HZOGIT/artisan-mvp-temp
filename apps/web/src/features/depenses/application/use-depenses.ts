@@ -1,5 +1,5 @@
 import { trpc } from "@/shared/trpc";
-import type { Budget, Categorie, Depense, KmClient } from "../domain/depense";
+import type { Budget, Categorie, Depense, KmClient, Trajet } from "../domain/depense";
 
 /*
  * Couche APPLICATION de la feature `depenses` (clean-archi) : SEULE couche important tRPC.
@@ -36,4 +36,18 @@ export function useIndemniteKm() {
   });
   const clients: KmClient[] = clientsQ.data ?? [];
   return { clients, creer };
+}
+
+/** Trajets enregistrés + conversion en indemnité kilométrique. */
+export function useTrajets() {
+  const utils = trpc.useUtils();
+  const trajetsQ = trpc.depenses.listTrajets.useQuery();
+  const convertir = trpc.depenses.convertirTrajet.useMutation({
+    onSuccess: () => {
+      utils.depenses.list.invalidate();
+      utils.depenses.listTrajets.invalidate();
+    },
+  });
+  const trajets: Trajet[] = trajetsQ.data ?? [];
+  return { trajets, convertir, isLoading: trajetsQ.isLoading };
 }

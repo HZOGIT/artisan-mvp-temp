@@ -219,6 +219,7 @@ import { registerVoiceRoute } from "./interface/http/voice-route";
 import { ConseilsStatsReaderDrizzle as AssistantStatsReaderDrizzle } from "./modules/conseils-ia/infra/conseils-stats-reader-drizzle";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
+import { DeplacementRepositoryDrizzle } from "./modules/depenses/infra/deplacement-repository-drizzle";
 import { createDevisModule } from "./modules/devis/devis.module";
 import { DevisRepositoryDrizzle } from "./modules/devis/infra/devis-repository-drizzle";
 import { FacturesDevisToFactureConverter } from "./modules/devis/infra/factures-devis-to-facture-converter";
@@ -702,6 +703,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     ocr: deps.ocrVision
       ? { vision: deps.ocrVision, rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000) }
       : { vision: new GeminiVisionAdapter(), rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000) },
+    deplacementRepository: new DeplacementRepositoryDrizzle(getDbHandle().db),
   });
   const devis = createDevisModule({
     repository: devisRepo,

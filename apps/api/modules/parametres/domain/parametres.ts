@@ -42,6 +42,8 @@ export interface ParametresArtisan {
   /** — Marque — */
   readonly couleurPrincipale: string;
   readonly couleurSecondaire: string;
+  /** Taux €/km pour les indemnités kilométriques (nullable = non configuré → fallback 0.529). */
+  readonly tauxIndemniteKm: string | null;
 }
 
 /** Champs modifiables via la configuration. ⚠️ AUCUN compteur ici (inviolables via la config). */
@@ -63,6 +65,7 @@ export interface UpdateParametresInput {
   readonly objectifClients?: number;
   readonly couleurPrincipale?: string;
   readonly couleurSecondaire?: string;
+  readonly tauxIndemniteKm?: string | null;
 }
 
 /*
@@ -92,5 +95,6 @@ export function defaultParametres(artisanId: number): ParametresArtisan {
     objectifClients: 0,
     couleurPrincipale: "#4F46E5",
     couleurSecondaire: "#6366F1",
+    tauxIndemniteKm: null,
   };
 }

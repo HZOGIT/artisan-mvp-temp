@@ -80,6 +80,7 @@ export const parametresArtisan = pgTable("parametres_artisan", {
   conditionsPaiementDefaut: text("conditionsPaiementDefaut"),
   delaiPaiementJours: integer("delaiPaiementJours"),
   delaiPaiementType: delaiPaiementTypeEnum("delaiPaiementType").default("net"),
+  tauxIndemniteKm: numeric("tauxIndemniteKm", { precision: 6, scale: 3 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
 });

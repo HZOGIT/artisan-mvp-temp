@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "@/shared/router/navigation";
 import { useTranslation } from "react-i18next";
-import { useDepenses, useIndemniteKm } from "../application/use-depenses";
+import { useDepenses, useIndemniteKm, useTrajets } from "../application/use-depenses";
 import {
   budgetTotal,
   buildTrajetMotif,
@@ -13,6 +13,7 @@ import {
   type Categorie,
   type Depense,
   type KmClient,
+  type Trajet,
 } from "../domain/depense";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
@@ -376,7 +377,78 @@ export default function DepensesPage() {
         onOpenChange={setIsKmOpen}
         onSuccess={() => setIsKmOpen(false)}
       />
+
+      <TrajetsSection />
     </div>
+  );
+}
+
+/** Section Trajets : liste les trajets enregistrés et propose la conversion en indemnité km. */
+function TrajetsSection() {
+  const { t } = useTranslation("depenses");
+  const { trajets, convertir, isLoading } = useTrajets();
+
+  if (isLoading) return null;
+  if (trajets.length === 0) return null;
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Car className="h-4 w-4 text-blue-600" />
+          {t("trajetsTitle", "Trajets enregistrés")}
+        </CardTitle>
+        <CardDescription>
+          {t("trajetsDesc", "Convertissez un trajet en indemnité kilométrique (sans TVA, remboursable).")}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {trajets.map((trajet: Trajet) => (
+            <div
+              key={trajet.id}
+              className="flex items-center justify-between gap-3 p-3 rounded-lg border bg-card"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate">
+                  {trajet.adresseDepart && trajet.adresseArrivee
+                    ? `${trajet.adresseDepart} → ${trajet.adresseArrivee}`
+                    : t("trajetSansAdresse", "Trajet sans adresse")}
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {format(new Date(trajet.dateDebut), "dd MMM yyyy", { locale: fr })}
+                  {trajet.distanceKm && ` · ${parseFloat(trajet.distanceKm).toFixed(1)} km`}
+                </div>
+              </div>
+              <div className="shrink-0">
+                {trajet.depenseId ? (
+                  <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">
+                    {t("trajetConverti", "Converti")}
+                  </Badge>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!trajet.distanceKm || convertir.isPending}
+                    onClick={() =>
+                      convertir.mutate(
+                        { deplacementId: trajet.id },
+                        {
+                          onSuccess: () => toast.success(t("toastTrajetConverti", "Indemnité kilométrique créée")),
+                          onError: (e) => toast.error(e.message || t("error")),
+                        },
+                      )
+                    }
+                  >
+                    {t("trajetConvertirBtn", "Convertir")}
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
