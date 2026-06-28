@@ -1,4 +1,5 @@
 import type { BillingPort, ChargeOffSessionParams, ChargeResult, PaymentIntentInfo, PaymentMethodInfo, SetupIntentResult } from "./billing";
+import { getSecret } from "../config/secrets";
 
 /*
  * Adapter Stripe pour le billing maison off-session. Même pattern que StripeAdapter : import variable
@@ -27,7 +28,7 @@ type StripeSDK = {
 
 export class BillingAdapter implements BillingPort {
   private client: StripeSDK | null = null;
-  constructor(private readonly secretKey = process.env.STRIPE_SECRET_KEY ?? "") {}
+  constructor(private readonly secretKey = getSecret("STRIPE_SECRET_KEY") ?? "") {}
 
   private async sdk(): Promise<StripeSDK> {
     if (this.client) return this.client;
