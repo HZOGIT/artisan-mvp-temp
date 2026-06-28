@@ -77,7 +77,7 @@ describe.skipIf(!URL)("VitrinePublicReaderDrizzle (lecture publique, RLS scopée
     expect(avis).toHaveLength(1); // masque + en_attente exclus
     expect(avis[0].note).toBe(5);
     expect(avis[0].clientNom).toBe("Marc Petit");
-    expect(avis[0].interventionId).toBeTypeOf("number"); // avis vérifié
+    expect(avis[0].verifie).toBe(true); // avis vérifié (lié à une intervention réelle)
     expect(avis[0].createdAt).toBeInstanceOf(Date);
   });
 
@@ -86,7 +86,7 @@ describe.skipIf(!URL)("VitrinePublicReaderDrizzle (lecture publique, RLS scopée
     await admin.query('insert into avis_clients ("artisanId","clientId",note,statut) values ($1,$2,4,$3)', [artisanA, c3, "publie"]);
     const avis = await reader.getPublishedAvis(artisanA);
     const nonVerifie = avis.find((a) => a.clientNom === "Sans");
-    expect(nonVerifie?.interventionId).toBeNull();
+    expect(nonVerifie?.verifie).toBe(false);
     await admin.query('delete from avis_clients where "artisanId"=$1 and "clientId"=$2', [artisanA, c3]);
     await admin.query('delete from clients where id=$1', [c3]);
   });

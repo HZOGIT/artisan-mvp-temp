@@ -72,7 +72,7 @@ export class VitrinePublicReaderDrizzle implements IVitrinePublicReader {
       return rows.map((r) => ({
         id: r.id, note: r.note, commentaire: r.commentaire ?? null,
         reponseArtisan: r.reponseArtisan ?? null, reponseAt: r.reponseAt ?? null, createdAt: r.createdAt,
-        interventionId: r.interventionId ?? null,
+        verifie: r.interventionId != null,
         clientNom: `${r.clientPrenom || ""} ${r.clientNom || ""}`.trim() || "Client",
       }));
     });

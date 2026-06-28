@@ -71,7 +71,7 @@ describe.skipIf(!URL)("vitrine.router e2e (public + admin leads)", () => {
   it("PUBLIC getBySlug : vitrine active → 200 + payload agrégé (artisan/vitrine/avis/stats)", async () => {
     const res = await injectTrpc(app, "GET", "vitrine.getBySlug", { slug: SLUG }); // pas de cookie
     expect(res.statusCode).toBe(200);
-    const data = res.json().result.data as { artisan: { nomEntreprise: string }; vitrine: unknown; avis: { interventionId: number | null; createdAt: string }[]; avisStats: unknown; publicStats: unknown };
+    const data = res.json().result.data as { artisan: { nomEntreprise: string }; vitrine: unknown; avis: { verifie: boolean; createdAt: string }[]; avisStats: unknown; publicStats: unknown };
     expect(data.artisan.nomEntreprise).toBe("Vitrine SARL");
     expect(data.vitrine).toBeTruthy();
     expect(Array.isArray(data.avis)).toBe(true);
@@ -79,7 +79,7 @@ describe.skipIf(!URL)("vitrine.router e2e (public + admin leads)", () => {
     expect(data).toHaveProperty("publicStats");
     // L111-7-2 : badge vérifié (interventionId présent) + date
     expect(data.avis).toHaveLength(1);
-    expect(data.avis[0].interventionId).toBeTypeOf("number");
+    expect(data.avis[0].verifie).toBe(true);
     expect(data.avis[0].createdAt).toBeTruthy();
   });
 

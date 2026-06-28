@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { computeAvisStats, resoudreServices, safeHtml, type AvisPublic } from "./vitrine";
 
-const avis = (note: number): AvisPublic => ({ id: note, note, commentaire: null, reponseArtisan: null, reponseAt: null, createdAt: new Date(), clientNom: "X", interventionId: null });
+const avis = (note: number): AvisPublic => ({ id: note, note, commentaire: null, reponseArtisan: null, reponseAt: null, createdAt: new Date(), clientNom: "X", verifie: false });
 
 describe("computeAvisStats", () => {
   it("moyenne arrondie au dixième + distribution 1..5", () => {
