@@ -299,6 +299,8 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
 
       const isoDate = input.date.toISOString().split("T")[0];
 
+      await tx.execute(sql`SELECT * FROM "factures" WHERE id = ${input.factureId} FOR UPDATE`);
+
       const [reglement] = await tx
         .insert(reglements)
         .values({

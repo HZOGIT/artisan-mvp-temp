@@ -387,4 +387,23 @@ describe("factures — use-cases d'écriture", () => {
       ajouterReglement(repo, B, { factureId: f.id, montant: "50.00", date: new Date(), mode: "cheque" }),
     );
   });
+
+  it("ajouterReglement — SELECT FOR UPDATE prévient les sur-paiements concurrents (verrouillage)", async () => {
+    const repo = repoWithClient(A, 100);
+    const f = await creerFacture(repo, A, {
+      clientId: 100,
+      lignes: [{ designation: "L", prixUnitaireHT: "100.00" }],
+    });
+    await changerStatutFacture(repo, A, f.id, "envoyee", undefined, fakeArtisanReader);
+
+    const r1 = await ajouterReglement(repo, A, { factureId: f.id, montant: "60.00", date: new Date("2026-06-01"), mode: "cheque" });
+    expect(r1.montant).toBe("60.00");
+
+    const r2 = await ajouterReglement(repo, A, { factureId: f.id, montant: "60.00", date: new Date("2026-06-15"), mode: "virement" });
+    expect(r2.montant).toBe("60.00");
+
+    const updated = await repo.getById(A, f.id);
+    expect(updated?.montantPaye).toBe("120.00");
+    expect(updated?.statut).toBe("payee");
+  });
 });
