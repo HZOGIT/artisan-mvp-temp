@@ -50,6 +50,7 @@ export interface Devis {
   readonly totalHT: string;
   readonly totalTVA: string;
   readonly totalTTC: string;
+  readonly montantDejaFacture: string;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }

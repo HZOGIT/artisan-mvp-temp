@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { ArrowLeft, Plus, Trash2, FileText, User, Receipt, Download, Mail, Copy, Pen, Layers, Star, Check, ArrowRight, Bell, Circle, AlarmClock } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, FileText, User, Receipt, Download, Mail, Copy, Pen, Layers, Star, Check, ArrowRight, Bell, Circle, AlarmClock, TrendingUp } from "lucide-react";
 import { generateDevisPDF } from "@/shared/lib/pdf-generator";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
@@ -35,6 +35,8 @@ export default function DevisDetailPage() {
   const [isSignatureDialogOpen, setIsSignatureDialogOpen] = useState(false);
   const [isNewVarianteOpen, setIsNewVarianteOpen] = useState(false);
   const [newVarianteForm, setNewVarianteForm] = useState({ nom: "", description: "", recommandee: false });
+  const [isSituationOpen, setIsSituationOpen] = useState(false);
+  const [situationPct, setSituationPct] = useState("");
   const [rappelTitre, setRappelTitre] = useState("");
   const [rappelEcheance, setRappelEcheance] = useState("");
   const [rappelType, setRappelType] = useState<RappelType>("relance");
@@ -73,6 +75,15 @@ export default function DevisDetailPage() {
   const handleDeleteLine = (lineId: number) => { if (confirm(t("confirmSupprimerLigne"))) D.deleteLigne.mutate({ id: lineId, devisId: id }, { onSuccess: () => toast.success(t("toastLigneSupprimee")) }); };
   const handleConvert = () => { if (confirm(t("confirmConvertirFacture"))) D.convertToFacture.mutate({ devisId: id }, { onSuccess: (data) => { toast.success(t("toastFactureCree")); window.location.href = `/factures/${data.id}`; }, onError: () => toast.error(t("errFacture")) }); };
   const handleDuplicate = () => { if (confirm(t("confirmDupliquer"))) D.duplicate.mutate({ devisId: id }, { onSuccess: (nd) => { toast.success(t("toastDuplique")); window.location.href = `/devis/${nd.id}`; }, onError: () => toast.error(t("errDuplication")) }); };
+
+  const handleFacturerSituation = () => {
+    const pct = parseFloat(situationPct);
+    if (!pct || pct <= 0 || pct > 100) { toast.error(t("errPourcentageInvalide")); return; }
+    D.facturerSituation.mutate({ devisId: id, pourcentageCumule: pct }, {
+      onSuccess: (f) => { toast.success(t("toastSituationCreee")); setIsSituationOpen(false); setSituationPct(""); window.location.href = `/factures/${f.id}`; },
+      onError: (e) => toast.error(e.message || t("errSituation")),
+    });
+  };
 
   if (isLoading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>;
   if (!devis) return <div className="text-center py-12"><h2 className="text-xl font-semibold text-foreground">{t("devisNonTrouve")}</h2><Button variant="link" onClick={goList}>{t("retourListe")}</Button></div>;
@@ -127,6 +138,33 @@ export default function DevisDetailPage() {
             </Dialog>
           )}
           {(statut === "accepte" || statut === "envoye") && (<Button onClick={handleConvert} disabled={D.convertToFacture.isPending}><Receipt className="h-4 w-4 mr-2" />{t("convertirFacture")}</Button>)}
+          {statut === "accepte" && (
+            <Dialog open={isSituationOpen} onOpenChange={setIsSituationOpen}>
+              <DialogTrigger asChild><Button variant="outline"><TrendingUp className="h-4 w-4 mr-2" />{t("facturerSituation")}</Button></DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{t("facturerSituationTitre")}</DialogTitle>
+                  <DialogDescription>{t("facturerSituationDesc", { total: formatCurrency(devis.totalTTC), dejaFacture: formatCurrency(devis.montantDejaFacture) })}</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="situation-pct">{t("pourcentageCumule")}</Label>
+                    <div className="flex items-center gap-2">
+                      <Input id="situation-pct" type="number" min="1" max="100" step="1" placeholder="30" value={situationPct} onChange={(e) => setSituationPct(e.target.value)} className="w-32" />
+                      <span className="text-muted-foreground">%</span>
+                    </div>
+                    {situationPct && parseFloat(situationPct) > 0 && parseFloat(situationPct) <= 100 && (
+                      <p className="text-sm text-muted-foreground">{t("montantSituationEstime", { montant: formatCurrency(String(Math.max(0, Math.round((parseFloat(situationPct) / 100 * parseFloat(String(devis.totalTTC)) - parseFloat(String(devis.montantDejaFacture))) * 100) / 100))) })}</p>
+                    )}
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => { setIsSituationOpen(false); setSituationPct(""); }}>{t("annuler")}</Button>
+                  <Button onClick={handleFacturerSituation} disabled={D.facturerSituation.isPending}>{D.facturerSituation.isPending ? t("creation") : t("creerSituation")}</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </div>
 

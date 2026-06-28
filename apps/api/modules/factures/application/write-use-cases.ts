@@ -497,3 +497,97 @@ export async function supprimerLigneFacture(
   const ok = await repo.deleteLigne(ctx, ligneId);
   if (!ok) throw new NotFoundError("Ligne introuvable");
 }
+
+/**
+ * Calcule le montant TTC d'une situation de travaux (fonction pure, testable).
+ * Formule : montantSituationTTC = round(pourcentageCumule% × totalTTC) − montantDejaFacture.
+ * Retourne également le montantHT et le tauxTVA effectif (proportionnel au devis).
+ */
+export function calculerMontantSituation(
+  pourcentageCumule: number,
+  totalTTC: string,
+  totalHT: string,
+  montantDejaFacture: string,
+): { montantSituationTTC: number; montantHT: number; tauxTVA: string } {
+  const ttc = Number(totalTTC) || 0;
+  const ht = Number(totalHT) || 0;
+  const dejaFacture = Number(montantDejaFacture) || 0;
+
+  if (pourcentageCumule <= 0 || pourcentageCumule > 100) {
+    throw new ValidationError("Le pourcentage doit être compris entre 0 (exclus) et 100");
+  }
+
+  const objectif = round2(pourcentageCumule / 100 * ttc);
+  const montantSituationTTC = round2(objectif - dejaFacture);
+
+  if (montantSituationTTC <= 0) {
+    throw new ValidationError("Le montant de la situation est nul ou négatif — ce pourcentage a déjà été facturé");
+  }
+  if (round2(dejaFacture + montantSituationTTC) > ttc + EPS) {
+    throw new ValidationError("Cette situation dépasserait le montant total TTC du devis");
+  }
+
+  /** Proportion HT/TTC identique au devis (préserve la structure TVA). */
+  const proportion = ttc > 0 ? ht / ttc : 1 / 1.2;
+  const montantHT = round2(montantSituationTTC * proportion);
+  const tauxTVA = ht > 0 && ttc > ht
+    ? round2((ttc - ht) / ht * 100).toFixed(2)
+    : "20.00";
+
+  return { montantSituationTTC, montantHT, tauxTVA };
+}
+
+/** Entrée pour facturer une situation de travaux. */
+export type FacturerSituationInput = {
+  readonly devisId: number;
+  readonly pourcentageCumule: number;
+};
+
+/*
+ * Facture une situation de travaux sur un devis accepté. ⚠️ Money path :
+ *  - devis du tenant (anti-IDOR-FK → NotFound) ;
+ *  - devis `accepte` sinon Conflict ;
+ *  - garde anti-dépassement : cumul des situations ≤ totalTTC → Validation ;
+ *  - crée une facture brouillon (1 ligne de situation) + incrémente montantDejaFacture.
+ */
+export async function facturerSituation(
+  factureRepo: IFactureRepository,
+  devisReader: IDevisReader,
+  ctx: TenantContext,
+  input: FacturerSituationInput,
+): Promise<Facture> {
+  const devisData = await devisReader.getDevis(ctx, input.devisId);
+  if (!devisData) throw new NotFoundError("Devis introuvable");
+  if (devisData.statut !== "accepte") {
+    throw new ConflictError("Seul un devis accepté peut être facturé par situation");
+  }
+
+  const { montantSituationTTC, montantHT, tauxTVA } = calculerMontantSituation(
+    input.pourcentageCumule,
+    devisData.totalTTC,
+    devisData.totalHT,
+    devisData.montantDejaFacture,
+  );
+
+  const label = `Situation de travaux — avancement ${input.pourcentageCumule} %`;
+  const notes = `Déjà facturé : ${Number(devisData.montantDejaFacture).toFixed(2)} € — Devis n° ${devisData.numero}`;
+
+  const facture = await creerFacture(factureRepo, ctx, {
+    clientId: devisData.clientId,
+    devisId: devisData.id,
+    objet: label,
+    notes,
+    lignes: [{
+      designation: label,
+      prixUnitaireHT: montantHT.toFixed(2),
+      quantite: "1.00",
+      tauxTVA,
+      remise: "0",
+    }],
+  });
+
+  const newCumul = round2(Number(devisData.montantDejaFacture) + montantSituationTTC);
+  await devisReader.updateMontantDejaFacture(ctx, input.devisId, newCumul.toFixed(2));
+
+  return facture;
+}

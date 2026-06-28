@@ -4,6 +4,7 @@ import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IDevisReader, DevisReadModel, DevisLigneReadModel } from "../application/devis-reader";
+import { ValidationError } from "../../../shared/errors";
 
 /*
  * Lecture du domaine devis pour la conversion devis→facture. Scopé tenant (RLS + filtre
@@ -33,7 +34,20 @@ export class DevisReaderDrizzle implements IDevisReader {
         totalHT: r.totalHT ?? "0.00",
         totalTVA: r.totalTVA ?? "0.00",
         totalTTC: r.totalTTC ?? "0.00",
+        montantDejaFacture: r.montantDejaFacture ?? "0.00",
       };
+    });
+  }
+
+  updateMontantDejaFacture(ctx: TenantContext, devisId: number, montant: string): Promise<void> {
+    if (!Number.isFinite(Number(montant)) || Number(montant) < 0) {
+      return Promise.reject(new ValidationError("Montant invalide"));
+    }
+    return withTenant(this.db, ctx, async (tx) => {
+      await tx
+        .update(devis)
+        .set({ montantDejaFacture: montant })
+        .where(and(eq(devis.id, devisId), eq(devis.artisanId, ctx.artisanId)));
     });
   }
 

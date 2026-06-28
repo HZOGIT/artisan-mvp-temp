@@ -90,6 +90,7 @@ describe("factures.module", () => {
       "deleteLigne",
       "enregistrerPaiement",
       "envoyer",
+      "facturerSituation",
       "getAuditLog",
       "getAvoirsByFacture",
       "getById",

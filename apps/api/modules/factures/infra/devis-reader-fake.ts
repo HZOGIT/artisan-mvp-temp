@@ -25,4 +25,11 @@ export class FakeDevisReader implements IDevisReader {
     if (!d || d.artisanId !== ctx.artisanId) return [];
     return this.lignes.get(devisId) ?? [];
   }
+
+  async updateMontantDejaFacture(ctx: TenantContext, devisId: number, montant: string): Promise<void> {
+    const d = this.store.get(devisId);
+    if (d && d.artisanId === ctx.artisanId) {
+      this.store.set(devisId, { ...d, montantDejaFacture: montant });
+    }
+  }
 }

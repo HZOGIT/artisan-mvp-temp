@@ -108,5 +108,14 @@
   "toastVarianteSupprimee": "Variante supprimée",
   "toastVarianteConvertie": "Variante convertie en lignes officielles du devis",
   "errConversion": "Erreur conversion",
-  "errNomObligatoire": "Le nom est obligatoire"
+  "errNomObligatoire": "Le nom est obligatoire",
+  "facturerSituation": "Facturer une situation",
+  "facturerSituationTitre": "Facturation à l'avancement",
+  "facturerSituationDesc": "Total devis : {{total}} — Déjà facturé : {{dejaFacture}}",
+  "pourcentageCumule": "Avancement cumulé (%)",
+  "montantSituationEstime": "Montant estimé : {{montant}} TTC",
+  "creerSituation": "Créer la facture de situation",
+  "toastSituationCreee": "Facture de situation créée",
+  "errSituation": "Erreur lors de la création de la situation",
+  "errPourcentageInvalide": "Veuillez saisir un pourcentage entre 1 et 100"
 }

@@ -75,6 +75,7 @@ export class FakeDevisRepository implements IDevisRepository {
       totalHT: "0.00",
       totalTVA: "0.00",
       totalTTC: "0.00",
+      montantDejaFacture: "0.00",
       createdAt: now,
       updatedAt: now,
     };

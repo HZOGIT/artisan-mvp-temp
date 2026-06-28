@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { FakeFactureRepository } from "../infra/facture-repository-fake";
+import { FakeDevisReader } from "../infra/devis-reader-fake";
 import { FakeStockRepository } from "../../stocks/infra/stock-repository-fake";
 import {
   creerFacture,
@@ -12,10 +13,13 @@ import {
   enregistrerPaiementFacture,
   ajouterReglement,
   creerAvoir,
+  calculerMontantSituation,
+  facturerSituation,
 } from "./write-use-cases";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import { ConflictError, NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
+import type { DevisReadModel } from "./devis-reader";
 
 const A: TenantContext = { artisanId: 1, userId: 10 };
 const B: TenantContext = { artisanId: 2, userId: 20 };
@@ -405,5 +409,112 @@ describe("factures — use-cases d'écriture", () => {
     const updated = await repo.getById(A, f.id);
     expect(updated?.montantPaye).toBe("120.00");
     expect(updated?.statut).toBe("payee");
+  });
+});
+
+/** Devis accepté de base (TVA 20 % : HT=1000, TTC=1200). */
+const devisSituation = (over: Partial<DevisReadModel> = {}): DevisReadModel => ({
+  id: 42,
+  artisanId: 1,
+  clientId: 100,
+  numero: "DEV-00042",
+  statut: "accepte",
+  objet: "Rénovation",
+  referenceClient: null,
+  conditionsPaiement: null,
+  notes: null,
+  totalHT: "1000.00",
+  totalTVA: "200.00",
+  totalTTC: "1200.00",
+  montantDejaFacture: "0.00",
+  ...over,
+});
+
+describe("calculerMontantSituation — fonction pure (L1)", () => {
+  it("30% sur un devis de 1200€ TTC (TVA 20%) → 360€ TTC, 300€ HT, taux 20%", () => {
+    const r = calculerMontantSituation(30, "1200.00", "1000.00", "0.00");
+    expect(r.montantSituationTTC).toBe(360);
+    expect(r.montantHT).toBe(300);
+    expect(r.tauxTVA).toBe("20.00");
+  });
+
+  it("deux situations successives : 30% puis 40% (cumul 70%)", () => {
+    const s1 = calculerMontantSituation(30, "1200.00", "1000.00", "0.00");
+    const s2 = calculerMontantSituation(70, "1200.00", "1000.00", s1.montantSituationTTC.toFixed(2));
+    expect(s1.montantSituationTTC).toBe(360);
+    expect(s2.montantSituationTTC).toBe(480);
+    expect(s1.montantSituationTTC + s2.montantSituationTTC).toBe(840);
+  });
+
+  it("situation à 100% : solde le devis entier (moins déjà facturé)", () => {
+    const r = calculerMontantSituation(100, "1200.00", "1000.00", "360.00");
+    expect(r.montantSituationTTC).toBe(840);
+  });
+
+  it("pourcentage > 100 → ValidationError", () => {
+    expect(() => calculerMontantSituation(101, "1200.00", "1000.00", "0.00")).toThrow(ValidationError);
+  });
+
+  it("pourcentage <= 0 → ValidationError", () => {
+    expect(() => calculerMontantSituation(0, "1200.00", "1000.00", "0.00")).toThrow(ValidationError);
+    expect(() => calculerMontantSituation(-5, "1200.00", "1000.00", "0.00")).toThrow(ValidationError);
+  });
+
+  it("situation déjà entièrement facturée → ValidationError (montant nul)", () => {
+    expect(() => calculerMontantSituation(100, "1200.00", "1000.00", "1200.00")).toThrow(ValidationError);
+  });
+
+  it("cumul qui dépasserait le total → ValidationError", () => {
+    expect(() => calculerMontantSituation(30, "1200.00", "1000.00", "1100.00")).toThrow(ValidationError);
+  });
+});
+
+describe("facturerSituation — use-case (L1 fakes)", () => {
+  function setup() {
+    const repo = new FakeFactureRepository();
+    repo.registerClient(A.artisanId, 100);
+    repo.registerDevis(A.artisanId, 42);
+    const reader = new FakeDevisReader();
+    return { repo, reader };
+  }
+
+  it("crée une facture brouillon liée au devis + met à jour montantDejaFacture", async () => {
+    const { repo, reader } = setup();
+    reader.register(devisSituation());
+    const f = await facturerSituation(repo, reader, A, { devisId: 42, pourcentageCumule: 30 });
+    expect(f.devisId).toBe(42);
+    expect(f.clientId).toBe(100);
+    expect(f.statut).toBe("brouillon");
+    expect(f.totalTTC).toBe("360.00");
+    const devisUpdated = await reader.getDevis(A, 42);
+    expect(devisUpdated?.montantDejaFacture).toBe("360.00");
+  });
+
+  it("devis non accepté → ConflictError", async () => {
+    const { repo, reader } = setup();
+    reader.register(devisSituation({ statut: "envoye" }));
+    await expect(facturerSituation(repo, reader, A, { devisId: 42, pourcentageCumule: 30 })).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("devis d'un autre tenant → NotFoundError (anti-IDOR-FK)", async () => {
+    const { repo, reader } = setup();
+    reader.register(devisSituation({ artisanId: B.artisanId }));
+    await expectCrossTenantDenied(() => facturerSituation(repo, reader, A, { devisId: 42, pourcentageCumule: 30 }));
+  });
+
+  it("deux situations successives : cumul cohérent", async () => {
+    const { repo, reader } = setup();
+    reader.register(devisSituation());
+    const f1 = await facturerSituation(repo, reader, A, { devisId: 42, pourcentageCumule: 30 });
+    const f2 = await facturerSituation(repo, reader, A, { devisId: 42, pourcentageCumule: 70 });
+    expect(Number(f1.totalTTC) + Number(f2.totalTTC)).toBe(840);
+    const devisUpdated = await reader.getDevis(A, 42);
+    expect(devisUpdated?.montantDejaFacture).toBe("840.00");
+  });
+
+  it("pourcentage > 100 → ValidationError (garde)", async () => {
+    const { repo, reader } = setup();
+    reader.register(devisSituation());
+    await expect(facturerSituation(repo, reader, A, { devisId: 42, pourcentageCumule: 110 })).rejects.toBeInstanceOf(ValidationError);
   });
 });

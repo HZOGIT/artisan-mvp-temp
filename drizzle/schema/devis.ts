@@ -30,6 +30,7 @@ export const devis = pgTable("devis", {
   totalHT: numeric("totalHT", { precision: 10, scale: 2 }).default("0.00"),
   totalTVA: numeric("totalTVA", { precision: 10, scale: 2 }).default("0.00"),
   totalTTC: numeric("totalTTC", { precision: 10, scale: 2 }).default("0.00"),
+  montantDejaFacture: numeric("montantDejaFacture", { precision: 10, scale: 2 }).default("0.00"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
 });
