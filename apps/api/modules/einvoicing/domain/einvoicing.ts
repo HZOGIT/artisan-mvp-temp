@@ -42,11 +42,13 @@ export interface EntityInput {
   siret: string;
   nom: string;
   email: string;
+  artisanId?: number;
 }
 
 export interface SubmitInvoiceInput {
   paEntityId: string;
   invoiceId: number;
+  artisanId?: number;
   /** Payload structuré — fourni par le drainer ; absent sur les appels directs legacy. */
   payload?: PaInvoicePayload;
   facturxBase64?: string;

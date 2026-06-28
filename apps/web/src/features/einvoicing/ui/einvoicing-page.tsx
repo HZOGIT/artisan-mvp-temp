@@ -18,11 +18,14 @@ export default function EinvoicingPage() {
   const {
     statut,
     isLoadingStatut,
+    oauthStatut,
+    isLoadingOauth,
     facturesEntrantes,
     isLoadingFactures,
     onboard,
     isOnboarding,
     marquerLu,
+    connecterSuperpdp,
   } = useEinvoicing();
 
   const handleActivate = async () => {
@@ -81,6 +84,28 @@ export default function EinvoicingPage() {
           )}
         </CardContent>
       </Card>
+
+      {statut?.paDisponible !== false && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("oauth_section")}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {isLoadingOauth ? (
+              <div className="h-5 w-36 bg-muted animate-pulse rounded" />
+            ) : (
+              <div className="flex items-center gap-3">
+                <Badge variant={oauthStatut?.connecte ? "default" : "outline"}>
+                  {oauthStatut?.connecte ? t("oauth_connecte") : t("oauth_non_connecte")}
+                </Badge>
+              </div>
+            )}
+            <Button onClick={connecterSuperpdp} variant={oauthStatut?.connecte ? "outline" : "default"}>
+              {oauthStatut?.connecte ? t("oauth_reconnecter") : t("oauth_connecter")}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

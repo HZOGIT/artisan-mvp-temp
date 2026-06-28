@@ -85,7 +85,7 @@ export const paReconciliationPollerPlugin = fp(
                 for (const facture of inflight) {
                   if (!facture.paDocumentId) continue;
                   total++;
-                  const events = await opts.pa.getLifecycle(facture.paDocumentId);
+                  const events = await opts.pa.getLifecycle(facture.paDocumentId, artisanId);
                   const newStatut = await reconcileFactureEvents(
                     events,
                     facture.id,

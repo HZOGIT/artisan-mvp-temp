@@ -37,7 +37,7 @@ export async function drainEntry(
       return;
     }
     const payload = await loadPayload(entry.factureId);
-    const result = await pa.submitInvoice({ paEntityId, invoiceId: entry.factureId, payload });
+    const result = await pa.submitInvoice({ paEntityId, invoiceId: entry.factureId, artisanId: entry.artisanId, payload });
     await update(entry.id, { statut: "sent", traiteeAt: new Date() });
     await onSuccess?.(entry.factureId, result.paDocumentId);
   } catch (err) {

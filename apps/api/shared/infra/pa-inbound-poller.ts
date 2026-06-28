@@ -46,10 +46,10 @@ export async function pollInbound(pa: PaPort, db: DbClient): Promise<number> {
         .where(eq(facturesEntrantes.artisanId, artisanId));
 
       const since = lastRow?.lastFetch ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      const inbounds = await pa.listInbound(entite.paEntityId, since);
+      const inbounds = await pa.listInbound(entite.paEntityId, since, artisanId);
 
       for (const doc of inbounds) {
-        const full = await pa.fetchInbound(doc.paDocumentId);
+        const full = await pa.fetchInbound(doc.paDocumentId, artisanId);
         await tx
           .insert(facturesEntrantes)
           .values({

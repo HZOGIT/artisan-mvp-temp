@@ -157,6 +157,7 @@ import { IcalPublicReaderDrizzle } from "./modules/calendrier/infra/ical-public-
 import { registerStripeWebhookRoute } from "./interface/http/stripe-webhook-route";
 import { registerResendWebhookRoute } from "./interface/http/resend-webhook-route";
 import { registerPaWebhookRoute } from "./interface/http/pa-webhook-route";
+import { registerSuperpdpOauthRoutes } from "./interface/http/superpdp-oauth-route";
 import { registerBillingSchedulerRoute } from "./interface/http/billing-scheduler-route";
 import { handleBillingWebhookEvent } from "./modules/billing/interface/http/billing-webhook-handler";
 import fastifySchedule from "@fastify/schedule";
@@ -1170,6 +1171,19 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   /** Webhook PA signé `/api/einvoicing/webhook` — vérif signature fail-closed → dispatch cycle de vie. */
   registerPaWebhookRoute(app, { pa: einvoicing.pa, db: getDbHandle().db });
+
+  /** Flow OAuth SuperPDP par artisan — authorize + callback. */
+  if (einvoicing.superpdpAdapter) {
+    const superpdpBaseUrl = process.env.SUPERPDP_BASE_URL ?? (process.env.NODE_ENV === "production" ? "https://api.superpdp.tech" : "https://sandbox.superpdp.tech");
+    registerSuperpdpOauthRoutes(app, {
+      adapter: einvoicing.superpdpAdapter,
+      baseUrl: superpdpBaseUrl,
+      clientId: process.env.SUPERPDP_CLIENT_ID ?? "",
+      jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+      resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
+      db: getDbHandle().db,
+    });
+  }
 
   /** Scheduler billing maison — `POST /internal/billing/tick` sécurisé par x-scheduler-secret. */
   const billingNotifier = new SubscriptionEventNotifierDrizzle(getDbHandle().db, emailAdapter);
