@@ -61,8 +61,7 @@ describe.skipIf(!URL)("clients.router e2e (HTTP → tRPC → use-case → repo �
     await admin.query('delete from artisans where "userId"=$1', [UC]);
     await admin.query('delete from permissions_utilisateur where "userId"=$1', [UC]);
     await admin.query("delete from users where id=$1", [UC]);
-    await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [UC, `u${UC}@t.fr`]);
-    await admin.query('insert into artisans ("userId") values ($1)', [UC]); // tenant (sinon requireTenant échoue avant le gate permission)
+    await admin.query('insert into users (id, email, password, role, "artisanId") values ($1,$2,\'x\',\'artisan\',$3)', [UC, `u${UC}@t.fr`, artisanA]);
     await admin.query('insert into permissions_utilisateur ("userId", permission, autorise) values ($1,$2,true)', [UC, "clients.voir"]);
     server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(app.db), clientRepo: new ClientRepositoryDrizzle(app.db) });
   });

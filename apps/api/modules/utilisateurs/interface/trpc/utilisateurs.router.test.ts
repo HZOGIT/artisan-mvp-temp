@@ -6,7 +6,8 @@ import { injectTrpc } from "../../../../shared/testing/trpc-inject";
 
 const URL = process.env.DATABASE_URL;
 const SECRET = "test-secret-at-least-32-characters-long-xxxx";
-const UID = 9942131; // owner artisan
+const UID = 9942131; /** owner artisan */
+const UID2 = 9942132; /** collaborateur non-owner de UID — sert au test PERMISSION GATE 403 */
 const EMAIL = `u${UID}@t.fr`;
 
 const jwt = (userId: number) =>
@@ -19,6 +20,7 @@ describe.skipIf(!URL)("utilisateurs.router e2e (gardé par permission)", () => {
   let app: ReturnType<typeof buildApp>;
 
   const cleanup = async () => {
+    await admin.query("delete from users where id=$1", [UID2]);
     await admin.query("delete from permissions_utilisateur where \"userId\"=$1", [UID]);
     await admin.query('delete from artisans where "userId"=$1', [UID]);
     await admin.query("delete from users where id=$1", [UID]);
@@ -27,7 +29,9 @@ describe.skipIf(!URL)("utilisateurs.router e2e (gardé par permission)", () => {
   beforeAll(async () => {
     await cleanup();
     await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [UID, EMAIL]);
-    await admin.query('insert into artisans ("userId","nomEntreprise") values ($1,$2)', [UID, "Equipe SARL"]);
+    const { rows } = await admin.query<{ id: number }>('insert into artisans ("userId","nomEntreprise") values ($1,$2) returning id', [UID, "Equipe SARL"]);
+    const artisanId = rows[0].id;
+    await admin.query('insert into users (id, email, password, role, "artisanId") values ($1,$2,\'x\',\'artisan\',$3)', [UID2, `u${UID2}@t.fr`, artisanId]);
     app = buildApp({ jwtSecret: SECRET });
   });
 
@@ -42,7 +46,7 @@ describe.skipIf(!URL)("utilisateurs.router e2e (gardé par permission)", () => {
   });
 
   it("authentifié SANS la permission `utilisateurs.gerer` → 403", async () => {
-    const res = await injectTrpc(app, "GET", "utilisateurs.list", undefined, await jwt(UID));
+    const res = await injectTrpc(app, "GET", "utilisateurs.list", undefined, await jwt(UID2));
     expect(res.statusCode).toBe(403);
   });
 
