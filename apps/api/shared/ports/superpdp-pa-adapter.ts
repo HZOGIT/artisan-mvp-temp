@@ -47,7 +47,7 @@ export class SuperPdpPaAdapter implements PaPort {
   ) {}
 
   /** Exécute fn dans une transaction avec app.tenant positionné → active la RLS pour cet artisan. */
-  private withArtisan<T>(artisanId: number, fn: (tx: DbClient) => Promise<T>): Promise<T> {
+  private async withArtisan<T>(artisanId: number, fn: (tx: DbClient) => Promise<T>): Promise<T> {
     if (!this.db) throw new Error("DB non injectée dans SuperPdpPaAdapter");
     return this.db.transaction(async (tx) => {
       await tx.execute(sql`select set_config('app.tenant', ${String(artisanId)}, true)`);
@@ -57,22 +57,21 @@ export class SuperPdpPaAdapter implements PaPort {
 
   /** Upsert un token OAuth artisan en base — appelé par le callback OAuth. */
   async upsertToken(artisanId: number, data: { accessToken: string; refreshToken: string | null; expiresAt: Date }): Promise<void> {
-    await this.withArtisan(artisanId, (tx) =>
-      tx
+    await this.withArtisan(artisanId, async (tx) => {
+      await tx
         .insert(superpdpTokens)
         .values({ artisanId, accessToken: data.accessToken, refreshToken: data.refreshToken, expiresAt: data.expiresAt })
         .onConflictDoUpdate({
           target: superpdpTokens.artisanId,
           set: { accessToken: data.accessToken, refreshToken: data.refreshToken, expiresAt: data.expiresAt, updatedAt: new Date() },
-        })
-        .then(() => undefined),
-    );
+        });
+    });
   }
 
   /** Token per-artisan depuis la DB — refresh automatique si expiré. */
   async getTokenForArtisan(artisanId: number): Promise<string | null> {
     if (!this.db) return null;
-    const rows = await this.withArtisan(artisanId, (tx) =>
+    const rows = await this.withArtisan(artisanId, async (tx) =>
       tx.select().from(superpdpTokens).where(eq(superpdpTokens.artisanId, artisanId)).limit(1),
     );
     const row = rows[0];
