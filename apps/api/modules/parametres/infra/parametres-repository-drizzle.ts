@@ -35,6 +35,7 @@ function toParametres(r: ParametresRow): ParametresArtisan {
     notificationsEmail: r.notificationsEmail ?? D.notificationsEmail,
     rappelDevisJours: r.rappelDevisJours ?? D.rappelDevisJours,
     rappelFactureJours: r.rappelFactureJours ?? D.rappelFactureJours,
+    rappelRdvClientActif: r.rappelRdvClientActif ?? D.rappelRdvClientActif,
     objectifCA: r.objectifCA ?? D.objectifCA,
     objectifDevis: r.objectifDevis ?? D.objectifDevis,
     objectifClients: r.objectifClients ?? D.objectifClients,
@@ -62,6 +63,7 @@ function toConfigSet(input: UpdateParametresInput): Partial<ParametresInsert> {
   if (input.notificationsEmail !== undefined) set.notificationsEmail = input.notificationsEmail;
   if (input.rappelDevisJours !== undefined) set.rappelDevisJours = input.rappelDevisJours;
   if (input.rappelFactureJours !== undefined) set.rappelFactureJours = input.rappelFactureJours;
+  if (input.rappelRdvClientActif !== undefined) set.rappelRdvClientActif = input.rappelRdvClientActif;
   if (input.objectifCA !== undefined) set.objectifCA = input.objectifCA;
   if (input.objectifDevis !== undefined) set.objectifDevis = input.objectifDevis;
   if (input.objectifClients !== undefined) set.objectifClients = input.objectifClients;

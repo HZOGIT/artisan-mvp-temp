@@ -65,6 +65,7 @@ export const parametresArtisan = pgTable("parametres_artisan", {
   conditionsGenerales: text("conditionsGenerales"),
   mediateurConsommation: text("mediateurConsommation"),
   notificationsEmail: boolean("notificationsEmail").default(true),
+  rappelRdvClientActif: boolean("rappelRdvClientActif").default(true),
   rappelDevisJours: integer("rappelDevisJours").default(7),
   rappelFactureJours: integer("rappelFactureJours").default(30),
   objectifCA: numeric("objectifCA", { precision: 10, scale: 2 }).default("0"),

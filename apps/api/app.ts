@@ -181,6 +181,7 @@ import { artisans as artisansTable, paOutbox } from "../../drizzle/schema.pg";
 import { alertesPrevisionsCronPlugin } from "./shared/infra/alertes-previsions-cron";
 import { contratsFacturesCronPlugin } from "./shared/infra/contrats-factures-cron";
 import { contratsVisitesCronPlugin } from "./shared/infra/contrats-visites-cron";
+import { rappelRdvClientCronPlugin } from "./shared/infra/rappel-rdv-client-cron";
 import { ensureStripeWebhookEndpoint } from "./shared/infra/stripe-webhook-setup";
 import { WebhookPaymentWriterDrizzle } from "./modules/subscription/infra/webhook-payment-writer-drizzle";
 import { SubscriptionEventNotifierDrizzle } from "./modules/subscription/infra/subscription-event-notifier-drizzle";
@@ -1307,6 +1308,12 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   app.register(contratsVisitesCronPlugin, {
     repo: contratRepo,
     db: getDbHandle().db,
+  });
+
+  /** Cron rappel RDV client — tick horaire, envoie les emails J-1 aux clients (idempotent via drapeau). */
+  app.register(rappelRdvClientCronPlugin, {
+    db: getDbHandle().db,
+    email: emailAdapter,
   });
 
   /** Upload/suppression du logo artisan `/api/upload-logo` (auth cookie JWT). Stocké en data-URL base64. */

@@ -267,6 +267,13 @@ export default function ParametresPage() {
                   </div>
                   <Switch checked={formData.notificationsEmail} onCheckedChange={(checked) => setFormData({ ...formData, notificationsEmail: checked })} />
                 </div>
+                <div className="flex items-center justify-between pt-4">
+                  <div className="space-y-0.5">
+                    <Label>{t("rappelRdvClient")}</Label>
+                    <p className="text-sm text-muted-foreground">{t("rappelRdvClientDesc")}</p>
+                  </div>
+                  <Switch checked={formData.rappelRdvClientActif} onCheckedChange={(checked) => setFormData({ ...formData, rappelRdvClientActif: checked })} />
+                </div>
               </CardContent>
             </Card>
 

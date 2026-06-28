@@ -34,6 +34,7 @@ export interface ParametresArtisan {
   readonly notificationsEmail: boolean;
   readonly rappelDevisJours: number;
   readonly rappelFactureJours: number;
+  readonly rappelRdvClientActif: boolean;
   /** — Objectifs — */
   /** numeric PG en string */
   readonly objectifCA: string;
@@ -60,6 +61,7 @@ export interface UpdateParametresInput {
   readonly notificationsEmail?: boolean;
   readonly rappelDevisJours?: number;
   readonly rappelFactureJours?: number;
+  readonly rappelRdvClientActif?: boolean;
   readonly objectifCA?: string;
   readonly objectifDevis?: number;
   readonly objectifClients?: number;
@@ -90,6 +92,7 @@ export function defaultParametres(artisanId: number): ParametresArtisan {
     notificationsEmail: true,
     rappelDevisJours: 7,
     rappelFactureJours: 30,
+    rappelRdvClientActif: true,
     objectifCA: "0",
     objectifDevis: 0,
     objectifClients: 0,
