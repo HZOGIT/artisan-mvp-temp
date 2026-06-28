@@ -150,15 +150,16 @@ describe("ecritures — inaltérabilité (statut validée) — OPE-118", () => {
     expect(validated.every((e) => e.statut === "validee")).toBe(true);
   });
 
-  it("genererEcrituresVente échoue (ConflictError) si écritures validées existent", async () => {
+  it("genererEcrituresVente idempotent si écritures validées (retourne liste vide)", async () => {
     const repo = new FakeEcritureRepository();
     const reader = new FakeFactureReader();
     reader.register(facture(), [{ tauxTVA: "20.00", montantTVA: "20.00" }]);
     await genererEcrituresVente(repo, reader, A, 501); // génère VE
     await validerEcritures(repo, A, 501); // valide
-    await expect(
-      genererEcrituresVente(repo, reader, A, 501), // tentative de régénération
-    ).rejects.toThrow(ConflictError);
+    const result = await genererEcrituresVente(repo, reader, A, 501); // régénération = liste vide
+    expect(result).toEqual([]);
+    const all = await repo.listByFacture(A, 501);
+    expect(all.length).toBe(3); // VE inchangée
   });
 
   it("validerEcritures ne marque que les écritures du tenant", async () => {
@@ -198,10 +199,10 @@ describe("ecritures — inaltérabilité (statut validée) — OPE-118", () => {
     expect(all.filter((e) => e.journal === "BQ" && e.statut === "brouillon").length).toBe(2);
   });
 
-  it("intégration : facture émise → genererEcrituresVente + validerEcritures → régénération refusée (OPE-118 conformité 286 CGI)", async () => {
+  it("intégration : facture émise → genererEcrituresVente + validerEcritures → paiement génère ENCAISSEMENT (OPE-666)", async () => {
     const repo = new FakeEcritureRepository();
     const reader = new FakeFactureReader();
-    reader.register(facture(), [{ tauxTVA: "20.00", montantTVA: "20.00" }]);
+    reader.register(facture({ statut: "payee" }), [{ tauxTVA: "20.00", montantTVA: "20.00" }]);
 
     const ecrInit = await genererEcrituresVente(repo, reader, A, 501);
     expect(ecrInit.every((e) => e.statut === "brouillon")).toBe(true);
@@ -209,12 +210,16 @@ describe("ecritures — inaltérabilité (statut validée) — OPE-118", () => {
     await validerEcritures(repo, A, 501);
     const afterValidate = await repo.listByFacture(A, 501);
     expect(afterValidate.every((e) => e.statut === "validee")).toBe(true);
+    expect(afterValidate.filter((e) => e.journal === "VE").length).toBe(3);
 
-    await expect(
-      genererEcrituresVente(repo, reader, A, 501),
-    ).rejects.toThrow(ConflictError);
+    const regenResult = await genererEcrituresVente(repo, reader, A, 501);
+    expect(regenResult).toEqual([]); // idempotent : retourne liste vide
 
-    const afterRegenFail = await repo.listByFacture(A, 501);
-    expect(afterRegenFail).toEqual(afterValidate);
+    const encaissement = await genererEcrituresEncaissement(repo, reader, A, 501);
+    expect(encaissement.filter((e) => e.journal === "BQ").length).toBe(2);
+
+    const final = await repo.listByFacture(A, 501);
+    expect(final.filter((e) => e.journal === "VE" && e.statut === "validee").length).toBe(3);
+    expect(final.filter((e) => e.journal === "BQ" && e.statut === "brouillon").length).toBe(2);
   });
 });

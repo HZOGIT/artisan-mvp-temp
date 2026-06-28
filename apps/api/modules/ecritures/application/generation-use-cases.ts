@@ -1,5 +1,4 @@
 import type { TenantContext } from "../../../shared/tenant";
-import { ConflictError } from "../../../shared/errors";
 import type { IEcritureRepository } from "./ecriture-repository";
 import type { IFactureReader } from "./facture-reader";
 import type { EcritureComptable, CreateEcritureInput } from "../domain/ecriture";
@@ -82,7 +81,7 @@ export async function genererEcrituresVente(
   }
 
   if (await ecritureRepo.hasValidatedEcritures(ctx, factureId)) {
-    throw new ConflictError("Écritures comptables déjà validées — non modifiables");
+    return [];
   }
 
   await ecritureRepo.deleteByFacture(ctx, factureId);
