@@ -67,6 +67,11 @@ export function calculerMontantsAvoirLigne(quantite: string, prixUnitaireHT: str
   };
 }
 
+/** TVA réduite travaux (CGI 279-0 bis / 278-0 bis A) : 10 % ou 5,5 % → attestation client requise. */
+export function necessite_attestation_tva_reduite(lignes: readonly { tauxTVA: string }[]): boolean {
+  return lignes.some((l) => { const t = Number(l.tauxTVA); return t === 10 || t === 5.5; });
+}
+
 export function calculerTotaux(
   lignes: readonly { montantHT: string; montantTVA: string; montantTTC: string }[],
 ): TotauxFacture {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calculerMontantsLigne, calculerTotaux, calculerMontantsAvoirLigne } from "./montants";
+import { calculerMontantsLigne, calculerTotaux, calculerMontantsAvoirLigne, necessite_attestation_tva_reduite } from "./montants";
 
 describe("factures — calcul des montants de ligne (pur)", () => {
   it("ligne produit : HT = q×pu, TVA = HT×taux/100, TTC = HT+TVA", () => {
@@ -94,5 +94,23 @@ describe("factures — montants d'avoir (pur, négatifs)", () => {
       montantTVA: "-18.00",
       montantTTC: "-108.00",
     });
+  });
+});
+
+describe("necessite_attestation_tva_reduite (L1 — pur)", () => {
+  it("renvoie true si une ligne est à 10 %", () => {
+    expect(necessite_attestation_tva_reduite([{ tauxTVA: "20" }, { tauxTVA: "10" }])).toBe(true);
+  });
+
+  it("renvoie true si une ligne est à 5.5 %", () => {
+    expect(necessite_attestation_tva_reduite([{ tauxTVA: "5.5" }])).toBe(true);
+  });
+
+  it("renvoie false si toutes les lignes sont à 20 %", () => {
+    expect(necessite_attestation_tva_reduite([{ tauxTVA: "20" }, { tauxTVA: "20" }])).toBe(false);
+  });
+
+  it("renvoie false pour une liste vide", () => {
+    expect(necessite_attestation_tva_reduite([])).toBe(false);
   });
 });

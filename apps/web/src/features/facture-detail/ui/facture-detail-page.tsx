@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { ArrowLeft, Plus, Trash2, Receipt, User, CheckCircle, Download, Mail, Search, Loader2, Lock, FileText, History, AlertTriangle, Bell, Circle, AlarmClock } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Receipt, User, CheckCircle, Download, Mail, Search, Loader2, Lock, FileText, History, AlertTriangle, Bell, Circle, AlarmClock, ShieldCheck, Upload, FileCheck } from "lucide-react";
 import { generateFacturePDF } from "@/shared/lib/pdf-generator";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
@@ -28,7 +28,7 @@ export default function FactureDetailPage() {
   const { id: idParam } = useParams({ strict: false }) as { id?: string };
   const factureId = parseInt(idParam || "0");
   const F = useFactureDetail(factureId);
-  const { facture, isLoading, artisan, parametres, activites, refetchActivites, avoirs, auditLogs, inv } = F;
+  const { facture, isLoading, artisan, parametres, activites, refetchActivites, avoirs, auditLogs, inv, attestations } = F;
 
   const [isAddLineDialogOpen, setIsAddLineDialogOpen] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
@@ -47,6 +47,8 @@ export default function FactureDetailPage() {
   const [rappelTitre, setRappelTitre] = useState("");
   const [rappelEcheance, setRappelEcheance] = useState("");
   const [rappelType, setRappelType] = useState<RappelType>("relance");
+  const [isAttestationSigneeDialogOpen, setIsAttestationSigneeDialogOpen] = useState(false);
+  const [attestationSigneeId, setAttestationSigneeId] = useState<number | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const fetchArticles = useSearchArticles();
@@ -143,6 +145,7 @@ export default function FactureDetailPage() {
               {avoir && (<Badge className="bg-red-100 text-red-700 border-red-300">{t("avoirMaj")}</Badge>)}
               <Badge className={STATUS_COLORS[statut] || "bg-gray-100"}>{t(STATUS_LABEL_KEY[statut] ?? "statutBrouillon")}</Badge>
               {isLocked && (<Lock className="h-4 w-4 text-amber-500" />)}
+              {facture.alerteTvaReduiteNonSignee && (<Badge className="bg-amber-100 text-amber-700 border-amber-300 flex items-center gap-1"><AlertTriangle className="h-3 w-3" />{t("alerteAttestationTva")}</Badge>)}
             </div>
             <p className="text-muted-foreground">{facture.objet || (avoir ? t("avoir") : t("facture"))}</p>
           </div>
@@ -358,6 +361,86 @@ export default function FactureDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      {facture.alerteTvaReduiteNonSignee || attestations.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-amber-600" />
+              {t("attestationTvaTitle")}
+              {facture.alerteTvaReduiteNonSignee && (<Badge className="bg-amber-100 text-amber-700 border-amber-300 ml-2">{t("nonSignee")}</Badge>)}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {facture.alerteTvaReduiteNonSignee && (
+              <div className="flex items-start gap-2 p-3 rounded-lg border border-amber-200 bg-amber-50 text-sm text-amber-800">
+                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>{t("alerteAttestationTvaDetail")}</span>
+              </div>
+            )}
+            <Button
+              variant="outline"
+              disabled={F.genererAttestation.isPending}
+              onClick={() => F.genererAttestation.mutate({ factureId }, { onSuccess: (r) => { toast.success(t("toastAttestationGeneree")); window.open(r.url, "_blank"); }, onError: (e) => toast.error(e.message) })}
+            >
+              {F.genererAttestation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+              {t("genererAttestation")}
+            </Button>
+            {attestations.length > 0 && (
+              <div className="space-y-2">
+                {attestations.map((att) => (
+                  <div key={att.id} className="flex items-center justify-between p-3 rounded-lg border text-sm">
+                    <div className="flex items-center gap-2">
+                      {att.statut === "signe" ? <FileCheck className="h-4 w-4 text-emerald-600" /> : <FileText className="h-4 w-4 text-muted-foreground" />}
+                      <span>{att.statut === "signe" ? t("attestationSignee") : t("attestationGeneree")}</span>
+                      <span className="text-muted-foreground text-xs">{format(new Date(att.createdAt), "dd/MM/yyyy")}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      {att.statut !== "signe" && (
+                        <Button size="sm" variant="outline" onClick={() => { setAttestationSigneeId(att.id); setIsAttestationSigneeDialogOpen(true); }}>
+                          <Upload className="h-3.5 w-3.5 mr-1" />{t("uploaderSignee")}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <Dialog open={isAttestationSigneeDialogOpen} onOpenChange={setIsAttestationSigneeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("uploaderSigneeTitre")}</DialogTitle>
+            <DialogDescription>{t("uploaderSigneeDesc")}</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <input
+              type="file"
+              accept="application/pdf"
+              className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded file:border file:border-input file:text-sm file:font-medium"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file || !attestationSigneeId) return;
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const base64 = (reader.result as string).split(",")[1];
+                  F.attacherSigneeAttestation.mutate(
+                    { id: attestationSigneeId, fichierBase64: base64 },
+                    { onSuccess: () => { toast.success(t("toastAttestationSigneeUplodee")); setIsAttestationSigneeDialogOpen(false); }, onError: (err) => toast.error(err.message) },
+                  );
+                };
+                reader.readAsDataURL(file);
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAttestationSigneeDialogOpen(false)}>{t("annuler")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5" />{t("rappels", { n: pendingCount(rappels) })}</CardTitle></CardHeader>

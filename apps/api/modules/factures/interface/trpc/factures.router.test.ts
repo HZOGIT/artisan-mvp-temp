@@ -6,6 +6,7 @@ import { createDbClient } from "../../../../shared/db";
 import { DrizzleTenantResolver } from "../../../../shared/tenant/drizzle-tenant-resolver";
 import { FactureRepositoryDrizzle } from "../../infra/facture-repository-drizzle";
 import { NoopComptaPort } from "../../application/compta-port";
+import { InMemoryStoragePort } from "../../../../shared/ports/fakes";
 import { injectTrpc } from "../../../../shared/testing/trpc-inject";
 
 const URL = process.env.DATABASE_URL;
@@ -44,6 +45,7 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
   const purge = async (uid: number) => {
     await admin.query('delete from events where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from ecritures_comptables where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
+    await admin.query('delete from attestations_tva where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from factures_lignes where "factureId" in (select id from factures where "artisanId" in (select id from artisans where "userId"=$1))', [uid]);
     await admin.query('delete from factures where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from devis_lignes where "devisId" in (select id from devis where "artisanId" in (select id from artisans where "userId"=$1))', [uid]);
@@ -66,7 +68,7 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
     devisB = (await admin.query('insert into devis ("artisanId","clientId",numero) values ($1,$2,$3) returning id', [artisanB, clientB, "DEV-B-FACT"])).rows[0].id;
     // ⚠️ NoopComptaPort : ce test couvre les factures, pas la génération FEC (testée côté
     // ecritures) — évite un effet de bord d'écritures via une autre connexion.
-    server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(app.db), factureRepo: new FactureRepositoryDrizzle(app.db), compta: new NoopComptaPort() });
+    server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(app.db), factureRepo: new FactureRepositoryDrizzle(app.db), compta: new NoopComptaPort(), storage: new InMemoryStoragePort() });
   });
 
   afterAll(async () => {
@@ -327,6 +329,38 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
     expect(log.map((e) => e.action)).toEqual(["sent", "created"]); /** tri récent → ancien */
     /** hors tenant → [] (pas 404) */
     expect((await callQuery(server, "factures.getAuditLog", { factureId: id }, tB)).json().result.data).toEqual([]);
+  });
+
+  it("attestationTva.generer (L3) : crée une attestation + statut=genere si ligne à taux réduit", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "factures.create", { clientId: clientA, objet: "Rénovation salle de bain" }, tA)).json().result.data.id as number;
+    /** Ligne à 10 % → doit déclencher la génération */
+    await callMutation(server, "factures.addLigne", { factureId: id, designation: "Pose carrelage", quantite: "1", prixUnitaireHT: "500.00", tvaCategorieId: "FR_10" }, tA);
+    const res = await callMutation(server, "factures.attestationTva.generer", { factureId: id }, tA);
+    expect(res.statusCode).toBe(200);
+    const data = res.json().result.data as { statut: string; factureId: number; url: string };
+    expect(data.statut).toBe("genere");
+    expect(data.factureId).toBe(id);
+    expect(typeof data.url).toBe("string");
+
+    /** getByFacture doit lister l'attestation créée */
+    const list = await callQuery(server, "factures.attestationTva.getByFacture", { factureId: id }, tA);
+    expect(list.statusCode).toBe(200);
+    const rows = list.json().result.data as Array<{ id: number; statut: string }>;
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0].statut).toBe("genere");
+
+    /** getById doit avoir alerteTvaReduiteNonSignee = true (pas encore signée) */
+    const detail = (await callQuery(server, "factures.getById", { id }, tA)).json().result.data as { alerteTvaReduiteNonSignee: boolean };
+    expect(detail.alerteTvaReduiteNonSignee).toBe(true);
+  });
+
+  it("attestationTva.generer → 400 si aucune ligne taux réduit", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "factures.create", { clientId: clientA, objet: "Travaux divers" }, tA)).json().result.data.id as number;
+    await callMutation(server, "factures.addLigne", { factureId: id, designation: "Pose standard", quantite: "1", prixUnitaireHT: "200.00", tvaCategorieId: "FR_20" }, tA);
+    const res = await callMutation(server, "factures.attestationTva.generer", { factureId: id }, tA);
+    expect(res.statusCode).toBe(400);
   });
 
   it("franchise TVA : addLigne sans tvaCategorieId → FR_FRANCHISE ; tvaCategorieId explicite non-FR_20 préservé", async () => {

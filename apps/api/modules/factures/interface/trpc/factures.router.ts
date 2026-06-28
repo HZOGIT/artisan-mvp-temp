@@ -8,10 +8,15 @@ import type { FactureMailingDeps } from "../../application/envoyer-facture-email
 import type { PushPort } from "../../../../shared/push/web-push-adapter";
 import type { DbClient } from "../../../../shared/db";
 import type { IStockRepository } from "../../../stocks/application/stock-repository";
+import type { StoragePort } from "../../../../shared/ports/storage";
 import { outboxEvent } from "../../../../shared/events/outbox-event";
 import { withOutbox } from "../../../../shared/events/with-outbox";
 import { envoyerFactureParEmail } from "../../application/envoyer-facture-email";
 import { listFactures, getFactureDetail, listLignesFacture, getAvoirsFacture, getAuditLogFacture } from "../../application/read-use-cases";
+import type { IAttestationTvaRepository } from "../../application/attestation-tva-repository";
+import { necessite_attestation_tva_reduite } from "../../application/montants";
+import { generateAttestationTvaPDF } from "../../../../shared/pdf/pdf-generator";
+import { TRPCError } from "@trpc/server";
 import {
   creerFacture,
   modifierFacture,
@@ -120,14 +125,15 @@ const avoirInputSchema = z.object({
  * use-cases (scoping tenant + numérotation serveur + anti-IDOR-FK + immutabilité post-émission),
  * laisse remonter les Domain errors (NotFound→404, Validation→400, Conflict→409).
  */
-export function createFacturesRouter(repo: IFactureRepository, devisReader: IDevisReader, compta: ComptaPort, mailing: FactureMailingDeps, push?: PushPort, outboxInTx?: (artisanId: number, factureId: number, tx: DbClient) => Promise<void>, db?: DbClient, stockRepo?: IStockRepository) {
+export function createFacturesRouter(repo: IFactureRepository, devisReader: IDevisReader, compta: ComptaPort, mailing: FactureMailingDeps, push?: PushPort, outboxInTx?: (artisanId: number, factureId: number, tx: DbClient) => Promise<void>, db?: DbClient, stockRepo?: IStockRepository, storage?: StoragePort, attestationRepo?: IAttestationTvaRepository) {
+
   return router({
     list: protectedProcedure.query(({ ctx }) => listFactures(repo, ctx.tenant)),
 
     /** Détail enrichi (parité legacy : `{ ...facture, lignes, client }`) — consommé par FactureDetail. */
     getById: protectedProcedure
       .input(z.object({ id: z.number().int() }))
-      .query(({ ctx, input }) => getFactureDetail(repo, mailing.clientReader, ctx.tenant, input.id)),
+      .query(({ ctx, input }) => getFactureDetail(repo, mailing.clientReader, ctx.tenant, input.id, attestationRepo)),
 
     getLignes: protectedProcedure
       .input(z.object({ factureId: z.number().int() }))
@@ -309,5 +315,111 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
           attachPdf: input.attachPdf,
         }),
       ),
+
+    attestationTva: router({
+      getByFacture: protectedProcedure
+        .input(z.object({ factureId: z.number().int() }))
+        .query(({ ctx, input }) => {
+          if (!attestationRepo) return [];
+          return attestationRepo.listByFacture(ctx.tenant, input.factureId);
+        }),
+
+      getByDevis: protectedProcedure
+        .input(z.object({ devisId: z.number().int() }))
+        .query(({ ctx, input }) => {
+          if (!attestationRepo) return [];
+          return attestationRepo.listByDevis(ctx.tenant, input.devisId);
+        }),
+
+      /** Génère le PDF d'attestation TVA réduite et le stocke. Renvoie l'URL publique. */
+      generer: protectedProcedure
+        .input(
+          z.object({
+            factureId: z.number().int().optional(),
+            devisId: z.number().int().optional(),
+          }).refine((v) => v.factureId !== undefined || v.devisId !== undefined, {
+            message: "factureId ou devisId requis",
+          }),
+        )
+        .mutation(async ({ ctx, input }) => {
+          if (!attestationRepo || !storage || !db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Stockage non configuré" });
+
+          /** Récupère les infos nécessaires depuis la facture ou le devis */
+          let documentRef: string | null = null;
+          let objetTravaux: string | null = null;
+          let dateDocument: Date | null = null;
+          let tauxTVA: number = 10;
+          let clientId: number | null = null;
+
+          if (input.factureId) {
+            const facture = await repo.getById(ctx.tenant, input.factureId);
+            if (!facture) throw new TRPCError({ code: "NOT_FOUND", message: "Facture introuvable" });
+            const lignes = await repo.listLignes(ctx.tenant, input.factureId);
+            if (!necessite_attestation_tva_reduite(lignes)) throw new TRPCError({ code: "BAD_REQUEST", message: "Aucune ligne à taux TVA réduit" });
+            const tauxLigne = lignes.find((l) => { const t = Number(l.tauxTVA); return t === 10 || t === 5.5; });
+            documentRef = facture.numero ?? `Facture #${facture.id}`;
+            objetTravaux = facture.objet;
+            dateDocument = facture.dateFacture;
+            tauxTVA = tauxLigne ? Number(tauxLigne.tauxTVA) : 10;
+            clientId = facture.clientId;
+          } else if (input.devisId) {
+            const devis = await devisReader.getDevis(ctx.tenant, input.devisId);
+            if (!devis) throw new TRPCError({ code: "NOT_FOUND", message: "Devis introuvable" });
+            const lignes = await devisReader.getLignes(ctx.tenant, input.devisId);
+            if (!necessite_attestation_tva_reduite(lignes)) throw new TRPCError({ code: "BAD_REQUEST", message: "Aucune ligne à taux TVA réduit" });
+            const tauxLigne = lignes.find((l) => { const t = Number(l.tauxTVA); return t === 10 || t === 5.5; });
+            documentRef = devis.numero ?? `Devis #${devis.id}`;
+            objetTravaux = devis.objet;
+            dateDocument = null;
+            tauxTVA = tauxLigne ? Number(tauxLigne.tauxTVA) : 10;
+            clientId = devis.clientId;
+          }
+
+          const [artisan, client] = await Promise.all([
+            mailing.artisanReader.getArtisan(ctx.tenant),
+            clientId !== null ? mailing.clientReader.getClient(ctx.tenant, clientId) : Promise.resolve(null),
+          ]);
+
+          const pdfBuffer = generateAttestationTvaPDF({ documentRef, dateDocument, objetTravaux, tauxTVA, artisan, client });
+          const s3Key = `attestations-tva/${ctx.tenant.artisanId}/${Date.now()}.pdf`;
+          const stored = await storage.withDb(db).upload(s3Key, pdfBuffer, {
+            contentType: "application/pdf",
+            artisanId: ctx.tenant.artisanId,
+            filename: `attestation-tva-${documentRef ?? "doc"}.pdf`,
+            purpose: "attestation-tva",
+          }, ctx.tenant);
+
+          const attestation = await attestationRepo.create(ctx.tenant, {
+            artisanId: ctx.tenant.artisanId,
+            factureId: input.factureId ?? null,
+            devisId: input.devisId ?? null,
+            s3Key: stored.storageKey,
+          });
+
+          const url = await storage.url(stored.storageKey);
+          return { ...attestation, url };
+        }),
+
+      /** Attache un PDF signé (base64) à une attestation existante. */
+      attacherSignee: protectedProcedure
+        .input(z.object({ id: z.number().int(), fichierBase64: z.string().min(1) }))
+        .mutation(async ({ ctx, input }) => {
+          if (!attestationRepo || !storage || !db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Stockage non configuré" });
+
+          const pdfBuffer = Buffer.from(input.fichierBase64, "base64");
+          const s3Key = `attestations-tva/${ctx.tenant.artisanId}/signed-${input.id}-${Date.now()}.pdf`;
+          const stored = await storage.withDb(db).upload(s3Key, pdfBuffer, {
+            contentType: "application/pdf",
+            artisanId: ctx.tenant.artisanId,
+            filename: `attestation-tva-signee-${input.id}.pdf`,
+            purpose: "attestation-tva-signee",
+          }, ctx.tenant);
+
+          const updated = await attestationRepo.attacherSignee(ctx.tenant, input.id, stored.storageKey);
+          if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Attestation introuvable" });
+          const url = await storage.url(stored.storageKey);
+          return { ...updated, url };
+        }),
+    }),
   });
 }

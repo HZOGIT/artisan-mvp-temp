@@ -1,7 +1,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 /** Types d entree structurels (./pdf-input-types) - generateur jsPDF internalise dans le new-stack. */
-import type { Devis, DevisLigne, Facture, FactureLigne, Artisan, Client, ContratMaintenance, CommandeFournisseur, LigneCommandeFournisseur, Fournisseur } from "./pdf-input-types";
+import type { Devis, DevisLigne, Facture, FactureLigne, Artisan, Client, ContratMaintenance, CommandeFournisseur, LigneCommandeFournisseur, Fournisseur, AttestationTvaInput } from "./pdf-input-types";
 import { ROBOTO_REGULAR, ROBOTO_BOLD } from "./fonts";
 import { TVA_CATEGORIES_MAP } from "../tva/taux-tva-fr";
 import type { TvaCategorieId } from "../tva/taux-tva-fr";
@@ -1358,6 +1358,166 @@ export function generateBonCommandePDF(data: PDFBonCommandeData): Buffer {
     PAGE_H - 12,
   );
   doc.text("Document généré automatiquement — Bon de commande fournisseur", MARGIN, PAGE_H - 8);
+
+  return Buffer.from(doc.output("arraybuffer"));
+}
+
+/**
+ * Attestation TVA réduite travaux (CGI 279-0 bis / 278-0 bis A).
+ * Le client atteste que le logement est achevé depuis plus de 2 ans et que les travaux relèvent
+ * du taux réduit. Ce document doit être signé par le client et conservé par l'artisan 10 ans.
+ */
+export function generateAttestationTvaPDF(data: AttestationTvaInput): Buffer {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const a = data.artisan ?? {};
+  const c = data.client ?? {};
+  const primary: RGB = [30, 64, 175];
+
+  doc.addFileToVFS("Roboto-Regular.ttf", ROBOTO_REGULAR);
+  doc.addFileToVFS("Roboto-Bold.ttf", ROBOTO_BOLD);
+  doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");
+  doc.addFont("Roboto-Bold.ttf", "Roboto", "bold");
+
+  /** Bandeau header */
+  doc.setFillColor(...primary);
+  doc.rect(0, 0, PAGE_W, HEADER_H, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("Roboto", "bold");
+  doc.setFontSize(16);
+  doc.text("ATTESTATION TVA RÉDUITE TRAVAUX", PAGE_W / 2, 18, { align: "center" });
+  doc.setFontSize(10);
+  doc.setFont("Roboto", "normal");
+  doc.text("(CGI art. 279-0 bis / 278-0 bis A)", PAGE_W / 2, 26, { align: "center" });
+  doc.text("À conserver 10 ans — document à signer par le client", PAGE_W / 2, 33, { align: "center" });
+
+  let y = HEADER_H + 14;
+  doc.setTextColor(...TEXT_DARK);
+
+  const field = (label: string, value: string, bold = false) => {
+    doc.setFont("Roboto", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(...TEXT_MUTED);
+    doc.text(label.toUpperCase(), MARGIN, y);
+    doc.setFont("Roboto", bold ? "bold" : "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(...TEXT_DARK);
+    doc.text(value || "—", MARGIN + 55, y);
+    y += 6;
+  };
+
+  /** Prestataire */
+  doc.setFont("Roboto", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(...primary);
+  doc.text("PRESTATAIRE (artisan)", MARGIN, y);
+  doc.setDrawColor(...DIVIDER);
+  doc.line(MARGIN, y + 1.5, PAGE_W - MARGIN, y + 1.5);
+  y += 8;
+  field("Entreprise", a.nomEntreprise || "");
+  field("Adresse", [a.adresse, a.codePostal, a.ville].filter(Boolean).join(" — "));
+  field("SIRET", a.siret || "");
+  y += 4;
+
+  /** Client */
+  doc.setFont("Roboto", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(...primary);
+  doc.text("CLIENT (donneur d'ordre)", MARGIN, y);
+  doc.setDrawColor(...DIVIDER);
+  doc.line(MARGIN, y + 1.5, PAGE_W - MARGIN, y + 1.5);
+  y += 8;
+  const clientNom = [c.prenom, c.nom].filter(Boolean).join(" ") || c.raisonSociale || "";
+  field("Nom / Raison sociale", clientNom);
+  field("Adresse du logement", [c.adresse, c.codePostal, c.ville].filter(Boolean).join(" — "));
+  y += 4;
+
+  /** Travaux */
+  doc.setFont("Roboto", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(...primary);
+  doc.text("TRAVAUX CONCERNÉS", MARGIN, y);
+  doc.setDrawColor(...DIVIDER);
+  doc.line(MARGIN, y + 1.5, PAGE_W - MARGIN, y + 1.5);
+  y += 8;
+  field("Référence document", data.documentRef || "");
+  if (data.dateDocument) {
+    const d = new Date(data.dateDocument);
+    field("Date", isNaN(d.getTime()) ? String(data.dateDocument) : d.toLocaleDateString("fr-FR"));
+  }
+  field("Taux TVA réduit", `${Number(data.tauxTVA) || 10} %`);
+  if (data.objetTravaux) {
+    doc.setFont("Roboto", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(...TEXT_MUTED);
+    doc.text("NATURE DES TRAVAUX", MARGIN, y);
+    y += 5;
+    doc.setFont("Roboto", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(...TEXT_DARK);
+    const objLines = doc.splitTextToSize(data.objetTravaux, PAGE_W - 2 * MARGIN);
+    doc.text(objLines, MARGIN, y);
+    y += objLines.length * 5 + 4;
+  }
+  y += 4;
+
+  /** Attestation */
+  doc.setFont("Roboto", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(...primary);
+  doc.text("ATTESTATION DU CLIENT", MARGIN, y);
+  doc.setDrawColor(...DIVIDER);
+  doc.line(MARGIN, y + 1.5, PAGE_W - MARGIN, y + 1.5);
+  y += 10;
+
+  const attestationText = [
+    "Je soussigné(e), _____________________________________, certifie sur l'honneur :",
+    "",
+    "□  Le logement objet des travaux ci-dessus est achevé depuis plus de deux (2) ans à la date",
+    "   de début des travaux.",
+    "",
+    "□  Les travaux réalisés portent sur des locaux à usage d'habitation et ne concourent pas à la",
+    "   construction d'un immeuble neuf.",
+    "",
+    "□  Les travaux concernent :",
+    "   □ Des travaux d'amélioration, de transformation, d'aménagement et d'entretien (taux 10 %)",
+    "   □ Des travaux de rénovation énergétique éligibles (taux 5,5 %)",
+    "",
+    "Je m'engage à informer le prestataire de tout changement de situation qui remettrait en cause",
+    "le bénéfice du taux réduit.",
+    "",
+    "⚠️  Toute fausse déclaration m'expose aux sanctions prévues à l'article 1737 du CGI.",
+  ];
+
+  doc.setFont("Roboto", "normal");
+  doc.setFontSize(9.5);
+  doc.setTextColor(...TEXT_BODY);
+  for (const line of attestationText) {
+    if (y > PAGE_H - 50) { doc.addPage(); y = 20; }
+    doc.text(line, MARGIN, y);
+    y += line === "" ? 3 : 5.5;
+  }
+
+  y += 10;
+  /** Zone signature */
+  doc.setFont("Roboto", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...TEXT_DARK);
+  doc.text("Fait à _____________________ , le _____ / _____ / _________", MARGIN, y);
+  y += 14;
+  doc.text("Signature du client :", MARGIN, y);
+  doc.setDrawColor(...DIVIDER);
+  doc.rect(MARGIN + 45, y - 5, 80, 20);
+  y += 30;
+
+  /** Pied de page */
+  doc.setFont("Roboto", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(...TEXT_MUTED);
+  doc.text(
+    `${a.nomEntreprise || ""}${a.siret ? ` — SIRET : ${a.siret}` : ""} — Document à conserver par l'artisan pendant 10 ans`,
+    MARGIN,
+    PAGE_H - 8,
+  );
 
   return Buffer.from(doc.output("arraybuffer"));
 }

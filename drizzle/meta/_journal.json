@@ -29,6 +29,20 @@
       "when": 1782666568927,
       "tag": "20260628170928_superpdp-tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1782669582259,
+      "tag": "20260628175942_attestations-tva",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1782669587356,
+      "tag": "20260628175947_seed-tva-categories",
+      "breakpoints": true
     }
   ]
 }

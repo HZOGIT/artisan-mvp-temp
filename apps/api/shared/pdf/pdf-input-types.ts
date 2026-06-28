@@ -128,3 +128,15 @@ export interface Fournisseur {
   codePostal?: string | null;
   ville?: string | null;
 }
+
+export interface AttestationTvaInput {
+  /** Numéro du devis ou de la facture concerné */
+  documentRef?: string | null;
+  dateDocument?: string | Date | null;
+  /** Nature des travaux — tirée de l'objet du document */
+  objetTravaux?: string | null;
+  /** Taux TVA réduit appliqué (10 ou 5.5) */
+  tauxTVA?: number | string | null;
+  artisan?: Artisan | null;
+  client?: Client | null;
+}

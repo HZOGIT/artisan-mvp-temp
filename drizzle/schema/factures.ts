@@ -183,3 +183,20 @@ export const reglements = pgTable("reglements", {
 });
 export type Reglement = typeof reglements.$inferSelect;
 export type InsertReglement = typeof reglements.$inferInsert;
+
+export const attestationsTvaStatutEnum = pgEnum("attestations_tva_statut", ["genere", "signe"]);
+
+export const attestationsTva = pgTable("attestations_tva", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  factureId: integer("factureId").references(() => factures.id, { onDelete: "cascade" }),
+  /** FK vers devis.id — ON DELETE CASCADE ajouté manuellement dans la migration (évite l'import circulaire). */
+  devisId: integer("devisId"),
+  s3Key: varchar("s3Key", { length: 500 }).notNull(),
+  signedS3Key: varchar("signedS3Key", { length: 500 }),
+  statut: attestationsTvaStatutEnum("statut").default("genere").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type AttestationTva = typeof attestationsTva.$inferSelect;
+export type InsertAttestationTva = typeof attestationsTva.$inferInsert;

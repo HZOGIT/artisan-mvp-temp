@@ -731,6 +731,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const compta =
     deps.compta ??
     new ComptaEcrituresAdapter(new EcritureRepositoryDrizzle(getDbHandle().db), new FactureReaderDrizzle(getDbHandle().db));
+  const facturesStorage: StoragePort = deps.storage ?? new OvhS3Adapter(getDbHandle().db);
   const factures = createFacturesModule({
     repository: factureRepo,
     devisReader: deps.devisReader ?? new DevisReaderDrizzle(getDbHandle().db),
@@ -752,6 +753,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       tx.insert(paOutbox).values({ artisanId, factureId, statut: "pending", tentatives: 0 }).then(() => {}),
     db: deps.facturesDb ?? getDbHandle().db,
     stockRepo,
+    storage: facturesStorage,
   });
   /*
    * Domaine compta/écritures — lecture seule (balance/grand-livre/FEC). La génération est

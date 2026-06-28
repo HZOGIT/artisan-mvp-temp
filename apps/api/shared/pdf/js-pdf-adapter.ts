@@ -5,6 +5,7 @@ import {
   generateBonCommandePDF,
   generateContratPDF,
   generateInterventionPDF,
+  generateAttestationTvaPDF,
 } from "./pdf-generator";
 
 /*
@@ -26,6 +27,8 @@ export class JsPdfAdapter implements PdfPort {
         return Promise.resolve(generateContratPDF(data as never));
       case "intervention":
         return Promise.resolve(generateInterventionPDF(data as never));
+      case "attestation-tva":
+        return Promise.resolve(generateAttestationTvaPDF(data as never));
       default:
         return Promise.reject(new Error(`Template PDF inconnu : ${template}`));
     }
