@@ -22,7 +22,7 @@ Pour toute tâche (fix, feature, audit, investigation) :
 
 ## Règle fondamentale — limite de slots
 
-**Maximum 2 sessions worker actives en parallèle — toujours.** Compter l'**union** de : PRs ouvertes feat/* + worktrees feat/* avec screen vivant :
+**Maximum 5 sessions worker actives en parallèle — toujours.** Compter l'**union** de : PRs ouvertes feat/* + worktrees feat/* avec screen vivant :
 
 ```bash
 cd /home/developer/artisan-mvp-temp
@@ -45,7 +45,7 @@ for b in "${!seen[@]}"; do echo "  $b"; done
 
 **Pourquoi l'union** : une session active sans PR encore créée n'apparaît que dans worktree+screen. Une session dont le worktree a été nettoyé (reviewer en cours) n'apparaît que dans les PRs. L'union couvre les deux cas.
 
-Si `$active >= 2` → log "2/2 actifs — tick skippé." et arrêter. **Cette limite est absolue.**
+Si `$active >= 5` → log "5/5 actifs — tick skippé." et arrêter. **Cette limite est absolue.**
 
 ---
 
