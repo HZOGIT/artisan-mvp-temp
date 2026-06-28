@@ -73,6 +73,13 @@ export interface ICongeRepository {
    */
   ajusterSolde(ctx: TenantContext, ajustement: AjustementSolde): Promise<void>;
   getSolde(ctx: TenantContext, technicienId: number, annee: number): Promise<SoldeResult[]>;
+  /** Date d'embauche (techniciens.createdAt) du technicien, null s'il n'appartient pas au tenant. */
+  getTechnicienDateEmbauche(ctx: TenantContext, technicienId: number): Promise<Date | null>;
+  /**
+   * Tous les techniciens du tenant avec leur date d'embauche et CP pris pour `annee`.
+   * Une ligne par technicien actif (joursAcquis calculé par le use-case appelant).
+   */
+  listTechniciensSolde(ctx: TenantContext, annee: number): Promise<Array<{ technicienId: number; dateEmbauche: Date; joursPris: number }>>;
   /*
    * Vérifie si le technicien a déjà un congé (en_attente ou approuvé) dont la période
    * chevauche [dateDebut, dateFin]. `excludeId` exclut la demande elle-même (modification).

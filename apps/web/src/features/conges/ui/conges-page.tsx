@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { Calendar, Plus, Check, X, Clock, User, CalendarDays } from "lucide-react";
+import { Calendar, Plus, Check, X, Clock, User, CalendarDays, TrendingUp } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Input } from "@/shared/ui/input";
@@ -28,7 +28,7 @@ const STATUT_COLOR: Record<StatutConge, string> = {
 
 export default function CongesPage() {
   const { t } = useTranslation("conges");
-  const { conges, congesEnAttente, techniciens, isLoading, create, approuver, refuser } = useConges();
+  const { conges, congesEnAttente, techniciens, soldes, isLoading, create, approuver, refuser } = useConges();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedTechnicien, setSelectedTechnicien] = useState<string>("");
@@ -256,6 +256,45 @@ export default function CongesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {soldes.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              {t("soldesTitre")}
+            </CardTitle>
+            <CardDescription>{t("soldesDescription")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-muted-foreground">
+                    <th className="text-left py-2 pr-4 font-medium">{t("technicien")}</th>
+                    <th className="text-right py-2 px-4 font-medium">{t("soldesAcquis")}</th>
+                    <th className="text-right py-2 px-4 font-medium">{t("soldesPris")}</th>
+                    <th className="text-right py-2 pl-4 font-medium">{t("soldesRestant")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {soldes.map((s) => {
+                    const tech = techniciens.find((t) => t.id === s.technicienId);
+                    return (
+                      <tr key={s.technicienId} className="border-b last:border-0">
+                        <td className="py-2 pr-4">{tech ? `${tech.prenom ?? ""} ${tech.nom}`.trim() : t("inconnu")}</td>
+                        <td className="text-right py-2 px-4">{s.joursAcquis.toFixed(1)}</td>
+                        <td className="text-right py-2 px-4">{s.joursPris.toFixed(1)}</td>
+                        <td className="text-right py-2 pl-4 font-medium text-green-700">{s.soldeRestant.toFixed(1)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs defaultValue="tous">
         <TabsList>

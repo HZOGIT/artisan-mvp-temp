@@ -4,7 +4,7 @@ import type { DbClient } from "../../../../shared/db";
 import { outboxEvent } from "../../../../shared/events/outbox-event";
 import { withOutbox } from "../../../../shared/events/with-outbox";
 import type { ICongeRepository } from "../../application/conge-repository";
-import { listConges, listCongesEnAttente, getConge, getSoldeConge } from "../../application/read-use-cases";
+import { listConges, listCongesEnAttente, getConge, getSoldeConge, listSoldesConges } from "../../application/read-use-cases";
 import {
   creerConge,
   modifierConge,
@@ -131,6 +131,13 @@ export function createCongesRouter(repo: ICongeRepository, db?: DbClient) {
       .input(z.object({ technicienId: z.number().int(), annee: z.number().int().optional() }))
       .query(({ ctx, input }) =>
         getSoldeConge(repo, ctx.tenant, input.technicienId, input.annee ?? new Date().getFullYear()),
+      ),
+
+    /** Soldes CP de tous les techniciens du tenant — calcul à la lecture (idempotent). */
+    soldesTous: protectedProcedure
+      .input(z.object({ annee: z.number().int().optional() }))
+      .query(({ ctx, input }) =>
+        listSoldesConges(repo, ctx.tenant, input.annee ?? new Date().getFullYear()),
       ),
   });
 }

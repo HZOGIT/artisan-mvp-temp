@@ -2,6 +2,7 @@ import { NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ICongeRepository, SoldeResult } from "./conge-repository";
 import type { Conge } from "../domain/conge";
+import { calculerJoursAcquisAnnee } from "./solde";
 
 /*
  * Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté par le
@@ -24,6 +25,36 @@ export async function getConge(repo: ICongeRepository, ctx: TenantContext, id: n
   return conge;
 }
 
-export function getSoldeConge(repo: ICongeRepository, ctx: TenantContext, technicienId: number, annee: number): Promise<SoldeResult[]> {
-  return repo.getSolde(ctx, technicienId, annee);
+/**
+ * Solde CP enrichi : `joursAcquis` calculé à la lecture depuis `techniciens.createdAt`,
+ * naturellement idempotent — même appel = même résultat.
+ */
+export async function getSoldeConge(repo: ICongeRepository, ctx: TenantContext, technicienId: number, annee: number): Promise<SoldeResult[]> {
+  const [dateEmbauche, rows] = await Promise.all([
+    repo.getTechnicienDateEmbauche(ctx, technicienId),
+    repo.getSolde(ctx, technicienId, annee),
+  ]);
+  const joursAcquis = dateEmbauche ? calculerJoursAcquisAnnee(dateEmbauche, annee) : 0;
+  const cpRow = rows.find((r) => r.type === "conge_paye");
+  const autres = rows.filter((r) => r.type !== "conge_paye");
+  const cpResult: SoldeResult = cpRow
+    ? { ...cpRow, joursAcquis, soldeRestant: Math.max(0, joursAcquis - cpRow.joursPris) }
+    : { type: "conge_paye", annee, soldeInitial: 0, joursAcquis, joursPris: 0, soldeRestant: joursAcquis };
+  return [cpResult, ...autres];
+}
+
+export interface SoldeResume {
+  readonly technicienId: number;
+  readonly joursAcquis: number;
+  readonly joursPris: number;
+  readonly soldeRestant: number;
+}
+
+/** Soldes CP de tous les techniciens du tenant pour l'année (un seul appel DB). */
+export async function listSoldesConges(repo: ICongeRepository, ctx: TenantContext, annee: number): Promise<SoldeResume[]> {
+  const rows = await repo.listTechniciensSolde(ctx, annee);
+  return rows.map(({ technicienId, dateEmbauche, joursPris }) => {
+    const joursAcquis = calculerJoursAcquisAnnee(dateEmbauche, annee);
+    return { technicienId, joursAcquis, joursPris, soldeRestant: Math.max(0, joursAcquis - joursPris) };
+  });
 }

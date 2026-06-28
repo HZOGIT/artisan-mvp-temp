@@ -16,6 +16,8 @@ export class FakeCongeRepository implements ICongeRepository {
   private userTechnicien = new Map<string, number>();
   /** Solde décompté (joursPris) : clé `${artisanId}:${technicienId}:${type}:${annee}` → jours. */
   private joursPris = new Map<string, number>();
+  /** Date d'embauche par technicien (injectable) : clé `${artisanId}:${technicienId}`. */
+  private technicienDates = new Map<string, Date>();
 
   /** Aide de test : lit le total de jours pris (décompté) pour une clé de solde. */
   getJoursPris(artisanId: number, technicienId: number, type: string, annee: number): number {
@@ -23,8 +25,9 @@ export class FakeCongeRepository implements ICongeRepository {
   }
 
   /** Aide de test : déclare qu'un technicien appartient au tenant. */
-  registerTechnicien(artisanId: number, technicienId: number): void {
+  registerTechnicien(artisanId: number, technicienId: number, dateEmbauche?: Date): void {
     this.ownedTechniciens.add(`${artisanId}:${technicienId}`);
+    if (dateEmbauche) this.technicienDates.set(`${artisanId}:${technicienId}`, dateEmbauche);
   }
 
   /** Aide de test : lie un utilisateur à une fiche technicien (garde anti self-approbation). */
@@ -123,6 +126,23 @@ export class FakeCongeRepository implements ICongeRepository {
       this.joursPris.set(key, deltaJours);
     }
     /** absente + recrédit (≤0) → no-op */
+  }
+
+  async getTechnicienDateEmbauche(ctx: TenantContext, technicienId: number): Promise<Date | null> {
+    return this.technicienDates.get(`${ctx.artisanId}:${technicienId}`) ?? null;
+  }
+
+  async listTechniciensSolde(ctx: TenantContext, annee: number): Promise<Array<{ technicienId: number; dateEmbauche: Date; joursPris: number }>> {
+    return Array.from(this.ownedTechniciens)
+      .filter((key) => Number(key.split(":")[0]) === ctx.artisanId)
+      .map((key) => {
+        const [artId, techId] = key.split(":").map(Number);
+        return {
+          technicienId: techId,
+          dateEmbauche: this.technicienDates.get(key) ?? new Date(0),
+          joursPris: this.joursPris.get(`${artId}:${techId}:conge_paye:${annee}`) ?? 0,
+        };
+      });
   }
 
   async getSolde(ctx: TenantContext, technicienId: number, annee: number): Promise<SoldeResult[]> {
