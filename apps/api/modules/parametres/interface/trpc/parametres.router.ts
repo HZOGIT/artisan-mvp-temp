@@ -28,6 +28,7 @@ const updateSchema = z.object({
   notificationsEmail: z.boolean().optional(),
   rappelDevisJours: z.number().int().min(0).optional(),
   rappelFactureJours: z.number().int().min(0).optional(),
+  rappelRdvClientActif: z.boolean().optional(),
   objectifCA: decimal.optional(),
   objectifDevis: z.number().int().min(0).optional(),
   objectifClients: z.number().int().min(0).optional(),

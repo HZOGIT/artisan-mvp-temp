@@ -44,6 +44,8 @@
   "notifications": "Notifications",
   "notifEmail": "Notifications par email",
   "notifEmailDesc": "Recevoir des notifications par email pour les événements importants",
+  "rappelRdvClient": "Rappel RDV au client (J-1)",
+  "rappelRdvClientDesc": "Envoyer automatiquement un email de rappel au client la veille de chaque intervention planifiée",
   "enregistrer": "Enregistrer les paramètres",
   "enregistrement": "Enregistrement...",
   "toastEnregistre": "Paramètres enregistrés avec succès",

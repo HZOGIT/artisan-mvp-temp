@@ -35,6 +35,7 @@ export interface ParametresForm {
   delaiPaiementType: DelaiPaiementType;
   delaiValiditeDevis: string;
   notificationsEmail: boolean;
+  rappelRdvClientActif: boolean;
   slug: string;
   couleurPrincipale: string;
   couleurSecondaire: string;
@@ -58,6 +59,7 @@ export const FORM_DEFAULTS: ParametresForm = {
   delaiPaiementType: "net",
   delaiValiditeDevis: "30",
   notificationsEmail: true,
+  rappelRdvClientActif: true,
   slug: "",
   couleurPrincipale: "#4F46E5",
   couleurSecondaire: "#6366F1",
@@ -124,6 +126,7 @@ export function parametresToForm(p: Parametres, slug: string): ParametresForm {
     delaiPaiementType: p.delaiPaiementType === "fin_de_mois" ? "fin_de_mois" : "net",
     delaiValiditeDevis: String(p.rappelDevisJours || 30),
     notificationsEmail: p.notificationsEmail ?? true,
+    rappelRdvClientActif: p.rappelRdvClientActif ?? true,
     slug: slug || "",
     couleurPrincipale: p.couleurPrincipale || "#4F46E5",
     couleurSecondaire: p.couleurSecondaire || "#6366F1",
@@ -142,6 +145,7 @@ export function formToUpdateInput(f: ParametresForm): UpdateParametresInput {
     delaiPaiementJours: f.delaiPaiementJours.trim() === "" ? null : (parseInt(f.delaiPaiementJours) || 0),
     delaiPaiementType: f.delaiPaiementType,
     notificationsEmail: f.notificationsEmail,
+    rappelRdvClientActif: f.rappelRdvClientActif,
     rappelDevisJours: parseInt(f.delaiValiditeDevis) || 30,
     couleurPrincipale: f.couleurPrincipale,
     couleurSecondaire: f.couleurSecondaire,

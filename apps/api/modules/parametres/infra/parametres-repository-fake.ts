@@ -45,6 +45,7 @@ export class FakeParametresRepository implements IParametresRepository {
       ...(input.notificationsEmail !== undefined ? { notificationsEmail: input.notificationsEmail } : {}),
       ...(input.rappelDevisJours !== undefined ? { rappelDevisJours: input.rappelDevisJours } : {}),
       ...(input.rappelFactureJours !== undefined ? { rappelFactureJours: input.rappelFactureJours } : {}),
+      ...(input.rappelRdvClientActif !== undefined ? { rappelRdvClientActif: input.rappelRdvClientActif } : {}),
       ...(input.objectifCA !== undefined ? { objectifCA: input.objectifCA } : {}),
       ...(input.objectifDevis !== undefined ? { objectifDevis: input.objectifDevis } : {}),
       ...(input.objectifClients !== undefined ? { objectifClients: input.objectifClients } : {}),
