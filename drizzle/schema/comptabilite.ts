@@ -12,6 +12,8 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 
+export const regimeTVAEnum = pgEnum("regime_tva", ["encaissements", "debits"]);
+
 export const ecritureJournalEnum = pgEnum("ecriture_journal", ["VE", "AC", "BQ", "OD"]);
 export const ecritureStatutEnum = pgEnum("ecriture_statut", ["brouillon", "validee"]);
 export const compteTypeEnum = pgEnum("compte_type", ["actif", "passif", "charge", "produit"]);
@@ -111,6 +113,7 @@ export const configurationsComptables = pgTable("configurations_comptables", {
   prefixeFacture: varchar("prefixeFacture", { length: 10 }).default("FA"),
   prefixeAvoir: varchar("prefixeAvoir", { length: 10 }).default("AV"),
   exerciceDebut: integer("exerciceDebut").default(1),
+  regimeTVA: regimeTVAEnum("regimeTVA").default("encaissements").notNull(),
   actif: boolean("actif").default(true),
   syncAutoFactures: boolean("syncAutoFactures").default(false),
   syncAutoPaiements: boolean("syncAutoPaiements").default(false),

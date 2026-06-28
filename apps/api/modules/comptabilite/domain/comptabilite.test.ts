@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { assembleDeclarationTVA, computeBalance, computeGrandLivre, computeRapportTVA } from "./comptabilite";
+import { assembleDeclarationTVA, computeBalance, computeGrandLivre, computeRapportTVA, selectDateExigibilite } from "./comptabilite";
 import type { Ecriture } from "./comptabilite";
 
 const ec = (over: Partial<Ecriture>): Ecriture => ({
@@ -93,6 +93,24 @@ describe("comptabilite domain (pur)", () => {
     expect(b.debit).toBe(0.3);
     expect(b.soldeDebiteur).toBe(b.debit - b.credit);
     expect(b.soldeCrediteur).toBe(0);
+  });
+
+  describe("selectDateExigibilite — régime exigibilité TVA (L1 pur)", () => {
+    const dateF = new Date("2026-06-10");
+    const dateP = new Date("2026-07-05");
+
+    it("débits : renvoie toujours dateFacture (non-régression)", () => {
+      expect(selectDateExigibilite("debits", dateF, dateP)).toBe(dateF);
+      expect(selectDateExigibilite("debits", dateF, null)).toBe(dateF);
+    });
+
+    it("encaissements : renvoie datePaiement quand la facture est réglée", () => {
+      expect(selectDateExigibilite("encaissements", dateF, dateP)).toBe(dateP);
+    });
+
+    it("encaissements : null si facture non réglée → à exclure du calcul", () => {
+      expect(selectDateExigibilite("encaissements", dateF, null)).toBeNull();
+    });
   });
 
   it("assembleDeclarationTVA : arrondi 2 déc., total collectée + nette", () => {

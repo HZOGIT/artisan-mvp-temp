@@ -7,6 +7,18 @@
 
 import { round2 } from "../../../shared/money";
 
+export type RegimeTVA = "encaissements" | "debits";
+
+/**
+ * Sélection de la date d'exigibilité selon le régime (pure).
+ * Encaissements : datePaiement (null = non encaissée → à exclure).
+ * Débits : dateFacture (comportement actuel inchangé).
+ */
+export function selectDateExigibilite(regime: RegimeTVA, dateFacture: Date, datePaiement: Date | null): Date | null {
+  if (regime === "debits") return dateFacture;
+  return datePaiement;
+}
+
 export interface Ecriture {
   readonly id: number;
   readonly dateEcriture: Date;

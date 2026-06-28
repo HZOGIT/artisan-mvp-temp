@@ -60,15 +60,23 @@ export class ComptabiliteReaderDrizzle implements IComptabiliteReader {
     const dStr = p.dateDebut.toISOString().slice(0, 10);
     const fStr = p.dateFin.toISOString().slice(0, 10);
     return withTenant(this.db, ctx, async (tx) => {
-      /** Base HT + TVA collectée par taux, depuis les lignes de factures émises (non brouillon/annulées). */
+      const [cfg] = await tx.select({ regimeTVA: configurationsComptables.regimeTVA }).from(configurationsComptables).where(eq(configurationsComptables.artisanId, ctx.artisanId)).limit(1);
+      const regime = cfg?.regimeTVA ?? "encaissements";
+
+      /** Base HT + TVA collectée par taux selon le régime d'exigibilité. */
+      const baseWhere = regime === "encaissements"
+        ? and(eq(factures.artisanId, ctx.artisanId), eq(factures.statut, "payee"), isNotNull(factures.datePaiement), sql`DATE(${factures.datePaiement}) BETWEEN ${dStr} AND ${fStr}`)
+        : and(eq(factures.artisanId, ctx.artisanId), sql`DATE(${factures.dateFacture}) BETWEEN ${dStr} AND ${fStr}`, inArray(factures.statut, ["validee", "envoyee", "payee", "en_retard"]));
+
       const rows = await tx
         .select({ taux: facturesLignes.tauxTVA, baseHT: sql<string>`SUM(${facturesLignes.montantHT})`, tva: sql<string>`SUM(${facturesLignes.montantTVA})` })
         .from(facturesLignes)
         .innerJoin(factures, eq(factures.id, facturesLignes.factureId))
-        .where(and(eq(factures.artisanId, ctx.artisanId), sql`DATE(${factures.dateFacture}) BETWEEN ${dStr} AND ${fStr}`, inArray(factures.statut, ["validee", "envoyee", "payee", "en_retard"])))
+        .where(baseWhere)
         .groupBy(facturesLignes.tauxTVA)
         .orderBy(desc(facturesLignes.tauxTVA));
       const parTaux = rows.map((r) => ({ taux: Number(r.taux ?? 0), baseHT: Number(r.baseHT ?? 0), tvaCollectee: Number(r.tva ?? 0) }));
+
       /** TVA déductible depuis les dépenses déductibles de la période. */
       const [ded] = await tx
         .select({ tva: sql<string>`COALESCE(SUM(${depenses.montant_tva}), 0)` })

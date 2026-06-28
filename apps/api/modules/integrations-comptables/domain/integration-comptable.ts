@@ -8,6 +8,7 @@ export type LogicielComptable = "sage" | "quickbooks" | "ciel" | "ebp" | "autre"
 export type FormatExport = "fec" | "iif" | "qbo" | "csv";
 export type FrequenceSync = "quotidien" | "hebdomadaire" | "mensuel" | "manuel";
 export type ExportStatut = "en_cours" | "termine" | "erreur";
+export type RegimeTVA = "encaissements" | "debits";
 
 /** Configuration comptable d'un artisan (1 par tenant). Tous les champs nullables (config partielle). */
 export interface ConfigComptable {
@@ -34,6 +35,7 @@ export interface ConfigComptable {
   readonly heureSync: string | null;
   readonly notifierErreurs: boolean | null;
   readonly notifierSucces: boolean | null;
+  readonly regimeTVA: RegimeTVA | null;
   readonly derniereSync: Date | null;
   readonly prochainSync: Date | null;
 }
@@ -57,6 +59,7 @@ export interface SaveConfigInput {
   readonly prefixeAvoir?: string;
   readonly exerciceDebut?: number;
   readonly actif?: boolean;
+  readonly regimeTVA?: RegimeTVA;
 }
 
 export interface SaveSyncConfigInput {

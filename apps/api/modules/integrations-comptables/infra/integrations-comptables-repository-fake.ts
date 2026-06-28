@@ -5,7 +5,7 @@ import type { ConfigComptable, ExportComptableRow, FactureIIF, SaveConfigInput, 
 const EMPTY_CONFIG: ConfigComptable = {
   logiciel: null, formatExport: null, compteVentes: null, compteTVACollectee: null, compteClients: null, compteAchats: null, compteTVADeductible: null, compteFournisseurs: null,
   compteBanque: null, compteCaisse: null, journalVentes: null, journalAchats: null, journalBanque: null, prefixeFacture: null, prefixeAvoir: null, exerciceDebut: null, actif: null,
-  syncAutoFactures: null, syncAutoPaiements: null, frequenceSync: null, heureSync: null, notifierErreurs: null, notifierSucces: null, derniereSync: null, prochainSync: null,
+  syncAutoFactures: null, syncAutoPaiements: null, frequenceSync: null, heureSync: null, notifierErreurs: null, notifierSucces: null, regimeTVA: null, derniereSync: null, prochainSync: null,
 };
 
 export interface IntegrationFakeState {

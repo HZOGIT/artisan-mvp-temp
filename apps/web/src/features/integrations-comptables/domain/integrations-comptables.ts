@@ -18,10 +18,12 @@ export type SyncStatus = RouterOutputs["integrationsComptables"]["getSyncStatus"
 export type Logiciel = NonNullable<RouterInputs["integrationsComptables"]["genererExport"]["logiciel"]>;
 export type FormatExport = NonNullable<RouterInputs["integrationsComptables"]["genererExport"]["formatExport"]>;
 export type FrequenceSync = NonNullable<RouterInputs["integrationsComptables"]["saveSyncConfig"]["frequenceSync"]>;
+export type RegimeTVA = NonNullable<RouterInputs["integrationsComptables"]["saveConfig"]["regimeTVA"]>;
 
 export const LOGICIELS: readonly Logiciel[] = ["sage", "quickbooks", "ciel", "ebp", "autre"];
 export const FORMATS: readonly FormatExport[] = ["fec", "iif", "qbo", "csv"];
 export const FREQUENCES: readonly FrequenceSync[] = ["quotidien", "hebdomadaire", "mensuel", "manuel"];
+export const REGIMES_TVA: readonly RegimeTVA[] = ["encaissements", "debits"];
 
 export type ExportForm = { logiciel: Logiciel; formatExport: FormatExport; dateDebut: string; dateFin: string };
 export type SyncConfigForm = {
@@ -35,6 +37,7 @@ export type ConfigForm = {
   compteBanque: string; compteCaisse: string;
   journalVentes: string; journalAchats: string; journalBanque: string;
   prefixeFacture: string; prefixeAvoir: string; exerciceDebut: number; actif: boolean;
+  regimeTVA: RegimeTVA;
 };
 
 export function defaultExportForm(): ExportForm {
@@ -44,7 +47,7 @@ export const DEFAULT_CONFIG_FORM: ConfigForm = {
   logiciel: "sage", formatExport: "fec", compteVentes: "701000", compteTVACollectee: "445710",
   compteClients: "411000", compteAchats: "607000", compteTVADeductible: "445660", compteFournisseurs: "401000",
   compteBanque: "512000", compteCaisse: "530000", journalVentes: "VE", journalAchats: "AC", journalBanque: "BQ",
-  prefixeFacture: "FA", prefixeAvoir: "AV", exerciceDebut: 1, actif: true,
+  prefixeFacture: "FA", prefixeAvoir: "AV", exerciceDebut: 1, actif: true, regimeTVA: "encaissements",
 };
 export const DEFAULT_SYNC_CONFIG: SyncConfigForm = {
   syncAutoFactures: false, syncAutoPaiements: false, frequenceSync: "quotidien",

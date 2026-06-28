@@ -16,7 +16,7 @@ function toConfig(r: ConfigRow): ConfigComptable {
     compteBanque: r.compteBanque ?? null, compteCaisse: r.compteCaisse ?? null, journalVentes: r.journalVentes ?? null, journalAchats: r.journalAchats ?? null, journalBanque: r.journalBanque ?? null,
     prefixeFacture: r.prefixeFacture ?? null, prefixeAvoir: r.prefixeAvoir ?? null, exerciceDebut: r.exerciceDebut ?? null, actif: r.actif ?? null,
     syncAutoFactures: r.syncAutoFactures ?? null, syncAutoPaiements: r.syncAutoPaiements ?? null, frequenceSync: r.frequenceSync ?? null, heureSync: r.heureSync ?? null,
-    notifierErreurs: r.notifierErreurs ?? null, notifierSucces: r.notifierSucces ?? null, derniereSync: r.derniereSync ?? null, prochainSync: r.prochainSync ?? null,
+    notifierErreurs: r.notifierErreurs ?? null, notifierSucces: r.notifierSucces ?? null, regimeTVA: r.regimeTVA ?? null, derniereSync: r.derniereSync ?? null, prochainSync: r.prochainSync ?? null,
   };
 }
 
@@ -28,6 +28,7 @@ function toExport(r: ExportRow): ExportComptableRow {
 const CONFIG_COLS = new Set<string>([
   "logiciel", "formatExport", "compteVentes", "compteTVACollectee", "compteClients", "compteAchats", "compteTVADeductible", "compteFournisseurs", "compteBanque", "compteCaisse",
   "journalVentes", "journalAchats", "journalBanque", "prefixeFacture", "prefixeAvoir", "exerciceDebut", "actif", "syncAutoFactures", "syncAutoPaiements", "frequenceSync", "heureSync", "notifierErreurs", "notifierSucces",
+  "regimeTVA",
 ]);
 
 /*

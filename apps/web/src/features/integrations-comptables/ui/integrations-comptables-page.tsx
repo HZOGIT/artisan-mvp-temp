@@ -12,7 +12,7 @@ import { Badge } from "@/shared/ui/badge";
 import { Switch } from "@/shared/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 import { useIntegrationsComptables } from "../application/use-integrations-comptables";
-import { DEFAULT_CONFIG_FORM, DEFAULT_SYNC_CONFIG, defaultExportForm, syncConfigFromConfig, statutVariant, pendingTotal, exportFilename, LOGICIELS, FORMATS, FREQUENCES, type Logiciel, type FormatExport, type FrequenceSync } from "../domain/integrations-comptables";
+import { DEFAULT_CONFIG_FORM, DEFAULT_SYNC_CONFIG, defaultExportForm, syncConfigFromConfig, statutVariant, pendingTotal, exportFilename, LOGICIELS, FORMATS, FREQUENCES, REGIMES_TVA, type Logiciel, type FormatExport, type FrequenceSync, type RegimeTVA } from "../domain/integrations-comptables";
 
 /*
  * Page `integrations-comptables` — migration clean-archi de `pages/IntegrationsComptables.tsx`. Markup à
@@ -239,6 +239,17 @@ export default function IntegrationsComptablesPage() {
                     <SelectContent>{FORMATS.map((f) => (<SelectItem key={f} value={f}>{t(`formatLabel.${f}`)}</SelectItem>))}</SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label>{t("regimeTVATitre")}</Label>
+                <Select value={configForm.regimeTVA} onValueChange={(v) => setConfigForm({ ...configForm, regimeTVA: v as RegimeTVA })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{REGIMES_TVA.map((r) => (<SelectItem key={r} value={r}>{t(`regimeTVALabel.${r}`)}</SelectItem>))}</SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">{t(`regimeTVADesc.${configForm.regimeTVA}`)}</p>
+                {configForm.regimeTVA === "encaissements" && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">{t("mentionTVAEncaissements")}</p>
+                )}
               </div>
               <div>
                 <h4 className="font-semibold mb-4">{t("comptesVentes")}</h4>
