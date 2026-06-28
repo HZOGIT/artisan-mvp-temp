@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { paEntites, facturesEntrantes } from "../../../../../../drizzle/schema/einvoicing";
+import { paEntites, facturesEntrantes, superpdpTokens } from "../../../../../../drizzle/schema/einvoicing";
 import { factures as facturesTable } from "../../../../../../drizzle/schema/factures";
 import type { DbClient } from "../../../../shared/db";
 import { withTenant } from "../../../../shared/db/with-tenant";
@@ -30,6 +30,17 @@ export function createEinvoicingRouter(pa: PaPort, db: DbClient, paDisponible: b
           .where(eq(paEntites.artisanId, ctx.tenant.artisanId))
           .limit(1)
           .then((rows) => ({ ...rows[0], paDisponible })),
+      ),
+    ),
+
+    oauthStatut: protectedProcedure.query(({ ctx }) =>
+      withTenant(db, ctx.tenant, (tx) =>
+        tx
+          .select({ expiresAt: superpdpTokens.expiresAt, updatedAt: superpdpTokens.updatedAt })
+          .from(superpdpTokens)
+          .where(eq(superpdpTokens.artisanId, ctx.tenant.artisanId))
+          .limit(1)
+          .then((rows) => ({ connecte: rows.length > 0, expiresAt: rows[0]?.expiresAt ?? null })),
       ),
     ),
 

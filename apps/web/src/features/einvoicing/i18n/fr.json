@@ -17,5 +17,10 @@
   "date": "Date",
   "statut": "Statut",
   "erreur_activation": "Erreur lors de l'activation",
-  "pa_non_configure": "Aucun fournisseur de dématérialisation externe n'est encore branché — contacter l'administrateur"
+  "pa_non_configure": "Aucun fournisseur de dématérialisation externe n'est encore branché — contacter l'administrateur",
+  "oauth_section": "Connexion SuperPDP (OAuth)",
+  "oauth_connecte": "Connecté à SuperPDP",
+  "oauth_non_connecte": "Non connecté",
+  "oauth_connecter": "Connecter à SuperPDP",
+  "oauth_reconnecter": "Reconnecter"
 }

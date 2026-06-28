@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, varchar, text, timestamp, unique, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, varchar, text, timestamp, unique, boolean, index } from "drizzle-orm/pg-core";
 import { artisans } from "./artisans";
 import { cycleVieEnum, factures } from "./factures";
 
@@ -60,6 +60,20 @@ export const facturesEntrantes = pgTable("factures_entrantes", {
 }));
 export type FactureEntrante = typeof facturesEntrantes.$inferSelect;
 export type InsertFactureEntrante = typeof facturesEntrantes.$inferInsert;
+
+export const superpdpTokens = pgTable("superpdp_tokens", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull().unique().references(() => artisans.id, { onDelete: "cascade" }),
+  accessToken: text("accessToken").notNull(),
+  refreshToken: text("refreshToken"),
+  expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+}, (t) => ({
+  idxArtisanId: index("superpdp_tokens_artisan_id_idx").on(t.artisanId),
+}));
+export type SuperpdpToken = typeof superpdpTokens.$inferSelect;
+export type InsertSuperpdpToken = typeof superpdpTokens.$inferInsert;
 
 export function isTerminal(statut: string): boolean {
   return statut === "refusee" || statut === "rejetee";

@@ -32,11 +32,11 @@ export class FakePaAdapter implements PaPort {
     return Promise.resolve({ paDocumentId, statut: "soumis" });
   }
 
-  listInbound(_paEntityId: string, _since: Date): Promise<InboundInvoice[]> {
+  listInbound(_paEntityId: string, _since: Date, _artisanId?: number): Promise<InboundInvoice[]> {
     return Promise.resolve([]);
   }
 
-  fetchInbound(paDocumentId: string): Promise<InboundInvoiceFull> {
+  fetchInbound(paDocumentId: string, _artisanId?: number): Promise<InboundInvoiceFull> {
     return Promise.resolve({
       paDocumentId,
       emetteurSiret: "00000000000000",
@@ -46,7 +46,7 @@ export class FakePaAdapter implements PaPort {
     });
   }
 
-  getLifecycle(paDocumentId: string): Promise<LifecycleEvent[]> {
+  getLifecycle(paDocumentId: string, _artisanId?: number): Promise<LifecycleEvent[]> {
     return Promise.resolve(this.lifecycle.get(paDocumentId) ?? []);
   }
 

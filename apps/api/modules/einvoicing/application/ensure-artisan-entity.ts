@@ -24,6 +24,7 @@ export async function ensureArtisanEntity(
     siret: artisan.siret,
     nom: artisan.nomEntreprise ?? "",
     email: artisan.email ?? "",
+    artisanId: ctx.artisanId,
   });
 
   await withTenant(db, ctx, async (tx) => {

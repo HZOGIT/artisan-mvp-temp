@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import type { PaPort } from "../../modules/einvoicing/application/pa-port";
 import type {
   EntityInput,
@@ -8,8 +9,8 @@ import type {
   WebhookEvent,
 } from "../../modules/einvoicing/domain/einvoicing";
 import { fetchWithRetry } from "../http/fetch-with-retry";
-
-interface TokenCache { accessToken: string; expiresAt: number }
+import type { DbClient } from "../db";
+import { superpdpTokens } from "../../../../drizzle/schema/einvoicing";
 
 /** Codes AFNOR EN16931 (fr:2XX) → valeur cycleVieEnum Operioz */
 const AFNOR_STATUTS: Record<string, string> = {
@@ -30,25 +31,83 @@ export function mapAfnorStatut(code: string): string {
   return AFNOR_STATUTS[code] ?? "prise_en_charge";
 }
 
-export class SuperPdpPaAdapter implements PaPort {
-  private tokenCache: TokenCache | null = null;
+interface TokenResponse {
+  access_token: string;
+  refresh_token?: string;
+  expires_in: number;
+}
 
+export class SuperPdpPaAdapter implements PaPort {
   constructor(
     private readonly clientId: string,
     private readonly clientSecret: string,
     private readonly baseUrl: string,
+    /** Connexion DB owner (artisan_user) pour lire/écrire les tokens per-artisan. */
+    private readonly db: DbClient | null = null,
   ) {}
 
-  private async getAccessToken(): Promise<string> {
-    if (this.tokenCache && this.tokenCache.expiresAt > Date.now() + 30_000) {
-      return this.tokenCache.accessToken;
+  /** Upsert un token OAuth artisan en base — appelé par le callback OAuth. */
+  async upsertToken(artisanId: number, data: { accessToken: string; refreshToken: string | null; expiresAt: Date }): Promise<void> {
+    if (!this.db) throw new Error("DB non injectée dans SuperPdpPaAdapter");
+    await this.db
+      .insert(superpdpTokens)
+      .values({ artisanId, accessToken: data.accessToken, refreshToken: data.refreshToken, expiresAt: data.expiresAt })
+      .onConflictDoUpdate({
+        target: superpdpTokens.artisanId,
+        set: { accessToken: data.accessToken, refreshToken: data.refreshToken, expiresAt: data.expiresAt, updatedAt: new Date() },
+      });
+  }
+
+  /** Token per-artisan depuis la DB — refresh automatique si expiré. */
+  async getTokenForArtisan(artisanId: number): Promise<string | null> {
+    if (!this.db) return null;
+    const [row] = await this.db
+      .select()
+      .from(superpdpTokens)
+      .where(eq(superpdpTokens.artisanId, artisanId))
+      .limit(1);
+    if (!row) return null;
+    if (row.expiresAt.getTime() > Date.now() + 30_000) return row.accessToken;
+    if (!row.refreshToken) return null;
+    return this.refreshToken(artisanId, row.refreshToken);
+  }
+
+  private async refreshToken(artisanId: number, refreshToken: string): Promise<string> {
+    const body = new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+      client_id: this.clientId,
+      client_secret: this.clientSecret,
+    });
+    const res = await fetchWithRetry(`${this.baseUrl}/oauth2/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+      forceRetry: true,
+    });
+    if (!res.ok) throw new Error(`SuperPDP token refresh failed: ${res.status}`);
+    const json = await res.json() as TokenResponse;
+    const expiresAt = new Date(Date.now() + json.expires_in * 1000);
+    await this.upsertToken(artisanId, {
+      accessToken: json.access_token,
+      refreshToken: json.refresh_token ?? refreshToken,
+      expiresAt,
+    });
+    return json.access_token;
+  }
+
+  private async getAccessToken(artisanId?: number): Promise<string> {
+    if (artisanId != null) {
+      const token = await this.getTokenForArtisan(artisanId);
+      if (token) return token;
     }
+    /* ponytail: client_credentials fallback — utilisé tant qu'aucun token per-artisan n'est stocké (avant connexion OAuth) */
     const body = new URLSearchParams({
       grant_type: "client_credentials",
       client_id: this.clientId,
       client_secret: this.clientSecret,
     });
-    const res = await fetchWithRetry(`${this.baseUrl}/oauth/token`, {
+    const res = await fetchWithRetry(`${this.baseUrl}/oauth2/token`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: body.toString(),
@@ -56,12 +115,11 @@ export class SuperPdpPaAdapter implements PaPort {
     });
     if (!res.ok) throw new Error(`SuperPDP OAuth2 failed: ${res.status}`);
     const json = await res.json() as { access_token: string; expires_in: number };
-    this.tokenCache = { accessToken: json.access_token, expiresAt: Date.now() + json.expires_in * 1000 };
     return json.access_token;
   }
 
-  private async apiFetch(path: string, opts: RequestInit = {}): Promise<Response> {
-    const token = await this.getAccessToken();
+  private async apiFetch(path: string, artisanId: number | undefined, opts: RequestInit = {}): Promise<Response> {
+    const token = await this.getAccessToken(artisanId);
     return fetchWithRetry(`${this.baseUrl}${path}`, {
       ...opts,
       headers: {
@@ -73,14 +131,12 @@ export class SuperPdpPaAdapter implements PaPort {
   }
 
   async ensureEntity(input: EntityInput): Promise<{ paEntityId: string; kybStatut: string }> {
-    /* Champs exacts à confirmer sur sandbox SuperPDP (siret / name / email) */
-    /* POST /v1.beta/members — idempotent sur SIRET ; 409 = déjà enregistré */
-    const res = await this.apiFetch("/v1.beta/members", {
+    const res = await this.apiFetch("/v1.beta/members", input.artisanId, {
       method: "POST",
       body: JSON.stringify({ siret: input.siret, name: input.nom, email: input.email }),
     });
     if (res.status === 409) {
-      const get = await this.apiFetch(`/v1.beta/members?siret=${encodeURIComponent(input.siret)}`);
+      const get = await this.apiFetch(`/v1.beta/members?siret=${encodeURIComponent(input.siret)}`, input.artisanId);
       if (!get.ok) throw new Error(`SuperPDP GET /v1.beta/members → ${get.status}`);
       const existing = await get.json() as { id: string; kyb_status: string };
       return { paEntityId: existing.id, kybStatut: existing.kyb_status ?? "pending" };
@@ -91,8 +147,6 @@ export class SuperPdpPaAdapter implements PaPort {
   }
 
   async submitInvoice(input: SubmitInvoiceInput): Promise<{ paDocumentId: string; statut: string }> {
-    /* Format à confirmer sur sandbox SuperPDP (JSON EN16931 vs Factur-X base64) */
-    /* POST /v1.beta/invoices */
     const p = input.payload;
     const body = JSON.stringify({
       member_id: input.paEntityId,
@@ -136,16 +190,14 @@ export class SuperPdpPaAdapter implements PaPort {
       }),
       ...(input.facturxBase64 && { facturx_base64: input.facturxBase64 }),
     });
-    const res = await this.apiFetch("/v1.beta/invoices", { method: "POST", body });
+    const res = await this.apiFetch("/v1.beta/invoices", input.artisanId, { method: "POST", body });
     if (!res.ok) throw new Error(`SuperPDP POST /v1.beta/invoices → ${res.status}`);
     const data = await res.json() as { id: string; status: string };
     return { paDocumentId: data.id, statut: mapAfnorStatut(data.status) };
   }
 
-  async getLifecycle(paDocumentId: string): Promise<LifecycleEvent[]> {
-    /* Endpoint et champs à vérifier sur sandbox (occurred_at / invoice_id / status) */
-    /* GET /v1.beta/invoices/{id}/events */
-    const res = await this.apiFetch(`/v1.beta/invoices/${encodeURIComponent(paDocumentId)}/events`);
+  async getLifecycle(paDocumentId: string, artisanId?: number): Promise<LifecycleEvent[]> {
+    const res = await this.apiFetch(`/v1.beta/invoices/${encodeURIComponent(paDocumentId)}/events`, artisanId);
     if (!res.ok) throw new Error(`SuperPDP GET /v1.beta/invoices/{id}/events → ${res.status}`);
     const data = await res.json() as Array<{
       invoice_id: string;
@@ -161,15 +213,13 @@ export class SuperPdpPaAdapter implements PaPort {
     }));
   }
 
-  async listInbound(paEntityId: string, since: Date): Promise<InboundInvoice[]> {
-    /* Pagination et noms de champs à confirmer (seller_siret / total_incl_vat / issue_date) */
-    /* GET /v1.beta/invoices?direction=inbound&member_id=...&since=... */
+  async listInbound(paEntityId: string, since: Date, artisanId?: number): Promise<InboundInvoice[]> {
     const params = new URLSearchParams({
       direction: "inbound",
       member_id: paEntityId,
       since: since.toISOString(),
     });
-    const res = await this.apiFetch(`/v1.beta/invoices?${params.toString()}`);
+    const res = await this.apiFetch(`/v1.beta/invoices?${params.toString()}`, artisanId);
     if (!res.ok) throw new Error(`SuperPDP GET /v1.beta/invoices (inbound) → ${res.status}`);
     const data = await res.json() as Array<{
       id: string;
@@ -185,10 +235,8 @@ export class SuperPdpPaAdapter implements PaPort {
     }));
   }
 
-  async fetchInbound(paDocumentId: string): Promise<InboundInvoiceFull> {
-    /* Champ base64 à confirmer sur sandbox (facturx_base64 vs pdf_base64) */
-    /* GET /v1.beta/invoices/{id} */
-    const res = await this.apiFetch(`/v1.beta/invoices/${encodeURIComponent(paDocumentId)}`);
+  async fetchInbound(paDocumentId: string, artisanId?: number): Promise<InboundInvoiceFull> {
+    const res = await this.apiFetch(`/v1.beta/invoices/${encodeURIComponent(paDocumentId)}`, artisanId);
     if (!res.ok) throw new Error(`SuperPDP GET /v1.beta/invoices/{id} → ${res.status}`);
     const data = await res.json() as {
       id: string;
