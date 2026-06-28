@@ -110,4 +110,38 @@ describe.skipIf(!URL)("ContratRepositoryDrizzle (PG, RLS + état machine + anti-
     // isolation : B ne voit aucun contrat de A
     expect((await repo.listAFacturer(ctx(B))).some((x) => x.artisanId === A)).toBe(false);
   });
+
+  it("reviserPrix : met à jour montantHT + dateDerniereRevision ; isolation RLS cross-tenant", async () => {
+    const c = await repo.create(ctx(A), { ...base(), montantHT: "300.00" }, await repo.nextReference(ctx(A)));
+    const dateRevision = new Date("2026-01-15T00:00:00Z");
+    const updated = await repo.reviserPrix(ctx(A), c.id, "306.00", dateRevision);
+    expect(updated?.montantHT).toBe("306.00");
+    expect(updated?.dateDerniereRevision?.toISOString()).toBe(dateRevision.toISOString());
+    // isolation cross-tenant : B ne peut pas réviser le contrat de A
+    expect(await repo.reviserPrix(ctx(B), c.id, "999.00", new Date())).toBeNull();
+    // le contrat de A est intact
+    expect((await repo.getById(ctx(A), c.id))?.montantHT).toBe("306.00");
+  });
+
+  it("reviserPrix : garde annuelle atomique — même année → null (idempotence SQL)", async () => {
+    const c = await repo.create(ctx(A), { ...base(), montantHT: "200.00" }, await repo.nextReference(ctx(A)));
+    const first = await repo.reviserPrix(ctx(A), c.id, "204.00", new Date());
+    expect(first?.montantHT).toBe("204.00");
+    // 2e appel dans la même année → la garde WHERE bloque
+    const second = await repo.reviserPrix(ctx(A), c.id, "210.00", new Date());
+    expect(second).toBeNull();
+    expect((await repo.getById(ctx(A), c.id))?.montantHT).toBe("204.00");
+  });
+
+  it("reviserPrix : concurrence — 2 appels parallèles → exactement 1 succès, 1 null", async () => {
+    const c = await repo.create(ctx(A), { ...base(), montantHT: "500.00" }, await repo.nextReference(ctx(A)));
+    const [r1, r2] = await Promise.all([
+      repo.reviserPrix(ctx(A), c.id, "510.00", new Date()),
+      repo.reviserPrix(ctx(A), c.id, "510.00", new Date()),
+    ]);
+    const successes = [r1, r2].filter((r) => r !== null).length;
+    expect(successes).toBe(1);
+    // le montant final est bien 510.00 (une seule indexation appliquée)
+    expect((await repo.getById(ctx(A), c.id))?.montantHT).toBe("510.00");
+  });
 });

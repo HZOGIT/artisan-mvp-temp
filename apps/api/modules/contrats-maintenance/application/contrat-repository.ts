@@ -84,6 +84,11 @@ export interface IContratRepository {
   listProchaineReconduction(ctx: TenantContext): Promise<Contrat[]>;
   /** Horodate l'envoi de l'alerte Chatel (idempotent — IS NULL filtré en amont). */
   markAlertReconductionSent(ctx: TenantContext, id: number): Promise<void>;
+  /**
+   * Met à jour `montantHT` + `dateDerniereRevision` atomiquement (révision d'indexation).
+   * null si hors tenant.
+   */
+  reviserPrix(ctx: TenantContext, id: number, nouveauMontantHT: string, dateDerniereRevision: Date): Promise<Contrat | null>;
   /** Retourne un repo lié à un client DB spécifique (pour `withOutbox`). */
   withDb(db: DbClient): IContratRepository;
 }

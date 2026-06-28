@@ -126,4 +126,23 @@ describe.skipIf(!URL)("contrats.router e2e (HTTP → tRPC → use-case → repo 
     // depuis terminal (termine) → 409
     expect((await mut(server, "contrats.suspendre", { id }, tA)).statusCode).toBe(409);
   });
+
+  it("reviserPrix : révise une fois ; 2e appel même année → 409 (idempotence)", async () => {
+    const tA = await token(UA);
+    const id = (await creer(tA, { tauxIndexationAnnuel: "2", montantHT: "300.00" })).json().result.data.id as number;
+    const r1 = await mut(server, "contrats.reviserPrix", { id }, tA);
+    expect(r1.statusCode).toBe(200);
+    const data = r1.json().result.data as { ancienMontantHT: string; nouveauMontantHT: string; contrat: { montantHT: string } };
+    expect(data.ancienMontantHT).toBe("300.00");
+    expect(data.nouveauMontantHT).toBe("306.00");
+    expect(data.contrat.montantHT).toBe("306.00");
+    // 2e appel → 409 (même année)
+    expect((await mut(server, "contrats.reviserPrix", { id }, tA)).statusCode).toBe(409);
+  });
+
+  it("reviserPrix sans taux défini → 400", async () => {
+    const tA = await token(UA);
+    const id = (await creer(tA)).json().result.data.id as number;
+    expect((await mut(server, "contrats.reviserPrix", { id }, tA)).statusCode).toBe(400);
+  });
 });

@@ -1,6 +1,6 @@
 {
-  "id": "5983c740-4c56-458d-b9b4-9dfcc701068f",
-  "prevId": "9ac5c40d-5e39-42ae-b1b2-5fa62cf1d0b9",
+  "id": "4c806a19-3c58-4187-8aa6-747ce876b05f",
+  "prevId": "aadef90c-704d-4708-a1c8-b2a564eda648",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -71,11 +71,11 @@
       "uniqueConstraints": {
         "sessions_user_token": {
           "name": "sessions_user_token",
+          "nullsNotDistinct": false,
           "columns": [
             "user_id",
             "session_token"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -135,15 +135,15 @@
         "admin_audit_log_staff_user_id_users_id_fk": {
           "name": "admin_audit_log_staff_user_id_users_id_fk",
           "tableFrom": "admin_audit_log",
+          "tableTo": "users",
           "columnsFrom": [
             "staff_user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -225,11 +225,11 @@
       "uniqueConstraints": {
         "devices_user_fingerprint": {
           "name": "devices_user_fingerprint",
+          "nullsNotDistinct": false,
           "columns": [
             "user_id",
             "device_fingerprint"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -272,10 +272,10 @@
       "uniqueConstraints": {
         "email_optouts_email_unique": {
           "name": "email_optouts_email_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "email"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -491,15 +491,15 @@
         "sessions_userId_users_id_fk": {
           "name": "sessions_userId_users_id_fk",
           "tableFrom": "sessions",
+          "tableTo": "users",
           "columnsFrom": [
             "userId"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -627,17 +627,17 @@
       "uniqueConstraints": {
         "users_openId_unique": {
           "name": "users_openId_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "openId"
-          ],
-          "nullsNotDistinct": false
+          ]
         },
         "users_email_unique": {
           "name": "users_email_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "email"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -687,11 +687,11 @@
       "uniqueConstraints": {
         "uq_artisan_module": {
           "name": "uq_artisan_module",
+          "nullsNotDistinct": false,
           "columns": [
             "artisan_id",
             "module_slug"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -911,17 +911,17 @@
       "uniqueConstraints": {
         "artisans_userId_unique": {
           "name": "artisans_userId_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "userId"
-          ],
-          "nullsNotDistinct": false
+          ]
         },
         "artisans_slug_unique": {
           "name": "artisans_slug_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "slug"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -1003,10 +1003,10 @@
       "uniqueConstraints": {
         "modules_slug_unique": {
           "name": "modules_slug_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "slug"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -1091,6 +1091,13 @@
         },
         "notificationsEmail": {
           "name": "notificationsEmail",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": true
+        },
+        "rappelRdvClientActif": {
+          "name": "rappelRdvClientActif",
           "type": "boolean",
           "primaryKey": false,
           "notNull": false,
@@ -1196,6 +1203,12 @@
           "notNull": false,
           "default": "'net'"
         },
+        "tauxIndemniteKm": {
+          "name": "tauxIndemniteKm",
+          "type": "numeric(6, 3)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "createdAt": {
           "name": "createdAt",
           "type": "timestamp",
@@ -1209,12 +1222,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "tauxIndemniteKm": {
-          "name": "tauxIndemniteKm",
-          "type": "numeric(6, 3)",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {},
@@ -1223,10 +1230,10 @@
       "uniqueConstraints": {
         "parametres_artisan_artisanId_unique": {
           "name": "parametres_artisan_artisanId_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "artisanId"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -1300,10 +1307,10 @@
       "uniqueConstraints": {
         "client_portal_access_token_unique": {
           "name": "client_portal_access_token_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "token"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -1364,10 +1371,10 @@
       "uniqueConstraints": {
         "client_portal_sessions_sessionToken_unique": {
           "name": "client_portal_sessions_sessionToken_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "sessionToken"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -1488,6 +1495,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "archivedAt": {
+          "name": "archivedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
         "createdAt": {
           "name": "createdAt",
           "type": "timestamp",
@@ -1579,15 +1592,15 @@
         "attestations_tva_factureId_factures_id_fk": {
           "name": "attestations_tva_factureId_factures_id_fk",
           "tableFrom": "attestations_tva",
+          "tableTo": "factures",
           "columnsFrom": [
             "factureId"
           ],
-          "tableTo": "factures",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1681,10 +1694,10 @@
       "uniqueConstraints": {
         "config_relances_auto_artisanId_unique": {
           "name": "config_relances_auto_artisanId_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "artisanId"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -1950,6 +1963,14 @@
           "notNull": true,
           "default": 0
         },
+        "regimeTVA": {
+          "name": "regimeTVA",
+          "type": "regime_tva_facture",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'normal'"
+        },
         "updatedAt": {
           "name": "updatedAt",
           "type": "timestamp",
@@ -2025,7 +2046,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -2088,15 +2109,15 @@
         "factures_lignes_tvaCategorieId_tva_categories_id_fk": {
           "name": "factures_lignes_tvaCategorieId_tva_categories_id_fk",
           "tableFrom": "factures_lignes",
+          "tableTo": "tva_categories",
           "columnsFrom": [
             "tvaCategorieId"
           ],
-          "tableTo": "tva_categories",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2338,15 +2359,15 @@
         "reglements_factureId_factures_id_fk": {
           "name": "reglements_factureId_factures_id_fk",
           "tableFrom": "reglements",
+          "tableTo": "factures",
           "columnsFrom": [
             "factureId"
           ],
-          "tableTo": "factures",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2583,6 +2604,13 @@
           "notNull": false,
           "default": "'0.00'"
         },
+        "montantDejaFacture": {
+          "name": "montantDejaFacture",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'0.00'"
+        },
         "createdAt": {
           "name": "createdAt",
           "type": "timestamp",
@@ -2596,13 +2624,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "montantDejaFacture": {
-          "name": "montantDejaFacture",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'0.00'"
         }
       },
       "indexes": {},
@@ -2666,7 +2687,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -2729,15 +2750,15 @@
         "devis_lignes_tvaCategorieId_tva_categories_id_fk": {
           "name": "devis_lignes_tvaCategorieId_tva_categories_id_fk",
           "tableFrom": "devis_lignes",
+          "tableTo": "tva_categories",
           "columnsFrom": [
             "tvaCategorieId"
           ],
-          "tableTo": "tva_categories",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2891,7 +2912,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -2954,15 +2975,15 @@
         "devis_options_lignes_tvaCategorieId_tva_categories_id_fk": {
           "name": "devis_options_lignes_tvaCategorieId_tva_categories_id_fk",
           "tableFrom": "devis_options_lignes",
+          "tableTo": "tva_categories",
           "columnsFrom": [
             "tvaCategorieId"
           ],
-          "tableTo": "tva_categories",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3081,7 +3102,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -3130,15 +3151,15 @@
         "modeles_devis_lignes_tvaCategorieId_tva_categories_id_fk": {
           "name": "modeles_devis_lignes_tvaCategorieId_tva_categories_id_fk",
           "tableFrom": "modeles_devis_lignes",
+          "tableTo": "tva_categories",
           "columnsFrom": [
             "tvaCategorieId"
           ],
-          "tableTo": "tva_categories",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3251,17 +3272,17 @@
       "uniqueConstraints": {
         "signatures_devis_devisId_unique": {
           "name": "signatures_devis_devisId_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "devisId"
-          ],
-          "nullsNotDistinct": false
+          ]
         },
         "signatures_devis_token_unique": {
           "name": "signatures_devis_token_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "token"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -3457,6 +3478,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "tauxIndexationAnnuel": {
+          "name": "tauxIndexationAnnuel",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dateDerniereRevision": {
+          "name": "dateDerniereRevision",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
         "createdAt": {
           "name": "createdAt",
           "type": "timestamp",
@@ -3534,15 +3567,15 @@
         "factures_recurrentes_contratId_contrats_maintenance_id_fk": {
           "name": "factures_recurrentes_contratId_contrats_maintenance_id_fk",
           "tableFrom": "factures_recurrentes",
+          "tableTo": "contrats_maintenance",
           "columnsFrom": [
             "contratId"
           ],
-          "tableTo": "contrats_maintenance",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3632,6 +3665,19 @@
         "technicienId": {
           "name": "technicienId",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rappelClientEnvoye": {
+          "name": "rappelClientEnvoye",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "dateRappelClient": {
+          "name": "dateRappelClient",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": false
         },
@@ -3801,15 +3847,15 @@
         "interventions_contrat_contratId_contrats_maintenance_id_fk": {
           "name": "interventions_contrat_contratId_contrats_maintenance_id_fk",
           "tableFrom": "interventions_contrat",
+          "tableTo": "contrats_maintenance",
           "columnsFrom": [
             "contratId"
           ],
-          "tableTo": "contrats_maintenance",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3916,15 +3962,15 @@
         "interventions_mobile_interventionId_interventions_id_fk": {
           "name": "interventions_mobile_interventionId_interventions_id_fk",
           "tableFrom": "interventions_mobile",
+          "tableTo": "interventions",
           "columnsFrom": [
             "interventionId"
           ],
-          "tableTo": "interventions",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -4039,15 +4085,15 @@
         "photos_interventions_interventionMobileId_interventions_mobile_id_fk": {
           "name": "photos_interventions_interventionMobileId_interventions_mobile_id_fk",
           "tableFrom": "photos_interventions",
+          "tableTo": "interventions_mobile",
           "columnsFrom": [
             "interventionMobileId"
           ],
-          "tableTo": "interventions_mobile",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -4227,33 +4273,33 @@
         "billing_charge_attempts_cycle_id_billing_cycles_id_fk": {
           "name": "billing_charge_attempts_cycle_id_billing_cycles_id_fk",
           "tableFrom": "billing_charge_attempts",
+          "tableTo": "billing_cycles",
           "columnsFrom": [
             "cycle_id"
           ],
-          "tableTo": "billing_cycles",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "billing_charge_attempts_idempotency_key_unique": {
           "name": "billing_charge_attempts_idempotency_key_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "idempotency_key"
-          ],
-          "nullsNotDistinct": false
+          ]
         },
         "uniq_cycle_attempt_no": {
           "name": "uniq_cycle_attempt_no",
+          "nullsNotDistinct": false,
           "columns": [
             "cycle_id",
             "attempt_no"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -4359,26 +4405,26 @@
         "billing_cycles_subscription_id_billing_subscriptions_id_fk": {
           "name": "billing_cycles_subscription_id_billing_subscriptions_id_fk",
           "tableFrom": "billing_cycles",
+          "tableTo": "billing_subscriptions",
           "columnsFrom": [
             "subscription_id"
           ],
-          "tableTo": "billing_subscriptions",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "uniq_cycle_per_period": {
           "name": "uniq_cycle_per_period",
+          "nullsNotDistinct": false,
           "columns": [
             "subscription_id",
             "period_start"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -4528,15 +4574,15 @@
         "billing_invoice_lines_invoice_id_billing_invoices_id_fk": {
           "name": "billing_invoice_lines_invoice_id_billing_invoices_id_fk",
           "tableFrom": "billing_invoice_lines",
+          "tableTo": "billing_invoices",
           "columnsFrom": [
             "invoice_id"
           ],
-          "tableTo": "billing_invoices",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -4770,39 +4816,39 @@
         "billing_invoices_billing_cycle_id_billing_cycles_id_fk": {
           "name": "billing_invoices_billing_cycle_id_billing_cycles_id_fk",
           "tableFrom": "billing_invoices",
+          "tableTo": "billing_cycles",
           "columnsFrom": [
             "billing_cycle_id"
           ],
-          "tableTo": "billing_cycles",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "billing_invoices_number_unique": {
           "name": "billing_invoices_number_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "number"
-          ],
-          "nullsNotDistinct": false
+          ]
         },
         "billing_invoices_stripe_invoice_id_unique": {
           "name": "billing_invoices_stripe_invoice_id_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "stripe_invoice_id"
-          ],
-          "nullsNotDistinct": false
+          ]
         },
         "billing_invoices_billing_cycle_id_unique": {
           "name": "billing_invoices_billing_cycle_id_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "billing_cycle_id"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -4901,10 +4947,10 @@
       "uniqueConstraints": {
         "billing_payment_methods_stripe_payment_method_id_unique": {
           "name": "billing_payment_methods_stripe_payment_method_id_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "stripe_payment_method_id"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -5009,25 +5055,25 @@
         "billing_subscriptions_payment_method_id_billing_payment_methods_id_fk": {
           "name": "billing_subscriptions_payment_method_id_billing_payment_methods_id_fk",
           "tableFrom": "billing_subscriptions",
+          "tableTo": "billing_payment_methods",
           "columnsFrom": [
             "payment_method_id"
           ],
-          "tableTo": "billing_payment_methods",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "billing_subscriptions_artisan_id_unique": {
           "name": "billing_subscriptions_artisan_id_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "artisan_id"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -5187,10 +5233,10 @@
       "uniqueConstraints": {
         "subscriptions_artisan_id_unique": {
           "name": "subscriptions_artisan_id_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "artisan_id"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -5246,12 +5292,12 @@
       "uniqueConstraints": {
         "uq_budget_mois": {
           "name": "uq_budget_mois",
+          "nullsNotDistinct": false,
           "columns": [
             "artisan_id",
             "categorie",
             "mois"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -5348,11 +5394,11 @@
       "uniqueConstraints": {
         "uq_cat_artisan_nom": {
           "name": "uq_cat_artisan_nom",
+          "nullsNotDistinct": false,
           "columns": [
             "artisan_id",
             "nom"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -5489,6 +5535,14 @@
           "notNull": false,
           "default": 1
         },
+        "regimeTVA": {
+          "name": "regimeTVA",
+          "type": "regime_tva",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'encaissements'"
+        },
         "actif": {
           "name": "actif",
           "type": "boolean",
@@ -5564,14 +5618,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "regimeTVA": {
-          "name": "regimeTVA",
-          "type": "regime_tva",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'encaissements'"
         }
       },
       "indexes": {},
@@ -5580,10 +5626,10 @@
       "uniqueConstraints": {
         "configurations_comptables_artisanId_unique": {
           "name": "configurations_comptables_artisanId_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "artisanId"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -5787,6 +5833,13 @@
           "primaryKey": false,
           "notNull": false,
           "default": true
+        },
+        "coeff_deductibilite": {
+          "name": "coeff_deductibilite",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'100'"
         },
         "created_at": {
           "name": "created_at",
@@ -6227,11 +6280,11 @@
       "uniqueConstraints": {
         "uq_note_depense": {
           "name": "uq_note_depense",
+          "nullsNotDistinct": false,
           "columns": [
             "note_id",
             "depense_id"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -6565,6 +6618,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "facture_id": {
+          "name": "facture_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "ignoree": {
           "name": "ignoree",
           "type": "boolean",
@@ -6578,12 +6637,6 @@
           "primaryKey": false,
           "notNull": false,
           "default": "now()"
-        },
-        "facture_id": {
-          "name": "facture_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {},
@@ -7184,18 +7237,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "depenseId": {
+          "name": "depenseId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "createdAt": {
           "name": "createdAt",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "depenseId": {
-          "name": "depenseId",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {},
@@ -7543,9 +7596,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -8360,7 +8413,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -8553,10 +8606,10 @@
       "uniqueConstraints": {
         "avis_clients_tokenAvis_unique": {
           "name": "avis_clients_tokenAvis_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "tokenAvis"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -9191,10 +9244,10 @@
       "uniqueConstraints": {
         "config_alertes_previsions_artisanId_unique": {
           "name": "config_alertes_previsions_artisanId_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "artisanId"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -9430,25 +9483,25 @@
         "demandes_avis_interventionId_interventions_id_fk": {
           "name": "demandes_avis_interventionId_interventions_id_fk",
           "tableFrom": "demandes_avis",
+          "tableTo": "interventions",
           "columnsFrom": [
             "interventionId"
           ],
-          "tableTo": "interventions",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "demandes_avis_tokenDemande_unique": {
           "name": "demandes_avis_tokenDemande_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "tokenDemande"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -9739,10 +9792,10 @@
             }
           ],
           "isUnique": false,
-          "with": {},
-          "method": "btree",
           "where": "\"email_outbox\".\"statut\" = 'pending'",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -10050,7 +10103,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixUnitaire": {
           "name": "prixUnitaire",
@@ -10247,41 +10300,41 @@
         "llm_usage_artisan_id_artisans_id_fk": {
           "name": "llm_usage_artisan_id_artisans_id_fk",
           "tableFrom": "llm_usage",
+          "tableTo": "artisans",
           "columnsFrom": [
             "artisan_id"
           ],
-          "tableTo": "artisans",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "llm_usage_user_id_users_id_fk": {
           "name": "llm_usage_user_id_users_id_fk",
           "tableFrom": "llm_usage",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "llm_usage_message_id_ai_messages_id_fk": {
           "name": "llm_usage_message_id_ai_messages_id_fk",
           "tableFrom": "llm_usage",
+          "tableTo": "ai_messages",
           "columnsFrom": [
             "message_id"
           ],
-          "tableTo": "ai_messages",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -11003,7 +11056,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixAchat": {
           "name": "prixAchat",
@@ -11092,7 +11145,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixEstime": {
           "name": "prixEstime",
@@ -11294,38 +11347,38 @@
         "factures_cycle_vie_events_artisanId_artisans_id_fk": {
           "name": "factures_cycle_vie_events_artisanId_artisans_id_fk",
           "tableFrom": "factures_cycle_vie_events",
+          "tableTo": "artisans",
           "columnsFrom": [
             "artisanId"
           ],
-          "tableTo": "artisans",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "factures_cycle_vie_events_factureId_factures_id_fk": {
           "name": "factures_cycle_vie_events_factureId_factures_id_fk",
           "tableFrom": "factures_cycle_vie_events",
+          "tableTo": "factures",
           "columnsFrom": [
             "factureId"
           ],
-          "tableTo": "factures",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "factures_cycle_vie_events_paEventId_unique": {
           "name": "factures_cycle_vie_events_paEventId_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "paEventId"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -11398,26 +11451,26 @@
         "factures_entrantes_artisanId_artisans_id_fk": {
           "name": "factures_entrantes_artisanId_artisans_id_fk",
           "tableFrom": "factures_entrantes",
+          "tableTo": "artisans",
           "columnsFrom": [
             "artisanId"
           ],
-          "tableTo": "artisans",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "fe_artisan_document": {
           "name": "fe_artisan_document",
+          "nullsNotDistinct": false,
           "columns": [
             "artisanId",
             "paDocumentId"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -11491,26 +11544,26 @@
         "pa_entites_artisanId_artisans_id_fk": {
           "name": "pa_entites_artisanId_artisans_id_fk",
           "tableFrom": "pa_entites",
+          "tableTo": "artisans",
           "columnsFrom": [
             "artisanId"
           ],
-          "tableTo": "artisans",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "pa_entites_artisan_fournisseur": {
           "name": "pa_entites_artisan_fournisseur",
+          "nullsNotDistinct": false,
           "columns": [
             "artisanId",
             "fournisseur"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -11578,28 +11631,28 @@
         "pa_outbox_artisanId_artisans_id_fk": {
           "name": "pa_outbox_artisanId_artisans_id_fk",
           "tableFrom": "pa_outbox",
+          "tableTo": "artisans",
           "columnsFrom": [
             "artisanId"
           ],
-          "tableTo": "artisans",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "pa_outbox_factureId_factures_id_fk": {
           "name": "pa_outbox_factureId_factures_id_fk",
           "tableFrom": "pa_outbox",
+          "tableTo": "factures",
           "columnsFrom": [
             "factureId"
           ],
-          "tableTo": "factures",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -11669,34 +11722,34 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "superpdp_tokens_artisanId_artisans_id_fk": {
           "name": "superpdp_tokens_artisanId_artisans_id_fk",
           "tableFrom": "superpdp_tokens",
+          "tableTo": "artisans",
           "columnsFrom": [
             "artisanId"
           ],
-          "tableTo": "artisans",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "superpdp_tokens_artisanId_unique": {
           "name": "superpdp_tokens_artisanId_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "artisanId"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -11780,25 +11833,25 @@
         "files_artisan_id_artisans_id_fk": {
           "name": "files_artisan_id_artisans_id_fk",
           "tableFrom": "files",
+          "tableTo": "artisans",
           "columnsFrom": [
             "artisan_id"
           ],
-          "tableTo": "artisans",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "files_storage_key_unique": {
           "name": "files_storage_key_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "storage_key"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -11852,28 +11905,28 @@
         "message_files_file_id_files_id_fk": {
           "name": "message_files_file_id_files_id_fk",
           "tableFrom": "message_files",
+          "tableTo": "files",
           "columnsFrom": [
             "file_id"
           ],
-          "tableTo": "files",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "message_files_artisan_id_artisans_id_fk": {
           "name": "message_files_artisan_id_artisans_id_fk",
           "tableFrom": "message_files",
+          "tableTo": "artisans",
           "columnsFrom": [
             "artisan_id"
           ],
-          "tableTo": "artisans",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -12008,6 +12061,15 @@
         "complete",
         "echoue",
         "rembourse"
+      ]
+    },
+    "public.regime_tva_facture": {
+      "name": "regime_tva_facture",
+      "schema": "public",
+      "values": [
+        "normal",
+        "autoliquidation_btp",
+        "exonere"
       ]
     },
     "public.reglement_mode": {
@@ -12262,6 +12324,14 @@
         "regression_lineaire",
         "saisonnalite",
         "manuel"
+      ]
+    },
+    "public.regime_tva": {
+      "name": "regime_tva",
+      "schema": "public",
+      "values": [
+        "encaissements",
+        "debits"
       ]
     },
     "public.releve_statut": {
@@ -12660,21 +12730,13 @@
         "en_cours",
         "termine"
       ]
-    },
-    "public.regime_tva": {
-      "name": "regime_tva",
-      "schema": "public",
-      "values": [
-        "encaissements",
-        "debits"
-      ]
     }
   },
   "schemas": {},
-  "views": {},
   "sequences": {},
   "roles": {},
   "policies": {},
+  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},

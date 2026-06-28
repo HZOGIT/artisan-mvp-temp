@@ -70,6 +70,8 @@ export class FakeContratRepository implements IContratRepository {
       /** forcé */
       statut: "actif",
       notes: input.notes ?? null,
+      tauxIndexationAnnuel: input.tauxIndexationAnnuel ?? null,
+      dateDerniereRevision: null,
       createdAt: now,
       updatedAt: now,
     };
@@ -97,7 +99,7 @@ export class FakeContratRepository implements IContratRepository {
       ...(input.prochainPassage !== undefined ? { prochainPassage: input.prochainPassage } : {}),
       ...(input.conditionsParticulieres !== undefined ? { conditionsParticulieres: input.conditionsParticulieres } : {}),
       ...(input.notes !== undefined ? { notes: input.notes } : {}),
-      /** statut/reference/clientId jamais touchés par update */
+      ...(input.tauxIndexationAnnuel !== undefined ? { tauxIndexationAnnuel: input.tauxIndexationAnnuel } : {}),
       updatedAt: new Date(),
     };
     this.store[idx] = next;
@@ -213,6 +215,16 @@ export class FakeContratRepository implements IContratRepository {
   async markAlertReconductionSent(ctx: TenantContext, id: number): Promise<void> {
     const idx = this.store.findIndex((c) => c.id === id && c.artisanId === ctx.artisanId);
     if (idx !== -1) this.store[idx] = { ...this.store[idx], alerteReconductionEnvoyeeLe: new Date() };
+  }
+
+  async reviserPrix(ctx: TenantContext, id: number, nouveauMontantHT: string, dateDerniereRevision: Date): Promise<Contrat | null> {
+    const idx = this.store.findIndex((c) => c.id === id && c.artisanId === ctx.artisanId);
+    if (idx === -1) return null;
+    const current = this.store[idx];
+    const anneeExistante = current.dateDerniereRevision?.getFullYear() ?? -1;
+    if (anneeExistante >= new Date().getFullYear()) return null;
+    this.store[idx] = { ...current, montantHT: nouveauMontantHT, dateDerniereRevision, updatedAt: new Date() };
+    return this.store[idx];
   }
 
   withDb(_db: unknown): this {

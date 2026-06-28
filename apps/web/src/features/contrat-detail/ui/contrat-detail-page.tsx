@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { apiUrl } from "@/shared/backend-url";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { ArrowLeft, Download, FileText, Loader2, Plus, Calendar, CheckCircle, XCircle, Clock, Wrench, Receipt, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Download, FileText, Loader2, Plus, Calendar, CheckCircle, XCircle, Clock, Wrench, Receipt, AlertTriangle, TrendingUp } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Input } from "@/shared/ui/input";
@@ -25,9 +25,10 @@ export default function ContratDetailPage() {
   const { t } = useTranslation("contratDetail");
   const { id: idParam } = useParams({ strict: false }) as { id?: string };
   const contratId = parseInt(idParam || "0");
-  const { contrat, client, isLoading, refetch, interventions, refetchInterventions, generateFacture, suspendre, reactiver, createIntervention, updateIntervention } = useContratDetail(contratId);
+  const { contrat, client, isLoading, refetch, interventions, refetchInterventions, generateFacture, suspendre, reactiver, createIntervention, updateIntervention, reviserPrix, updateTaux } = useContratDetail(contratId);
   const [showDialog, setShowDialog] = useState(false);
   const [form, setForm] = useState<InterventionForm>(defaultInterventionForm);
+  const [tauxInput, setTauxInput] = useState<string>("");
 
   const goBack = () => { window.location.href = "/contrats"; };
 
@@ -50,6 +51,12 @@ export default function ContratDetailPage() {
    */
   const factures: never[] = [];
 
+  const taux = tauxInput !== "" ? tauxInput : (contrat.tauxIndexationAnnuel ?? "");
+  const saveTaux = () => updateTaux.mutate({ id: contrat.id, tauxIndexationAnnuel: taux || null }, { onSuccess: () => { toast.success(t("toastTauxSauvegarde")); refetch(); }, onError: (e) => toast.error(e.message) });
+  const doReviserPrix = () => reviserPrix.mutate({ id: contrat.id }, {
+    onSuccess: (r) => { toast.success(t("toastPrixRevise", { ancien: r.ancienMontantHT, nouveau: r.nouveauMontantHT })); refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
   const genFacture = () => generateFacture.mutate({ contratId: contrat.id }, { onSuccess: () => { toast.success(t("toastFactureGeneree")); refetch(); }, onError: (e) => toast.error(e.message) });
   const doSuspendre = () => suspendre.mutate({ id: contrat.id }, { onSuccess: () => { toast.success(t("toastSuspendu")); refetch(); }, onError: (e) => toast.error(e.message) });
   const doReactiver = () => reactiver.mutate({ id: contrat.id }, { onSuccess: () => { toast.success(t("toastReactive")); refetch(); }, onError: (e) => toast.error(e.message) });
@@ -120,6 +127,32 @@ export default function ContratDetailPage() {
                     <span className="text-muted-foreground">{t("tvaTaux", { taux: m.taux })}</span><span>{m.tva.toFixed(2)} €</span>
                     <span className="text-muted-foreground font-medium">{t("montantTTC")}</span><span className="font-bold text-primary">{m.ttc.toFixed(2)} €</span>
                   </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><TrendingUp className="h-4 w-4" />{t("indexationTitre")}</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      placeholder={t("tauxIndexationPlaceholder")}
+                      value={taux}
+                      onChange={(e) => setTauxInput(e.target.value)}
+                      className="max-w-[120px]"
+                    />
+                    <span className="text-sm text-muted-foreground">%</span>
+                    <Button size="sm" variant="outline" onClick={saveTaux} disabled={updateTaux.isPending}>{t("sauvegarderTaux")}</Button>
+                  </div>
+                  {contrat.dateDerniereRevision && (
+                    <p className="text-xs text-muted-foreground">{t("derniereRevision")} : {format(new Date(contrat.dateDerniereRevision), "dd/MM/yyyy", { locale: fr })}</p>
+                  )}
+                  <Button size="sm" onClick={doReviserPrix} disabled={reviserPrix.isPending || !taux || contrat.statut !== "actif"}>
+                    {reviserPrix.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <TrendingUp className="h-4 w-4 mr-2" />}
+                    {t("reviserPrix")}
+                  </Button>
                 </CardContent>
               </Card>
               <Card>

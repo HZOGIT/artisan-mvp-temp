@@ -12,6 +12,7 @@ import type { IArtisanRepository } from "../../../artisan/application/artisan-re
 import { listContrats, getContrat } from "../../application/read-use-cases";
 import { creerContrat, modifierContrat, supprimerContrat } from "../../application/write-use-cases";
 import { suspendreContrat, reactiverContrat, terminerContrat, annulerContrat } from "../../application/transition-use-cases";
+import { reviserPrixContrat } from "../../application/revision-use-cases";
 import {
   listContratsAFacturer,
   getInterventionsContrat,
@@ -44,6 +45,7 @@ const createSchema = z.object({
   preavisResiliation: z.number().int().min(0).optional(),
   conditionsParticulieres: z.string().max(5000).nullish(),
   notes: z.string().max(5000).nullish(),
+  tauxIndexationAnnuel: z.string().regex(/^\d+(\.\d{1,2})?$/).nullish(),
 });
 
 const updateSchema = z.object({
@@ -59,6 +61,7 @@ const updateSchema = z.object({
   preavisResiliation: z.number().int().min(0).optional(),
   conditionsParticulieres: z.string().max(5000).nullish(),
   notes: z.string().max(5000).nullish(),
+  tauxIndexationAnnuel: z.string().regex(/^\d+(\.\d{1,2})?$/).nullish(),
 });
 
 /*
@@ -167,6 +170,15 @@ export function createContratsMaintenanceRouter(repo: IContratRepository, factur
       .mutation(async ({ ctx, input }) => {
         const result = await genererFactureContrat(repo, factureGen, ctx.tenant, input.contratId, () => new Date(), artisanRepo);
         ctx.log.info({ event: "contrat_facture_generee", contratId: input.contratId, factureId: result.id }, "Facture contrat maintenance générée");
+        return result;
+      }),
+
+    /** Révise le prix d'un contrat selon son taux d'indexation annuel (idempotent par année). */
+    reviserPrix: gerer
+      .input(z.object({ id: z.number().int() }))
+      .mutation(async ({ ctx, input }) => {
+        const result = await reviserPrixContrat(repo, ctx.tenant, input.id);
+        ctx.log.info({ event: "contrat_prix_revise", contratId: input.id, ancienMontant: result.ancienMontantHT, nouveauMontant: result.nouveauMontantHT }, "Révision indexation annuelle du prix contrat");
         return result;
       }),
 

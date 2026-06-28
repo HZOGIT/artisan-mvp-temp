@@ -60,6 +60,8 @@ function toContrat(r: ContratRow): Contrat {
     conditionsParticulieres: r.conditionsParticulieres ?? null,
     statut: (r.statut ?? "actif") as ContratStatut,
     notes: r.notes ?? null,
+    tauxIndexationAnnuel: r.tauxIndexationAnnuel ?? null,
+    dateDerniereRevision: r.dateDerniereRevision ?? null,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };
@@ -103,7 +105,6 @@ export class ContratRepositoryDrizzle implements IContratRepository {
         .values({
           artisanId: ctx.artisanId,
           clientId: input.clientId,
-          /** générée serveur (argument) */
           reference,
           titre: input.titre,
           description: input.description ?? null,
@@ -118,9 +119,9 @@ export class ContratRepositoryDrizzle implements IContratRepository {
           prochainFacturation: input.prochainFacturation ?? null,
           prochainPassage: input.prochainPassage ?? null,
           conditionsParticulieres: input.conditionsParticulieres ?? null,
-          /** forcé */
           statut: "actif",
           notes: input.notes ?? null,
+          tauxIndexationAnnuel: input.tauxIndexationAnnuel ?? null,
         })
         .returning();
       return toContrat(row);
@@ -145,6 +146,7 @@ export class ContratRepositoryDrizzle implements IContratRepository {
       if (input.prochainPassage !== undefined) set.prochainPassage = input.prochainPassage;
       if (input.conditionsParticulieres !== undefined) set.conditionsParticulieres = input.conditionsParticulieres;
       if (input.notes !== undefined) set.notes = input.notes;
+      if (input.tauxIndexationAnnuel !== undefined) set.tauxIndexationAnnuel = input.tauxIndexationAnnuel;
       const [row] = await tx
         .update(contratsMaintenance)
         .set(set)
@@ -339,6 +341,23 @@ export class ContratRepositoryDrizzle implements IContratRepository {
         .update(contratsMaintenance)
         .set({ alerteReconductionEnvoyeeLe: new Date() })
         .where(and(eq(contratsMaintenance.id, id), eq(contratsMaintenance.artisanId, ctx.artisanId)));
+    });
+  }
+
+  reviserPrix(ctx: TenantContext, id: number, nouveauMontantHT: string, dateDerniereRevision: Date): Promise<Contrat | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .update(contratsMaintenance)
+        .set({ montantHT: nouveauMontantHT, dateDerniereRevision, updatedAt: new Date() })
+        .where(
+          and(
+            eq(contratsMaintenance.id, id),
+            eq(contratsMaintenance.artisanId, ctx.artisanId),
+            sql`(${contratsMaintenance.dateDerniereRevision} IS NULL OR EXTRACT(YEAR FROM ${contratsMaintenance.dateDerniereRevision}) < EXTRACT(YEAR FROM now()))`,
+          ),
+        )
+        .returning();
+      return row ? toContrat(row) : null;
     });
   }
 

@@ -31,6 +31,9 @@ export interface Contrat {
   readonly conditionsParticulieres: string | null;
   readonly statut: ContratStatut;
   readonly notes: string | null;
+  /** % annuel d'indexation — null si non configuré */
+  readonly tauxIndexationAnnuel: string | null;
+  readonly dateDerniereRevision: Date | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
@@ -55,6 +58,7 @@ export interface CreateContratInput {
   readonly prochainPassage?: Date | null;
   readonly conditionsParticulieres?: string | null;
   readonly notes?: string | null;
+  readonly tauxIndexationAnnuel?: string | null;
 }
 
 /*
@@ -133,4 +137,12 @@ export interface UpdateContratInput {
   readonly prochainPassage?: Date | null;
   readonly conditionsParticulieres?: string | null;
   readonly notes?: string | null;
+  readonly tauxIndexationAnnuel?: string | null;
+}
+
+/** Résultat d'une révision de prix : contrat mis à jour + ancien montant HT (pour affichage). */
+export interface ReviserPrixResult {
+  readonly contrat: Contrat;
+  readonly ancienMontantHT: string;
+  readonly nouveauMontantHT: string;
 }
