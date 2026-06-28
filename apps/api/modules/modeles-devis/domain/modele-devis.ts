@@ -34,6 +34,9 @@ export interface ModeleDevis {
   readonly description: string | null;
   readonly notes: string | null;
   readonly isDefault: boolean;
+  readonly dureeValiditeJours: number | null;
+  readonly conditionsPaiementDefaut: string | null;
+  readonly objetType: string | null;
   readonly lignes: readonly ModeleDevisLigne[];
   readonly createdAt: Date;
   readonly updatedAt: Date;
@@ -61,6 +64,9 @@ export interface CreateModeleDevisInput {
   readonly description?: string | null;
   readonly notes?: string | null;
   readonly isDefault?: boolean;
+  readonly dureeValiditeJours?: number | null;
+  readonly conditionsPaiementDefaut?: string | null;
+  readonly objetType?: string | null;
   readonly lignes?: readonly CreateModeleDevisLigneInput[];
 }
 
@@ -73,5 +79,8 @@ export interface UpdateModeleDevisInput {
   readonly description?: string | null;
   readonly notes?: string | null;
   readonly isDefault?: boolean;
+  readonly dureeValiditeJours?: number | null;
+  readonly conditionsPaiementDefaut?: string | null;
+  readonly objetType?: string | null;
   readonly lignes?: readonly CreateModeleDevisLigneInput[];
 }

@@ -26,6 +26,6 @@ describe("modeles-devis.module", () => {
   it("expose un routeur tRPC assemblé (CRUD agrégat)", () => {
     const module = createModelesDevisModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["create", "delete", "getById", "list", "update"]);
+    expect(procedures).toEqual(["ajouterLigne", "create", "delete", "getById", "list", "update"]);
   });
 });

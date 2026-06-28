@@ -78,6 +78,38 @@ describe.skipIf(!URL)("ModeleDevisRepositoryDrizzle (PG, RLS + agrégat header+l
     expect(orphelines.rows[0].n).toBe(0);
   });
 
+  it("create avec dureeValiditeJours + conditionsPaiementDefaut + objetType → persist + getById les retourne", async () => {
+    const m = await repo.create(ctx(A), {
+      nom: "Trame Defaults",
+      dureeValiditeJours: 45,
+      conditionsPaiementDefaut: "Paiement à 30 jours",
+      objetType: "Entretien annuel chaudière",
+      lignes: [ligne()],
+    });
+    expect(m.dureeValiditeJours).toBe(45);
+    expect(m.conditionsPaiementDefaut).toBe("Paiement à 30 jours");
+    expect(m.objetType).toBe("Entretien annuel chaudière");
+    const agg = await repo.getById(ctx(A), m.id);
+    expect(agg?.dureeValiditeJours).toBe(45);
+    expect(agg?.conditionsPaiementDefaut).toBe("Paiement à 30 jours");
+    expect(agg?.objetType).toBe("Entretien annuel chaudière");
+  });
+
+  it("create sans les 3 champs → null (non-régression)", async () => {
+    const m = await repo.create(ctx(A), { nom: "Sans Defaults", lignes: [ligne()] });
+    expect(m.dureeValiditeJours).toBeNull();
+    expect(m.conditionsPaiementDefaut).toBeNull();
+    expect(m.objetType).toBeNull();
+  });
+
+  it("update peut modifier les 3 champs de défaut", async () => {
+    const m = await repo.create(ctx(A), { nom: "À Mettre à jour", lignes: [ligne()] });
+    const maj = await repo.update(ctx(A), m.id, { dureeValiditeJours: 60, conditionsPaiementDefaut: "Acompte 30%", objetType: "Plomberie" });
+    expect(maj?.dureeValiditeJours).toBe(60);
+    expect(maj?.conditionsPaiementDefaut).toBe("Acompte 30%");
+    expect(maj?.objetType).toBe("Plomberie");
+  });
+
   it("addLigne : ajoute UNE ligne au modèle possédé (sans toucher aux autres) ; null si hors tenant", async () => {
     const m = await repo.create(ctx(A), { nom: "Trame", lignes: [ligne({ designation: "L1" })] });
     const ajoutee = await repo.addLigne(ctx(A), m.id, { designation: "L2", quantite: "3.00", prixUnitaireHT: "50.00" });

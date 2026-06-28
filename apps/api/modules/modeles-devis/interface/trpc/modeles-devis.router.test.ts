@@ -112,6 +112,23 @@ describe.skipIf(!URL)("modelesDevis.router e2e (HTTP → tRPC → use-case → r
     expect(agg.lignes[0].designation).toBe("Unique");
   });
 
+  it("create avec les 3 champs de défaut → getById les retourne ; sans les champs → null (non-régression)", async () => {
+    const tA = await token(UA);
+    const r1 = await mut(server, "modelesDevis.create", { nom: nom(), dureeValiditeJours: 30, conditionsPaiementDefaut: "Net 30", objetType: "Rénovation", lignes: [ligne()] }, tA);
+    expect(r1.statusCode).toBe(200);
+    const id1 = r1.json().result.data.id as number;
+    const agg1 = (await q(server, "modelesDevis.getById", { id: id1 }, tA)).json().result.data as { dureeValiditeJours: number; conditionsPaiementDefaut: string; objetType: string };
+    expect(agg1.dureeValiditeJours).toBe(30);
+    expect(agg1.conditionsPaiementDefaut).toBe("Net 30");
+    expect(agg1.objetType).toBe("Rénovation");
+    const r2 = await mut(server, "modelesDevis.create", { nom: nom(), lignes: [ligne()] }, tA);
+    const id2 = r2.json().result.data.id as number;
+    const agg2 = (await q(server, "modelesDevis.getById", { id: id2 }, tA)).json().result.data as { dureeValiditeJours: null; conditionsPaiementDefaut: null; objetType: null };
+    expect(agg2.dureeValiditeJours).toBeNull();
+    expect(agg2.conditionsPaiementDefaut).toBeNull();
+    expect(agg2.objetType).toBeNull();
+  });
+
   it("INVARIANT : unicité du défaut via l'API (le 2e défaut retombe le 1er, lignes du 1er préservées)", async () => {
     const tA = await token(UA);
     const id1 = (await mut(server, "modelesDevis.create", { nom: "D1", isDefault: true, lignes: [ligne(), ligne()] }, tA)).json().result.data.id as number;

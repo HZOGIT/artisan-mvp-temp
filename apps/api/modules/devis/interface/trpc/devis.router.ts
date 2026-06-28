@@ -260,7 +260,14 @@ export function createDevisRouter(
       .query(({ ctx, input }) => getModeleDevisAvecLignes(modeleRepo, ctx.tenant, input.modeleId)),
 
     createModele: protectedProcedure
-      .input(z.object({ nom: z.string().min(1).max(255), description: z.string().max(2000).optional(), notes: z.string().max(5000).optional() }))
+      .input(z.object({
+        nom: z.string().min(1).max(255),
+        description: z.string().max(2000).nullish(),
+        notes: z.string().max(5000).nullish(),
+        dureeValiditeJours: z.number().int().positive().nullish(),
+        conditionsPaiementDefaut: z.string().max(2000).nullish(),
+        objetType: z.string().max(500).nullish(),
+      }))
       .mutation(({ ctx, input }) => creerModeleDevis(modeleRepo, ctx.tenant, input)),
 
     /** Le client envoie des NOMBRES (quantite/prix/TVA) ; le domaine attend des décimaux string. */
