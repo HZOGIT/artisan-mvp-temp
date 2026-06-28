@@ -222,7 +222,7 @@ export default function VitrinePage() {
                       <div>
                         <div className="flex items-center gap-1.5">
                           <p className="font-semibold text-sm text-slate-900">{clientNameShort(a.clientNom)}</p>
-                          {a.interventionId && (<span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-700"><BadgeCheck className="h-3.5 w-3.5" /> {t("verifie")}</span>)}
+                          {a.verifie && (<span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-700"><BadgeCheck className="h-3.5 w-3.5" /> {t("verifie")}</span>)}
                         </div>
                         <p className="text-[11px] text-slate-500">{a.createdAt ? new Date(a.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }) : ""}</p>
                       </div>

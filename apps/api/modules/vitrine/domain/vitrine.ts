@@ -34,6 +34,8 @@ export interface AvisPublic {
   readonly reponseAt: Date | null;
   readonly createdAt: Date;
   readonly clientNom: string;
+  /** Vrai si l'avis est lié à une intervention réelle (avis vérifié au sens L111-7-2). */
+  readonly verifie: boolean;
 }
 
 export interface AvisStats {

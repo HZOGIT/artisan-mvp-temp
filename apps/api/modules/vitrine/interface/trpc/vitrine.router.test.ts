@@ -19,6 +19,9 @@ describe.skipIf(!URL)("vitrine.router e2e (public + admin leads)", () => {
   let app: ReturnType<typeof buildApp>;
 
   const cleanup = async () => {
+    await admin.query('delete from avis_clients where "artisanId" in (select id from artisans where "userId"=$1)', [UID]);
+    await admin.query('delete from interventions where "artisanId" in (select id from artisans where "userId"=$1)', [UID]);
+    await admin.query('delete from clients where "artisanId" in (select id from artisans where "userId"=$1)', [UID]);
     await admin.query('delete from parametres_artisan where "artisanId" in (select id from artisans where "userId"=$1)', [UID]);
     await admin.query('delete from artisans where "userId"=$1', [UID]);
     await admin.query("delete from users where id=$1", [UID]);
@@ -31,6 +34,9 @@ describe.skipIf(!URL)("vitrine.router e2e (public + admin leads)", () => {
     await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [UID, EMAIL]);
     const artisanId = (await admin.query('insert into artisans ("userId","nomEntreprise",slug) values ($1,$2,$3) returning id', [UID, "Vitrine SARL", SLUG])).rows[0].id;
     await admin.query('insert into parametres_artisan ("artisanId","vitrineActive","vitrineDescription") values ($1,true,$2)', [artisanId, "Artisan vitrine"]);
+    const clientId = (await admin.query('insert into clients ("artisanId",nom,prenom) values ($1,$2,$3) returning id', [artisanId, "Client", "Test"])).rows[0].id;
+    const iId = (await admin.query('insert into interventions ("artisanId","clientId",titre,"dateDebut",statut) values ($1,$2,$3,$4,$5) returning id', [artisanId, clientId, "Réparation", "2026-06-01T08:00:00Z", "terminee"])).rows[0].id;
+    await admin.query('insert into avis_clients ("artisanId","clientId","interventionId",note,statut) values ($1,$2,$3,5,$4)', [artisanId, clientId, iId, "publie"]);
     app = buildApp({ jwtSecret: SECRET });
   });
 
@@ -65,12 +71,16 @@ describe.skipIf(!URL)("vitrine.router e2e (public + admin leads)", () => {
   it("PUBLIC getBySlug : vitrine active → 200 + payload agrégé (artisan/vitrine/avis/stats)", async () => {
     const res = await injectTrpc(app, "GET", "vitrine.getBySlug", { slug: SLUG }); // pas de cookie
     expect(res.statusCode).toBe(200);
-    const data = res.json().result.data as { artisan: { nomEntreprise: string }; vitrine: unknown; avis: unknown[]; avisStats: unknown; publicStats: unknown };
+    const data = res.json().result.data as { artisan: { nomEntreprise: string }; vitrine: unknown; avis: { verifie: boolean; createdAt: string }[]; avisStats: unknown; publicStats: unknown };
     expect(data.artisan.nomEntreprise).toBe("Vitrine SARL");
     expect(data.vitrine).toBeTruthy();
     expect(Array.isArray(data.avis)).toBe(true);
     expect(data).toHaveProperty("avisStats");
     expect(data).toHaveProperty("publicStats");
+    // L111-7-2 : badge vérifié (interventionId présent) + date
+    expect(data.avis).toHaveLength(1);
+    expect(data.avis[0].verifie).toBe(true);
+    expect(data.avis[0].createdAt).toBeTruthy();
   });
 
   it("PUBLIC getBySlug : slug inconnu → 404 (NOT_FOUND)", async () => {

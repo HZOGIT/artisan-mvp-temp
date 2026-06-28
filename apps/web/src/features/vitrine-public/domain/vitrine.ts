@@ -15,7 +15,7 @@ export type VitrineArtisan = {
 };
 export type VitrineAvis = {
   id: number; clientNom: string; note: number; createdAt: string | Date | null;
-  commentaire: string | null; reponseArtisan: string | null; interventionId: number | null;
+  commentaire: string | null; reponseArtisan: string | null; verifie: boolean;
 };
 export type VitrineAvisStats = { moyenne: number; total: number; distribution: Record<number, number> };
 export type VitrineData = {
