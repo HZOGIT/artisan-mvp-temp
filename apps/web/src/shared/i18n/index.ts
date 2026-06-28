@@ -54,6 +54,7 @@ import previsionsFr from "@/features/previsions/i18n/fr.json";
 import performancesFournisseursFr from "@/features/performances-fournisseurs/i18n/fr.json";
 import tableauBordDepensesFr from "@/features/tableau-bord-depenses/i18n/fr.json";
 import importReleveFr from "@/features/import-releve/i18n/fr.json";
+import rapprochementEncaissementsFr from "@/features/rapprochement-encaissements/i18n/fr.json";
 import syncComptableFr from "@/features/tableau-bord-sync-comptable/i18n/fr.json";
 import geolocalisationFr from "@/features/geolocalisation/i18n/fr.json";
 import planificationFr from "@/features/planification/i18n/fr.json";
@@ -151,6 +152,7 @@ const resources = {
     performancesFournisseurs: performancesFournisseursFr,
     tableauBordDepenses: tableauBordDepensesFr,
     importReleve: importReleveFr,
+    rapprochementEncaissements: rapprochementEncaissementsFr,
     syncComptable: syncComptableFr,
     geolocalisation: geolocalisationFr,
     planification: planificationFr,

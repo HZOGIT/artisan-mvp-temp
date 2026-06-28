@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { transactionsBancaires, relevesBancaires } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
@@ -19,6 +19,7 @@ function toTransaction(r: Row): TransactionBancaire {
     typeTransaction: r.type_transaction as TransactionType,
     categorieSuggeree: r.categorie_suggeree ?? null,
     depenseId: r.depense_id ?? null,
+    factureId: r.facture_id ?? null,
     ignoree: r.ignoree ?? false,
     createdAt: r.created_at ?? new Date(),
   };
@@ -99,6 +100,34 @@ export class TransactionBancaireRepositoryDrizzle implements ITransactionBancair
         .update(transactionsBancaires)
         .set({ depense_id: depenseId })
         .where(and(eq(transactionsBancaires.id, transactionId), eq(transactionsBancaires.artisan_id, ctx.artisanId)));
+    });
+  }
+
+  lierFacture(ctx: TenantContext, transactionId: number, factureId: number): Promise<void> {
+    return withTenant(this.db, ctx, async (tx) => {
+      await tx
+        .update(transactionsBancaires)
+        .set({ facture_id: factureId })
+        .where(and(eq(transactionsBancaires.id, transactionId), eq(transactionsBancaires.artisan_id, ctx.artisanId)));
+    });
+  }
+
+  listCreditsNonRapproches(ctx: TenantContext): Promise<TransactionBancaire[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(transactionsBancaires)
+        .where(
+          and(
+            eq(transactionsBancaires.artisan_id, ctx.artisanId),
+            eq(transactionsBancaires.type_transaction, "credit"),
+            isNull(transactionsBancaires.facture_id),
+            eq(transactionsBancaires.ignoree, false),
+          ),
+        )
+        .orderBy(desc(transactionsBancaires.date_transaction), desc(transactionsBancaires.id))
+        .limit(500);
+      return rows.map(toTransaction);
     });
   }
 }

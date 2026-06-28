@@ -20,4 +20,8 @@ export interface ITransactionBancaireRepository {
   createReleve(ctx: TenantContext, nomFichier: string, items: ReleveItem[]): Promise<ImportReleveResult>;
   /** Lie une transaction à une dépense (set `depense_id`), scopé tenant. No-op si hors tenant. */
   lierDepense(ctx: TenantContext, transactionId: number, depenseId: number): Promise<void>;
+  /** Lie une transaction à une facture (lettrage — set `facture_id`), scopé tenant. Idempotent. */
+  lierFacture(ctx: TenantContext, transactionId: number, factureId: number): Promise<void>;
+  /** Crédits non rapprochés du tenant (facture_id IS NULL, ignoree=false), récents d'abord. */
+  listCreditsNonRapproches(ctx: TenantContext): Promise<TransactionBancaire[]>;
 }

@@ -96,4 +96,54 @@ describe.skipIf(!URL)("TransactionBancaireRepositoryDrizzle (PG, RLS + scope ten
     await repo.lierDepense(ctx(B), id, 9999);
     expect((await repo.getById(ctx(A), id))?.depenseId).toBe(4242);
   });
+
+  it("lierFacture : factureId persiste + isolation RLS (B ne peut pas lier)", async () => {
+    const { rows } = await seed(A, { libelle: "CreditA", type: "credit" });
+    const id = rows[0].id as number;
+    /** factureId null par défaut */
+    expect((await repo.getById(ctx(A), id))?.factureId).toBeNull();
+    /** B ne peut pas lier */
+    await repo.lierFacture(ctx(B), id, 777);
+    expect((await repo.getById(ctx(A), id))?.factureId).toBeNull();
+    /** A lie la transaction à une facture fictive (FK non vérifiée ici : FK dans la migration) */
+    await admin.query("insert into factures (\"artisanId\",\"clientId\",\"dateFacture\",statut,\"totalHT\",\"totalTVA\",\"totalTTC\",\"montantPaye\") values ($1,0,now(),'envoyee','100.00','20.00','120.00','0.00') returning id", [A]);
+    const { rows: fRows } = await admin.query("select id from factures where \"artisanId\"=$1 order by id desc limit 1", [A]);
+    const fid = (fRows[0] as { id: number }).id;
+    await repo.lierFacture(ctx(A), id, fid);
+    expect((await repo.getById(ctx(A), id))?.factureId).toBe(fid);
+    /** idempotent : re-lier à la même facture ne lève pas d'erreur */
+    await repo.lierFacture(ctx(A), id, fid);
+    expect((await repo.getById(ctx(A), id))?.factureId).toBe(fid);
+  });
+
+  it("listCreditsNonRapproches : exclut débits, rapprochés, ignorés ; isolation RLS", async () => {
+    /** seed : crédit non rapproché A */
+    await seed(A, { type: "credit", libelle: "CREDIT_A" });
+    /** crédit rapproché (factureId non null) */
+    const { rows: fRows } = await admin.query(
+      "insert into factures (\"artisanId\",\"clientId\",\"dateFacture\",statut,\"totalHT\",\"totalTVA\",\"totalTTC\",\"montantPaye\") values ($1,0,now(),'payee','100.00','20.00','120.00','120.00') returning id",
+      [A],
+    );
+    const fid = (fRows[0] as { id: number }).id;
+    const { rows: tRows } = await seed(A, { type: "credit", libelle: "RAPPROCHE_A" });
+    const tid = (tRows[0] as { id: number }).id;
+    await admin.query("update transactions_bancaires set facture_id=$1 where id=$2", [fid, tid]);
+    /** débit : exclu */
+    await seed(A, { type: "debit", libelle: "DEBIT_A" });
+    /** ignoré : exclu */
+    await seed(A, { type: "credit", libelle: "IGNORE_A", ignoree: true });
+    /** crédit non rapproché de B : exclu par RLS */
+    await seed(B, { type: "credit", libelle: "CREDIT_B" });
+
+    const credits = await repo.listCreditsNonRapproches(ctx(A));
+    const libelles = credits.map((t) => t.libelle);
+    expect(libelles).toContain("CREDIT_A");
+    expect(libelles).not.toContain("RAPPROCHE_A");
+    expect(libelles).not.toContain("DEBIT_A");
+    expect(libelles).not.toContain("IGNORE_A");
+    expect(libelles).not.toContain("CREDIT_B");
+    /** factureId exposé */
+    const t = await repo.getById(ctx(A), tid);
+    expect(t?.factureId).toBe(fid);
+  });
 });

@@ -5,6 +5,7 @@ import type { IBudgetCategorieRepository } from "../budgets-categories/applicati
 import type { IRegleCategorisationRepository } from "../regles-categorisation/application/regle-categorisation-repository";
 import type { INoteDeFraisRepository } from "../notes-de-frais/application/note-de-frais-repository";
 import type { ITransactionBancaireRepository } from "./application/transaction-bancaire-repository";
+import type { IFactureLettrerPort } from "./application/facture-lettreur-port";
 import type { FecReader } from "./application/fec-reader";
 import type { VisionPort, RateLimiterPort } from "../../shared/ports";
 import { createDepensesRouter } from "./interface/trpc/depenses.router";
@@ -22,6 +23,7 @@ export interface DepensesModuleDeps {
   readonly regleRepository: IRegleCategorisationRepository;
   readonly noteRepository: INoteDeFraisRepository;
   readonly transactionRepository: ITransactionBancaireRepository;
+  readonly factureLettreur: IFactureLettrerPort;
   readonly fecReader: FecReader;
   readonly db?: DbClient;
   /*
@@ -46,6 +48,7 @@ export function createDepensesModule(deps: DepensesModuleDeps): DepensesModule {
       deps.regleRepository,
       deps.noteRepository,
       deps.transactionRepository,
+      deps.factureLettreur,
       deps.fecReader,
       deps.db,
       deps.ocr,

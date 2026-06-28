@@ -43,6 +43,13 @@
       "when": 1782669587356,
       "tag": "20260628175947_seed-tva-categories",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1782671050384,
+      "tag": "20260628182410_facture-id-transaction",
+      "breakpoints": true
     }
   ]
 }

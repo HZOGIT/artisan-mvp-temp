@@ -31,7 +31,9 @@ import type { INoteDeFraisRepository } from "../../../notes-de-frais/application
 import { listNotesDeFraisAvecCompte, getNoteFraisDetail } from "../../../notes-de-frais/application/read-use-cases";
 import { creerNoteDeFrais, soumettreNoteDeFrais, approuverNoteDeFrais, rejeterNoteDeFrais, payerNoteDeFrais, ajouterDepenseANote, retirerDepenseDeNote } from "../../../notes-de-frais/application/write-use-cases";
 import type { ITransactionBancaireRepository } from "../../application/transaction-bancaire-repository";
+import type { IFactureLettrerPort } from "../../application/facture-lettreur-port";
 import { getTransactionsBancaires, ignorerTransaction, importReleve, convertirTransaction } from "../../application/transactions-use-cases";
+import { getSuggestionsRapprochement, rapprocher } from "../../application/lettrage-use-cases";
 import type { FecReader } from "../../application/fec-reader";
 import { exportFecAchats } from "../../application/fec";
 import type { VisionPort, RateLimiterPort } from "../../../../shared/ports";
@@ -132,6 +134,7 @@ export function createDepensesRouter(
   regleRepo: IRegleCategorisationRepository,
   noteRepo: INoteDeFraisRepository,
   transactionRepo: ITransactionBancaireRepository,
+  factureLettreur: IFactureLettrerPort,
   fecReader: FecReader,
   db?: DbClient,
   ocr?: { vision: VisionPort; rateLimiter: RateLimiterPort },
@@ -445,6 +448,15 @@ export function createDepensesRouter(
         }),
       )
       .mutation(({ ctx, input }) => convertirTransaction({ transactionRepo, depenseRepo: repo }, ctx.tenant, input)),
+
+    /** ── Rapprochement encaissements (lettrage crédit → facture) ────────────────────────── */
+    getSuggestionsRapprochement: protectedProcedure
+      .query(({ ctx }) => getSuggestionsRapprochement({ transactionRepo, lettreur: factureLettreur }, ctx.tenant)),
+
+    /** ⚠️ Idempotent : si déjà rapproché à la même facture → success immédiat. */
+    rapprocher: protectedProcedure
+      .input(z.object({ transactionId: z.number().int(), factureId: z.number().int() }))
+      .mutation(({ ctx, input }) => rapprocher({ transactionRepo, lettreur: factureLettreur }, ctx.tenant, input)),
 
     /** ── Export FEC achats (format AFNOR ; débit=crédit par construction) — lecture seule ────────── */
     exportFecAchats: protectedProcedure
