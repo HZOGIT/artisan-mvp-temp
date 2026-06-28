@@ -1209,6 +1209,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "tauxIndemniteKm": {
+          "name": "tauxIndemniteKm",
+          "type": "numeric(6, 3)",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -5558,6 +5564,14 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "regimeTVA": {
+          "name": "regimeTVA",
+          "type": "regime_tva",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'encaissements'"
         }
       },
       "indexes": {},
@@ -6564,6 +6578,12 @@
           "primaryKey": false,
           "notNull": false,
           "default": "now()"
+        },
+        "facture_id": {
+          "name": "facture_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -7170,6 +7190,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "depenseId": {
+          "name": "depenseId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -12633,6 +12659,14 @@
         "a_faire",
         "en_cours",
         "termine"
+      ]
+    },
+    "public.regime_tva": {
+      "name": "regime_tva",
+      "schema": "public",
+      "values": [
+        "encaissements",
+        "debits"
       ]
     }
   },

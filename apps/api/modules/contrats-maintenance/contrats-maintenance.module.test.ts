@@ -67,6 +67,7 @@ describe("contrats-maintenance.module", () => {
       "getInterventions",
       "list",
       "reactiver",
+      "reviserPrix",
       "suspendre",
       "terminer",
       "update",

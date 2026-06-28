@@ -74,6 +74,8 @@ export const contratsMaintenance = pgTable("contrats_maintenance", {
   conditionsParticulieres: text("conditionsParticulieres"),
   statut: contratStatutEnum("statut").default("actif"),
   notes: text("notes"),
+  tauxIndexationAnnuel: numeric("tauxIndexationAnnuel", { precision: 5, scale: 2 }),
+  dateDerniereRevision: timestamp("dateDerniereRevision"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });

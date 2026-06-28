@@ -24,5 +24,7 @@ export function useContratDetail(contratId: number) {
     reactiver: trpc.contrats.reactiver.useMutation(),
     createIntervention: trpc.contrats.createIntervention.useMutation(),
     updateIntervention: trpc.contrats.updateIntervention.useMutation(),
+    reviserPrix: trpc.contrats.reviserPrix.useMutation(),
+    updateTaux: trpc.contrats.update.useMutation(),
   };
 }
