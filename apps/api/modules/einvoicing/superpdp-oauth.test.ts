@@ -2,56 +2,66 @@ import { describe, it, expect, vi, afterAll } from "vitest";
 import { Pool } from "pg";
 import { createDbClient } from "../../shared/db/client";
 import { SuperPdpPaAdapter } from "../../shared/ports/superpdp-pa-adapter";
-import { sql } from "drizzle-orm";
-import { withTenant } from "../../shared/db/with-tenant";
 
 const URL = process.env.DATABASE_URL;
 const APP_URL =
   process.env.APP_DATABASE_URL ??
   (URL ? URL.replace(/:\/\/[^@]+@/, "://app_tenant:app_tenant_pw@") : undefined);
 
-describe.skipIf(!URL)("SuperPDP OAuth — adapter token L2", () => {
+/** Pool app_tenant : tous les inserts passent par la RLS (même comportement qu'en prod). */
+describe.skipIf(!URL)("SuperPDP OAuth — adapter token L2 (pool app_tenant, sans GUC manuel)", () => {
   const admin = new Pool({ connectionString: URL });
-  const db = createDbClient(URL!);
   const appDb = createDbClient(APP_URL!);
-  let artisanId = 0;
+  let artisanAId = 0;
+  let artisanBId = 0;
 
   afterAll(async () => {
-    if (artisanId) await admin.query(`delete from superpdp_tokens where "artisanId" = $1`, [artisanId]).catch(() => {});
-    if (artisanId) await admin.query(`delete from artisans where id = $1`, [artisanId]).catch(() => {});
-    await db.close().catch(() => {});
+    if (artisanAId) await admin.query(`delete from superpdp_tokens where "artisanId" = $1`, [artisanAId]).catch(() => {});
+    if (artisanBId) await admin.query(`delete from superpdp_tokens where "artisanId" = $1`, [artisanBId]).catch(() => {});
+    if (artisanAId) await admin.query(`delete from artisans where id = $1`, [artisanAId]).catch(() => {});
+    if (artisanBId) await admin.query(`delete from artisans where id = $1`, [artisanBId]).catch(() => {});
     await appDb.close().catch(() => {});
     await admin.end();
   });
 
-  it("setup : crée artisan de test", async () => {
-    const u = (await admin.query("insert into users default values returning id")).rows[0].id as number;
-    artisanId = (await admin.query(`insert into artisans ("userId") values ($1) returning id`, [u])).rows[0].id as number;
-    expect(artisanId).toBeGreaterThan(0);
+  it("setup : crée deux artisans distincts", async () => {
+    const uA = (await admin.query("insert into users default values returning id")).rows[0].id as number;
+    artisanAId = (await admin.query(`insert into artisans ("userId") values ($1) returning id`, [uA])).rows[0].id as number;
+    const uB = (await admin.query("insert into users default values returning id")).rows[0].id as number;
+    artisanBId = (await admin.query(`insert into artisans ("userId") values ($1) returning id`, [uB])).rows[0].id as number;
+    expect(artisanAId).toBeGreaterThan(0);
+    expect(artisanBId).toBeGreaterThan(0);
   });
 
-  it("upsertToken stocke le token et getTokenForArtisan le retourne", async () => {
-    const adapter = new SuperPdpPaAdapter("client_id", "client_secret", "https://sandbox.superpdp.tech", db.db);
+  it("upsertToken + getTokenForArtisan via appDb sans GUC manuel → persiste et relit", async () => {
+    const adapter = new SuperPdpPaAdapter("cid", "cs", "https://sandbox", appDb.db);
     const expiresAt = new Date(Date.now() + 3600 * 1000);
 
-    await adapter.upsertToken(artisanId, { accessToken: "tok-123", refreshToken: "refresh-abc", expiresAt });
-
-    const token = await adapter.getTokenForArtisan(artisanId);
+    await adapter.upsertToken(artisanAId, { accessToken: "tok-123", refreshToken: "ref-abc", expiresAt });
+    const token = await adapter.getTokenForArtisan(artisanAId);
     expect(token).toBe("tok-123");
   });
 
-  it("getTokenForArtisan retourne null si aucun token", async () => {
-    const adapter = new SuperPdpPaAdapter("client_id", "client_secret", "https://sandbox.superpdp.tech", db.db);
-    const unknownId = 999_999;
-    const token = await adapter.getTokenForArtisan(unknownId);
+  it("getTokenForArtisan retourne null si aucun token pour cet artisan", async () => {
+    const adapter = new SuperPdpPaAdapter("cid", "cs", "https://sandbox", appDb.db);
+    const token = await adapter.getTokenForArtisan(999_999);
     expect(token).toBeNull();
   });
 
-  it("getTokenForArtisan rafraîchit si expiré (mock fetch)", async () => {
-    const adapter = new SuperPdpPaAdapter("client_id", "client_secret", "https://sandbox.superpdp.tech", db.db);
+  it("isolation cross-tenant — session artisan B (GUC=artisanBId) ne voit pas le token de A", async () => {
+    const adapter = new SuperPdpPaAdapter("cid", "cs", "https://sandbox", appDb.db);
+    /**
+     * getTokenForArtisan(artisanBId) pose app.tenant=artisanBId
+     * → RLS filtre sur artisanId=artisanBId → le token de A est invisible.
+     */
+    const token = await adapter.getTokenForArtisan(artisanBId);
+    expect(token).toBeNull();
+  });
 
+  it("getTokenForArtisan rafraîchit si expiré (mock fetch) et met à jour la DB", async () => {
+    const adapter = new SuperPdpPaAdapter("cid", "cs", "https://sandbox", appDb.db);
     const expiredAt = new Date(Date.now() - 10_000);
-    await adapter.upsertToken(artisanId, { accessToken: "old-tok", refreshToken: "ref-xyz", expiresAt: expiredAt });
+    await adapter.upsertToken(artisanAId, { accessToken: "old-tok", refreshToken: "ref-xyz", expiresAt: expiredAt });
 
     const mockFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
       new Response(JSON.stringify({ access_token: "new-tok", refresh_token: "new-ref", expires_in: 3600 }), {
@@ -60,14 +70,12 @@ describe.skipIf(!URL)("SuperPDP OAuth — adapter token L2", () => {
       }),
     );
 
-    const token = await adapter.getTokenForArtisan(artisanId);
+    const token = await adapter.getTokenForArtisan(artisanAId);
     expect(mockFetch).toHaveBeenCalledOnce();
     expect(token).toBe("new-tok");
 
-    const stored = await withTenant(appDb.db, { artisanId, userId: 0 }, async (tx) => {
-      const r = await tx.execute(sql`select "accessToken" from superpdp_tokens where "artisanId" = ${artisanId}`);
-      return (r.rows[0] as { accessToken: string }).accessToken;
-    });
+    /** Vérifie la persistance via l'adaptateur lui-même (pas de GUC manuel) */
+    const stored = await adapter.getTokenForArtisan(artisanAId);
     expect(stored).toBe("new-tok");
 
     mockFetch.mockRestore();

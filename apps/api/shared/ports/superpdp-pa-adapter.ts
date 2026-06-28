@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { PaPort } from "../../modules/einvoicing/application/pa-port";
 import type {
   EntityInput,
@@ -42,30 +42,40 @@ export class SuperPdpPaAdapter implements PaPort {
     private readonly clientId: string,
     private readonly clientSecret: string,
     private readonly baseUrl: string,
-    /** Connexion DB owner (artisan_user) pour lire/écrire les tokens per-artisan. */
+    /** Pool app_tenant (RLS-soumis) — toutes les I/O token passent par withArtisan. */
     private readonly db: DbClient | null = null,
   ) {}
 
+  /** Exécute fn dans une transaction avec app.tenant positionné → active la RLS pour cet artisan. */
+  private withArtisan<T>(artisanId: number, fn: (tx: DbClient) => Promise<T>): Promise<T> {
+    if (!this.db) throw new Error("DB non injectée dans SuperPdpPaAdapter");
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`select set_config('app.tenant', ${String(artisanId)}, true)`);
+      return fn(tx as unknown as DbClient);
+    });
+  }
+
   /** Upsert un token OAuth artisan en base — appelé par le callback OAuth. */
   async upsertToken(artisanId: number, data: { accessToken: string; refreshToken: string | null; expiresAt: Date }): Promise<void> {
-    if (!this.db) throw new Error("DB non injectée dans SuperPdpPaAdapter");
-    await this.db
-      .insert(superpdpTokens)
-      .values({ artisanId, accessToken: data.accessToken, refreshToken: data.refreshToken, expiresAt: data.expiresAt })
-      .onConflictDoUpdate({
-        target: superpdpTokens.artisanId,
-        set: { accessToken: data.accessToken, refreshToken: data.refreshToken, expiresAt: data.expiresAt, updatedAt: new Date() },
-      });
+    await this.withArtisan(artisanId, (tx) =>
+      tx
+        .insert(superpdpTokens)
+        .values({ artisanId, accessToken: data.accessToken, refreshToken: data.refreshToken, expiresAt: data.expiresAt })
+        .onConflictDoUpdate({
+          target: superpdpTokens.artisanId,
+          set: { accessToken: data.accessToken, refreshToken: data.refreshToken, expiresAt: data.expiresAt, updatedAt: new Date() },
+        })
+        .then(() => undefined),
+    );
   }
 
   /** Token per-artisan depuis la DB — refresh automatique si expiré. */
   async getTokenForArtisan(artisanId: number): Promise<string | null> {
     if (!this.db) return null;
-    const [row] = await this.db
-      .select()
-      .from(superpdpTokens)
-      .where(eq(superpdpTokens.artisanId, artisanId))
-      .limit(1);
+    const rows = await this.withArtisan(artisanId, (tx) =>
+      tx.select().from(superpdpTokens).where(eq(superpdpTokens.artisanId, artisanId)).limit(1),
+    );
+    const row = rows[0];
     if (!row) return null;
     if (row.expiresAt.getTime() > Date.now() + 30_000) return row.accessToken;
     if (!row.refreshToken) return null;
