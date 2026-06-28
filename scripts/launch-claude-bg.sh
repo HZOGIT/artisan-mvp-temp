@@ -182,12 +182,13 @@ else
 fi
 
 if [[ -n "$CLAUDE_INIT_PROMPT" ]]; then
-  screen -dmS "$SESSION_NAME" bash -c "cd '$WORKDIR' && exec $QUOTED_CMD \"\$CLAUDE_INIT_PROMPT\""
+  # ponytail: printf %q bakes the prompt into the bash -c string (no env-inheritance dependency)
+  screen -dmS "$SESSION_NAME" bash -c "cd '$WORKDIR' && exec $QUOTED_CMD $(printf '%q' "$CLAUDE_INIT_PROMPT")"
 else
   screen -dmS "$SESSION_NAME" bash -c "cd '$WORKDIR' && exec $QUOTED_CMD"
 fi
 
-sleep 1
+sleep 3
 if screen -ls 2>/dev/null | grep -qE "[0-9]+\.${SESSION_NAME}[[:space:]]"; then
   echo "OK — session '${SESSION_NAME}' is running."
   echo "Attach:  screen -r ${SESSION_NAME}"
@@ -197,7 +198,7 @@ if screen -ls 2>/dev/null | grep -qE "[0-9]+\.${SESSION_NAME}[[:space:]]"; then
     echo "Worktree: /tmp/wt-${SESSION_NAME}  (branch: feat/${SESSION_NAME})"
   fi
 else
-  echo "ERROR: session '${SESSION_NAME}' failed to start." >&2
+  echo "ERROR: session '${SESSION_NAME}' exited immediately after start — check init prompt." >&2
   if $USE_WORKTREE && [[ -d "/tmp/wt-${SESSION_NAME}" ]]; then
     git -C "$MAIN_REPO" worktree remove "/tmp/wt-${SESSION_NAME}" --force 2>/dev/null || true
   fi
