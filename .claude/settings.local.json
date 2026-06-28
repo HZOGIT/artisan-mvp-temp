@@ -57,7 +57,8 @@
       "Bash(__NEW_LINE_8a13d4f24db50689__ echo \"\")",
       "Bash(__NEW_LINE_4ccc6a0b28f25752__ echo \"=== 2.1 dashboard.getStats ===\")",
       "Bash(ls -la pnpm-workspace.yaml)",
-      "Bash(cat pnpm-workspace.yaml)"
+      "Bash(cat pnpm-workspace.yaml)",
+      "mcp__firecrawl__firecrawl_search"
     ]
   }
 }
