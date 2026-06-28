@@ -357,3 +357,54 @@ est présent mais toutes les entrées sont dans `__migrations` → le bloc est i
 - **Snapshots `meta/`** : inchangés, utilisés par drizzle-kit pour les diffs.
 - **Collision résolue** : deux worktrees produisent `20260628HHMMSS_<nom>.sql` et
   `20260628HHMMSS_<autre>.sql` → noms différents → aucun conflit → merge trivial.
+
+---
+
+## 7. Corrections apportées à l'implémentation (vs le brouillon §6)
+
+Le code §6 est un brouillon ; l'implémentation livrée corrige trois points découverts en
+vérifiant contre un vrai PostgreSQL (tests `run-migrations.l2.test.ts`).
+
+1. **Bascule par `folderMillis`, PAS par checksum.** Le brouillon (§ Bascule) marquait une
+   migration comme appliquée si son checksum correspondait à un `hash` de
+   `drizzle.__drizzle_migrations`. **Faux** : Drizzle décide d'appliquer une migration uniquement
+   par `folderMillis` (le `when` du `_journal.json`), comparé au `max(created_at)` du ledger — le
+   checksum/hash n'entre JAMAIS dans la décision (cf. `pg-core/dialect.migrate`). Sur 5432/5433,
+   6 des 17 migrations ont été **éditées après application** → leur checksum diverge alors qu'elles
+   sont bien appliquées. Une bascule par checksum les aurait crues « non appliquées » → ré-exécution
+   du DDL → `… already exists` → boot fail-closed → crash-loop. La bascule livrée reproduit donc
+   exactement le critère Drizzle : une migration dont le `when` (lu dans `_journal.json`) est
+   `≤ max(created_at)` est inscrite au ledger sans ré-exécution ; les `when` supérieurs sont
+   réellement en attente et appliqués normalement. → `_journal.json` est lu **uniquement pendant la
+   bascule** (transition), pas au runtime courant.
+2. **Transaction sur une connexion dédiée.** Le brouillon faisait `pool.query("begin")` /
+   `pool.query(content)` / `pool.query("commit")` : `pool.query()` emprunte une connexion **par
+   appel** → BEGIN, DDL et COMMIT pouvaient tomber sur des connexions différentes (DDL auto-commit
+   hors transaction → atomicité illusoire). Livré : `pool.connect()` une fois par fichier, tout sur
+   le même client.
+3. **Échappatoire `-- no-transaction`.** Le runner enveloppe chaque fichier dans `BEGIN/COMMIT` ;
+   or certains DDL PostgreSQL (`CREATE INDEX CONCURRENTLY`) sont interdits en bloc transactionnel.
+   Une migration dont la 1ʳᵉ ligne est `-- no-transaction` est exécutée statement par statement
+   (split sur `--> statement-breakpoint`) en auto-commit. Atomicité perdue dans ce mode → ses
+   statements doivent être idempotents (`… IF NOT EXISTS`).
+4. **Apply tolérant pendant la transition.** Une BDD héritée de Drizzle peut avoir un ledger
+   `drizzle.__drizzle_migrations` **incomplet** (DDL présent mais lignes manquantes — churn de
+   régénération, applications hors-bande par d'autres agents). La bascule par `folderMillis` classe
+   alors ces migrations « en attente » alors que leur DDL existe → ré-exécution → `… already exists`
+   → boot fail-closed → **crash-loop sur un état pourtant récupérable** (constaté au review sur 5432).
+   Correctif : tant que le schéma `drizzle` est présent (= transition), l'apply tourne en mode
+   **tolérant** — statement par statement sous `SAVEPOINT`, un échec « objet déjà présent »
+   (SQLSTATE `42701`/`42P07`/`42710`) est avalé (migration marquée appliquée) au lieu de crasher,
+   l'atomicité par fichier restant préservée. Une BDD **pur-runner** (sans schéma `drizzle`) reste
+   en mode **strict** : un duplicate y est une vraie erreur → throw.
+
+**Conséquence sur §6 « Ordre de livraison » point 5** : `_journal.json` n'est PAS un pur artéfact
+dev — il reste nécessaire à la bascule. Ne pas le présenter comme « ignoré au runtime » ; il est lu
+une fois lors de la transition Drizzle → runner. Le commentaire de `generate-tenant-rls.mjs` n'a
+donc pas été modifié.
+
+**Note dev 5432** : la BDD de dev peut être incohérente (migrations appliquées hors-bande par
+d'autres agents, absentes du ledger Drizzle) — `drizzle-kit migrate` y échouerait **déjà** de la
+même façon. Ce n'est pas une régression du runner. La cible critique est **5433** (provisionné
+uniquement par le boot standard), où la bascule a été validée sur une BDD fraîche provisionnée par
+le vrai `migrate()` Drizzle : 17 migrations inscrites, **zéro ré-exécution**, re-run idempotent.
