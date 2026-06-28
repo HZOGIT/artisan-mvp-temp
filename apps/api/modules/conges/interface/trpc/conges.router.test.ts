@@ -15,6 +15,8 @@ const SECRET = "test-secret-at-least-32-characters-long-xxxx";
 
 const UA = 9909001;
 const UB = 9909002;
+/** Collaborateur (non-owner) de artisanA sans conges.gerer — sert au test PERMISSION GATE 403. */
+const UC = 9909003;
 
 async function token(userId: number): Promise<string> {
   return new SignJWT({ userId, email: `u${userId}@t.fr` })
@@ -61,11 +63,14 @@ describe.skipIf(!URL)("conges.router e2e (HTTP → tRPC → use-case → repo �
       await purge(uid);
       await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [uid, `u${uid}@t.fr`]);
     }
+    await admin.query("delete from users where id=$1", [UC]);
     artisanA = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UA])).rows[0].id;
     artisanB = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UB])).rows[0].id;
     techA = (await admin.query('insert into techniciens ("artisanId",nom) values ($1,$2) returning id', [artisanA, "Tech A"])).rows[0].id;
     techB = (await admin.query('insert into techniciens ("artisanId",nom) values ($1,$2) returning id', [artisanB, "Tech B"])).rows[0].id;
-    /* UA peut approuver/refuser — UB n'a aucune permission (sert au test 403). */
+    /* UC : collaborateur de artisanA, non-owner (pas dans artisans), sans conges.gerer. */
+    await admin.query('insert into users (id, email, password, role, "artisanId") values ($1,$2,\'x\',\'artisan\',$3)', [UC, `u${UC}@t.fr`, artisanA]);
+    /* UA peut approuver/refuser — UB et UC n'ont aucune permission. */
     await admin.query('insert into permissions_utilisateur ("userId", permission, autorise) values ($1,$2,true)', [UA, "conges.gerer"]);
     server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(app.db), congeRepo: new CongeRepositoryDrizzle(app.db) });
   });
@@ -73,6 +78,7 @@ describe.skipIf(!URL)("conges.router e2e (HTTP → tRPC → use-case → repo �
   afterAll(async () => {
     await server.close();
     for (const uid of [UA, UB]) await purge(uid);
+    await admin.query("delete from users where id=$1", [UC]);
     await app.close();
     await admin.end();
   });
@@ -202,15 +208,17 @@ describe.skipIf(!URL)("conges.router e2e (HTTP → tRPC → use-case → repo �
   });
 
   it("PERMISSION GATE : approuver/refuser sans conges.gerer → 403", async () => {
-    const tB = await token(UB);
-    expect((await callMutation(server, "conges.approuver", { id: 1 }, tB)).statusCode).toBe(403);
-    expect((await callMutation(server, "conges.refuser", { id: 1 }, tB)).statusCode).toBe(403);
+    /* UC est collaborateur de artisanA (isOwner=false) et n'a pas conges.gerer → le gate doit 403. */
+    const tC = await token(UC);
+    expect((await callMutation(server, "conges.approuver", { id: 1 }, tC)).statusCode).toBe(403);
+    expect((await callMutation(server, "conges.refuser", { id: 1 }, tC)).statusCode).toBe(403);
   });
 
   it("getSolde : retourne les lignes soldes_conges du technicien pour l'année", async () => {
     const tA = await token(UA);
     await admin.query('delete from soldes_conges where "artisanId"=$1 and "technicienId"=$2', [artisanA, techA]);
-    const id = (await callMutation(server, "conges.create", { technicienId: techA, type: "conge_paye", dateDebut: "2028-01-02", dateFin: "2028-01-04" }, tA)).json().result.data.id as number;
+    /* 2028-01-03 lundi → 2028-01-05 mercredi = 3 jours ouvrés (jan02 2028 = dimanche, exclure). */
+    const id = (await callMutation(server, "conges.create", { technicienId: techA, type: "conge_paye", dateDebut: "2028-01-03", dateFin: "2028-01-05" }, tA)).json().result.data.id as number;
     await callMutation(server, "conges.approuver", { id }, tA);
     const res = await callQuery(server, "conges.getSolde", { technicienId: techA, annee: 2028 }, tA);
     expect(res.statusCode).toBe(200);
