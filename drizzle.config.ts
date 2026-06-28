@@ -7,7 +7,7 @@ if (!connectionString) {
 
 export default defineConfig({
   schema: "./drizzle/schema.pg.ts",
-  out: "./drizzle/pg",
+  out: "./drizzle",
   dialect: "postgresql",
   migrations: { prefix: "timestamp" },
   dbCredentials: {

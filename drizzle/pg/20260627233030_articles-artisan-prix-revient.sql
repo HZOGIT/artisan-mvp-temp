@@ -1,1 +1,0 @@
-ALTER TABLE "articles_artisan" ADD COLUMN "prixRevientHT" numeric(10, 2);

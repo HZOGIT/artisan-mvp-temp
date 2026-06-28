@@ -1,1 +1,0 @@
-ALTER TABLE "contrats_maintenance" ADD COLUMN "alerteReconductionEnvoyeeLe" timestamp;

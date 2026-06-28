@@ -1,5 +1,0 @@
-ALTER TABLE audit_log RENAME TO events;
-ALTER TABLE events ALTER COLUMN "artisanId" DROP NOT NULL;
-ALTER TABLE events ALTER COLUMN "userId" DROP NOT NULL;
-ALTER TABLE events ADD COLUMN IF NOT EXISTS payload jsonb;
-ALTER TABLE events ADD COLUMN IF NOT EXISTS occurred_at timestamptz;

@@ -1,1 +1,0 @@
-ALTER TABLE "factures" ALTER COLUMN "numero" DROP NOT NULL;

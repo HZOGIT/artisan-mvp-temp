@@ -1,1 +1,0 @@
-REVOKE UPDATE, DELETE ON "billing_events" FROM app_tenant;

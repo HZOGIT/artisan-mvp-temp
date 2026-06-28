@@ -1,1 +1,0 @@
-ALTER TABLE "factures_lignes" ADD COLUMN "articleId" integer;

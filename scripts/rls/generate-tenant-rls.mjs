@@ -62,7 +62,7 @@ for (const t of excluded) {
   lines.push("");
 }
 
-const PG_DIR = "drizzle/pg";
+const PG_DIR = "drizzle";
 const TAG = "rls-tenant-isolation";
 const BODY_MARKER = "-- Isolation multi-tenant (RLS)";
 const body = lines.join("\n").trim();

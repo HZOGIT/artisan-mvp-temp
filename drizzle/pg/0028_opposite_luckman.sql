@@ -1,2 +1,0 @@
-ALTER TABLE "modeles_devis_lignes" ADD COLUMN "tvaCategorieId" varchar(30);--> statement-breakpoint
-ALTER TABLE "modeles_devis_lignes" ADD CONSTRAINT "modeles_devis_lignes_tvaCategorieId_tva_categories_id_fk" FOREIGN KEY ("tvaCategorieId") REFERENCES "public"."tva_categories"("id") ON DELETE no action ON UPDATE no action;

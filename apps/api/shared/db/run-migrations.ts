@@ -9,7 +9,7 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 const PROVISION_LOCK_KEY = 720916;
 
 /** Dossier des migrations Drizzle (SQL + meta/_journal.json). Relatif au cwd (= `/app` en conteneur). */
-const MIGRATIONS_DIR = process.env.MIGRATIONS_DIR ?? "drizzle/pg";
+const MIGRATIONS_DIR = process.env.MIGRATIONS_DIR ?? "drizzle";
 
 /**
  * Exécute `fn` en tenant un `pg_advisory_lock` (session-scoped) sur une connexion dédiée.
