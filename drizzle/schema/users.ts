@@ -126,3 +126,17 @@ export const adminAuditLog = pgTable("admin_audit_log", {
 });
 export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
 export type InsertAdminAuditLog = typeof adminAuditLog.$inferInsert;
+
+/**
+ * Table plateforme (pas de tenant) — opt-out global par adresse email pour les emails
+ * lifecycle/marketing. RLS désactivée : même logique que `events` (journal global).
+ * Lecture autorisée au rôle app_tenant pour que la garde pre-send fonctionne.
+ */
+export const emailOptouts = pgTable("email_optouts", {
+  id:        serial("id").primaryKey(),
+  email:     varchar("email", { length: 320 }).notNull().unique(),
+  reason:    text("reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type EmailOptout = typeof emailOptouts.$inferSelect;
+export type InsertEmailOptout = typeof emailOptouts.$inferInsert;

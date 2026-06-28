@@ -188,6 +188,8 @@ import { registerComptabiliteExportRoute } from "./interface/http/comptabilite-e
 import { FacturesCsvReaderDrizzle } from "./modules/comptabilite/infra/factures-csv-reader-drizzle";
 import { registerRgpdExportRoute } from "./interface/http/rgpd-export-route";
 import { registerPaiementRoute } from "./interface/http/paiement-route";
+import { registerEmailUnsubscribeRoute } from "./interface/http/email-unsubscribe-route";
+import { EmailOptoutRepositoryDrizzle } from "./modules/emails/infra/email-optout-repository-drizzle";
 import { PortalPaymentReaderDrizzle } from "./modules/paiement/infra/portal-payment-reader-drizzle";
 import { PortalPaymentWriterDrizzle } from "./modules/paiement/infra/portal-payment-writer-drizzle";
 import { registerArticlesSearchRoute } from "./interface/http/articles-search-route";
@@ -427,6 +429,8 @@ export interface AppDeps extends ContextDeps {
   readonly tresorerieReader?: TresorerieReader;
   readonly eventBus?: EventBusPort;
   readonly checkSubscriptionActive?: (artisanId: number) => Promise<boolean>;
+  /** Secret HMAC pour les tokens de désinscription email lifecycle. Défaut : JWT_SECRET. */
+  readonly emailUnsubscribeSecret?: string;
 }
 
 /** Construit l'instance Fastify : /health + tRPC monté sur /api/trpc. */
@@ -901,6 +905,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     email: emailAdapter,
     resetRateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(5, 60 * 60 * 1000),
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+    optoutRepo: new EmailOptoutRepositoryDrizzle(getDbHandle().db),
+    unsubscribeSecret: deps.emailUnsubscribeSecret ?? process.env.EMAIL_UNSUBSCRIBE_SECRET ?? process.env.JWT_SECRET ?? "dev-unsubscribe-secret",
   });
   const subscription = createSubscriptionModule(subscriptionReader);
   /*
@@ -1306,6 +1312,12 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
     db: getDbHandle().db,
+  });
+
+  /** Désinscription email lifecycle/marketing — public par token signé HMAC (RFC 8058 + lien visible). */
+  registerEmailUnsubscribeRoute(app, {
+    optoutRepo: new EmailOptoutRepositoryDrizzle(getDbHandle().db),
+    unsubscribeSecret: deps.emailUnsubscribeSecret ?? process.env.EMAIL_UNSUBSCRIBE_SECRET ?? process.env.JWT_SECRET ?? "dev-unsubscribe-secret",
   });
 
   /** Statut de paiement + Checkout Stripe — portail client, public par token. */

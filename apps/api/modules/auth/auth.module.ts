@@ -4,6 +4,7 @@ import { createAuthRouter } from "./interface/trpc/auth.router";
 import type { EmailPort } from "../../shared/ports/email";
 import type { PasswordHasher } from "../../shared/ports/password-hasher";
 import type { RateLimiterPort } from "../../shared/ports/rate-limiter";
+import type { IEmailOptoutRepository } from "../emails/application/email-optout-repository";
 
 /*
  * Wiring DI du module `auth`. ⚠️ `jwtSecret` DOIT être le même que le legacy (cookie inter-opérable).
@@ -18,6 +19,8 @@ export interface AuthModuleDeps {
   readonly resetRateLimiter?: RateLimiterPort;
   readonly appUrl?: string;
   readonly genResetToken?: () => string;
+  readonly optoutRepo?: IEmailOptoutRepository;
+  readonly unsubscribeSecret?: string;
 }
 
 export interface AuthModule {
@@ -35,6 +38,8 @@ export function createAuthModule(deps: AuthModuleDeps): AuthModule {
     resetRateLimiter: deps.resetRateLimiter,
     appUrl: deps.appUrl,
     genResetToken: deps.genResetToken,
+    optoutRepo: deps.optoutRepo,
+    unsubscribeSecret: deps.unsubscribeSecret,
   };
   return { deps: authDeps, router: createAuthRouter(authDeps) };
 }

@@ -16,6 +16,13 @@ function sanitizeCRLF(s: string): string {
   return s.replace(/[\r\n]/g, " ").replace(/[<>"]/g, "");
 }
 
+function injectUnsubscribeFooter(html: string, url: string): string {
+  const footer = `<div style="margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;"><p style="margin:0;font-size:12px;color:#9ca3af;">Vous recevez cet email car vous avez créé un compte Operioz.<br><a href="${url}" style="color:#6b7280;text-decoration:underline;">Se désinscrire</a></p></div>`;
+  const closeBody = html.lastIndexOf("</body>");
+  if (closeBody !== -1) return `${html.slice(0, closeBody)}${footer}</body>${html.slice(closeBody + 7)}`;
+  return html + footer;
+}
+
 export class ResendEmailAdapter implements EmailPort {
   private readonly log: AppLogger;
   private readonly resend: Resend | null;
@@ -48,8 +55,15 @@ export class ResendEmailAdapter implements EmailPort {
       replyTo: message.replyTo && EMAIL_RE.test(message.replyTo) ? sanitizeCRLF(message.replyTo) : "support@operioz.com",
       to,
       subject,
-      html: body,
+      html: message.unsubscribeUrl ? injectUnsubscribeFooter(body, message.unsubscribeUrl) : body,
     };
+    if (message.unsubscribeUrl) {
+      const url = message.unsubscribeUrl;
+      options.headers = {
+        "List-Unsubscribe": `<${url}>, <mailto:unsubscribe@operioz.com>`,
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      };
+    }
     if (message.attachments?.length) {
       options.attachments = message.attachments.map((a) => ({ filename: a.filename, content: a.content }));
     }

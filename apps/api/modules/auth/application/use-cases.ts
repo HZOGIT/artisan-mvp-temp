@@ -8,6 +8,9 @@ import type { TokenClaims } from "../../../shared/tenant";
 import { resetPasswordEmail, welcomeEmail } from "./emails";
 import type { AuthMe, AuthUser } from "../domain/auth";
 import type { IAuthRepository } from "./auth-repository";
+import type { IEmailOptoutRepository } from "../../emails/application/email-optout-repository";
+import { sendLifecycleEmail } from "../../../shared/email/lifecycle-email-sender";
+import { signUnsubscribeToken } from "../../../shared/email/unsubscribe-token";
 
 /** Dépendances du module auth (injectables/testables). */
 export interface AuthDeps {
@@ -23,6 +26,10 @@ export interface AuthDeps {
   readonly appUrl?: string;
   /** Génère le jeton de reset brut (défaut : 32 octets hex). Injectable (déterminisme test). */
   readonly genResetToken?: () => string;
+  /** Vérification opt-out avant envoi email lifecycle (welcome). Optionnel : skip garde si absent. */
+  readonly optoutRepo?: IEmailOptoutRepository;
+  /** Secret pour signer le token de désinscription dans le lien List-Unsubscribe du welcome. */
+  readonly unsubscribeSecret?: string;
 }
 
 const sha256 = (s: string): string => createHash("sha256").update(s).digest("hex");
@@ -76,7 +83,15 @@ export async function signup(deps: AuthDeps, input: { email: string; password: s
   const token = await signAuthToken({ userId: created.id, email: created.email ?? input.email }, deps.jwtSecret, deps.tokenTtl ?? "7d");
   if (deps.email) {
     try {
-      await deps.email.send({ to: input.email, subject: "Bienvenue sur Operioz ! 🎉", body: welcomeEmail(input.name, deps.appUrl) });
+      const appUrl = deps.appUrl ?? "https://www.operioz.com";
+      const unsubToken = deps.unsubscribeSecret ? signUnsubscribeToken(input.email, deps.unsubscribeSecret) : null;
+      const unsubscribeUrl = unsubToken ? `${appUrl}/api/emails/unsubscribe?token=${unsubToken}` : `${appUrl}/api/emails/unsubscribe`;
+      const message = { to: input.email, subject: "Bienvenue sur Operioz ! 🎉", body: welcomeEmail(input.name, appUrl), unsubscribeUrl };
+      if (deps.optoutRepo) {
+        await sendLifecycleEmail(deps.email, deps.optoutRepo, message);
+      } else {
+        await deps.email.send(message);
+      }
     } catch {
       /* best-effort */
     }
