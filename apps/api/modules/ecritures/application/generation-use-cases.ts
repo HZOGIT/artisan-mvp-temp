@@ -1,6 +1,6 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { IEcritureRepository } from "./ecriture-repository";
-import type { IFactureReader } from "./facture-reader";
+import type { IFactureReader, FactureReadModel } from "./facture-reader";
 import type { EcritureComptable, CreateEcritureInput } from "../domain/ecriture";
 import { COMPTE_CLIENT, COMPTE_VENTES, COMPTE_BANQUE, compteTvaCollectee } from "./comptes";
 
@@ -100,7 +100,7 @@ export async function genererEcrituresEncaissement(
   factureReader: IFactureReader,
   ctx: TenantContext,
   factureId: number,
-  facture?: any,
+  facture?: FactureReadModel,
 ): Promise<EcritureComptable[]> {
   const _facture = facture ?? (await factureReader.getFacture(ctx, factureId));
   if (!_facture) return [];
