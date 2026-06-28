@@ -265,9 +265,6 @@ export async function ajouterReglement(
   }
   const montant = Number(input.montant);
   if (!Number.isFinite(montant) || montant <= 0) throw new ValidationError("Le montant du reglement doit être strictement positif");
-  const total = Number(facture.totalTTC) || 0;
-  const cumul = (Number(facture.montantPaye) || 0) + montant;
-  if (cumul > total + EPS) throw new ValidationError("Le montant payé dépasse le total TTC de la facture");
 
   const reglement = await repo.ajouterReglement(ctx, {
     factureId: input.factureId,
@@ -278,11 +275,6 @@ export async function ajouterReglement(
     note: input.note ?? null,
   });
   if (!reglement) throw new NotFoundError("Facture introuvable");
-
-  const soldee = total > 0 && cumul >= total - EPS;
-  if (soldee) {
-    await repo.setStatut(ctx, input.factureId, "payee");
-  }
 
   return reglement;
 }

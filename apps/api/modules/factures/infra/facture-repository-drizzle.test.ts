@@ -131,4 +131,33 @@ describe.skipIf(!URL)("FactureRepositoryDrizzle (PG, RLS + scope tenant + lignes
     const detail = await repo.getById(ctx(A), f.id);
     expect(detail?.totalHT).toBe("180.00");
   });
+
+  it("ajouterReglement : SELECT FOR UPDATE + garde sous lock prévient les sur-paiements concurrents", async () => {
+    const f = await repo.create(ctx(A), {
+      clientId: clientA,
+      numero: "FAC-CONC",
+      lignes: [{ designation: "L", prixUnitaireHT: "120.00", tauxTVA: "20" }],
+    });
+    await repo.setStatut(ctx(A), f.id, "envoyee");
+    const facture = await repo.getById(ctx(A), f.id);
+    expect(facture?.totalTTC).toBe("144.00");
+
+    const promises = [
+      repo.ajouterReglement(ctx(A), { factureId: f.id, montant: "60.00", date: new Date("2026-06-01"), mode: "cheque" }),
+      repo.ajouterReglement(ctx(A), { factureId: f.id, montant: "60.00", date: new Date("2026-06-02"), mode: "virement" }),
+      repo.ajouterReglement(ctx(A), { factureId: f.id, montant: "60.00", date: new Date("2026-06-03"), mode: "especes" }),
+    ];
+
+    const results = await Promise.allSettled(promises);
+    const successes = results.filter((r) => r.status === "fulfilled" && r.value);
+    const failures = results.filter((r) => r.status === "rejected");
+
+    expect(successes.length).toBeGreaterThanOrEqual(2);
+    expect(failures.length).toBeGreaterThanOrEqual(1);
+
+    const updated = await repo.getById(ctx(A), f.id);
+    const montantNum = Number(updated?.montantPaye || "0");
+    expect(montantNum).toBeLessThanOrEqual(144.005);
+    expect(updated?.montantPaye).toMatch(/^(120|144|60|0)\./);
+  });
 });

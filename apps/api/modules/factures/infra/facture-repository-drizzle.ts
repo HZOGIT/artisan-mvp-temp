@@ -3,6 +3,7 @@ import { factures, facturesLignes, clients, devis, parametresArtisan, eventLog, 
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
+import { ValidationError } from "../../../shared/errors";
 import type { IFactureRepository, PaiementPatch, CreateAvoirInput, CreateFromDevisInput, Reglement, CreateReglementInput } from "../application/facture-repository";
 import type {
   Facture,
@@ -289,17 +290,29 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
 
   async ajouterReglement(ctx: TenantContext, input: CreateReglementInput): Promise<Reglement | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      const facture = await tx
+      const [facture] = await tx
         .select()
         .from(factures)
         .where(and(eq(factures.id, input.factureId), eq(factures.artisanId, ctx.artisanId)))
         .limit(1);
 
-      if (!facture.length) return null;
-
-      const isoDate = input.date.toISOString().split("T")[0];
+      if (!facture) return null;
 
       await tx.execute(sql`SELECT * FROM "factures" WHERE id = ${input.factureId} FOR UPDATE`);
+
+      const [sumResult] = await tx
+        .select({ total: sum(reglements.montant) })
+        .from(reglements)
+        .where(eq(reglements.factureId, input.factureId));
+
+      const currentSum = sumResult?.total ? Number(sumResult.total) : 0;
+      const montantNum = Number(input.montant);
+      const totalTTC = Number(facture.totalTTC) || 0;
+      const cumul = currentSum + montantNum;
+
+      if (cumul > totalTTC + 0.005) throw new ValidationError("Le montant payé dépasse le total TTC de la facture");
+
+      const isoDate = input.date.toISOString().split("T")[0];
 
       const [reglement] = await tx
         .insert(reglements)
@@ -317,17 +330,14 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
 
       if (!reglement) return null;
 
-      const [sumResult] = await tx
-        .select({ total: sum(reglements.montant) })
-        .from(reglements)
-        .where(eq(reglements.factureId, input.factureId));
-
-      const newMontantPaye = sumResult?.total ? String(sumResult.total) : "0.00";
+      const newMontantPaye = cumul.toFixed(2);
+      const soldee = totalTTC > 0 && cumul >= totalTTC - 0.005;
 
       await tx
         .update(factures)
         .set({
           montantPaye: newMontantPaye,
+          statut: soldee ? "payee" : facture.statut,
           updatedAt: new Date(),
         })
         .where(eq(factures.id, input.factureId));

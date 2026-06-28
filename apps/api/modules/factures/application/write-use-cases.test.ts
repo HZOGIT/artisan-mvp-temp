@@ -388,7 +388,7 @@ describe("factures — use-cases d'écriture", () => {
     );
   });
 
-  it("ajouterReglement — SELECT FOR UPDATE prévient les sur-paiements concurrents (verrouillage)", async () => {
+  it("ajouterReglement — cumul de deux règlements qui soldent la facture", async () => {
     const repo = repoWithClient(A, 100);
     const f = await creerFacture(repo, A, {
       clientId: 100,

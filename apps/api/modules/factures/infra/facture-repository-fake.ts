@@ -11,6 +11,7 @@ import type {
   AuditLogEntry,
 } from "../domain/facture";
 import { calculerMontantsLigne, calculerTotaux } from "../application/montants";
+import { ValidationError } from "../../../shared/errors";
 
 /*
  * Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
@@ -221,6 +222,17 @@ export class FakeFactureRepository implements IFactureRepository {
     const facture = await this.getById(ctx, input.factureId);
     if (!facture) return null;
 
+    const currentSum = this.reglementStore
+      .filter((r) => r.factureId === input.factureId)
+      .reduce((sum, r) => sum + Number(r.montant), 0);
+    const montantNum = Number(input.montant);
+    const totalTTC = Number(facture.totalTTC) || 0;
+    const cumul = currentSum + montantNum;
+
+    if (cumul > totalTTC + 0.005) {
+      throw new ValidationError("Le montant payé dépasse le total TTC de la facture");
+    }
+
     const reglement: Reglement = {
       id: ++this.reglementSeq,
       factureId: input.factureId,
@@ -235,14 +247,11 @@ export class FakeFactureRepository implements IFactureRepository {
 
     this.reglementStore.push(reglement);
 
-    const totalMontant = this.reglementStore
-      .filter((r) => r.factureId === input.factureId)
-      .reduce((sum, r) => sum + Number(r.montant), 0)
-      .toFixed(2);
-
+    const soldee = totalTTC > 0 && cumul >= totalTTC - 0.005;
     const updated: Facture = {
       ...facture,
-      montantPaye: totalMontant,
+      montantPaye: cumul.toFixed(2),
+      statut: soldee ? "payee" : facture.statut,
       updatedAt: new Date(),
     };
     this.factureStore = this.factureStore.map((x) => (x.id === input.factureId ? updated : x));
