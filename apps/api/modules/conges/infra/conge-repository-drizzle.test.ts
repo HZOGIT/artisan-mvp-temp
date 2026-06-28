@@ -4,6 +4,7 @@ import { createDbClient } from "../../../shared/db";
 import { CongeRepositoryDrizzle } from "./conge-repository-drizzle";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import type { TenantContext } from "../../../shared/tenant";
+import { getSoldeConge, listSoldesConges } from "../application/read-use-cases";
 
 const URL = process.env.DATABASE_URL;
 const APP_URL =
@@ -77,5 +78,30 @@ describe.skipIf(!URL)("CongeRepositoryDrizzle (PG, RLS + scope tenant)", () => {
     expect(await repo.ownsTechnicien(ctx(A), techA)).toBe(true);
     expect(await repo.ownsTechnicien(ctx(B), techA)).toBe(false); // technicien de A, vu depuis B
     expect(await repo.ownsTechnicien(ctx(A), 987654321)).toBe(false); // inexistant
+  });
+
+  it("getTechnicienDateEmbauche : retourne createdAt du technicien, null si cross-tenant", async () => {
+    const date = await repo.getTechnicienDateEmbauche(ctx(A), techA);
+    expect(date).toBeInstanceOf(Date);
+    expect(await repo.getTechnicienDateEmbauche(ctx(B), techA)).toBeNull(); /* isolation RLS */
+  });
+
+  it("getSoldeConge (use-case) : joursAcquis calculés depuis createdAt, non nuls", async () => {
+    /* techA créé en beforeAll (environ now) — au moins 0 mois acquis, toujours ≥ 0 */
+    const rows = await getSoldeConge(repo, ctx(A), techA, new Date().getFullYear());
+    const cp = rows.find((r) => r.type === "conge_paye");
+    expect(cp).toBeDefined();
+    expect(typeof cp!.joursAcquis).toBe("number");
+    expect(cp!.joursAcquis).toBeGreaterThanOrEqual(0);
+    expect(cp!.soldeRestant).toBe(cp!.joursAcquis); // aucun congé pris → solde = acquis
+  });
+
+  it("listSoldesConges (use-case) : retourne une entrée par technicien du tenant A", async () => {
+    const soldes = await listSoldesConges(repo, ctx(A), new Date().getFullYear());
+    expect(soldes.some((s) => s.technicienId === techA)).toBe(true);
+    const cpA = soldes.find((s) => s.technicienId === techA);
+    expect(cpA!.joursAcquis).toBeGreaterThanOrEqual(0);
+    /* technicien de B absent du résultat de A */
+    expect(soldes.some((s) => s.technicienId === techB)).toBe(false);
   });
 });

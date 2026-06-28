@@ -213,6 +213,40 @@ export class CongeRepositoryDrizzle implements ICongeRepository {
     });
   }
 
+  getTechnicienDateEmbauche(ctx: TenantContext, technicienId: number): Promise<Date | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .select({ createdAt: techniciens.createdAt })
+        .from(techniciens)
+        .where(and(eq(techniciens.id, technicienId), eq(techniciens.artisanId, ctx.artisanId)))
+        .limit(1);
+      return row?.createdAt ?? null;
+    });
+  }
+
+  listTechniciensSolde(ctx: TenantContext, annee: number): Promise<Array<{ technicienId: number; dateEmbauche: Date; joursPris: number }>> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select({
+          technicienId: techniciens.id,
+          dateEmbauche: techniciens.createdAt,
+          joursPris: sql<number>`COALESCE(${soldesConges.joursPris}, 0)::float`,
+        })
+        .from(techniciens)
+        .leftJoin(
+          soldesConges,
+          and(
+            eq(soldesConges.technicienId, techniciens.id),
+            eq(soldesConges.artisanId, techniciens.artisanId),
+            eq(soldesConges.type, "conge_paye"),
+            eq(soldesConges.annee, annee),
+          ),
+        )
+        .where(eq(techniciens.artisanId, ctx.artisanId));
+      return rows;
+    });
+  }
+
   withDb(db: DbClient): CongeRepositoryDrizzle {
     return new CongeRepositoryDrizzle(db);
   }

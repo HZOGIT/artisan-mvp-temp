@@ -1,11 +1,39 @@
 import { describe, it, expect } from "vitest";
-import { calculerJoursConge, typeAffecteSolde } from "./solde";
+import { calculerJoursConge, typeAffecteSolde, calculerJoursAcquisAnnee } from "./solde";
 import { FakeCongeRepository } from "../infra/conge-repository-fake";
 import { creerConge, approuverConge, annulerConge, supprimerConge } from "./write-use-cases";
 import type { TenantContext } from "../../../shared/tenant";
 
 const A: TenantContext = { artisanId: 1, userId: 10 };
 const TECH = 500;
+
+describe("calculerJoursAcquisAnnee (acquisition CP — mois entiers × 2,5)", () => {
+  it("N mois entiers → N × 2,5", () => {
+    /* Jan 1 → Jul 1 : Jan-Jun complets = 6 mois */
+    expect(calculerJoursAcquisAnnee(new Date("2026-01-01"), 2026, new Date("2026-07-01"))).toBe(15);
+    /* Jan 1 → Apr 1 : Jan-Mar complets = 3 mois */
+    expect(calculerJoursAcquisAnnee(new Date("2026-01-01"), 2026, new Date("2026-04-01"))).toBe(7.5);
+  });
+
+  it("12 mois complets (année suivante) → 30 j", () => {
+    expect(calculerJoursAcquisAnnee(new Date("2026-01-01"), 2026, new Date("2027-01-01"))).toBe(30);
+  });
+
+  it("idempotence — même inputs → même résultat", () => {
+    const d = new Date("2026-01-01");
+    const t = new Date("2026-06-15");
+    expect(calculerJoursAcquisAnnee(d, 2026, t)).toBe(calculerJoursAcquisAnnee(d, 2026, t));
+  });
+
+  it("embauche hors de l'année → 0", () => {
+    expect(calculerJoursAcquisAnnee(new Date("2027-01-01"), 2026, new Date("2026-12-31"))).toBe(0);
+  });
+
+  it("embauche en cours de mois — mois partiel exclu", () => {
+    /* Jan 15 → Jul 1 : Jan partiel exclu, Feb-Jun = 5 mois */
+    expect(calculerJoursAcquisAnnee(new Date("2026-01-15"), 2026, new Date("2026-07-01"))).toBe(12.5);
+  });
+});
 
 describe("calculerJoursConge (jours ouvrés, sam/dim exclus)", () => {
   it("jours ouvrés pleins — lun→ven = 5 jours, même jour ouvré = 1", () => {

@@ -46,6 +46,12 @@
     "formation": "Formation",
     "autre": "Autre"
   },
+  "soldesTitre": "Soldes congés payés",
+  "soldesDescription": "Jours acquis automatiquement (2,5 j/mois travaillé)",
+  "soldesAcquis": "Acquis",
+  "soldesPris": "Pris",
+  "soldesRestant": "Restant",
+  "soldesVide": "Aucun technicien enregistré",
   "statut": {
     "en_attente": "En attente",
     "approuve": "Approuvé",

@@ -13,10 +13,12 @@ export function useConges() {
   const listQ = trpc.conges.list.useQuery();
   const enAttenteQ = trpc.conges.enAttente.useQuery();
   const techniciensQ = trpc.techniciens.getAll.useQuery();
+  const soldesQ = trpc.conges.soldesTous.useQuery({});
 
   const invalidate = () => {
     utils.conges.list.invalidate();
     utils.conges.enAttente.invalidate();
+    utils.conges.soldesTous.invalidate();
   };
 
   const create = trpc.conges.create.useMutation({ onSuccess: invalidate });
@@ -26,6 +28,7 @@ export function useConges() {
   const conges: Conge[] = listQ.data ?? [];
   const congesEnAttente: CongeEnAttente[] = enAttenteQ.data ?? [];
   const techniciens: Technicien[] = techniciensQ.data ?? [];
+  const soldes = soldesQ.data ?? [];
 
-  return { conges, congesEnAttente, techniciens, isLoading: listQ.isLoading, create, approuver, refuser };
+  return { conges, congesEnAttente, techniciens, soldes, isLoading: listQ.isLoading, create, approuver, refuser };
 }

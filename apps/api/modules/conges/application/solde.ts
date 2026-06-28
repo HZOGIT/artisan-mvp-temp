@@ -101,6 +101,21 @@ function joursFerriesFR(year: number): Set<string> {
   return feries;
 }
 
+/**
+ * Jours de CP acquis pour l'année `annee` selon la date d'embauche (techniciens.createdAt).
+ * Règle MVP : chaque mois calendaire entièrement écoulé = 2,5 j (samedi 30 ou 31 du mois inclus).
+ * `today` injectable pour les tests (défaut : Date.now()).
+ */
+export function calculerJoursAcquisAnnee(dateEmbauche: Date, annee: number, today = new Date()): number {
+  if (dateEmbauche.getFullYear() > annee || today.getFullYear() < annee) return 0;
+  const moisDebut =
+    dateEmbauche.getFullYear() < annee
+      ? 0
+      : dateEmbauche.getMonth() + (dateEmbauche.getDate() === 1 ? 0 : 1);
+  const moisFin = today.getFullYear() > annee ? 12 : today.getMonth();
+  return Math.max(0, moisFin - moisDebut) * 2.5;
+}
+
 export function calculerJoursConge(conge: CongeDuree): CalculSolde {
   const debut = new Date(conge.dateDebut);
   const fin = new Date(conge.dateFin);
