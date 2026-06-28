@@ -27,6 +27,9 @@ describe.skipIf(!URL)("StockRepositoryDrizzle (PG, RLS + scope tenant)", () => {
   beforeAll(cleanup);
   afterAll(async () => {
     await cleanup();
+    await admin.query("delete from lignes_commandes_fournisseurs where \"commandeId\" in (select id from commandes_fournisseurs where \"artisanId\" in ($1,$2))", [A, B]);
+    await admin.query("delete from commandes_fournisseurs where \"artisanId\" in ($1,$2)", [A, B]);
+    await admin.query("delete from fournisseurs where \"artisanId\" in ($1,$2)", [A, B]);
     await app.close();
     await admin.end();
   });
@@ -55,6 +58,27 @@ describe.skipIf(!URL)("StockRepositoryDrizzle (PG, RLS + scope tenant)", () => {
     expect(maj?.designation).toBe("Après");
     expect(maj?.emplacement).toBe("Allée 3");
     expect(maj?.quantiteEnStock).toBe("50.00"); // quantité intacte
+  });
+
+  it("listEntrant : Σ(quantite-quantiteRecue) des commandes non soldées, isolé par tenant", async () => {
+    const stock = await repo.create(ctx(A), { reference: "ENT-L2", designation: "Entrant L2", quantiteEnStock: "0.00" });
+    const fId = (await admin.query("insert into fournisseurs (\"artisanId\", nom) values ($1, 'F-L2') returning id", [A])).rows[0].id as number;
+    /* commande envoyée : (10-3) + (5-0) = 12 entrant */
+    const cId = (await admin.query("insert into commandes_fournisseurs (\"artisanId\",\"fournisseurId\",statut) values ($1,$2,'envoyee') returning id", [A, fId])).rows[0].id as number;
+    await admin.query(
+      "insert into lignes_commandes_fournisseurs (\"commandeId\",\"stockId\",designation,quantite,\"quantiteRecue\") values ($1,$2,'L','10','3'),($1,$2,'L','5','0')",
+      [cId, stock.id],
+    );
+    /* commande brouillon : exclue du calcul */
+    const cBrouillon = (await admin.query("insert into commandes_fournisseurs (\"artisanId\",\"fournisseurId\",statut) values ($1,$2,'brouillon') returning id", [A, fId])).rows[0].id as number;
+    await admin.query("insert into lignes_commandes_fournisseurs (\"commandeId\",\"stockId\",designation,quantite,\"quantiteRecue\") values ($1,$2,'L','99','0')", [cBrouillon, stock.id]);
+
+    const entrantA = await repo.listEntrant(ctx(A));
+    const ligne = entrantA.find((e) => e.stockId === stock.id);
+    expect(ligne?.entrant).toBe(12); /* (10-3)+(5-0) ; brouillon exclu */
+
+    /* isolation : tenant B ne voit rien */
+    expect((await repo.listEntrant(ctx(B))).find((e) => e.stockId === stock.id)).toBeUndefined();
   });
 
   it("delete : purge le stock + ses mouvements (cascade), scopé", async () => {
