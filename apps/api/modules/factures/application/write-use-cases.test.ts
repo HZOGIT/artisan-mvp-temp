@@ -518,6 +518,24 @@ describe("facturerSituation — use-case (L1 fakes)", () => {
     await expect(facturerSituation(repo, reader, A, { devisId: 42, pourcentageCumule: 110 })).rejects.toBeInstanceOf(ValidationError);
   });
 
+  it("concurrence : deux situations à 60% simultanées — la seconde échoue (anti-dépassement sous lock)", async () => {
+    const { reader } = setup();
+    const devis = devisSituation({ totalTTC: "100.00", totalHT: "83.33", totalTVA: "16.67" });
+    reader.register(devis);
+    const repoC = new FakeFactureRepository();
+    repoC.registerClient(A.artisanId, devis.clientId);
+    repoC.registerDevis(A.artisanId, devis.id);
+    const results = await Promise.allSettled([
+      facturerSituation(repoC, reader, A, { devisId: 42, pourcentageCumule: 60 }),
+      facturerSituation(repoC, reader, A, { devisId: 42, pourcentageCumule: 60 }),
+    ]);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const failed = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
+    expect(failed.reason).toBeInstanceOf(ValidationError);
+    expect(await repoC.list(A)).toHaveLength(1);
+    expect(Number((await reader.getDevis(A, 42))?.montantDejaFacture)).toBeCloseTo(60, 1);
+  });
+
   it("rollback atomique : si maj cumul lève une erreur la facture ne persiste pas", async () => {
     const { reader } = setup();
     const devis = devisSituation();

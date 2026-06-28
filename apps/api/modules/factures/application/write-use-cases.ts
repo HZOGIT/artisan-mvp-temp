@@ -572,9 +572,6 @@ export async function facturerSituation(
   const label = `Situation de travaux — avancement ${input.pourcentageCumule} %`;
   const notes = `Déjà facturé : ${Number(devisData.montantDejaFacture).toFixed(2)} € — Devis n° ${devisData.numero}`;
 
-  const newCumul = round2(Number(devisData.montantDejaFacture) + montantSituationTTC);
-  const cumulStr = newCumul.toFixed(2);
-
   const facture = await creerFacture(factureRepo, ctx, {
     clientId: devisData.clientId,
     devisId: devisData.id,
@@ -587,7 +584,7 @@ export async function facturerSituation(
       tauxTVA,
       remise: "0",
     }],
-  }, (tx) => devisReader.updateMontantDejaFactureTx(tx, ctx, input.devisId, cumulStr));
+  }, (tx) => devisReader.updateMontantDejaFactureTx(tx, ctx, input.devisId, montantSituationTTC.toFixed(2)));
 
   return facture;
 }

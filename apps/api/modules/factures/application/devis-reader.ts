@@ -50,6 +50,6 @@ export interface IDevisReader {
   getLignes(ctx: TenantContext, devisId: number): Promise<DevisLigneReadModel[]>;
   /** Met à jour montantDejaFacture (TTC cumulé des situations émises). Scopé tenant. */
   updateMontantDejaFacture(ctx: TenantContext, devisId: number, montant: string): Promise<void>;
-  /** Variante intra-transaction : tx doit avoir le tenant déjà positionné (via withTenant). */
-  updateMontantDejaFactureTx(tx: DbClient, ctx: TenantContext, devisId: number, montant: string): Promise<void>;
+  /** Intra-transaction (SELECT FOR UPDATE) : ajoute delta TTC au cumul courant + valide anti-dépassement. */
+  updateMontantDejaFactureTx(tx: DbClient, ctx: TenantContext, devisId: number, delta: string): Promise<void>;
 }
