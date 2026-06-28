@@ -8,7 +8,7 @@ import { buildFastifyLoggerConfig } from "./shared/ports/logger-fastify";
 import { fastifyTRPCPlugin } from "@trpc/server/adapters/fastify";
 import { createAppRouter } from "./interface/trpc/router";
 import { makeCreateContext, type ContextDeps } from "./interface/trpc/context";
-import { getDbHandle, type DbClient } from "./shared/db";
+import { getDbHandle, createDbClient, type DbClient } from "./shared/db";
 import { DrizzleTenantResolver } from "./shared/tenant/drizzle-tenant-resolver";
 import { DrizzleUserRoleReader } from "./shared/tenant/role-reader";
 import { DrizzlePermissionsReader } from "./shared/tenant/permissions-reader";
@@ -86,6 +86,8 @@ import type { IIcalFeedRepository } from "./modules/calendrier/application/ical-
 import { createEmailsModule } from "./modules/emails/emails.module";
 import { EmailLogReaderDrizzle } from "./modules/emails/infra/email-log-reader-drizzle";
 import type { IEmailLogReader } from "./modules/emails/application/email-log-reader";
+import { EmailLogWriterDrizzle } from "./modules/emails/infra/email-log-writer-drizzle";
+import type { IEmailLogWriter } from "./modules/emails/application/email-log-writer";
 import { createSearchModule } from "./modules/search/search.module";
 import { SearchReaderDrizzle } from "./modules/search/infra/search-reader-drizzle";
 import type { ISearchReader } from "./modules/search/application/search-reader";
@@ -425,6 +427,8 @@ export interface AppDeps extends ContextDeps {
   readonly stripePort?: StripePort;
   readonly stripeWebhookSecret?: string;
   readonly resendWebhookSecret?: string;
+  /** Writer cross-tenant pour MAJ statuts email (connexion superuser). */
+  readonly emailLogWriter?: IEmailLogWriter;
   readonly facturesCAReader?: FacturesCAReader;
   readonly tresorerieReader?: TresorerieReader;
   readonly eventBus?: EventBusPort;
@@ -1178,7 +1182,18 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   const resendSecret = deps.resendWebhookSecret ?? process.env.RESEND_WEBHOOK_SECRET;
   if (resendSecret) {
-    registerResendWebhookRoute(app, { resendWebhookSecret: resendSecret });
+    const databaseUrl = process.env.DATABASE_URL;
+    let emailLogWriter = deps.emailLogWriter;
+    if (!emailLogWriter && databaseUrl) {
+      const adminHandle = createDbClient(databaseUrl, 2);
+      emailLogWriter = new EmailLogWriterDrizzle(adminHandle.db);
+      app.addHook("onClose", () => adminHandle.close());
+    }
+    registerResendWebhookRoute(app, {
+      resendWebhookSecret: resendSecret,
+      emailLogWriter,
+      notificationRepo,
+    });
   }
 
   /** Webhook PA signé `/api/einvoicing/webhook` — vérif signature fail-closed → dispatch cycle de vie. */
