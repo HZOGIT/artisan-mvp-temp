@@ -77,9 +77,11 @@ le `.sql` ligne par ligne et applique nos conventions manquantes : **RLS** (nouv
 filtrées/triées, partiels), **CHECK** (statuts, invariants), **FK `ON DELETE`**, **sûreté sur données existantes**
 (`NOT VALID`/backfill). Détail + checklist : **skill `migrations` §2/§3**. Une migration générée non complétée sera **rejetée** par le reviewer.
 
-Convention au merge (prefix `timestamp` → noms uniques, zéro collision entre PRs) : si deux workers ont
-généré une entrée au même `idx` dans `_journal.json`, garder les deux, renumber le second (`idx`→`idx+1`),
-trier par `when` croissant ; le `.sql` timestamp le plus récent s'applique en dernier — ordre naturel ✓
+**Collision de migrations résolue par Option D** (cf. `docs/architecture/migration-runner-option-d.md` §7) :
+les noms de fichiers sont **horodatés** (`YYYYMMDDHHMMSS_<nom>.sql`) → uniques par construction → **pas de
+rebase ni de régénération nécessaire pour l'ordre**. Si `_journal.json` présente un conflit textuel au merge,
+résolution triviale : garder les deux entrées (un entrée par migration) → `_journal.json` est cosmétique au
+runtime, le runner applique les migrations **par nom de fichier**.
 
 ### Vérifier avant la PR
 

@@ -181,8 +181,16 @@ tsc -p tsconfig.web.json --noEmit   # frontend seul (strict)
 
 Stack 100% PostgreSQL. Schéma **ET** RLS = **une seule chaîne de migrations Drizzle** (dossier **`drizzle/`**),
 appliquée **automatiquement au boot** par `apps/api/shared/db/provision-database.ts` (sous `pg_advisory_lock`) :
-`migrate()` (schéma + RLS) → (ré)assure le rôle `app_tenant` → **fail-closed** si le rôle runtime peut
-contourner la RLS. Une base neuve n'a besoin d'aucun script manuel.
+`runMigrations()` (runner maison — `apps/api/shared/db/run-migrations.ts`) applique les `.sql` de `drizzle/`
+triés par nom (= ordre chronologique du timestamp), les trace dans le ledger `__migrations` (filename +
+SHA-256), puis (ré)assure le rôle `app_tenant` → **fail-closed** si le rôle runtime peut contourner la RLS.
+Une base neuve n'a besoin d'aucun script manuel.
+
+> `_journal.json` n'est **plus la source de vérité runtime** : `drizzle-kit generate` l'écrit encore
+> (cosmétique / traçabilité), mais le runner ne le lit que lors de la **bascule unique** depuis une BDD
+> gérée par Drizzle (critère `folderMillis` ≤ max `created_at` du ledger Drizzle, cf.
+> `docs/architecture/migration-runner-option-d.md` §7). Après bascule, tout se pilote par les noms de
+> fichiers horodatés.
 
 **Deux rôles, deux URLs** (nommées par rôle, jamais croisées) :
 - `DATABASE_URL` = `artisan_user` (owner) → provision au boot (migrations + grants). Connexion **éphémère**.
@@ -193,7 +201,7 @@ contourner la RLS. Une base neuve n'a besoin d'aucun script manuel.
   **indicatif** — le migrateur **DOIT le relire ligne par ligne et appliquer nos conventions manquantes**
   (RLS, index, CHECK, FK `ON DELETE`, sûreté sur données existantes) avant de committer. drizzle-kit oublie
   **systématiquement** la RLS et la plupart des index/contraintes. Une migration générée non relue/complétée
-  = à rejeter. (Checklist : skill `migrations` §2.) **Jamais** de `.sql` ni d'édition de `_journal.json` à la main.
+  = à rejeter. (Checklist : skill `migrations` §2.) **Jamais** de `.sql` à la main — `drizzle-kit generate` crée le fichier horodaté, `_journal.json` et le snapshot atomiquement.
 - **Migration custom** (ce que drizzle-kit ne génère PAS : RLS, CHECK, index partiels `WHERE`, triggers,
   self-ref FK) : `drizzle-kit generate --custom --name=<nom>` puis remplir le SQL. RLS tenant :
   `node scripts/rls/generate-tenant-rls.mjs`. RLS public-token : SQL canonique dans la skill.
