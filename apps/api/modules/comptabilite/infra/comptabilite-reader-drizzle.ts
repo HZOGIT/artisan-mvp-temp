@@ -77,9 +77,9 @@ export class ComptabiliteReaderDrizzle implements IComptabiliteReader {
         .orderBy(desc(facturesLignes.tauxTVA));
       const parTaux = rows.map((r) => ({ taux: Number(r.taux ?? 0), baseHT: Number(r.baseHT ?? 0), tvaCollectee: Number(r.tva ?? 0) }));
 
-      /** TVA déductible depuis les dépenses déductibles de la période. */
+      /** TVA déductible retenue = montant_tva × coeff_deductibilite/100 pour les dépenses déductibles. */
       const [ded] = await tx
-        .select({ tva: sql<string>`COALESCE(SUM(${depenses.montant_tva}), 0)` })
+        .select({ tva: sql<string>`COALESCE(SUM(${depenses.montant_tva} * ${depenses.coeff_deductibilite} / 100), 0)` })
         .from(depenses)
         .where(and(eq(depenses.artisan_id, ctx.artisanId), between(depenses.date_depense, dStr, fStr), eq(depenses.tva_deductible, true)));
       return { parTaux, tvaDeductible: Number(ded?.tva ?? 0) };
@@ -114,9 +114,9 @@ export class ComptabiliteReaderDrizzle implements IComptabiliteReader {
       }
       const facturesFec: FecFacture[] = factRows.map((f) => ({ ...f, lignesTVA: lignesByFacture.get(f.id) ?? [] }));
 
-      /** 2) Dépenses de la période (journal AC). */
+      /** 2) Dépenses de la période (journal AC) avec coefficient de déductibilité. */
       const depRows = await tx
-        .select({ id: depenses.id, numero: depenses.numero, dateDepense: depenses.date_depense, fournisseur: depenses.fournisseur, categorie: depenses.categorie, montantHT: depenses.montant_ht, montantTVA: depenses.montant_tva, montantTTC: depenses.montant_ttc })
+        .select({ id: depenses.id, numero: depenses.numero, dateDepense: depenses.date_depense, fournisseur: depenses.fournisseur, categorie: depenses.categorie, montantHT: depenses.montant_ht, montantTVA: depenses.montant_tva, montantTTC: depenses.montant_ttc, tvaDeductible: depenses.tva_deductible, coeffDeductibilite: depenses.coeff_deductibilite })
         .from(depenses)
         .where(and(eq(depenses.artisan_id, ctx.artisanId), between(depenses.date_depense, dStr, fStr)))
         .orderBy(asc(depenses.date_depense), asc(depenses.id));

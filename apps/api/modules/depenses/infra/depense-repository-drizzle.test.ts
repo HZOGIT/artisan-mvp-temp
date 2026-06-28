@@ -98,6 +98,15 @@ describe.skipIf(!URL)("DepenseRepositoryDrizzle (PG, RLS + scope tenant)", () =>
     expect(sansD1.every((d) => d.id !== d1.id)).toBe(true);
   });
 
+  it("coeffDeductibilite persiste et applique le défaut 100", async () => {
+    const d80 = await repo.create(ctx(A), base({ montantTva: "20.00", coeffDeductibilite: "80" }));
+    expect(d80.coeffDeductibilite).toBe("80.00");
+    const d100 = await repo.create(ctx(A), base({ montantTva: "20.00" })); /* sans coeff → défaut 100 */
+    expect(d100.coeffDeductibilite).toBe("100.00");
+    const updated = await repo.update(ctx(A), d80.id, { coeffDeductibilite: "50" });
+    expect(updated?.coeffDeductibilite).toBe("50.00");
+  });
+
   it("getStats : agrège le mois (total/nb/catégories), scopé tenant", async () => {
     await repo.create(ctx(A), base({ montantTtc: "100.00", dateDepense: "2026-08-05", categorie: "carburant", fournisseur: "Total" }));
     await repo.create(ctx(A), base({ montantTtc: "300.00", dateDepense: "2026-08-20", categorie: "materiaux", fournisseur: "Point P" }));

@@ -234,6 +234,22 @@ export default function NouvelleDepensePage() {
             <Label htmlFor="tva-ded" className="cursor-pointer">{t("tvaDeductible")}</Label>
             <Switch id="tva-ded" checked={form.tvaDeductible} onCheckedChange={(v) => setField("tvaDeductible", v)} />
           </div>
+          {form.tvaDeductible && (
+            <div>
+              <Label htmlFor="coeff-ded">{t("coeffDeductibilite")}</Label>
+              <Input
+                id="coeff-ded"
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                value={form.coeffDeductibilite}
+                onChange={(e) => setField("coeffDeductibilite", e.target.value)}
+                className="mt-1"
+              />
+              <p className="text-xs text-muted-foreground mt-1">{t("coeffDeductibiliteDesc")}</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

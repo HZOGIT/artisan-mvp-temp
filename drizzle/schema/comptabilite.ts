@@ -177,6 +177,7 @@ export const depenses = pgTable("depenses", {
   frequence_recurrence: depenseFrequenceEnum("frequence_recurrence"),
   prochaine_occurrence: date("prochaine_occurrence"),
   tva_deductible: boolean("tva_deductible").default(true),
+  coeff_deductibilite: numeric("coeff_deductibilite", { precision: 5, scale: 2 }).default("100").notNull(),
   created_at: timestamp("created_at").defaultNow(),
   updated_at: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
 });

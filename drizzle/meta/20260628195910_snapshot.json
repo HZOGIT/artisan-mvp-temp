@@ -2019,7 +2019,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unité'"
+          "default": "'unit\u00e9'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -2660,7 +2660,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unité'"
+          "default": "'unit\u00e9'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -2885,7 +2885,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unité'"
+          "default": "'unit\u00e9'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -3075,7 +3075,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unité'"
+          "default": "'unit\u00e9'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -8334,7 +8334,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unité'"
+          "default": "'unit\u00e9'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -10024,7 +10024,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unité'"
+          "default": "'unit\u00e9'"
         },
         "prixUnitaire": {
           "name": "prixUnitaire",
@@ -10977,7 +10977,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unité'"
+          "default": "'unit\u00e9'"
         },
         "prixAchat": {
           "name": "prixAchat",
@@ -11066,7 +11066,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unité'"
+          "default": "'unit\u00e9'"
         },
         "prixEstime": {
           "name": "prixEstime",

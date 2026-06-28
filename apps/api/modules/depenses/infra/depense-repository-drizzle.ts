@@ -42,6 +42,7 @@ function toDepense(r: DepenseRow): Depense {
     frequenceRecurrence: (r.frequence_recurrence ?? null) as Depense["frequenceRecurrence"],
     prochaineOccurrence: r.prochaine_occurrence ?? null,
     tvaDeductible: r.tva_deductible ?? true,
+    coeffDeductibilite: r.coeff_deductibilite ?? "100",
     createdAt: r.created_at ?? null,
     updatedAt: r.updated_at ?? null,
   };
@@ -74,6 +75,7 @@ function toInsertValues(input: CreateDepenseInput, artisanId: number): typeof de
     frequence_recurrence: input.frequenceRecurrence ?? undefined,
     prochaine_occurrence: input.prochaineOccurrence ?? undefined,
     tva_deductible: input.tvaDeductible ?? undefined,
+    coeff_deductibilite: input.coeffDeductibilite ?? undefined,
   } as typeof depenses.$inferInsert;
 }
 
@@ -101,6 +103,7 @@ function toUpdateSet(input: UpdateDepenseInput): Partial<typeof depenses.$inferI
   if (input.frequenceRecurrence !== undefined) set.frequence_recurrence = input.frequenceRecurrence;
   if (input.prochaineOccurrence !== undefined) set.prochaine_occurrence = input.prochaineOccurrence;
   if (input.tvaDeductible !== undefined) set.tva_deductible = input.tvaDeductible;
+  if (input.coeffDeductibilite !== undefined) set.coeff_deductibilite = input.coeffDeductibilite;
   return set;
 }
 
@@ -274,7 +277,7 @@ export class DepenseRepositoryDrizzle implements IDepenseRepository {
           total: sumTtc,
           nb: sql<number>`COUNT(*)::int`,
           aRembourser: sql<string>`COALESCE(SUM(CASE WHEN ${depenses.remboursable} = TRUE AND ${depenses.rembourse} = FALSE THEN ${depenses.montant_ttc} ELSE 0 END), 0)`,
-          tvaRecup: sql<string>`COALESCE(SUM(CASE WHEN ${depenses.tva_deductible} = TRUE THEN ${depenses.montant_tva} ELSE 0 END), 0)`,
+          tvaRecup: sql<string>`COALESCE(SUM(CASE WHEN ${depenses.tva_deductible} = TRUE THEN ${depenses.montant_tva} * ${depenses.coeff_deductibilite} / 100 ELSE 0 END), 0)`,
         })
         .from(depenses)
         .where(and(eq(depenses.artisan_id, a), between(depenses.date_depense, debutMois, finMois)));
