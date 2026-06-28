@@ -1,6 +1,8 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { Counter } from "prom-client";
+import type { IEmailLogWriter } from "../../modules/emails/application/email-log-writer";
+import type { INotificationRepository } from "../../modules/notifications/application/notification-repository";
 
 const resendWebhookCounter = new Counter({
   name: "resend_webhook_total",
@@ -31,9 +33,29 @@ function verifyResendSignature(
   });
 }
 
+const STATUT_MAP = {
+  "email.delivered": "delivre",
+  "email.bounced": "bounce",
+  "email.complained": "plainte",
+} as const;
+
+type TrackedEventType = keyof typeof STATUT_MAP;
+
+function isTrackedEvent(type: string): type is TrackedEventType {
+  return type in STATUT_MAP;
+}
+
+export interface ResendWebhookDeps {
+  readonly resendWebhookSecret: string;
+  /** Writer cross-tenant pour MAJ statut (requiert connexion superuser). */
+  readonly emailLogWriter?: IEmailLogWriter;
+  /** Pour créer une notification artisan sur bounce/plainte. */
+  readonly notificationRepo?: INotificationRepository;
+}
+
 export function registerResendWebhookRoute(
   app: FastifyInstance,
-  deps: { resendWebhookSecret: string },
+  deps: ResendWebhookDeps,
 ): void {
   app.register((instance) => {
     instance.addContentTypeParser(
@@ -52,17 +74,53 @@ export function registerResendWebhookRoute(
       const payload = JSON.parse(rawBody.toString()) as { type: string; data: Record<string, unknown> };
       const { type, data } = payload;
       resendWebhookCounter.inc({ type });
-      if (type === "email.bounced" || type === "email.complained") {
-        req.log.warn(
-          { event: "resend_email_alert", type, to: data["to"], emailId: data["email_id"] },
-          `Resend: ${type}`,
-        );
+
+      if (isTrackedEvent(type)) {
+        const resendId = typeof data["email_id"] === "string" ? data["email_id"] : undefined;
+        const newStatut = STATUT_MAP[type];
+        const isAlerte = type === "email.bounced" || type === "email.complained";
+
+        if (isAlerte) {
+          req.log.warn(
+            { event: "resend_email_alert", type, to: data["to"], emailId: resendId },
+            `Resend: ${type}`,
+          );
+        } else {
+          req.log.info(
+            { event: "resend_webhook", type, emailId: resendId },
+            `Resend: ${type}`,
+          );
+        }
+
+        if (resendId && deps.emailLogWriter) {
+          try {
+            const updated = await deps.emailLogWriter.updateStatutByResendId(resendId, newStatut);
+            if (updated?.artisanId && isAlerte && deps.notificationRepo) {
+              const motif = type === "email.bounced" ? "bounce" : "plainte";
+              await deps.notificationRepo.creer(
+                { artisanId: updated.artisanId, userId: 0 },
+                {
+                  type: "alerte",
+                  titre: "Email non délivré",
+                  message: `L'email à ${updated.destinataire} a échoué (${motif}) — vérifiez l'adresse.`,
+                  lien: "/emails",
+                },
+              );
+            }
+          } catch (err) {
+            req.log.error(
+              { event: "resend_webhook_update_error", resendId, error: String(err) },
+              "Erreur MAJ statut email_log",
+            );
+          }
+        }
       } else {
         req.log.info(
           { event: "resend_webhook", type, emailId: data["email_id"] },
           `Resend: ${type}`,
         );
       }
+
       return reply.code(200).send({ ok: true });
     });
   });
