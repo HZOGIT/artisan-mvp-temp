@@ -21,9 +21,60 @@ describe.skipIf(!URL)("ClientRepositoryDrizzle (PG, RLS + scope tenant)", () => 
   const repo = new ClientRepositoryDrizzle(app.db);
 
   const cleanup = async () => {
-    await admin.query('delete from factures where "artisanId" in ($1,$2)', [A, B]);
-    await admin.query('delete from devis where "artisanId" in ($1,$2)', [A, B]);
+    /** demandes_avis avant interventions (FK interventionId). client_portal_sessions sans artisanId. */
+    await admin.query('delete from demandes_avis where "artisanId" in ($1,$2)', [A, B]);
+    await admin.query('delete from client_portal_sessions where "clientId" in (select id from clients where "artisanId" in ($1,$2))', [A, B]);
+    for (const t of [
+      "factures", "devis", "interventions", "contrats_maintenance", "rdv_en_ligne", "chantiers",
+      "analyses_photos_chantier", "avis_clients", "demandes_contact", "conversations", "client_portal_access",
+    ]) {
+      await admin.query(`delete from ${t} where "artisanId" in ($1,$2)`, [A, B]);
+    }
     await admin.query('delete from clients where "artisanId" in ($1,$2)', [A, B]);
+  };
+
+  /** Seede UNE ligne dans CHACUNE des 13 tables référençant clientId (renvoie le nb de tables). */
+  const seedToutesTables = async (artisanId: number, clientId: number): Promise<number> => {
+    await admin.query('insert into factures ("artisanId","clientId",numero) values ($1,$2,$3)', [artisanId, clientId, `F-${clientId}`]);
+    await admin.query('insert into devis ("artisanId","clientId",numero) values ($1,$2,$3)', [artisanId, clientId, `D-${clientId}`]);
+    const iv = await admin.query(
+      'insert into interventions ("artisanId","clientId",titre,"dateDebut") values ($1,$2,$3,now()) returning id',
+      [artisanId, clientId, "Interv"],
+    );
+    const interventionId = iv.rows[0].id;
+    await admin.query(
+      'insert into contrats_maintenance ("artisanId","clientId",reference,titre,"montantHT",periodicite,"dateDebut") values ($1,$2,$3,$4,$5,$6,now())',
+      [artisanId, clientId, `CT-${clientId}`, "Contrat", "100.00", "mensuel"],
+    );
+    await admin.query('insert into rdv_en_ligne ("artisanId","clientId",titre,"dateProposee") values ($1,$2,$3,now())', [artisanId, clientId, "RDV"]);
+    await admin.query('insert into chantiers ("artisanId","clientId",reference,nom) values ($1,$2,$3,$4)', [artisanId, clientId, `CH-${clientId}`, "Chantier"]);
+    await admin.query('insert into analyses_photos_chantier ("artisanId","clientId") values ($1,$2)', [artisanId, clientId]);
+    await admin.query('insert into avis_clients ("artisanId","clientId",note) values ($1,$2,5)', [artisanId, clientId]);
+    await admin.query('insert into demandes_contact ("artisanId","clientId",nom) values ($1,$2,$3)', [artisanId, clientId, "Demande"]);
+    await admin.query(
+      'insert into demandes_avis ("artisanId","clientId","interventionId","tokenDemande","expiresAt") values ($1,$2,$3,$4,now())',
+      [artisanId, clientId, interventionId, `TOK-${clientId}`],
+    );
+    await admin.query('insert into conversations ("artisanId","clientId") values ($1,$2)', [artisanId, clientId]);
+    await admin.query(
+      'insert into client_portal_access ("artisanId","clientId",token,email,"expiresAt") values ($1,$2,$3,$4,now())',
+      [artisanId, clientId, `PT-${clientId}`, "p@a.fr"],
+    );
+    await admin.query('insert into client_portal_sessions ("clientId","sessionToken","expiresAt") values ($1,$2,now())', [clientId, `S-${clientId}`]);
+    return 13;
+  };
+
+  /** Liste des 13 tables (table, colonne tenant ou null pour client_portal_sessions). */
+  const TABLES_CLIENT: ReadonlyArray<readonly [string, string | null]> = [
+    ["factures", "artisanId"], ["devis", "artisanId"], ["interventions", "artisanId"],
+    ["contrats_maintenance", "artisanId"], ["rdv_en_ligne", "artisanId"], ["chantiers", "artisanId"],
+    ["analyses_photos_chantier", "artisanId"], ["avis_clients", "artisanId"], ["demandes_contact", "artisanId"],
+    ["demandes_avis", "artisanId"], ["conversations", "artisanId"], ["client_portal_access", "artisanId"],
+    ["client_portal_sessions", null],
+  ];
+  const countPointant = async (table: string, clientId: number): Promise<number> => {
+    const r = await admin.query(`select count(*)::int n from ${table} where "clientId"=$1`, [clientId]);
+    return r.rows[0].n;
   };
 
   beforeAll(cleanup);
@@ -128,5 +179,76 @@ describe.skipIf(!URL)("ClientRepositoryDrizzle (PG, RLS + scope tenant)", () => 
     expect(tousA.some((r) => Number(r.totalTTC) === 777)).toBe(false);
 
     await admin.query('delete from factures where "artisanId" in ($1,$2)', [A, B]);
+  });
+
+  it("fusionner : re-pointe CHAQUE table vers le survivant, complète ses champs, archive le doublon, idempotent", async () => {
+    /** Survivant volontairement incomplet ; doublon riche → on observe la complétion de champs. */
+    const survivant = await repo.create(ctx(A), { nom: "Dupont" });
+    const doublon = await repo.create(ctx(A), {
+      nom: "Dupont", email: "dupont@example.fr", telephone: "0102030405", ville: "Lyon", type: "professionnel",
+    });
+    await seedToutesTables(A, doublon.id);
+
+    /** Pré-condition : tout pointe vers le doublon, rien vers le survivant. */
+    for (const [t] of TABLES_CLIENT) {
+      expect(await countPointant(t, doublon.id)).toBe(1);
+      expect(await countPointant(t, survivant.id)).toBe(0);
+    }
+
+    const fusionne = await repo.fusionner(ctx(A), survivant.id, doublon.id);
+    expect(fusionne).not.toBeNull();
+
+    /** Data-integrity : AUCUNE ligne ne pointe plus vers le doublon ; tout est sur le survivant. */
+    for (const [t] of TABLES_CLIENT) {
+      expect(await countPointant(t, doublon.id)).toBe(0);
+      expect(await countPointant(t, survivant.id)).toBe(1);
+    }
+
+    /** Champs complétés depuis le doublon (le survivant était vide), type le plus précis conservé. */
+    expect(fusionne?.email).toBe("dupont@example.fr");
+    expect(fusionne?.telephone).toBe("0102030405");
+    expect(fusionne?.ville).toBe("Lyon");
+    expect(fusionne?.type).toBe("professionnel");
+    expect(fusionne?.nom).toBe("Dupont");
+
+    /** Doublon archivé (jamais supprimé) : exclu de list, survivant présent, archivedAt non nul. */
+    const liste = await repo.list(ctx(A));
+    expect(liste.some((c) => c.id === doublon.id)).toBe(false);
+    expect(liste.some((c) => c.id === survivant.id)).toBe(true);
+    const arch = await admin.query('select "archivedAt" from clients where id=$1', [doublon.id]);
+    expect(arch.rows[0].archivedAt).not.toBeNull();
+
+    /** Idempotent : re-fusionner ne change rien (ni double archivage, ni re-déplacement). */
+    const archAvant = arch.rows[0].archivedAt;
+    const refusionne = await repo.fusionner(ctx(A), survivant.id, doublon.id);
+    expect(refusionne).not.toBeNull();
+    for (const [t] of TABLES_CLIENT) {
+      expect(await countPointant(t, survivant.id)).toBe(1);
+      expect(await countPointant(t, doublon.id)).toBe(0);
+    }
+    const arch2 = await admin.query('select "archivedAt" from clients where id=$1', [doublon.id]);
+    expect(arch2.rows[0].archivedAt.getTime()).toBe(archAvant.getTime());
+  });
+
+  it("fusionner : isolation RLS — refus de fusionner vers/depuis le client d'un autre tenant", async () => {
+    const survivantA = await repo.create(ctx(A), { nom: "Survivant A" });
+    const doublonA = await repo.create(ctx(A), { nom: "Doublon A" });
+    const clientB = await repo.create(ctx(B), { nom: "Client B" });
+    await seedToutesTables(A, doublonA.id);
+
+    /** B tente de fusionner les clients de A → null (clients invisibles), rien n'est touché. */
+    expect(await repo.fusionner(ctx(B), survivantA.id, doublonA.id)).toBeNull();
+    /** A tente de fusionner un doublon appartenant à B → null (cross-tenant refusé). */
+    expect(await repo.fusionner(ctx(A), survivantA.id, clientB.id)).toBeNull();
+    /** A tente de réaffecter vers le survivant de B → null. */
+    expect(await repo.fusionner(ctx(A), clientB.id, doublonA.id)).toBeNull();
+
+    /** Aucune réaffectation : tout l'historique de doublonA est resté sur doublonA, rien archivé. */
+    for (const [t] of TABLES_CLIENT) {
+      expect(await countPointant(t, doublonA.id)).toBe(1);
+    }
+    const arch = await admin.query('select "archivedAt" from clients where id=$1', [doublonA.id]);
+    expect(arch.rows[0].archivedAt).toBeNull();
+    expect((await repo.list(ctx(A))).some((c) => c.id === doublonA.id)).toBe(true);
   });
 });

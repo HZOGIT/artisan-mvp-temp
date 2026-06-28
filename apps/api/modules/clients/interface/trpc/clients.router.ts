@@ -16,7 +16,7 @@ import {
   getEncoursClient,
   getEncoursMap,
 } from "../../application/read-use-cases";
-import { creerClient, modifierClient, supprimerClient } from "../../application/write-use-cases";
+import { creerClient, modifierClient, supprimerClient, fusionnerClients } from "../../application/write-use-cases";
 import { importerClients } from "../../application/import-use-cases";
 
 /*
@@ -108,6 +108,22 @@ export function createClientsRouter(repo: IClientRepository) {
         await supprimerClient(repo, ctx.tenant, input.id);
         ctx.log.warn({ event: "client_deleted", clientId: input.id }, "Client supprimé définitivement");
         return { success: true };
+      }),
+
+    /*
+     * Fusion de doublons : réaffecte tout l'historique du `doublonId` vers `survivantId` (une
+     * transaction, all-or-nothing) puis archive le doublon. Cloisonnement tenant strict (cross-tenant
+     * → NotFound). Idempotent.
+     */
+    fusionner: gerer
+      .input(z.object({ survivantId: z.number().int(), doublonId: z.number().int() }))
+      .mutation(async ({ ctx, input }) => {
+        const result = await fusionnerClients(repo, ctx.tenant, input.survivantId, input.doublonId);
+        ctx.log.warn(
+          { event: "clients_merged", survivantId: input.survivantId, doublonId: input.doublonId },
+          "Fusion de doublons clients",
+        );
+        return result;
       }),
 
     /*

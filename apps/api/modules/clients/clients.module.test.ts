@@ -11,6 +11,7 @@ const stubRepo: IClientRepository = {
   update: async () => null,
   delete: async () => false,
   countDocumentsLies: async () => 0,
+  fusionner: async () => null,
   search: async () => [],
   listFacturesPourEncours: async () => [],
 };
@@ -26,6 +27,7 @@ describe("clients.module", () => {
       "countDocumentsLies",
       "create",
       "delete",
+      "fusionner",
       "getById",
       "list",
       "listFacturesPourEncours",
@@ -40,6 +42,7 @@ describe("clients.module", () => {
     expect(procedures).toEqual([
       "create",
       "delete",
+      "fusionner",
       "getById",
       "getEncours",
       "getEncoursMap",

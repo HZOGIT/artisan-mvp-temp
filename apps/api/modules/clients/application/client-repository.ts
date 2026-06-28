@@ -25,6 +25,16 @@ export interface IClientRepository {
    */
   countDocumentsLies(ctx: TenantContext, clientId: number): Promise<number>;
   /*
+   * Fusion de deux doublons du MÊME tenant dans UNE transaction (all-or-nothing). Réaffecte
+   * `clientId` de `doublonId` → `survivantId` dans CHAQUE table référençant un client (sinon
+   * historique orphelin = corruption silencieuse), complète les champs vides du survivant à
+   * partir du doublon, puis ARCHIVE le doublon (`archivedAt`, jamais de delete dur). Idempotent
+   * (re-rejouer ne re-déplace rien, n'altère pas le survivant). ⚠️ Cloisonnement tenant strict :
+   * les deux clients doivent appartenir au tenant (RLS + filtre `artisanId`) sinon rien n'est
+   * touché. Renvoie le survivant à jour, ou null si l'un des deux n'appartient pas au tenant.
+   */
+  fusionner(ctx: TenantContext, survivantId: number, doublonId: number): Promise<Client | null>;
+  /*
    * Recherche scopée tenant sur nom/prénom/e-mail/téléphone. ⚠️ Les métacaractères LIKE
    * (`%`, `_`, `\`) de la saisie sont échappés par l'implémentation → pas d'injection de
    * wildcard (une recherche `%` ne « matche » pas tout).

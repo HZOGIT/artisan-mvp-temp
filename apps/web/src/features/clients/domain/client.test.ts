@@ -3,6 +3,7 @@ import {
   nomComplet,
   findDuplicateGroups,
   findCreateDuplicateMatch,
+  pickSurvivor,
   ofClient,
   activitesOfClient,
   sortActivitesByEcheance,
@@ -19,6 +20,20 @@ const mk = (p: Partial<Client> & { id: number }): Client => ({
   nom: "", prenom: "", email: "", telephone: "", ville: "", raisonSociale: null,
   ...p,
 } as unknown as Client);
+
+describe("pickSurvivor", () => {
+  it("choisit le client au profil le plus complet", () => {
+    const pauvre = mk({ id: 1, nom: "Martin" });
+    const riche = mk({ id: 2, nom: "Martin", email: "m@a.fr", telephone: "0600000000", ville: "Lyon" });
+    expect(pickSurvivor([pauvre, riche]).id).toBe(2);
+  });
+
+  it("à profils égaux, garde le plus ancien (id le plus petit)", () => {
+    const a = mk({ id: 5, nom: "Martin", email: "m@a.fr" });
+    const b = mk({ id: 2, nom: "Martin", email: "m@b.fr" });
+    expect(pickSurvivor([a, b]).id).toBe(2);
+  });
+});
 
 // Règle de domaine PURE (sans réseau) : libellé d'affichage d'un client.
 describe("nomComplet", () => {

@@ -1,7 +1,7 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { IClientRepository } from "../application/client-repository";
 import type { FactureEncoursLigne } from "../application/encours";
-import type { Client, CreateClientInput, UpdateClientInput } from "../domain/client";
+import { champsFusionnes, type Client, type CreateClientInput, type UpdateClientInput } from "../domain/client";
 
 /*
  * Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
@@ -14,6 +14,8 @@ export class FakeClientRepository implements IClientRepository {
   private documentsLies = new Map<number, number>();
   /** Lignes de factures injectables (pour tester le wiring de l'encours). */
   private facturesEncours: FactureEncoursLigne[] = [];
+  /** Ids des clients archivés (soft-delete simulé : exclus de list/search, jamais supprimés). */
+  private archived = new Set<number>();
 
   /** Aide de test : déclare N documents métier liés à un client (garde d'intégrité). */
   setDocumentsLies(clientId: number, n: number): void {
@@ -26,7 +28,7 @@ export class FakeClientRepository implements IClientRepository {
   }
 
   async list(ctx: TenantContext): Promise<Client[]> {
-    return this.store.filter((c) => c.artisanId === ctx.artisanId);
+    return this.store.filter((c) => c.artisanId === ctx.artisanId && !this.archived.has(c.id));
   }
 
   async getById(ctx: TenantContext, id: number): Promise<Client | null> {
@@ -83,6 +85,19 @@ export class FakeClientRepository implements IClientRepository {
     return this.documentsLies.get(clientId) ?? 0;
   }
 
+  async fusionner(ctx: TenantContext, survivantId: number, doublonId: number): Promise<Client | null> {
+    const survivant = await this.getById(ctx, survivantId);
+    const doublon = await this.getById(ctx, doublonId);
+    /** Cloisonnement tenant : les deux doivent appartenir au tenant, sinon rien n'est touché. */
+    if (!survivant || !doublon) return null;
+    /** Le double in-memory n'a pas les tables liées : on simule complétion des champs + archivage. */
+    const maj = champsFusionnes(survivant, doublon);
+    const fusionne: Client = { ...survivant, ...maj, updatedAt: new Date() };
+    this.store = this.store.map((x) => (x.id === survivantId ? fusionne : x));
+    this.archived.add(doublonId);
+    return fusionne;
+  }
+
   async search(ctx: TenantContext, query: string): Promise<Client[]> {
     /*
      * Substring case-insensitive sur les mêmes champs ; `includes` traite `%`/`_` comme des
@@ -92,6 +107,7 @@ export class FakeClientRepository implements IClientRepository {
     return this.store.filter(
       (c) =>
         c.artisanId === ctx.artisanId &&
+        !this.archived.has(c.id) &&
         [c.nom, c.prenom, c.email, c.telephone].some((f) => (f ?? "").toLowerCase().includes(q)),
     );
   }

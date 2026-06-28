@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useLocation, useSearch } from "@/shared/router/navigation";
 import { useTranslation } from "react-i18next";
 import { useClients } from "../application/use-clients";
-import { findDuplicateGroups, findCreateDuplicateMatch, type Client } from "../domain/client";
+import { findDuplicateGroups, findCreateDuplicateMatch, pickSurvivor, type Client } from "../domain/client";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Card, CardContent } from "@/shared/ui/card";
@@ -62,7 +62,7 @@ export default function ClientsListPage() {
   const { t } = useTranslation("clients");
   const [, navigate] = useLocation();
   const search = useSearch();
-  const { clients, encoursMap, isLoading, update, remove } = useClients();
+  const { clients, encoursMap, isLoading, update, remove, fusionner } = useClients();
 
   /** State pour le formulaire d'édition */
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -176,6 +176,22 @@ export default function ClientsListPage() {
     setSearchQuery(e.target.value);
   }, []);
 
+  /*
+   * Fusionne un groupe de doublons : le survivant (profil le plus complet) absorbe l'historique de
+   * chaque autre client du groupe (transaction côté serveur), qui est ensuite archivé. Non destructif.
+   */
+  const handleMergeGroup = useCallback((group: Client[]) => {
+    const survivant = pickSurvivor(group);
+    const doublons = group.filter((c) => c.id !== survivant.id);
+    const label = `${(survivant.prenom || "")} ${survivant.nom}`.trim();
+    if (!confirm(t("dupesMergeConfirm", { count: doublons.length, survivant: label }))) return;
+    void Promise.all(
+      doublons.map((d) => fusionner.mutateAsync({ survivantId: survivant.id, doublonId: d.id })),
+    )
+      .then(() => toast.success(t("dupesMergeSuccess", { survivant: label })))
+      .catch((error: { message?: string }) => toast.error(error.message || t("dupesMergeError")));
+  }, [fusionner, t]);
+
   /** Filtrer les clients (recherche insensible aux accents et a la casse). */
   const filteredClients = clients.filter(client =>
     matchSearch(client.nom, searchQuery) ||
@@ -253,11 +269,22 @@ export default function ClientsListPage() {
                   </p>
                   <ul className="mt-1 space-y-1 text-amber-700">
                     {duplicateGroups.slice(0, 5).map((g, i) => (
-                      <li key={i}>
-                        <span className="text-amber-600">{t(g.reasonKey, g.reasonParams)}</span>{" : "}
-                        {g.clients
-                          .map((c) => `${(c.prenom || "")} ${c.nom}`.trim() + (c.ville ? ` (${c.ville})` : ""))
-                          .join(" · ")}
+                      <li key={i} className="flex items-center justify-between gap-2">
+                        <span>
+                          <span className="text-amber-600">{t(g.reasonKey, g.reasonParams)}</span>{" : "}
+                          {g.clients
+                            .map((c) => `${(c.prenom || "")} ${c.nom}`.trim() + (c.ville ? ` (${c.ville})` : ""))
+                            .join(" · ")}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="shrink-0 border-amber-300 text-amber-800 hover:bg-amber-100"
+                          disabled={fusionner.isPending}
+                          onClick={() => handleMergeGroup(g.clients)}
+                        >
+                          {t("dupesMergeAction")}
+                        </Button>
                       </li>
                     ))}
                     {duplicateGroups.length > 5 && (
