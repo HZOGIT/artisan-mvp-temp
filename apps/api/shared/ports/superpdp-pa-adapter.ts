@@ -37,6 +37,39 @@ interface TokenResponse {
   expires_in: number;
 }
 
+interface CompanyResponse {
+  id: number;
+  formal_name?: string;
+  number?: string;
+}
+
+interface InvoiceResponse {
+  id: number;
+  en_invoice: {
+    issue_date: string;
+    seller?: { legal_registration_identifier?: { value?: string } };
+    totals?: { total_with_vat?: string };
+  };
+  events?: Array<{ status_code: string }>;
+}
+
+interface InvoiceOverview {
+  id: number;
+  en_invoice?: {
+    issue_date?: string;
+    seller?: { legal_registration_identifier?: { value?: string } };
+    totals?: { total_with_vat?: string };
+  };
+}
+
+interface InvoiceEvent {
+  id: number;
+  invoice_id: number;
+  status_code: string;
+  created_at: string;
+  status_text?: string;
+}
+
 export class SuperPdpPaAdapter implements PaPort {
   constructor(
     private readonly clientId: string,
@@ -140,19 +173,31 @@ export class SuperPdpPaAdapter implements PaPort {
   }
 
   async ensureEntity(input: EntityInput): Promise<{ paEntityId: string; kybStatut: string }> {
-    const res = await this.apiFetch("/v1.beta/members", input.artisanId, {
+    const getMe = async (): Promise<{ paEntityId: string; kybStatut: string }> => {
+      const res = await this.apiFetch("/v1.beta/companies/me", input.artisanId);
+      if (!res.ok) throw new Error(`SuperPDP GET /v1.beta/companies/me → ${res.status}`);
+      const data = await res.json() as CompanyResponse;
+      return { paEntityId: String(data.id), kybStatut: "pending" };
+    };
+
+    const form = new FormData();
+    form.append(
+      "enroll",
+      new Blob(
+        [JSON.stringify({ email: input.email, number: input.siret, number_scheme: "fr_siren" })],
+        { type: "application/json" },
+      ),
+    );
+    const token = await this.getAccessToken(input.artisanId);
+    const res = await fetchWithRetry(`${this.baseUrl}/v1.beta/companies`, {
       method: "POST",
-      body: JSON.stringify({ siret: input.siret, name: input.nom, email: input.email }),
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
     });
-    if (res.status === 409) {
-      const get = await this.apiFetch(`/v1.beta/members?siret=${encodeURIComponent(input.siret)}`, input.artisanId);
-      if (!get.ok) throw new Error(`SuperPDP GET /v1.beta/members → ${get.status}`);
-      const existing = await get.json() as { id: string; kyb_status: string };
-      return { paEntityId: existing.id, kybStatut: existing.kyb_status ?? "pending" };
-    }
-    if (!res.ok) throw new Error(`SuperPDP POST /v1.beta/members → ${res.status}`);
-    const data = await res.json() as { id: string; kyb_status: string };
-    return { paEntityId: data.id, kybStatut: data.kyb_status ?? "pending" };
+    if (res.status === 409) return getMe();
+    if (!res.ok) throw new Error(`SuperPDP POST /v1.beta/companies → ${res.status}`);
+    const data = await res.json() as CompanyResponse;
+    return { paEntityId: String(data.id), kybStatut: "pending" };
   }
 
   async submitInvoice(input: SubmitInvoiceInput): Promise<{ paDocumentId: string; statut: string }> {
@@ -201,65 +246,55 @@ export class SuperPdpPaAdapter implements PaPort {
     });
     const res = await this.apiFetch("/v1.beta/invoices", input.artisanId, { method: "POST", body });
     if (!res.ok) throw new Error(`SuperPDP POST /v1.beta/invoices → ${res.status}`);
-    const data = await res.json() as { id: string; status: string };
-    return { paDocumentId: data.id, statut: mapAfnorStatut(data.status) };
+    const data = await res.json() as { id: number; events?: Array<{ status_code: string }> };
+    return {
+      paDocumentId: String(data.id),
+      statut: mapAfnorStatut(data.events?.[0]?.status_code ?? "api:uploaded"),
+    };
   }
 
   async getLifecycle(paDocumentId: string, artisanId?: number): Promise<LifecycleEvent[]> {
-    const res = await this.apiFetch(`/v1.beta/invoices/${encodeURIComponent(paDocumentId)}/events`, artisanId);
-    if (!res.ok) throw new Error(`SuperPDP GET /v1.beta/invoices/{id}/events → ${res.status}`);
-    const data = await res.json() as Array<{
-      invoice_id: string;
-      status: string;
-      occurred_at: string;
-      detail?: string;
-    }>;
-    return data.map((e) => ({
-      paDocumentId: e.invoice_id,
-      statut: mapAfnorStatut(e.status),
-      timestamp: new Date(e.occurred_at),
-      detail: e.detail,
+    const res = await this.apiFetch(`/v1.beta/invoice_events?invoice_id=${encodeURIComponent(paDocumentId)}`, artisanId);
+    if (!res.ok) throw new Error(`SuperPDP GET /v1.beta/invoice_events → ${res.status}`);
+    const body = await res.json() as { data: InvoiceEvent[] };
+    return body.data.map((e) => ({
+      paDocumentId: String(e.invoice_id),
+      statut: mapAfnorStatut(e.status_code),
+      timestamp: new Date(e.created_at),
+      detail: e.status_text,
     }));
   }
 
-  async listInbound(paEntityId: string, since: Date, artisanId?: number): Promise<InboundInvoice[]> {
+  async listInbound(_paEntityId: string, since: Date, artisanId?: number): Promise<InboundInvoice[]> {
     const params = new URLSearchParams({
-      direction: "inbound",
-      member_id: paEntityId,
-      since: since.toISOString(),
+      direction: "in",
+      date: since.toISOString().slice(0, 10),
     });
+    params.append("expand[]", "en_invoice");
     const res = await this.apiFetch(`/v1.beta/invoices?${params.toString()}`, artisanId);
     if (!res.ok) throw new Error(`SuperPDP GET /v1.beta/invoices (inbound) → ${res.status}`);
-    const data = await res.json() as Array<{
-      id: string;
-      seller_siret: string;
-      total_incl_vat: string;
-      issue_date: string;
-    }>;
-    return data.map((d) => ({
-      paDocumentId: d.id,
-      emetteurSiret: d.seller_siret,
-      montantTTC: d.total_incl_vat,
-      date: new Date(d.issue_date),
+    const body = await res.json() as { data: InvoiceOverview[] };
+    return body.data.map((d) => ({
+      paDocumentId: String(d.id),
+      emetteurSiret: d.en_invoice?.seller?.legal_registration_identifier?.value ?? "",
+      montantTTC: d.en_invoice?.totals?.total_with_vat ?? "0",
+      date: new Date(d.en_invoice?.issue_date ?? Date.now()),
     }));
   }
 
   async fetchInbound(paDocumentId: string, artisanId?: number): Promise<InboundInvoiceFull> {
     const res = await this.apiFetch(`/v1.beta/invoices/${encodeURIComponent(paDocumentId)}`, artisanId);
     if (!res.ok) throw new Error(`SuperPDP GET /v1.beta/invoices/{id} → ${res.status}`);
-    const data = await res.json() as {
-      id: string;
-      seller_siret: string;
-      total_incl_vat: string;
-      issue_date: string;
-      facturx_base64: string;
-    };
+    const data = await res.json() as InvoiceResponse;
+    const dlRes = await this.apiFetch(`/v1.beta/invoices/${encodeURIComponent(paDocumentId)}/download`, artisanId);
+    if (!dlRes.ok) throw new Error(`SuperPDP GET /v1.beta/invoices/{id}/download → ${dlRes.status}`);
+    const bytes = await dlRes.arrayBuffer();
     return {
-      paDocumentId: data.id,
-      emetteurSiret: data.seller_siret,
-      montantTTC: data.total_incl_vat,
-      date: new Date(data.issue_date),
-      facturxBase64: data.facturx_base64,
+      paDocumentId: String(data.id),
+      emetteurSiret: data.en_invoice?.seller?.legal_registration_identifier?.value ?? "",
+      montantTTC: data.en_invoice?.totals?.total_with_vat ?? "0",
+      date: new Date(data.en_invoice.issue_date),
+      facturxBase64: Buffer.from(bytes).toString("base64"),
     };
   }
 
