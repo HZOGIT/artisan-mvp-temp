@@ -10,6 +10,9 @@ interface StoredModele {
   description: string | null;
   notes: string | null;
   isDefault: boolean;
+  dureeValiditeJours: number | null;
+  conditionsPaiementDefaut: string | null;
+  objetType: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -73,6 +76,9 @@ export class FakeModeleDevisRepository implements IModeleDevisRepository {
       description: input.description ?? null,
       notes: input.notes ?? null,
       isDefault: input.isDefault ?? false,
+      dureeValiditeJours: input.dureeValiditeJours ?? null,
+      conditionsPaiementDefaut: input.conditionsPaiementDefaut ?? null,
+      objetType: input.objetType ?? null,
       createdAt: now,
       updatedAt: now,
     };
@@ -90,6 +96,9 @@ export class FakeModeleDevisRepository implements IModeleDevisRepository {
     if (input.description !== undefined) m.description = input.description;
     if (input.notes !== undefined) m.notes = input.notes;
     if (input.isDefault !== undefined) m.isDefault = input.isDefault;
+    if (input.dureeValiditeJours !== undefined) m.dureeValiditeJours = input.dureeValiditeJours ?? null;
+    if (input.conditionsPaiementDefaut !== undefined) m.conditionsPaiementDefaut = input.conditionsPaiementDefaut ?? null;
+    if (input.objetType !== undefined) m.objetType = input.objetType ?? null;
     m.updatedAt = new Date();
     if (input.lignes !== undefined) {
       this.lignes.set(id, input.lignes.map((l, i) => this.toLigne(id, l, i + 1)));

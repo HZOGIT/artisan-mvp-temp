@@ -30,6 +30,9 @@ const createSchema = z.object({
   description: z.string().max(5000).nullish(),
   notes: z.string().max(5000).nullish(),
   isDefault: z.boolean().optional(),
+  dureeValiditeJours: z.number().int().positive().nullish(),
+  conditionsPaiementDefaut: z.string().max(2000).nullish(),
+  objetType: z.string().max(500).nullish(),
   lignes: z.array(ligneSchema).optional(),
 });
 
@@ -38,6 +41,9 @@ const updateSchema = z.object({
   description: z.string().max(5000).nullish(),
   notes: z.string().max(5000).nullish(),
   isDefault: z.boolean().optional(),
+  dureeValiditeJours: z.number().int().positive().nullish(),
+  conditionsPaiementDefaut: z.string().max(2000).nullish(),
+  objetType: z.string().max(500).nullish(),
   /** si fourni → remplacement complet des lignes */
   lignes: z.array(ligneSchema).optional(),
 });

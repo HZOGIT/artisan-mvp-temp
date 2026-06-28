@@ -23,6 +23,7 @@ export default function DevisNouveauPage() {
   const [dateExpiration, setDateExpiration] = useState(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]);
   const [objet, setObjet] = useState("");
   const [referenceClient, setReferenceClient] = useState("");
+  const [conditionsPaiement, setConditionsPaiement] = useState("");
   const [notes, setNotes] = useState("");
   const [lignes, setLignes] = useState<LigneDevis[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -32,6 +33,9 @@ export default function DevisNouveauPage() {
   const [activeSearchLigneId, setActiveSearchLigneId] = useState<string | null>(null);
   const [selectedModeleId, setSelectedModeleId] = useState<number | null>(null);
   const [modeleNom, setModeleNom] = useState("");
+  const [modeleDureeValidite, setModeleDureeValidite] = useState("");
+  const [modeleConditions, setModeleConditions] = useState("");
+  const [modeleObjetType, setModeleObjetType] = useState("");
   const [showSaveModele, setShowSaveModele] = useState(false);
   const [savingModele, setSavingModele] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -66,27 +70,44 @@ export default function DevisNouveauPage() {
     if (lignes.length === 0) { toast.error(t("errLigneModele")); return; }
     setSavingModele(true);
     try {
-      const modele = await createModele.mutateAsync({ nom: modeleNom.trim() });
+      const duree = modeleDureeValidite ? parseInt(modeleDureeValidite, 10) : undefined;
+      const modele = await createModele.mutateAsync({
+        nom: modeleNom.trim(),
+        dureeValiditeJours: duree && duree > 0 ? duree : undefined,
+        conditionsPaiementDefaut: modeleConditions.trim() || undefined,
+        objetType: modeleObjetType.trim() || undefined,
+      });
       for (const l of lignes) await addLigneToModele.mutateAsync(buildModeleLignePayload(modele.id, l));
-      toast.success(t("toastModeleOk")); setModeleNom(""); setShowSaveModele(false); refetchModeles();
+      toast.success(t("toastModeleOk"));
+      setModeleNom(""); setModeleDureeValidite(""); setModeleConditions(""); setModeleObjetType("");
+      setShowSaveModele(false); refetchModeles();
     } catch (e) { toast.error(e instanceof Error ? e.message : t("errModele")); } finally { setSavingModele(false); }
   };
 
   const handleLoadModele = async (modeleId: number) => {
     try {
       const data = await loadModele(modeleId);
-      if (data?.lignes) {
-        setLignes((ls) => {
-          const tauxToId = (t: string | number | null | undefined): TvaCategorieId => {
-            const n = parseFloat(String(t ?? "0"));
+      if (data) {
+        if (data.lignes.length > 0) {
+          const tauxToId = (tv: string | number | null | undefined): TvaCategorieId => {
+            const n = parseFloat(String(tv ?? "0"));
             if (n >= 20) return "FR_20";
             if (n >= 10) return "FR_10";
             if (n >= 5.5) return "FR_5_5";
             if (n >= 2.1) return "FR_2_1";
             return "FR_EXONERE";
           };
-          return [...ls, ...data.lignes.map((l) => ({ ...emptyLigne(), description: l.designation, quantite: parseFloat(String(l.quantite)), prixUnitaireHT: parseFloat(String(l.prixUnitaireHT)), tvaCategorieId: (l.tvaCategorieId as TvaCategorieId | null | undefined) ?? tauxToId(String(l.tauxTVA)), unite: l.unite || "unité", remise: parseFloat(String(l.remise ?? "0")) }))];
-        });
+          setLignes((ls) => [...ls, ...data.lignes.map((l) => ({ ...emptyLigne(), description: l.designation, quantite: parseFloat(String(l.quantite)), prixUnitaireHT: parseFloat(String(l.prixUnitaireHT)), tvaCategorieId: (l.tvaCategorieId as TvaCategorieId | null | undefined) ?? tauxToId(String(l.tauxTVA)), unite: l.unite || "unité", remise: parseFloat(String(l.remise ?? "0")) }))]);
+        }
+        if (data.modele.dureeValiditeJours != null) {
+          const exp = new Date();
+          exp.setDate(exp.getDate() + data.modele.dureeValiditeJours);
+          setDateExpiration(exp.toISOString().split("T")[0]);
+        }
+        const objetDefaut = data.modele.objetType;
+        if (objetDefaut) setObjet((prev) => prev || objetDefaut);
+        const conditionsDefaut = data.modele.conditionsPaiementDefaut;
+        if (conditionsDefaut) setConditionsPaiement((prev) => prev || conditionsDefaut);
         setSelectedModeleId(null); toast.success(t("toastModeleCharge"));
       }
     } catch { toast.error(t("errModeleCharge")); }
@@ -98,7 +119,7 @@ export default function DevisNouveauPage() {
     if (lignes.length === 0) { toast.error(t("errLigne")); return; }
     setIsSubmitting(true);
     try {
-      const devis = await create.mutateAsync(buildCreatePayload(clientId, objet, referenceClient, dateExpiration, notes));
+      const devis = await create.mutateAsync(buildCreatePayload(clientId, objet, referenceClient, dateExpiration, notes, conditionsPaiement));
       for (const ligne of lignes) await addLigne.mutateAsync(buildAddLignePayload(devis.id, ligne));
       toast.success(t("toastCree")); utils.devis.list.invalidate(); window.location.href = `/devis/${devis.id}`;
     } catch (error) { toast.error(error instanceof Error ? error.message : t("errCreation")); } finally { setIsSubmitting(false); }
@@ -154,11 +175,16 @@ export default function DevisNouveauPage() {
             {!showSaveModele ? (
               <Button type="button" variant="outline" size="sm" onClick={() => setShowSaveModele(true)}><Plus className="h-4 w-4 mr-1" /> {t("enregistrerModele")}</Button>
             ) : (
-              <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+              <div className="flex flex-col gap-2">
                 <Input placeholder={t("nomModelePlaceholder")} value={modeleNom} onChange={(e) => setModeleNom(e.target.value)} className="sm:w-72" maxLength={255} />
+                <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                  <Input type="number" min="1" placeholder={t("modeleDureeValiditePlaceholder")} value={modeleDureeValidite} onChange={(e) => setModeleDureeValidite(e.target.value)} className="sm:w-44" />
+                  <Input placeholder={t("modeleObjetTypePlaceholder")} value={modeleObjetType} onChange={(e) => setModeleObjetType(e.target.value)} className="sm:w-72" maxLength={500} />
+                </div>
+                <Textarea placeholder={t("modeleConditionsPlaceholder")} value={modeleConditions} onChange={(e) => setModeleConditions(e.target.value)} rows={2} />
                 <div className="flex gap-2">
                   <Button type="button" size="sm" onClick={handleSaveAsModele} disabled={savingModele}>{savingModele ? t("enregistrementEnCours") : t("enregistrer")}</Button>
-                  <Button type="button" size="sm" variant="ghost" onClick={() => { setShowSaveModele(false); setModeleNom(""); }}>{t("annuler")}</Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => { setShowSaveModele(false); setModeleNom(""); setModeleDureeValidite(""); setModeleConditions(""); setModeleObjetType(""); }}>{t("annuler")}</Button>
                 </div>
               </div>
             )}
@@ -230,6 +256,8 @@ export default function DevisNouveauPage() {
             <div className="flex justify-between border-t pt-2 text-lg"><span className="font-bold">{t("totalTTC")}</span><span className="font-bold text-blue-600">{formatCurrency(tot.totalTTC)}</span></div>
           </div>
         )}
+
+        <div><Label htmlFor="conditionsPaiement" className="block text-sm font-medium mb-2">{t("conditionsPaiement")}</Label><Textarea id="conditionsPaiement" value={conditionsPaiement} onChange={(e) => setConditionsPaiement(e.target.value)} rows={2} placeholder={t("conditionsPaiementPlaceholder")} /></div>
 
         <div><Label htmlFor="notes" className="block text-sm font-medium mb-2">{t("notes")}</Label><Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} placeholder={t("notesPlaceholder")} /></div>
 

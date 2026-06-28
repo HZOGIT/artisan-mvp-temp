@@ -34,6 +34,9 @@ function toModele(r: ModeleRow, lignes: ModeleDevisLigne[]): ModeleDevis {
     description: r.description ?? null,
     notes: r.notes ?? null,
     isDefault: r.isDefault ?? false,
+    dureeValiditeJours: r.dureeValiditeJours ?? null,
+    conditionsPaiementDefaut: r.conditionsPaiementDefaut ?? null,
+    objetType: r.objetType ?? null,
     lignes,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
@@ -92,6 +95,9 @@ export class ModeleDevisRepositoryDrizzle implements IModeleDevisRepository {
           description: input.description ?? null,
           notes: input.notes ?? null,
           isDefault: input.isDefault ?? undefined,
+          dureeValiditeJours: input.dureeValiditeJours ?? null,
+          conditionsPaiementDefaut: input.conditionsPaiementDefaut ?? null,
+          objetType: input.objetType ?? null,
         })
         .returning();
       if (input.lignes?.length) {
@@ -112,6 +118,9 @@ export class ModeleDevisRepositoryDrizzle implements IModeleDevisRepository {
       if (input.description !== undefined) set.description = input.description;
       if (input.notes !== undefined) set.notes = input.notes;
       if (input.isDefault !== undefined) set.isDefault = input.isDefault;
+      if (input.dureeValiditeJours !== undefined) set.dureeValiditeJours = input.dureeValiditeJours;
+      if (input.conditionsPaiementDefaut !== undefined) set.conditionsPaiementDefaut = input.conditionsPaiementDefaut;
+      if (input.objetType !== undefined) set.objetType = input.objetType;
       if (Object.keys(set).length > 0) {
         await tx.update(modelesDevis).set(set).where(and(eq(modelesDevis.id, id), eq(modelesDevis.artisanId, ctx.artisanId)));
       }

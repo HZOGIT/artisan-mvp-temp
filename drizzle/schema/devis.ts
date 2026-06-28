@@ -123,6 +123,9 @@ export const modelesDevis = pgTable("modeles_devis", {
   description: text("description"),
   notes: text("notes"),
   isDefault: boolean("isDefault").default(false),
+  dureeValiditeJours: integer("dureeValiditeJours"),
+  conditionsPaiementDefaut: text("conditionsPaiementDefaut"),
+  objetType: text("objetType"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
 });

@@ -83,8 +83,8 @@ export function iaTotals(lignes: readonly IALigne[]): { ht: number; ttc: number 
   return { ht, ttc };
 }
 
-export function buildCreatePayload(clientId: number, objet: string, referenceClient: string, dateValidite: string, notes: string): CreateDevisInput {
-  return { clientId, objet: objet || undefined, referenceClient: referenceClient || undefined, dateValidite, notes };
+export function buildCreatePayload(clientId: number, objet: string, referenceClient: string, dateValidite: string, notes: string, conditionsPaiement?: string): CreateDevisInput {
+  return { clientId, objet: objet || undefined, referenceClient: referenceClient || undefined, dateValidite, notes, conditionsPaiement: conditionsPaiement || undefined };
 }
 
 export function buildAddLignePayload(devisId: number, ligne: LigneDevis): AddLigneInput {
