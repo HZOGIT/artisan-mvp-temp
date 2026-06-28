@@ -37,6 +37,7 @@ const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide
 const ligneTypeEnum = z.enum(["produit", "section", "note"]);
 const typeDocumentEnum = z.enum(["facture", "avoir"]);
 const tvaCategorieEnum = z.enum(["FR_20", "FR_10", "FR_5_5", "FR_2_1", "FR_FRANCHISE", "FR_EXONERE", "FR_AUTO"]);
+const regimeTVAEnum = z.enum(["normal", "autoliquidation_btp", "exonere"]);
 
 /** `dateEcheance` arrive en string ISO (transport) ; le domaine attend une `Date | null`. */
 function toDate(v: string | null | undefined): Date | null | undefined {
@@ -76,6 +77,7 @@ const createSchema = z.object({
   dateEcheance: isoDate.nullish(),
   /** Lignes initiales — insérées dans la même transaction que le header (évite les headers orphelins). */
   lignes: z.array(ligneCreateSchema).max(500).optional(),
+  regimeTVA: regimeTVAEnum.optional(),
 });
 
 /** ⚠️ clientId / devisId / numero / statut / typeDocument / totaux / montantPaye ABSENTS. */
@@ -86,6 +88,7 @@ const updateSchema = z.object({
   conditionsPaiement: z.string().max(2000).nullish(),
   notes: z.string().max(5000).nullish(),
   dateEcheance: isoDate.nullish(),
+  regimeTVA: regimeTVAEnum.optional(),
 });
 
 const ligneUpdateSchema = z.object({

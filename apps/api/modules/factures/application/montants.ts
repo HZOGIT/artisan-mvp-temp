@@ -67,6 +67,20 @@ export function calculerMontantsAvoirLigne(quantite: string, prixUnitaireHT: str
   };
 }
 
+/**
+ * Si `regimeTVA` est `autoliquidation_btp` ou `exonere`, force totalTVA=0 et totalTTC=totalHT.
+ * La base HT est conservée (sous-traitant facture HT, preneur autoliquide la TVA).
+ */
+export function appliquerRegimeTVA(
+  totaux: { totalHT: string; totalTVA: string; totalTTC: string },
+  regimeTVA: string | null | undefined,
+): { totalHT: string; totalTVA: string; totalTTC: string } {
+  if (regimeTVA === "autoliquidation_btp" || regimeTVA === "exonere") {
+    return { totalHT: totaux.totalHT, totalTVA: "0.00", totalTTC: totaux.totalHT };
+  }
+  return totaux;
+}
+
 /** TVA réduite travaux (CGI 279-0 bis / 278-0 bis A) : 10 % ou 5,5 % → attestation client requise. */
 export function necessite_attestation_tva_reduite(lignes: readonly { tauxTVA: string }[]): boolean {
   return lignes.some((l) => { const t = Number(l.tauxTVA); return t === 10 || t === 5.5; });

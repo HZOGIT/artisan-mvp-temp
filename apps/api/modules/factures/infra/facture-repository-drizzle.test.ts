@@ -132,6 +132,33 @@ describe.skipIf(!URL)("FactureRepositoryDrizzle (PG, RLS + scope tenant + lignes
     expect(detail?.totalHT).toBe("180.00");
   });
 
+  it("regimeTVA autoliquidation_btp : totalTVA=0, totalTTC=totalHT ; persiste et reste isolé cross-tenant", async () => {
+    const f = await repo.createWithLignes(
+      ctx(A),
+      { clientId: clientA, numero: "FAC-AUTO-BTP", regimeTVA: "autoliquidation_btp" },
+      [{ designation: "Travaux BTP", prixUnitaireHT: "1000.00", tauxTVA: "20" }],
+    );
+    expect(f.regimeTVA).toBe("autoliquidation_btp");
+    expect(f.totalHT).toBe("1000.00");
+    expect(f.totalTVA).toBe("0.00");
+    expect(f.totalTTC).toBe("1000.00");
+
+    const fetched = await repo.getById(ctx(A), f.id);
+    expect(fetched?.regimeTVA).toBe("autoliquidation_btp");
+    expect(fetched?.totalTVA).toBe("0.00");
+
+    expect(await repo.getById(ctx(B), f.id)).toBeNull();
+
+    /** Mise à jour regimeTVA : repasser en normal recalcule TVA */
+    const backToNormal = await repo.update(ctx(A), f.id, { regimeTVA: "normal" });
+    expect(backToNormal?.regimeTVA).toBe("normal");
+    /** Ajout d'une ligne → recalculerTotaux doit utiliser le nouveau régime (normal = TVA due) */
+    await repo.addLigne(ctx(A), f.id, { designation: "L2", prixUnitaireHT: "0.01", tauxTVA: "20" });
+    const withLine = await repo.getById(ctx(A), f.id);
+    /** En régime normal, TVA doit être > 0 sur une ligne à 20% */
+    expect(Number(withLine?.totalTVA)).toBeGreaterThan(0);
+  });
+
   it("ajouterReglement : SELECT FOR UPDATE + garde sous lock prévient les sur-paiements concurrents", async () => {
     const f = await repo.createWithLignes(ctx(A), { clientId: clientA, numero: "FAC-CONC" }, [
       { designation: "L", prixUnitaireHT: "120.00", tauxTVA: "20" },

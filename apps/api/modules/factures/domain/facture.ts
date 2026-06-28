@@ -15,6 +15,7 @@
 export type FactureStatut = "brouillon" | "validee" | "envoyee" | "payee" | "en_retard" | "annulee";
 export type FactureTypeDocument = "facture" | "avoir";
 export type LigneType = "produit" | "section" | "note";
+export type RegimeTVA = "normal" | "autoliquidation_btp" | "exonere";
 
 export interface FactureLigne {
   readonly id: number;
@@ -62,6 +63,7 @@ export interface Facture {
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly nombreRelances: number;
+  readonly regimeTVA: RegimeTVA;
 }
 
 /*
@@ -80,6 +82,7 @@ export interface CreateFactureInput {
   readonly conditionsPaiement?: string | null;
   readonly notes?: string | null;
   readonly dateEcheance?: Date | null;
+  readonly regimeTVA?: RegimeTVA;
 }
 
 /*
@@ -95,6 +98,7 @@ export interface UpdateFactureInput {
   readonly notes?: string | null;
   readonly dateEcheance?: Date | null;
   readonly nombreRelances?: number;
+  readonly regimeTVA?: RegimeTVA;
 }
 
 export interface CreateFactureLigneInput {

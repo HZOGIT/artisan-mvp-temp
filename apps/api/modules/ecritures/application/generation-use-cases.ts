@@ -76,8 +76,11 @@ export async function genererEcrituresVente(
     { ...base, numeroCompte: COMPTE_VENTES.compte, libelleCompte: COMPTE_VENTES.lib, ...creditFacture(totalHT) },
   ];
   const lignesFacture = await factureReader.getLignes(ctx, factureId);
-  for (const t of ventilerTva(lignesFacture, totalTVA)) {
-    lignes.push({ ...base, numeroCompte: t.compte, libelleCompte: t.lib, ...creditFacture(t.montant) });
+  /** Autoliquidation BTP (CGI art. 283-2 nonies) : la TVA est due par le preneur → pas de 445 collectée. */
+  if (facture.regimeTVA !== "autoliquidation_btp") {
+    for (const t of ventilerTva(lignesFacture, totalTVA)) {
+      lignes.push({ ...base, numeroCompte: t.compte, libelleCompte: t.lib, ...creditFacture(t.montant) });
+    }
   }
 
   if (await ecritureRepo.hasValidatedEcritures(ctx, factureId)) {

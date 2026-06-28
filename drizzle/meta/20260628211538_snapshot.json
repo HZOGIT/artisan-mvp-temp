@@ -1,6 +1,6 @@
 {
-  "id": "1c4401b5-12d0-4f80-ba2b-e95f8f4715de",
-  "prevId": "c7ce22e7-ed96-4492-8c25-23e3cd914482",
+  "id": "aadef90c-704d-4708-a1c8-b2a564eda648",
+  "prevId": "7e753a14-aa1b-42bf-ac2c-eae3d1924769",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1096,6 +1096,13 @@
           "notNull": false,
           "default": true
         },
+        "rappelRdvClientActif": {
+          "name": "rappelRdvClientActif",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": true
+        },
         "rappelDevisJours": {
           "name": "rappelDevisJours",
           "type": "integer",
@@ -1215,13 +1222,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "rappelRdvClientActif": {
-          "name": "rappelRdvClientActif",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false,
-          "default": true
         }
       },
       "indexes": {},
@@ -1492,6 +1492,12 @@
         "notes": {
           "name": "notes",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "archivedAt": {
+          "name": "archivedAt",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": false
         },
@@ -1956,6 +1962,14 @@
           "primaryKey": false,
           "notNull": true,
           "default": 0
+        },
+        "regimeTVA": {
+          "name": "regimeTVA",
+          "type": "regime_tva_facture",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'normal'"
         },
         "updatedAt": {
           "name": "updatedAt",
@@ -3642,6 +3656,19 @@
           "primaryKey": false,
           "notNull": false
         },
+        "rappelClientEnvoye": {
+          "name": "rappelClientEnvoye",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "dateRappelClient": {
+          "name": "dateRappelClient",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
         "createdAt": {
           "name": "createdAt",
           "type": "timestamp",
@@ -3655,19 +3682,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "rappelClientEnvoye": {
-          "name": "rappelClientEnvoye",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "dateRappelClient": {
-          "name": "dateRappelClient",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {},
@@ -12035,6 +12049,15 @@
         "complete",
         "echoue",
         "rembourse"
+      ]
+    },
+    "public.regime_tva_facture": {
+      "name": "regime_tva_facture",
+      "schema": "public",
+      "values": [
+        "normal",
+        "autoliquidation_btp",
+        "exonere"
       ]
     },
     "public.reglement_mode": {

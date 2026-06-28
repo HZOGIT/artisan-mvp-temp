@@ -10,7 +10,7 @@ import type {
   UpdateFactureLigneInput,
   AuditLogEntry,
 } from "../domain/facture";
-import { calculerMontantsLigne, calculerTotaux } from "../application/montants";
+import { calculerMontantsLigne, calculerTotaux, appliquerRegimeTVA } from "../application/montants";
 import { ValidationError } from "../../../shared/errors";
 
 /*
@@ -98,6 +98,7 @@ export class FakeFactureRepository implements IFactureRepository {
       createdAt: now,
       updatedAt: now,
       nombreRelances: 0,
+      regimeTVA: input.regimeTVA ?? "normal",
     };
     this.factureStore.push(f);
     return f;
@@ -134,7 +135,8 @@ export class FakeFactureRepository implements IFactureRepository {
         montants,
       };
     });
-    const totaux = calculerTotaux(processedLignes.map((p) => p.montants));
+    const totauxBruts = calculerTotaux(processedLignes.map((p) => p.montants));
+    const totaux = appliquerRegimeTVA(totauxBruts, header.regimeTVA ?? "normal");
     const facture: Facture = {
       id,
       artisanId: ctx.artisanId,
@@ -160,6 +162,7 @@ export class FakeFactureRepository implements IFactureRepository {
       createdAt: now,
       updatedAt: now,
       nombreRelances: 0,
+      regimeTVA: header.regimeTVA ?? "normal",
     };
     this.factureStore.push(facture);
     const lignesAdded: number[] = [];
@@ -193,6 +196,7 @@ export class FakeFactureRepository implements IFactureRepository {
       notes: input.notes !== undefined ? input.notes : f.notes,
       dateEcheance: input.dateEcheance !== undefined ? input.dateEcheance : f.dateEcheance,
       nombreRelances: input.nombreRelances !== undefined ? input.nombreRelances : f.nombreRelances,
+      regimeTVA: input.regimeTVA !== undefined ? input.regimeTVA : f.regimeTVA,
       updatedAt: new Date(),
     };
     this.factureStore = this.factureStore.map((x) => (x.id === id ? updated : x));
@@ -344,6 +348,7 @@ export class FakeFactureRepository implements IFactureRepository {
       createdAt: now,
       updatedAt: now,
       nombreRelances: 0,
+      regimeTVA: "normal",
     };
     this.factureStore.push(avoir);
     input.lignes.forEach((l, i) => {
@@ -405,6 +410,7 @@ export class FakeFactureRepository implements IFactureRepository {
       createdAt: now,
       updatedAt: now,
       nombreRelances: 0,
+      regimeTVA: "normal",
     };
     this.factureStore.push(facture);
     input.lignes.forEach((l) => {
