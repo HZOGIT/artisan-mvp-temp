@@ -6,6 +6,7 @@ import type { IBudgetCategorieRepository } from "../budgets-categories/applicati
 import type { IRegleCategorisationRepository } from "../regles-categorisation/application/regle-categorisation-repository";
 import type { INoteDeFraisRepository } from "../notes-de-frais/application/note-de-frais-repository";
 import type { ITransactionBancaireRepository } from "./application/transaction-bancaire-repository";
+import type { IFactureLettrerPort } from "./application/facture-lettreur-port";
 import type { FecReader } from "./application/fec-reader";
 
 const stubTransactionRepo: ITransactionBancaireRepository = {
@@ -14,6 +15,13 @@ const stubTransactionRepo: ITransactionBancaireRepository = {
   ignorer: async () => {},
   createReleve: async () => ({ releveId: 0, nbImportees: 0 }),
   lierDepense: async () => {},
+  lierFacture: async () => {},
+  listCreditsNonRapproches: async () => [],
+};
+
+const stubFactureLettreur: IFactureLettrerPort = {
+  listImpayees: async () => [],
+  payer: async () => {},
 };
 
 const stubFecReader: FecReader = {
@@ -87,7 +95,7 @@ const stubNoteRepo: INoteDeFraisRepository = {
 
 describe("depenses.module", () => {
   it("createDepensesModule câble le repository injecté", () => {
-    const module = createDepensesModule({ repository: stubRepo, categorieRepository: stubCategorieRepo, budgetRepository: stubBudgetRepo, regleRepository: stubRegleRepo, noteRepository: stubNoteRepo, transactionRepository: stubTransactionRepo, fecReader: stubFecReader });
+    const module = createDepensesModule({ repository: stubRepo, categorieRepository: stubCategorieRepo, budgetRepository: stubBudgetRepo, regleRepository: stubRegleRepo, noteRepository: stubNoteRepo, transactionRepository: stubTransactionRepo, factureLettreur: stubFactureLettreur, fecReader: stubFecReader });
     expect(module.deps.repository).toBe(stubRepo);
   });
 
@@ -96,8 +104,8 @@ describe("depenses.module", () => {
   });
 
   it("expose les procédures de catégories (parité client trpc.depenses.*Categorie)", () => {
-    const module = createDepensesModule({ repository: stubRepo, categorieRepository: stubCategorieRepo, budgetRepository: stubBudgetRepo, regleRepository: stubRegleRepo, noteRepository: stubNoteRepo, transactionRepository: stubTransactionRepo, fecReader: stubFecReader });
+    const module = createDepensesModule({ repository: stubRepo, categorieRepository: stubCategorieRepo, budgetRepository: stubBudgetRepo, regleRepository: stubRegleRepo, noteRepository: stubNoteRepo, transactionRepository: stubTransactionRepo, factureLettreur: stubFactureLettreur, fecReader: stubFecReader });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record);
-    expect(procedures).toEqual(expect.arrayContaining(["checkDoublons", "stats", "getCategories", "createCategorie", "updateCategorie", "deleteCategorie", "setBudget", "getBudgets", "getRegles", "createRegle", "deleteRegle", "listNotesFrais", "getNoteFraisById", "createNoteFrais", "soumettreNoteFrais", "approuverNoteFrais", "rejeterNoteFrais", "payerNoteFrais", "addDepenseToNoteFrais", "removeDepenseFromNoteFrais", "copierBudgetsMois", "creerIndemniteKm", "getTransactionsBancaires", "ignorerTransaction", "importReleve", "convertirTransaction", "exportFecAchats", "analyserJustificatif"]));
+    expect(procedures).toEqual(expect.arrayContaining(["checkDoublons", "stats", "getCategories", "createCategorie", "updateCategorie", "deleteCategorie", "setBudget", "getBudgets", "getRegles", "createRegle", "deleteRegle", "listNotesFrais", "getNoteFraisById", "createNoteFrais", "soumettreNoteFrais", "approuverNoteFrais", "rejeterNoteFrais", "payerNoteFrais", "addDepenseToNoteFrais", "removeDepenseFromNoteFrais", "copierBudgetsMois", "creerIndemniteKm", "getTransactionsBancaires", "ignorerTransaction", "importReleve", "convertirTransaction", "exportFecAchats", "analyserJustificatif", "getSuggestionsRapprochement", "rapprocher"]));
   });
 });

@@ -11,8 +11,8 @@ export class FakeTransactionBancaireRepository implements ITransactionBancaireRe
   private seq = 0;
 
   /** Aide de test : insère une transaction (artisanId forcé via l'appelant). */
-  seed(t: Omit<TransactionBancaire, "id" | "createdAt"> & { id?: number; createdAt?: Date }): TransactionBancaire {
-    const created: TransactionBancaire = { ...t, id: t.id ?? ++this.seq, createdAt: t.createdAt ?? new Date() };
+  seed(t: Omit<TransactionBancaire, "id" | "createdAt" | "factureId"> & { id?: number; createdAt?: Date; factureId?: number | null }): TransactionBancaire {
+    const created: TransactionBancaire = { factureId: null, ...t, id: t.id ?? ++this.seq, createdAt: t.createdAt ?? new Date() };
     this.store.push(created);
     return created;
   }
@@ -48,6 +48,7 @@ export class FakeTransactionBancaireRepository implements ITransactionBancaireRe
         typeTransaction: t.typeTransaction,
         categorieSuggeree: t.categorieSuggeree,
         depenseId: null,
+        factureId: null,
         ignoree: false,
         createdAt: new Date(),
       });
@@ -58,5 +59,16 @@ export class FakeTransactionBancaireRepository implements ITransactionBancaireRe
 
   async lierDepense(ctx: TenantContext, transactionId: number, depenseId: number): Promise<void> {
     this.store = this.store.map((t) => (t.id === transactionId && t.artisanId === ctx.artisanId ? { ...t, depenseId } : t));
+  }
+
+  async lierFacture(ctx: TenantContext, transactionId: number, factureId: number): Promise<void> {
+    this.store = this.store.map((t) => (t.id === transactionId && t.artisanId === ctx.artisanId ? { ...t, factureId } : t));
+  }
+
+  async listCreditsNonRapproches(ctx: TenantContext): Promise<TransactionBancaire[]> {
+    return this.store
+      .filter((t) => t.artisanId === ctx.artisanId && t.typeTransaction === "credit" && t.factureId === null && !t.ignoree)
+      .sort((a, b) => (a.dateTransaction < b.dateTransaction ? 1 : a.dateTransaction > b.dateTransaction ? -1 : b.id - a.id))
+      .slice(0, 500);
   }
 }

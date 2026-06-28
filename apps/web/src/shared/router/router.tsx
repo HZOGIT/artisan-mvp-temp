@@ -311,6 +311,12 @@ const importReleveRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/import-releve/ui/import-releve-page")),
 });
 
+const rapprochementEncaissementsRoute = createRoute({
+  getParentRoute: () => appShellRoute,
+  path: "/rapprochement-encaissements",
+  component: lazyRouteComponent(() => import("../../features/rapprochement-encaissements/ui/rapprochement-page")),
+});
+
 const syncComptableRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/tableau-bord-sync-comptable",
@@ -511,7 +517,7 @@ const cgvRoute = createRoute({ getParentRoute: () => rootRoute, path: "/cgv", co
 const confidentialiteRoute = createRoute({ getParentRoute: () => rootRoute, path: "/confidentialite", component: lazyRouteComponent(() => import("../../features/legal/ui/confidentialite-page")) });
 
 /** Arbre AUTHENTIFIÉ : toutes les pages sous le shell (chrome persistante). */
-const appShellTree = appShellRoute.addChildren([eventsAdminRoute, einvoicingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute, modulesRoute, congesRoute, contratsRoute, relancesDevisRoute, calendrierRoute, utilisateursRoute, devisOptionsRoute, parametresRoute, dashboardRoute, notesFraisRoute, chatRoute, badgesRoute, classementRoute, modelesEmailRoute, modelesTransactionnelsRoute, assistantConversationsRoute, vehiculesRoute, rapportCommandeRoute, rapportsRoute, documentationRoute, maVitrineRoute, rdvEnLigneRoute, alertesPrevisionsRoute, previsionsRoute, performancesFournisseursRoute, tableauBordDepensesRoute, importReleveRoute, syncComptableRoute, geolocalisationRoute, planificationRoute, nouvelleDepenseRoute, integrationsComptablesRoute, analysesPhotosRoute, importRoute, devisIaRoute, chantiersRoute, assistantRoute, calendrierChantiersRoute, clientsNouveauRoute, clientsImportRoute, mobileRoute, commandeDetailRoute, contratDetailRoute, profilRoute, devisLigneRoute, devisNouveauRoute, devisDetailRoute, factureDetailRoute, commandeNouvelleRoute, commandeModifierRoute]);
+const appShellTree = appShellRoute.addChildren([eventsAdminRoute, einvoicingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute, modulesRoute, congesRoute, contratsRoute, relancesDevisRoute, calendrierRoute, utilisateursRoute, devisOptionsRoute, parametresRoute, dashboardRoute, notesFraisRoute, chatRoute, badgesRoute, classementRoute, modelesEmailRoute, modelesTransactionnelsRoute, assistantConversationsRoute, vehiculesRoute, rapportCommandeRoute, rapportsRoute, documentationRoute, maVitrineRoute, rdvEnLigneRoute, alertesPrevisionsRoute, previsionsRoute, performancesFournisseursRoute, tableauBordDepensesRoute, importReleveRoute, rapprochementEncaissementsRoute, syncComptableRoute, geolocalisationRoute, planificationRoute, nouvelleDepenseRoute, integrationsComptablesRoute, analysesPhotosRoute, importRoute, devisIaRoute, chantiersRoute, assistantRoute, calendrierChantiersRoute, clientsNouveauRoute, clientsImportRoute, mobileRoute, commandeDetailRoute, contratDetailRoute, profilRoute, devisLigneRoute, devisNouveauRoute, devisDetailRoute, factureDetailRoute, commandeNouvelleRoute, commandeModifierRoute]);
 
 const routeTree = rootRoute.addChildren([
   appShellTree, indexRoute, onboardingRoute,

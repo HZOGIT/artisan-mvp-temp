@@ -1,0 +1,23 @@
+{
+  "titre": "Rapprochement des encaissements",
+  "desc": "Associez chaque virement reçu à une facture impayée.",
+  "aucunCredit": "Aucun crédit bancaire non rapproché.",
+  "aucunCreditDesc": "Importez un relevé bancaire ou attendez de nouveaux encaissements.",
+  "rapprocher": "Rapprocher",
+  "rapprochement": "Rapprochement",
+  "confirmer": "Confirmer le rapprochement",
+  "annuler": "Annuler",
+  "scoreExact": "Montant exact",
+  "scoreApproche": "Montant approché",
+  "facture": "Facture",
+  "client": "Client",
+  "montant": "Montant",
+  "date": "Date",
+  "libelle": "Libellé",
+  "aucuneSuggestion": "Aucune facture correspondante trouvée.",
+  "toastOk": "Facture marquée payée — rapprochement effectué.",
+  "toastErr": "Erreur lors du rapprochement.",
+  "chargement": "Chargement…",
+  "voirDepenses": "Voir les dépenses",
+  "credit": "Encaissement"
+}

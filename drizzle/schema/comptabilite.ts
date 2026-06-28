@@ -264,6 +264,8 @@ export const transactionsBancaires = pgTable("transactions_bancaires", {
   type_transaction: transactionTypeEnum("type_transaction").notNull(),
   categorie_suggeree: varchar("categorie_suggeree", { length: 50 }),
   depense_id: integer("depense_id"),
+  /** Facture rapprochée (lettrage encaissement) — nullable, FK ON DELETE SET NULL. */
+  facture_id: integer("facture_id"),
   ignoree: boolean("ignoree").default(false),
   created_at: timestamp("created_at").defaultNow(),
 });

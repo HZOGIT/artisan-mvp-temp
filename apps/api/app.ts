@@ -60,6 +60,8 @@ import type { IChantierRepository } from "./modules/chantiers/application/chanti
 import { createDepensesModule } from "./modules/depenses/depenses.module";
 import { TransactionBancaireRepositoryDrizzle } from "./modules/depenses/infra/transaction-bancaire-repository-drizzle";
 import type { ITransactionBancaireRepository } from "./modules/depenses/application/transaction-bancaire-repository";
+import { FactureLettrerDrizzle } from "./modules/depenses/infra/facture-lettreur-drizzle";
+import type { IFactureLettrerPort } from "./modules/depenses/application/facture-lettreur-port";
 import { FecReaderDrizzle } from "./modules/depenses/infra/fec-reader-drizzle";
 import type { FecReader } from "./modules/depenses/application/fec-reader";
 import { createArtisanModule } from "./modules/artisan/artisan.module";
@@ -354,6 +356,7 @@ export interface AppDeps extends ContextDeps {
   /** Pool DB pour les transactions outbox events du module depenses (défaut : getDbHandle().db). */
   readonly depensesDb?: DbClient;
   readonly transactionBancaireRepo?: ITransactionBancaireRepository;
+  readonly factureLettreur?: IFactureLettrerPort;
   readonly fecReader?: FecReader;
   readonly devisRepo?: IDevisRepository;
   /** Pool DB pour les transactions outbox du module devis (défaut : getDbHandle().db). */
@@ -684,6 +687,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     regleRepository: regleCategorisationRepo,
     noteRepository: noteDeFraisRepo,
     transactionRepository: deps.transactionBancaireRepo ?? new TransactionBancaireRepositoryDrizzle(getDbHandle().db),
+    factureLettreur: deps.factureLettreur ?? new FactureLettrerDrizzle(getDbHandle().db),
     fecReader: deps.fecReader ?? new FecReaderDrizzle(getDbHandle().db),
     db: deps.depensesDb ?? getDbHandle().db,
     /** OCR justificatif : Gemini vision + rate-limiter IA dédié (injectables en test : FakeVisionPort). */

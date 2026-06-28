@@ -16,6 +16,8 @@ export interface TransactionBancaire {
   readonly typeTransaction: TransactionType;
   readonly categorieSuggeree: string | null;
   readonly depenseId: number | null;
+  /** Facture rapprochée (lettrage encaissement). null = non rapprochée. */
+  readonly factureId: number | null;
   readonly ignoree: boolean;
   readonly createdAt: Date;
 }
