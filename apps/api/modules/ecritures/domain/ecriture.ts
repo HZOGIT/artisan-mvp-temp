@@ -12,6 +12,9 @@
 /** Ventes / Achats / Banque / Opérations diverses */
 export type JournalComptable = "VE" | "AC" | "BQ" | "OD";
 
+/** Statut d'une écriture comptable : brouillon (modifiable) ou validée (inaltérable) */
+export type EcritureStatut = "brouillon" | "validee";
+
 export interface EcritureComptable {
   readonly id: number;
   readonly artisanId: number;
@@ -28,6 +31,7 @@ export interface EcritureComptable {
   readonly factureId: number | null;
   readonly lettrage: string | null;
   readonly pointage: boolean;
+  readonly statut: EcritureStatut;
   readonly createdAt: Date;
 }
 

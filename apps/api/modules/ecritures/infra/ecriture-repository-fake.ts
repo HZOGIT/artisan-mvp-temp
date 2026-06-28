@@ -36,6 +36,7 @@ export class FakeEcritureRepository implements IEcritureRepository {
       factureId: l.factureId ?? null,
       lettrage: l.lettrage ?? null,
       pointage: l.pointage ?? false,
+      statut: "brouillon" as const,
       createdAt: now,
     }));
     this.store.push(...created);
@@ -54,5 +55,23 @@ export class FakeEcritureRepository implements IEcritureRepository {
       (e) => !(e.artisanId === ctx.artisanId && e.factureId === factureId && e.journal === journal),
     );
     return before - this.store.length;
+  }
+
+  async hasValidatedEcritures(ctx: TenantContext, factureId: number): Promise<boolean> {
+    return this.store.some(
+      (e) => e.artisanId === ctx.artisanId && e.factureId === factureId && e.statut === "validee",
+    );
+  }
+
+  async validateByFacture(ctx: TenantContext, factureId: number): Promise<number> {
+    let count = 0;
+    this.store = this.store.map((e) => {
+      if (e.artisanId === ctx.artisanId && e.factureId === factureId && e.statut !== "validee") {
+        count++;
+        return { ...e, statut: "validee" as const };
+      }
+      return e;
+    });
+    return count;
   }
 }
