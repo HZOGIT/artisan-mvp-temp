@@ -103,7 +103,7 @@ export class FakeFactureRepository implements IFactureRepository {
     return f;
   }
 
-  async createWithLignes(ctx: TenantContext, header: CreateFactureInput, lignes: readonly CreateFactureLigneInput[]): Promise<Facture> {
+  async createWithLignes(ctx: TenantContext, header: CreateFactureInput, lignes: readonly CreateFactureLigneInput[], inTx?: (tx: DbClient) => Promise<void>): Promise<Facture> {
     const now = new Date();
     const id = ++this.seq;
     const processedLignes = lignes.map((l, i) => {
@@ -162,8 +162,21 @@ export class FakeFactureRepository implements IFactureRepository {
       nombreRelances: 0,
     };
     this.factureStore.push(facture);
+    const lignesAdded: number[] = [];
     for (const { ligne } of processedLignes) {
-      this.lignesStore.push({ ...ligne, id: ++this.ligneSeq });
+      const id2 = ++this.ligneSeq;
+      this.lignesStore.push({ ...ligne, id: id2 });
+      lignesAdded.push(id2);
+    }
+    if (inTx) {
+      try {
+        await inTx(null as unknown as DbClient);
+      } catch (e) {
+        /** Simulate rollback on inTx failure. */
+        this.factureStore.splice(this.factureStore.indexOf(facture), 1);
+        this.lignesStore = this.lignesStore.filter((l) => !lignesAdded.includes(l.id));
+        throw e;
+      }
     }
     return facture;
   }

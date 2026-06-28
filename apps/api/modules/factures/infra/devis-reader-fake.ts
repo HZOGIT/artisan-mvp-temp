@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db/client";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IDevisReader, DevisReadModel, DevisLigneReadModel } from "../application/devis-reader";
 
@@ -31,5 +32,9 @@ export class FakeDevisReader implements IDevisReader {
     if (d && d.artisanId === ctx.artisanId) {
       this.store.set(devisId, { ...d, montantDejaFacture: montant });
     }
+  }
+
+  async updateMontantDejaFactureTx(_tx: DbClient, ctx: TenantContext, devisId: number, montant: string): Promise<void> {
+    return this.updateMontantDejaFacture(ctx, devisId, montant);
   }
 }

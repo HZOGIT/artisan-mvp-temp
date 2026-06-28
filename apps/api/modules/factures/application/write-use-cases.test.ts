@@ -517,4 +517,24 @@ describe("facturerSituation — use-case (L1 fakes)", () => {
     reader.register(devisSituation());
     await expect(facturerSituation(repo, reader, A, { devisId: 42, pourcentageCumule: 110 })).rejects.toBeInstanceOf(ValidationError);
   });
+
+  it("rollback atomique : si maj cumul lève une erreur la facture ne persiste pas", async () => {
+    const { reader } = setup();
+    const devis = devisSituation();
+    reader.register(devis);
+    const repoAtomic = new FakeFactureRepository();
+    repoAtomic.registerClient(A.artisanId, devis.clientId);
+    repoAtomic.registerDevis(A.artisanId, devis.id);
+    const boom = new Error("DB down");
+    reader.register({ ...devis, updateMontantDejaFactureTx: undefined } as unknown as DevisReadModel);
+    const origTx = reader.updateMontantDejaFactureTx.bind(reader);
+    reader.updateMontantDejaFactureTx = () => Promise.reject(boom);
+
+    await expect(facturerSituation(repoAtomic, reader, A, { devisId: 42, pourcentageCumule: 30 })).rejects.toThrow("DB down");
+    /** La facture a été rollbackée — store vide. */
+    expect(await repoAtomic.list(A)).toHaveLength(0);
+    /** Le cumul devis est inchangé. */
+    expect((await reader.getDevis(A, 42))?.montantDejaFacture).toBe("0.00");
+    reader.updateMontantDejaFactureTx = origTx;
+  });
 });

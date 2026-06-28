@@ -43,12 +43,18 @@ export class DevisReaderDrizzle implements IDevisReader {
     if (!Number.isFinite(Number(montant)) || Number(montant) < 0) {
       return Promise.reject(new ValidationError("Montant invalide"));
     }
-    return withTenant(this.db, ctx, async (tx) => {
-      await tx
-        .update(devis)
-        .set({ montantDejaFacture: montant })
-        .where(and(eq(devis.id, devisId), eq(devis.artisanId, ctx.artisanId)));
-    });
+    return withTenant(this.db, ctx, (tx) => this.updateMontantDejaFactureTx(tx, ctx, devisId, montant));
+  }
+
+  updateMontantDejaFactureTx(tx: DbClient, ctx: TenantContext, devisId: number, montant: string): Promise<void> {
+    if (!Number.isFinite(Number(montant)) || Number(montant) < 0) {
+      return Promise.reject(new ValidationError("Montant invalide"));
+    }
+    return tx
+      .update(devis)
+      .set({ montantDejaFacture: montant })
+      .where(and(eq(devis.id, devisId), eq(devis.artisanId, ctx.artisanId)))
+      .then(() => undefined);
   }
 
   getLignes(ctx: TenantContext, devisId: number): Promise<DevisLigneReadModel[]> {

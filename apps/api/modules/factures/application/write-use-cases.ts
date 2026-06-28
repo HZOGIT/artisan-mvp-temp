@@ -59,13 +59,13 @@ function assertLigneValide(designation: string | undefined, prixUnitaireHT?: str
   }
 }
 
-export async function creerFacture(repo: IFactureRepository, ctx: TenantContext, input: CreerFactureInput): Promise<Facture> {
+export async function creerFacture(repo: IFactureRepository, ctx: TenantContext, input: CreerFactureInput, inTx?: (tx: DbClient) => Promise<void>): Promise<Facture> {
   /** Anti-IDOR-FK : client (et devis lié) du tenant uniquement (ne révèle pas l'existence). */
   if (!(await repo.ownsClient(ctx, input.clientId))) throw new NotFoundError("Client introuvable");
   if (input.devisId != null && !(await repo.ownsDevis(ctx, input.devisId))) throw new NotFoundError("Devis introuvable");
   const { lignes, ...header } = input;
   const facture = lignes && lignes.length > 0
-    ? await repo.createWithLignes(ctx, { ...header, numero: null }, lignes)
+    ? await repo.createWithLignes(ctx, { ...header, numero: null }, lignes, inTx)
     : await repo.create(ctx, { ...header, numero: null });
   factureCounter.inc({ action: "created" });
   return facture;
@@ -572,6 +572,9 @@ export async function facturerSituation(
   const label = `Situation de travaux — avancement ${input.pourcentageCumule} %`;
   const notes = `Déjà facturé : ${Number(devisData.montantDejaFacture).toFixed(2)} € — Devis n° ${devisData.numero}`;
 
+  const newCumul = round2(Number(devisData.montantDejaFacture) + montantSituationTTC);
+  const cumulStr = newCumul.toFixed(2);
+
   const facture = await creerFacture(factureRepo, ctx, {
     clientId: devisData.clientId,
     devisId: devisData.id,
@@ -584,10 +587,7 @@ export async function facturerSituation(
       tauxTVA,
       remise: "0",
     }],
-  });
-
-  const newCumul = round2(Number(devisData.montantDejaFacture) + montantSituationTTC);
-  await devisReader.updateMontantDejaFacture(ctx, input.devisId, newCumul.toFixed(2));
+  }, (tx) => devisReader.updateMontantDejaFactureTx(tx, ctx, input.devisId, cumulStr));
 
   return facture;
 }
