@@ -57,3 +57,24 @@ export async function supprimerClient(repo: IClientRepository, ctx: TenantContex
   const ok = await repo.delete(ctx, id);
   if (!ok) throw new NotFoundError("Client introuvable");
 }
+
+/*
+ * Fusionne un doublon dans un client survivant (déduplication CRM). Tout l'historique du doublon
+ * (devis/factures/interventions/chantiers/contrats/avis/rdv/conversations…) est réaffecté au
+ * survivant dans UNE transaction (le repo), puis le doublon est archivé (jamais supprimé).
+ * Idempotent. ⚠️ Cloisonnement tenant : si l'un des deux n'appartient pas au tenant → NotFound
+ * (le repo renvoie null) ; impossible de fusionner vers/depuis le client d'un autre artisan.
+ */
+export async function fusionnerClients(
+  repo: IClientRepository,
+  ctx: TenantContext,
+  survivantId: number,
+  doublonId: number,
+): Promise<Client> {
+  if (survivantId === doublonId) {
+    throw new ValidationError("Le survivant et le doublon doivent être deux clients différents");
+  }
+  const survivant = await repo.fusionner(ctx, survivantId, doublonId);
+  if (!survivant) throw new NotFoundError("Client introuvable");
+  return survivant;
+}

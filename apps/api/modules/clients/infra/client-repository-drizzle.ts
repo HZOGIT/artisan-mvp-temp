@@ -1,18 +1,26 @@
-import { and, asc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, asc, eq, ilike, isNull, or, sql } from "drizzle-orm";
 import {
   clients,
+  clientPortalAccess,
+  clientPortalSessions,
   devis,
   factures,
   interventions,
   chantiers,
   contratsMaintenance,
+  rdvEnLigne,
+  analysesPhotosChantier,
+  avisClients,
+  demandesContact,
+  demandesAvis,
+  conversations,
 } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IClientRepository } from "../application/client-repository";
 import type { FactureEncoursLigne } from "../application/encours";
-import type { Client, CreateClientInput, UpdateClientInput } from "../domain/client";
+import { champsFusionnes, type Client, type CreateClientInput, type UpdateClientInput } from "../domain/client";
 
 type ClientRow = typeof clients.$inferSelect;
 
@@ -55,7 +63,7 @@ export class ClientRepositoryDrizzle implements IClientRepository {
       const rows = await tx
         .select()
         .from(clients)
-        .where(eq(clients.artisanId, ctx.artisanId))
+        .where(and(eq(clients.artisanId, ctx.artisanId), isNull(clients.archivedAt)))
         .orderBy(asc(clients.nom), asc(clients.id));
       return rows.map(toClient);
     });
@@ -129,6 +137,67 @@ export class ClientRepositoryDrizzle implements IClientRepository {
     });
   }
 
+  fusionner(ctx: TenantContext, survivantId: number, doublonId: number): Promise<Client | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const a = ctx.artisanId;
+      /*
+       * Garde de cloisonnement DANS la transaction : les deux clients doivent appartenir au
+       * tenant. Sinon on n'altère rien (rollback implicite : on n'a encore rien écrit) → null.
+       */
+      const proprietes = await tx
+        .select({ id: clients.id })
+        .from(clients)
+        .where(and(eq(clients.artisanId, a), or(eq(clients.id, survivantId), eq(clients.id, doublonId))));
+      const ids = new Set(proprietes.map((r) => r.id));
+      if (!ids.has(survivantId) || !ids.has(doublonId)) return null;
+
+      const set = { clientId: survivantId };
+      /*
+       * Réaffectation EXHAUSTIVE de chaque table portant un `clientId` (12 tables RLS + filtre
+       * artisanId). Une table oubliée = historique orphelin. Les lignes filles (devis_lignes,
+       * factures_lignes…) suivent leur parent → pas de réaffectation directe.
+       */
+      await tx.update(factures).set(set).where(and(eq(factures.clientId, doublonId), eq(factures.artisanId, a)));
+      await tx.update(devis).set(set).where(and(eq(devis.clientId, doublonId), eq(devis.artisanId, a)));
+      await tx.update(interventions).set(set).where(and(eq(interventions.clientId, doublonId), eq(interventions.artisanId, a)));
+      await tx.update(contratsMaintenance).set(set).where(and(eq(contratsMaintenance.clientId, doublonId), eq(contratsMaintenance.artisanId, a)));
+      await tx.update(rdvEnLigne).set(set).where(and(eq(rdvEnLigne.clientId, doublonId), eq(rdvEnLigne.artisanId, a)));
+      await tx.update(chantiers).set(set).where(and(eq(chantiers.clientId, doublonId), eq(chantiers.artisanId, a)));
+      await tx.update(analysesPhotosChantier).set(set).where(and(eq(analysesPhotosChantier.clientId, doublonId), eq(analysesPhotosChantier.artisanId, a)));
+      await tx.update(avisClients).set(set).where(and(eq(avisClients.clientId, doublonId), eq(avisClients.artisanId, a)));
+      await tx.update(demandesContact).set(set).where(and(eq(demandesContact.clientId, doublonId), eq(demandesContact.artisanId, a)));
+      await tx.update(demandesAvis).set(set).where(and(eq(demandesAvis.clientId, doublonId), eq(demandesAvis.artisanId, a)));
+      await tx.update(conversations).set(set).where(and(eq(conversations.clientId, doublonId), eq(conversations.artisanId, a)));
+      await tx.update(clientPortalAccess).set(set).where(and(eq(clientPortalAccess.clientId, doublonId), eq(clientPortalAccess.artisanId, a)));
+      /*
+       * `client_portal_sessions` n'a NI artisanId NI RLS (jeton de session éphémère du portail).
+       * Le scope tenant tient car `doublonId` a été prouvé appartenir au tenant ci-dessus.
+       */
+      await tx.update(clientPortalSessions).set(set).where(eq(clientPortalSessions.clientId, doublonId));
+
+      /* Complète les champs vides du survivant à partir du doublon (règle pure, no-op si complet). */
+      const [survRow] = await tx.select().from(clients).where(eq(clients.id, survivantId)).limit(1);
+      const [dblRow] = await tx.select().from(clients).where(eq(clients.id, doublonId)).limit(1);
+      const maj = champsFusionnes(toClient(survRow), toClient(dblRow));
+      if (Object.keys(maj).length > 0) {
+        await tx.update(clients).set({ ...maj, updatedAt: new Date() }).where(and(eq(clients.id, survivantId), eq(clients.artisanId, a)));
+      }
+
+      /* Archive le doublon (jamais de delete dur). `WHERE archivedAt IS NULL` → idempotent. */
+      await tx
+        .update(clients)
+        .set({ archivedAt: new Date() })
+        .where(and(eq(clients.id, doublonId), eq(clients.artisanId, a), isNull(clients.archivedAt)));
+
+      const [updated] = await tx
+        .select()
+        .from(clients)
+        .where(and(eq(clients.id, survivantId), eq(clients.artisanId, a)))
+        .limit(1);
+      return updated ? toClient(updated) : null;
+    });
+  }
+
   search(ctx: TenantContext, query: string): Promise<Client[]> {
     return withTenant(this.db, ctx, async (tx) => {
       /*
@@ -143,6 +212,7 @@ export class ClientRepositoryDrizzle implements IClientRepository {
         .where(
           and(
             eq(clients.artisanId, ctx.artisanId),
+            isNull(clients.archivedAt),
             or(
               ilike(clients.nom, term),
               ilike(clients.prenom, term),

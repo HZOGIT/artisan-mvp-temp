@@ -110,6 +110,20 @@ export function findDuplicateGroups(clients: readonly Client[]): DuplicateGroup[
   return groups;
 }
 
+/*
+ * Choisit PUREMENT le survivant d'un groupe de doublons : le client au profil le plus complet
+ * (max de champs renseignés) ; à égalité, le plus ancien (id le plus petit) pour stabilité.
+ */
+export function pickSurvivor(group: readonly Client[]): Client {
+  const score = (c: Client) =>
+    [c.email, c.telephone, c.adresse, c.codePostal, c.ville, c.raisonSociale, c.siret, c.numeroTVA, c.notes]
+      .filter((v) => v != null && v !== "").length;
+  return group.reduce((best, c) => {
+    const ds = score(c) - score(best);
+    return ds > 0 || (ds === 0 && c.id < best.id) ? c : best;
+  });
+}
+
 export type CreateDupeReasonKey = "dupeReasonEmail" | "dupeReasonPhone" | "dupeReasonName";
 export interface CreateDuplicateMatch {
   client: Client;

@@ -92,6 +92,13 @@
       "when": 1782678888888,
       "tag": "20260628202844_coeff-deductibilite-tva",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1782680373739,
+      "tag": "20260628205933_clients-archived-at",
+      "breakpoints": true
     }
   ]
 }

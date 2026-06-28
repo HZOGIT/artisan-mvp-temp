@@ -17,9 +17,16 @@ export function useClients() {
   const remove = trpc.clients.delete.useMutation({
     onSuccess: () => utils.clients.list.invalidate(),
   });
+  /** Fusion de doublons : le doublon est archivé, l'historique passe au survivant → réinvalide liste + encours. */
+  const fusionner = trpc.clients.fusionner.useMutation({
+    onSuccess: () => {
+      utils.clients.list.invalidate();
+      utils.clients.getEncoursMap.invalidate();
+    },
+  });
 
   const clients: Client[] = list.data ?? [];
   const encoursMap: EncoursMap = encours.data ?? ({} as EncoursMap);
 
-  return { clients, encoursMap, isLoading: list.isLoading, update, remove };
+  return { clients, encoursMap, isLoading: list.isLoading, update, remove, fusionner };
 }

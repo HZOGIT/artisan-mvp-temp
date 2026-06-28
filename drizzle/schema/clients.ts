@@ -30,6 +30,7 @@ export const clients = pgTable("clients", {
   numeroTVA: varchar("numeroTVA", { length: 20 }),
   etiquettes: varchar("etiquettes", { length: 500 }),
   notes: text("notes"),
+  archivedAt: timestamp("archivedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
 });
