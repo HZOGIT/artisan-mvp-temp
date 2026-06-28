@@ -46,6 +46,33 @@ function migrationFiles(): string[] {
 }
 
 /**
+ * Statements découpés sur `--> statement-breakpoint`, vides retirés. Drizzle insère ce marqueur
+ * entre instructions ; le runner l'exploite pour appliquer statement par statement (modes tolérant
+ * et `-- no-transaction`).
+ */
+function splitStatements(content: string): string[] {
+  return content
+    .split("--> statement-breakpoint")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+/**
+ * SQLSTATE « objet déjà présent » tolérés pendant la bascule : `duplicate_column` (42701),
+ * `duplicate_table`/relation (42P07), `duplicate_object` — contrainte, index, type, policy,
+ * trigger (42710).
+ */
+const DUPLICATE_OBJECT_CODES = new Set(["42701", "42P07", "42710"]);
+
+/** Le schéma Drizzle (`drizzle.__drizzle_migrations`) est-il présent ? = on hérite d'une BDD gérée par Drizzle. */
+async function hasDrizzleLedger(ownerPool: Pool): Promise<boolean> {
+  const res = await ownerPool.query(
+    "select 1 from information_schema.tables where table_schema = 'drizzle' and table_name = '__drizzle_migrations'",
+  );
+  return Boolean(res.rowCount);
+}
+
+/**
  * Empreinte temporelle (`when` = epoch millis) de chaque migration, par tag, lue depuis
  * `meta/_journal.json`. C'est la clé qu'utilise Drizzle pour décider d'appliquer ou non une
  * migration. Utilisée UNIQUEMENT pour la bascule (transition Drizzle → runner). Absent (dossier
@@ -78,11 +105,6 @@ async function backfillFromDrizzle(
   files: string[],
   ledger: Map<string, string>,
 ): Promise<void> {
-  const hasDrizzle = await ownerPool.query(
-    "select 1 from information_schema.tables where table_schema = 'drizzle' and table_name = '__drizzle_migrations'",
-  );
-  if (!hasDrizzle.rowCount) return;
-
   const lastApplied = await ownerPool.query<{ max: string | null }>(
     "select max(created_at)::text as max from drizzle.__drizzle_migrations",
   );
@@ -112,44 +134,65 @@ async function backfillFromDrizzle(
  */
 const NO_TRANSACTION = /^[ \t]*--[ \t]*no-transaction\b/im;
 
+function isDuplicateObjectError(err: unknown): boolean {
+  const code = (err as { code?: string } | null)?.code;
+  return code !== undefined && DUPLICATE_OBJECT_CODES.has(code);
+}
+
+const recordLedger = "insert into __migrations (filename, checksum) values ($1, $2)";
+
 /**
  * Applique un fichier de migration et l'inscrit au ledger, sur une connexion dédiée (BEGIN/DDL/
  * INSERT/COMMIT DOIVENT partager la même connexion : `pool.query()` en emprunte une par appel,
  * le DDL tomberait alors hors transaction).
  *
- * Mode transactionnel (défaut) : tout le fichier dans un `BEGIN/COMMIT` → atomique (crash en
- * cours = rollback, réappliqué au boot suivant). Mode `-- no-transaction` : chaque statement
- * (séparé par `--> statement-breakpoint`) exécuté en auto-commit, puis inscription au ledger.
- * Sans transaction l'atomicité n'existe pas — un crash entre deux statements laisse une migration
- * partielle ; les statements doivent donc être idempotents (`… IF NOT EXISTS`).
+ * - **Mode `-- no-transaction`** : chaque statement (`--> statement-breakpoint`) en auto-commit
+ *   (requis pour `CREATE INDEX CONCURRENTLY` & co). Atomicité perdue → statements idempotents.
+ * - **Mode tolérant** (`tolerant=true`, bascule depuis une BDD Drizzle) : statement par statement
+ *   sous `SAVEPOINT` ; un échec « objet déjà présent » ({@link DUPLICATE_OBJECT_CODES}) est avalé
+ *   (DDL déjà appliqué hors-bande / ledger Drizzle incomplet) au lieu de crasher le boot, tout en
+ *   restant transactionnel (atomicité préservée par fichier). Toute autre erreur → throw.
+ * - **Mode strict** (défaut) : tout le fichier dans un `BEGIN/COMMIT` → atomique ; un duplicate
+ *   est une vraie erreur (BDD pur-runner, jamais gérée par Drizzle) → throw.
  */
 async function applyMigration(
   ownerPool: Pool,
   file: string,
   content: string,
   checksum: string,
+  tolerant: boolean,
 ): Promise<void> {
   const client = await ownerPool.connect();
   try {
     if (NO_TRANSACTION.test(content)) {
-      const statements = content
-        .split("--> statement-breakpoint")
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
-      for (const statement of statements) await client.query(statement);
-      await client.query("insert into __migrations (filename, checksum) values ($1, $2)", [
-        file,
-        checksum,
-      ]);
+      for (const statement of splitStatements(content)) {
+        try {
+          await client.query(statement);
+        } catch (err) {
+          if (!(tolerant && isDuplicateObjectError(err))) throw err;
+        }
+      }
+      await client.query(recordLedger, [file, checksum]);
       return;
     }
+
     try {
       await client.query("begin");
-      await client.query(content);
-      await client.query("insert into __migrations (filename, checksum) values ($1, $2)", [
-        file,
-        checksum,
-      ]);
+      if (tolerant) {
+        for (const statement of splitStatements(content)) {
+          await client.query("savepoint s");
+          try {
+            await client.query(statement);
+            await client.query("release savepoint s");
+          } catch (err) {
+            if (!isDuplicateObjectError(err)) throw err;
+            await client.query("rollback to savepoint s");
+          }
+        }
+      } else {
+        await client.query(content);
+      }
+      await client.query(recordLedger, [file, checksum]);
       await client.query("commit");
     } catch (err) {
       await client.query("rollback");
@@ -183,7 +226,13 @@ export async function runMigrations(ownerPool: Pool): Promise<void> {
 
   const files = migrationFiles();
 
-  await backfillFromDrizzle(ownerPool, files, ledger);
+  /**
+   * Transition = on hérite d'une BDD gérée par Drizzle (5432/5433). Active la bascule (peupler le
+   * ledger sans ré-exécuter) ET l'apply tolérant (DDL déjà présent toléré au lieu de crasher le
+   * boot sur un état récupérable). Une BDD pur-runner (sans schéma `drizzle`) reste en mode strict.
+   */
+  const transition = await hasDrizzleLedger(ownerPool);
+  if (transition) await backfillFromDrizzle(ownerPool, files, ledger);
 
   for (const file of files) {
     const content = fs.readFileSync(path.join(migrationsDir(), file), "utf8");
@@ -199,7 +248,7 @@ export async function runMigrations(ownerPool: Pool): Promise<void> {
     }
 
     try {
-      await applyMigration(ownerPool, file, content, checksum);
+      await applyMigration(ownerPool, file, content, checksum, transition);
     } catch (err) {
       throw new Error(`Migration ${file} échouée : ${String(err)}`);
     }

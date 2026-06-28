@@ -148,6 +148,56 @@ describe.skipIf(!URL)("runMigrations (Option D — runner SQL horodaté + ledger
     }
   });
 
+  it("transition (schéma drizzle présent) : migration pendante dont le DDL existe déjà → tolérée, sans throw", async () => {
+    if (!available) return;
+    /**
+     * Reproduit l'état dev 5432 : ledger Drizzle incomplet (la migration a un `when` > max
+     * created_at → classée pendante) MAIS son DDL est déjà présent en base (appliqué hors-bande).
+     * Le boot ne doit PAS crasher : le duplicate est avalé, la migration marquée appliquée.
+     */
+    const dir = writeFixtures({
+      "20000101000003_c.sql": "create table mig_c (id int);",
+    });
+    fs.mkdirSync(path.join(dir, "meta"), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "meta", "_journal.json"),
+      JSON.stringify({ entries: [{ idx: 0, tag: "20000101000003_c", when: 3000 }] }),
+    );
+    const temp = await createTempDb();
+    const pool = new Pool({ connectionString: temp.url, max: 2 });
+    try {
+      await pool.query("create schema drizzle");
+      await pool.query(
+        "create table drizzle.__drizzle_migrations (id serial primary key, hash text not null, created_at bigint)",
+      );
+      await pool.query("insert into drizzle.__drizzle_migrations (hash, created_at) values ('x', 1000)");
+      await pool.query("create table mig_c (id int)");
+
+      await expect(withMigrationsDir(dir, () => runMigrations(pool))).resolves.toBeUndefined();
+      const led = await pool.query("select count(*)::int as n from __migrations where filename='20000101000003_c.sql'");
+      expect(led.rows[0].n).toBe(1);
+    } finally {
+      await pool.end();
+      await temp.drop();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("strict hors transition : un duplicate sur BDD pur-runner (sans schéma drizzle) → throw", async () => {
+    if (!available) return;
+    const dir = writeFixtures({ "20000101000001_a.sql": "create table mig_a (id int);" });
+    const temp = await createTempDb();
+    const pool = new Pool({ connectionString: temp.url, max: 2 });
+    try {
+      await pool.query("create table mig_a (id int)");
+      await expect(withMigrationsDir(dir, () => runMigrations(pool))).rejects.toThrow(/already exists|existe/i);
+    } finally {
+      await pool.end();
+      await temp.drop();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("-- no-transaction : exécute hors transaction (CREATE INDEX CONCURRENTLY, interdit en bloc)", async () => {
     if (!available) return;
     const dir = writeFixtures({

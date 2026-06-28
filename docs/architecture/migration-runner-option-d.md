@@ -387,6 +387,16 @@ vérifiant contre un vrai PostgreSQL (tests `run-migrations.l2.test.ts`).
    Une migration dont la 1ʳᵉ ligne est `-- no-transaction` est exécutée statement par statement
    (split sur `--> statement-breakpoint`) en auto-commit. Atomicité perdue dans ce mode → ses
    statements doivent être idempotents (`… IF NOT EXISTS`).
+4. **Apply tolérant pendant la transition.** Une BDD héritée de Drizzle peut avoir un ledger
+   `drizzle.__drizzle_migrations` **incomplet** (DDL présent mais lignes manquantes — churn de
+   régénération, applications hors-bande par d'autres agents). La bascule par `folderMillis` classe
+   alors ces migrations « en attente » alors que leur DDL existe → ré-exécution → `… already exists`
+   → boot fail-closed → **crash-loop sur un état pourtant récupérable** (constaté au review sur 5432).
+   Correctif : tant que le schéma `drizzle` est présent (= transition), l'apply tourne en mode
+   **tolérant** — statement par statement sous `SAVEPOINT`, un échec « objet déjà présent »
+   (SQLSTATE `42701`/`42P07`/`42710`) est avalé (migration marquée appliquée) au lieu de crasher,
+   l'atomicité par fichier restant préservée. Une BDD **pur-runner** (sans schéma `drizzle`) reste
+   en mode **strict** : un duplicate y est une vraie erreur → throw.
 
 **Conséquence sur §6 « Ordre de livraison » point 5** : `_journal.json` n'est PAS un pur artéfact
 dev — il reste nécessaire à la bascule. Ne pas le présenter comme « ignoré au runtime » ; il est lu
