@@ -23,6 +23,13 @@ export interface EmailMessage {
   readonly fromName?: string;
   /** Adresse de réponse (ex. email de l'artisan). Sanitisation CRLF appliquée dans l'adapter. */
   readonly replyTo?: string;
+  /**
+   * URL de désinscription pré-signée (lifecycle/marketing uniquement).
+   * Quand présente : l'adapter ajoute les headers RFC 8058 List-Unsubscribe + List-Unsubscribe-Post
+   * et un lien visible en pied de corps HTML.
+   * Absente sur les emails transactionnels (facture, devis, relance…).
+   */
+  readonly unsubscribeUrl?: string;
 }
 
 export interface EmailPort {
