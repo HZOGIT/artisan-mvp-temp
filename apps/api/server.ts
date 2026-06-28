@@ -2,6 +2,7 @@ import "./otel.js";
 import v8 from "node:v8";
 import { PgBoss } from "pg-boss";
 import { buildApp } from "./app";
+import { hydrateSecrets, getSecret } from "./shared/config/secrets";
 import { getDbHandle } from "./shared/db/client";
 import { provisionDatabase, assertAppRoleExistsAndRestricted } from "./shared/db/provision-database";
 import { PgBossEventBus } from "./shared/queue/pg-boss-event-bus";
@@ -11,6 +12,9 @@ import { registerWorkers } from "./shared/queue/workers";
 import { ResendEmailAdapter } from "./shared/email/resend-email-adapter";
 
 async function main(): Promise<void> {
+  /* Hydratation Bitwarden en premier — les consommateurs lisent leurs secrets via getSecret(). */
+  await hydrateSecrets();
+
   /* Provision automatique au boot (sous verrou) : migrations schéma + RLS, rôle applicatif + droits. */
   const dbProvisionStart = Date.now();
   await provisionDatabase();
@@ -18,7 +22,7 @@ async function main(): Promise<void> {
   /* Fail-closed : refuse de servir si le pool runtime peut contourner la RLS. */
   await assertAppRoleExistsAndRestricted(getDbHandle().db);
 
-  const databaseUrl = process.env.DATABASE_URL;
+  const databaseUrl = getSecret("DATABASE_URL");
   if (!databaseUrl) throw new Error("DATABASE_URL manquant — requis pour pg-boss");
 
   const boss = new PgBoss({ connectionString: databaseUrl });
@@ -32,8 +36,8 @@ async function main(): Promise<void> {
 
   const app = buildApp({ eventBus, devisDb: getDbHandle().db });
   app.addHook("onClose", async () => { await boss.stop(); });
-  const port = Number(process.env.NEW_STACK_PORT ?? process.env.PORT ?? 3001);
-  const host = process.env.HOST ?? "0.0.0.0";
+  const port = Number(getSecret("NEW_STACK_PORT") ?? getSecret("PORT") ?? 3001);
+  const host = getSecret("HOST") ?? "0.0.0.0";
 
   await app.listen({ port, host });
 
@@ -43,12 +47,12 @@ async function main(): Promise<void> {
       event: "server_start",
       port,
       host,
-      env: process.env.NODE_ENV,
-      betterstack: !!process.env.BETTERSTACK_TOKEN,
-      stripe: !!process.env.STRIPE_SECRET_KEY,
-      resend: !!process.env.RESEND_API_KEY,
-      gemini: !!process.env.GEMINI_API_KEY,
-      jwtConfigured: !!process.env.JWT_SECRET,
+      env: getSecret("NODE_ENV"),
+      betterstack: !!getSecret("BETTERSTACK_TOKEN"),
+      stripe: !!getSecret("STRIPE_SECRET_KEY"),
+      resend: !!getSecret("RESEND_API_KEY"),
+      gemini: !!getSecret("GEMINI_API_KEY"),
+      jwtConfigured: !!getSecret("JWT_SECRET"),
       dbProvisionMs,
       heapUsedMb: Math.round(startMem.heapUsed / 1024 / 1024),
       rssMb: Math.round(startMem.rss / 1024 / 1024),

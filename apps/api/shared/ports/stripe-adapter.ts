@@ -1,4 +1,5 @@
 import type { CreateCustomerParams, CreateInvoiceCheckoutParams, StripePort, StripeWebhookEvent } from "./stripe";
+import { getSecret } from "../config/secrets";
 
 const STRIPE_MODULE = "stripe";
 
@@ -10,7 +11,7 @@ type StripeSDK = {
 
 export class StripeAdapter implements StripePort {
   private client: StripeSDK | null = null;
-  constructor(private readonly secretKey = process.env.STRIPE_SECRET_KEY ?? "") {}
+  constructor(private readonly secretKey = getSecret("STRIPE_SECRET_KEY") ?? "") {}
 
   private async sdk(): Promise<StripeSDK> {
     if (this.client) return this.client;

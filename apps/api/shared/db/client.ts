@@ -1,5 +1,6 @@
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+import { getSecret } from "../config/secrets";
 
 /** Le nouveau stack est PostgreSQL-only : pas d'indirection de dialecte ici. */
 export type DbClient = NodePgDatabase<Record<string, never>>;
@@ -32,7 +33,7 @@ export function createDbClient(connectionString: string, max = 10): DbHandle {
 let defaultHandle: DbHandle | null = null;
 export function getDbHandle(): DbHandle {
   if (defaultHandle) return defaultHandle;
-  const url = process.env.APP_DATABASE_URL;
+  const url = getSecret("APP_DATABASE_URL");
   if (!url) {
     throw new Error(
       "APP_DATABASE_URL manquant — le runtime DOIT utiliser le rôle applicatif non-superuser (RLS)",
