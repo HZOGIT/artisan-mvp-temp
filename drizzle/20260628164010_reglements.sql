@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS "reglements" CASCADE;--> statement-breakpoint
+DROP TYPE IF EXISTS "public"."reglement_mode" CASCADE;--> statement-breakpoint
 CREATE TYPE "public"."reglement_mode" AS ENUM('cheque', 'virement', 'especes', 'carte', 'autre');--> statement-breakpoint
 CREATE TABLE "reglements" (
 	"id" serial PRIMARY KEY NOT NULL,
