@@ -377,6 +377,49 @@ async function casAttestationTvaDownload() {
 }
 
 await casAttestationTvaDownload();
+
+// ── CAS 8 — clients.create + update + delete, teardown garanti (anti-régression OPE-735) ───────────
+// Bug : les runs précédents créaient des clients E2E-<ts> sans cleanup → pollution liste /clients.
+// Ce cas crée un client, vérifie la persistance, puis le supprime dans finally quelle que soit l'issue.
+async function casClientsCreateUpdateDelete() {
+  casesRun++;
+  const tag = 'clients.create-update-delete';
+  const trpcPost = async (proc, input) => ctx.request.post(`${BACKEND}/api/trpc/${proc}?batch=1`, {
+    headers: { 'content-type': 'application/json' },
+    data: { '0': { json: input } },
+  });
+  const ts = Date.now();
+  let clientId = null;
+  try {
+    const rc = await trpcPost('clients.create', { nom: `E2E-${ts} Client`, email: `e2e+${ts}@example.com`, type: 'particulier' });
+    if (!rc.ok()) { issues.push({ tag, step: 'create', error: `HTTP ${rc.status()}` }); return; }
+    const created = (await rc.json())[0]?.result?.data?.json;
+    if (!created?.id) { issues.push({ tag, step: 'create-id', error: 'id absent dans la réponse' }); return; }
+    clientId = created.id;
+
+    const fetched = await trpcGet('clients.getById', { id: clientId });
+    if (fetched?.nom !== `E2E-${ts} Client`) {
+      issues.push({ tag, step: 'getById', expected: `E2E-${ts} Client`, got: fetched?.nom });
+    }
+
+    const ru = await trpcPost('clients.update', { id: clientId, nom: `E2E-${ts} Updated` });
+    if (!ru.ok()) { issues.push({ tag, step: 'update', error: `HTTP ${ru.status()}` }); }
+    else {
+      const afterUpdate = await trpcGet('clients.getById', { id: clientId });
+      if (afterUpdate?.nom !== `E2E-${ts} Updated`) {
+        issues.push({ tag, step: 'update-persist', expected: `E2E-${ts} Updated`, got: afterUpdate?.nom });
+      }
+    }
+  } catch (e) {
+    issues.push({ tag, error: String(e).slice(0, 200) });
+  } finally {
+    if (clientId !== null) {
+      try { await trpcPost('clients.delete', { id: clientId }); } catch { /* best-effort */ }
+    }
+  }
+}
+
+await casClientsCreateUpdateDelete();
 // ── (Ajouter ici les cas factures/contrats et tout futur bug d'intégration front↔tRPC) ─────────────
 
 console.log('=== E2E MUTATIONS RESULT ===');
