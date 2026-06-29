@@ -13,6 +13,8 @@ export interface IClientRepository {
   list(ctx: TenantContext): Promise<Client[]>;
   /** null si le client n'appartient pas au tenant. */
   getById(ctx: TenantContext, id: number): Promise<Client | null>;
+  /** Batch : renvoie uniquement les clients appartenant au tenant (filtre cross-tenant inclus). */
+  listByIds(ctx: TenantContext, ids: number[]): Promise<Client[]>;
   create(ctx: TenantContext, input: CreateClientInput): Promise<Client>;
   /** null si le client n'appartient pas au tenant. */
   update(ctx: TenantContext, id: number, input: UpdateClientInput): Promise<Client | null>;
