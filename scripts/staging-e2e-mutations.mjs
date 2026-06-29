@@ -82,7 +82,7 @@ async function casBillingGetInfo() {
   }
 }
 
-// ── CAS 3 — Page /parametres?tab=abonnement : section billing visible + dialog "Ajouter" s'ouvre ──
+// ── CAS 3 — Page /abonnement : section billing visible + dialog "Ajouter" s'ouvre ──
 // Anti-régression : vérifie que BillingMaisonSection est monté et que le bouton "Ajouter" ouvre bien
 // AddCardDialog (bug possible : dialog ne s'ouvre pas si state addCardOpen mal propagé).
 async function casBillingRender() {
@@ -93,11 +93,11 @@ async function casBillingRender() {
   page.on('pageerror', (e) => consoleErrors.push(String(e).slice(0, 200)));
   page.on('console', (msg) => { if (msg.type() === 'error') consoleErrors.push(msg.text().slice(0, 200)); });
   try {
-    await page.goto('/parametres?tab=abonnement', { waitUntil: 'networkidle' });
+    await page.goto('/abonnement', { waitUntil: 'networkidle' });
     const btn = page.getByRole('button', { name: /Ajouter/i }).first();
     const btnVisible = await btn.isVisible({ timeout: 4000 }).catch(() => false);
     if (!btnVisible) {
-      issues.push({ tag, error: 'Bouton "Ajouter" non visible sur /parametres?tab=abonnement', consoleErrors });
+      issues.push({ tag, error: 'Bouton "Ajouter" non visible sur /abonnement', consoleErrors });
       return;
     }
     await btn.click();
