@@ -131,6 +131,46 @@ describe("helpers de clé de période", () => {
 
 /* ── L2 integration tests (PostgreSQL) ── */
 
+describe.skipIf(!process.env.DATABASE_URL)("JobRegistry.runAll — idempotence bout-en-bout tous jobs", () => {
+  let handle: DbHandle;
+  let db: DbClient;
+
+  beforeAll(() => {
+    const url = process.env.DATABASE_URL;
+    if (!url) throw new Error("DATABASE_URL requis pour les tests L2");
+    handle = createDbClient(url);
+    db = handle.db;
+  });
+
+  afterAll(async () => {
+    await handle.close();
+  });
+
+  it("4 jobs s'exécutent au premier tick puis sont tous skippés au second (même période)", async () => {
+    const repo = new JobRunRepositoryDrizzle(db);
+    const registry = new JobRegistry(repo);
+    const calls: Record<string, number> = {};
+
+    const jobNames = ["relances-devis-idem", "alertes-previsions-idem", "depenses-recurrentes-idem", "factures-recurrentes-idem"];
+    for (const name of jobNames) {
+      calls[name] = 0;
+      registry.register({ name, periodKey: dailyKey, run: async () => { calls[name]++; } });
+    }
+
+    const now = new Date();
+
+    await registry.runAll(now);
+    for (const name of jobNames) {
+      expect(calls[name], `${name} doit avoir tourné 1 fois`).toBe(1);
+    }
+
+    await registry.runAll(now);
+    for (const name of jobNames) {
+      expect(calls[name], `${name} doit rester à 1 (skip au 2e tick)`).toBe(1);
+    }
+  });
+});
+
 describe.skipIf(!process.env.DATABASE_URL)("JobRunRepositoryDrizzle — intégration PG", () => {
   let handle: DbHandle;
   let db: DbClient;

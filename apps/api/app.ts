@@ -183,7 +183,6 @@ import { genererAlertesStock } from "./modules/stocks/application/alertes-use-ca
 import { genererAlertesRetardLivraison } from "./modules/commandes/application/alertes-retard-use-cases";
 import { genererAlertesReconductionContrats } from "./modules/contrats-maintenance/application/alertes-reconduction-use-cases";
 import { artisans as artisansTable, paOutbox } from "../../drizzle/schema.pg";
-import { contratsFacturesCronPlugin } from "./shared/infra/contrats-factures-cron";
 import { makeDepensesRecurrentesJob } from "./modules/depenses/application/depenses-recurrentes-job";
 import { contratsVisitesCronPlugin } from "./shared/infra/contrats-visites-cron";
 import { rappelRdvClientCronPlugin } from "./shared/infra/rappel-rdv-client-cron";
@@ -1319,13 +1318,6 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
         return { alertsCreated };
       },
     },
-  });
-
-  /** Cron factures contrats — tick horaire, génère les factures récurrentes dues (prochainFacturation <= now). */
-  app.register(contratsFacturesCronPlugin, {
-    repo: contratRepo,
-    factureGen: new FacturesContratFactureGenerator(factureRepo),
-    db: getDbHandle().db,
   });
 
   /** Cron visites contrats — tick horaire, génère les interventions récurrentes dues (prochainPassage <= now). */
