@@ -117,5 +117,6 @@
   "creerSituation": "Créer la facture de situation",
   "toastSituationCreee": "Facture de situation créée",
   "errSituation": "Erreur lors de la création de la situation",
-  "errPourcentageInvalide": "Veuillez saisir un pourcentage entre 1 et 100"
+  "errPourcentageInvalide": "Veuillez saisir un pourcentage entre 1 et 100",
+  "sousTotalLot": "Sous-total {{label}} — {{montant}}"
 }

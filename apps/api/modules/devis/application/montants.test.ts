@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calculerMontantsLigne, calculerTotaux } from "./montants";
+import { calculerMontantsLigne, calculerTotaux, calculerSousTotauxParSection } from "./montants";
 
 describe("devis — calcul des montants de ligne (pur)", () => {
   it("ligne produit : HT = q×pu, TVA = HT×taux/100, TTC = HT+TVA", () => {
@@ -80,5 +80,53 @@ describe("devis — calcul des totaux (pur)", () => {
   it("invariant totalTTC = totalHT + totalTVA", () => {
     const t = calculerTotaux([{ montantHT: "1234.56", montantTVA: "246.91", montantTTC: "1481.47" }]);
     expect(Number(t.totalTTC)).toBeCloseTo(Number(t.totalHT) + Number(t.totalTVA), 2);
+  });
+});
+
+describe("devis — sous-totaux par section (pur)", () => {
+  const l = (type: "produit" | "section" | "note", ht = "0.00", tva = "0.00", ttc = "0.00", designation = "") =>
+    ({ type, designation, montantHT: ht, montantTVA: tva, montantTTC: ttc } as const);
+
+  it("aucune section → Map vide", () => {
+    expect(calculerSousTotauxParSection([l("produit", "100.00", "20.00", "120.00")])).toEqual(new Map());
+  });
+
+  it("section neutre (0 articles) → Map vide", () => {
+    expect(calculerSousTotauxParSection([l("section", "0.00", "0.00", "0.00", "Lot 1")])).toEqual(new Map());
+  });
+
+  it("regroupement correct : sous-total après le dernier article du lot", () => {
+    const lignes = [
+      l("section", "0.00", "0.00", "0.00", "Lot 1 — Plomberie"),
+      l("produit", "100.00", "20.00", "120.00"),
+      l("produit", "200.00", "40.00", "240.00"),
+      l("section", "0.00", "0.00", "0.00", "Lot 2 — Électricité"),
+      l("produit", "50.00", "10.00", "60.00"),
+    ] as const;
+    const result = calculerSousTotauxParSection(lignes);
+    expect(result.size).toBe(2);
+    expect(result.get(2)).toEqual({ sectionLabel: "Lot 1 — Plomberie", totalHT: "300.00", totalTVA: "60.00", totalTTC: "360.00" });
+    expect(result.get(4)).toEqual({ sectionLabel: "Lot 2 — Électricité", totalHT: "50.00", totalTVA: "10.00", totalTTC: "60.00" });
+  });
+
+  it("note dans un lot : ne contribue pas au sous-total, sous-total après la note", () => {
+    const lignes = [
+      l("section", "0.00", "0.00", "0.00", "Lot 1"),
+      l("produit", "100.00", "20.00", "120.00"),
+      l("note", "0.00", "0.00", "0.00"),
+    ] as const;
+    const result = calculerSousTotauxParSection(lignes);
+    expect(result.get(2)).toEqual({ sectionLabel: "Lot 1", totalHT: "100.00", totalTVA: "20.00", totalTTC: "120.00" });
+  });
+
+  it("articles avant la première section : ignorés (pas de sous-total)", () => {
+    const lignes = [
+      l("produit", "999.00", "199.80", "1198.80"),
+      l("section", "0.00", "0.00", "0.00", "Lot 1"),
+      l("produit", "50.00", "10.00", "60.00"),
+    ] as const;
+    const result = calculerSousTotauxParSection(lignes);
+    expect(result.size).toBe(1);
+    expect(result.get(2)).toEqual({ sectionLabel: "Lot 1", totalHT: "50.00", totalTVA: "10.00", totalTTC: "60.00" });
   });
 });

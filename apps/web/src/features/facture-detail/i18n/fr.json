@@ -129,5 +129,6 @@
   "uploaderSignee": "Uploader signée",
   "uploaderSigneeTitre": "Importer l'attestation signée",
   "uploaderSigneeDesc": "Importez le PDF de l'attestation signé par le client.",
-  "toastAttestationSigneeUplodee": "Attestation signée enregistrée"
+  "toastAttestationSigneeUplodee": "Attestation signée enregistrée",
+  "sousTotalLot": "Sous-total {{label}} — {{montant}}"
 }

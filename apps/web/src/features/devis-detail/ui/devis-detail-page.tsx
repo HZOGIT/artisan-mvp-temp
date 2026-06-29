@@ -16,7 +16,7 @@ import { Badge } from "@/shared/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 import { Textarea } from "@/shared/ui/textarea";
 import { useDevisDetail } from "../application/use-devis-detail";
-import { formatCurrency, activitesForDevis, pendingCount, pdfLignes, statutTransition, STATUS_LABEL_KEY, STATUS_COLORS, RAPPEL_TYPE_KEY, type RappelType } from "../domain/devis-detail";
+import { formatCurrency, activitesForDevis, pendingCount, pdfLignes, statutTransition, STATUS_LABEL_KEY, STATUS_COLORS, RAPPEL_TYPE_KEY, sectionSousTotaux, type RappelType } from "../domain/devis-detail";
 
 /*
  * Page `/devis/:id` — migration clean-archi de `pages/DevisDetail.tsx`. Markup à l'identique. Le dialog
@@ -231,7 +231,8 @@ export default function DevisDetailPage() {
                   <table className="data-table">
                     <thead><tr><th>{t("colReference")}</th><th>{t("colDesignation")}</th><th className="text-right">{t("colQte")}</th><th className="text-right">{t("colPrixHT")}</th><th className="text-right">{t("colTVA")}</th><th className="text-right">{t("colTotalTTC")}</th><th className="w-12"></th></tr></thead>
                     <tbody>
-                      {devis.lignes.map((ligne) => {
+                      {(() => { const stMap = sectionSousTotaux(devis.lignes); return devis.lignes.map((ligne, i) => {
+                        const st = stMap.get(i);
                         if (ligne.type === "section" || ligne.type === "note") {
                           return (
                             <tr key={ligne.id} className={ligne.type === "section" ? "bg-muted/50" : ""}>
@@ -241,17 +242,25 @@ export default function DevisDetailPage() {
                           );
                         }
                         return (
-                          <tr key={ligne.id}>
-                            <td>{ligne.reference || "-"}</td>
-                            <td>{ligne.designation}</td>
-                            <td className="text-right">{ligne.quantite} {ligne.unite}</td>
-                            <td className="text-right">{formatCurrency(ligne.prixUnitaireHT)}</td>
-                            <td className="text-right">{ligne.tauxTVA}%</td>
-                            <td className="text-right font-medium">{formatCurrency(ligne.montantTTC)}</td>
-                            <td><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteLine(ligne.id)}><Trash2 className="h-4 w-4" /></Button></td>
-                          </tr>
+                          <>
+                            <tr key={ligne.id}>
+                              <td>{ligne.reference || "-"}</td>
+                              <td>{ligne.designation}</td>
+                              <td className="text-right">{ligne.quantite} {ligne.unite}</td>
+                              <td className="text-right">{formatCurrency(ligne.prixUnitaireHT)}</td>
+                              <td className="text-right">{ligne.tauxTVA}%</td>
+                              <td className="text-right font-medium">{formatCurrency(ligne.montantTTC)}</td>
+                              <td><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteLine(ligne.id)}><Trash2 className="h-4 w-4" /></Button></td>
+                            </tr>
+                            {st && (
+                              <tr key={`st-${i}`} className="bg-slate-100/80 border-t border-slate-200">
+                                <td colSpan={6} className="text-right text-sm font-semibold text-slate-600 py-1 pr-4">{t("sousTotalLot", { label: st.sectionLabel, montant: formatCurrency(st.totalHT) })}</td>
+                                <td></td>
+                              </tr>
+                            )}
+                          </>
                         );
-                      })}
+                      }); })()}
                     </tbody>
                     <tfoot>
                       <tr className="border-t-2"><td colSpan={5} className="text-right font-medium">{t("totalHT")}</td><td className="text-right font-medium">{formatCurrency(devis.totalHT)}</td><td></td></tr>
