@@ -97,9 +97,9 @@ Ainsi drizzle-kit lit **ton** schéma (tes edits) et écrit dans **ton** `drizzl
 **🔴 Restaurer les snapshots préexistants (obligatoire, avant `git add`) :**
 ```bash
 git -C /tmp/wt-__SESSION_NAME__ fetch origin staging -q
-git -C /tmp/wt-__SESSION_NAME__ checkout origin/staging -- drizzle/meta/
+git -C /tmp/wt-__SESSION_NAME__ checkout origin/staging -- 'drizzle/meta/*_snapshot.json'
 ```
-`drizzle-kit generate` réécrit **tous** les snapshots `drizzle/meta/` (prevId + ré-encodage unicode) des migrations déjà mergées → stowaway dans la PR → le reviewer rejette. Ce checkout restaure les snapshots préexistants depuis `origin/staging`. Le **nouveau** snapshot (absent d'`origin/staging`) est laissé intact par git.
+`drizzle-kit generate` réécrit **tous** les snapshots `drizzle/meta/` (prevId + ré-encodage unicode) des migrations déjà mergées → stowaway dans la PR → le reviewer rejette. Ce checkout restaure uniquement les `*_snapshot.json` préexistants depuis `origin/staging`. `_journal.json` (modifié par generate avec la nouvelle entrée) et le **nouveau** snapshot (absent d'`origin/staging`) restent intacts.
 
 **Vérifie après generate + restauration** :
 ```bash
