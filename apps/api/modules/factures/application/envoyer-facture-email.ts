@@ -2,6 +2,8 @@ import { NotFoundError, ValidationError, TooManyRequestsError } from "../../../s
 import type { TenantContext } from "../../../shared/tenant";
 import type { EmailPort } from "../../../shared/ports/email";
 import type { PdfPort } from "../../../shared/ports/pdf";
+import type { StoragePort } from "../../../shared/ports/storage";
+import type { DbClient } from "../../../shared/db";
 import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import { round2 } from "../../../shared/money";
 import type { IFactureRepository } from "./facture-repository";
@@ -21,6 +23,9 @@ export interface FactureMailingDeps {
   readonly rateLimiter: RateLimiterPort;
   /** Optionnel : si présent, le modèle `isDefault` du type `envoi_facture` remplace le gabarit codé en dur. */
   readonly modeleEmailRepo?: IModeleEmailRepository;
+  /** Optionnel : stockage S3 pour lire/écrire le PDF figé à l'émission. */
+  readonly storage?: StoragePort;
+  readonly db?: DbClient;
 }
 
 export interface EnvoyerFactureEmailInput {
@@ -171,8 +176,21 @@ export async function envoyerFactureParEmail(
   const attachments = input.attachPdf
     ? await (async () => {
         const lignes = await repo.listLignes(ctx, facture.id);
-        const pdf = await deps.pdf.render("facture", { facture: { ...facture, lignes }, artisan, client });
-        return [{ filename: `Facture_${effectiveNumero}.pdf`, content: pdf, contentType: "application/pdf" }];
+        let pdfBuf: Buffer | null = null;
+        if (facture.pdfStorageKey && deps.storage) {
+          pdfBuf = await deps.storage.get(facture.pdfStorageKey);
+        }
+        if (!pdfBuf) {
+          pdfBuf = await deps.pdf.render("facture", { facture: { ...facture, lignes }, artisan, client });
+          if (deps.storage && deps.db && !facture.pdfStorageKey) {
+            try {
+              const s3Key = `factures/${ctx.artisanId}/${facture.id}.pdf`;
+              const stored = await deps.storage.withDb(deps.db).upload(s3Key, pdfBuf, { contentType: "application/pdf", artisanId: ctx.artisanId, filename: `Facture_${effectiveNumero}.pdf`, purpose: "facture-pdf" }, ctx);
+              await repo.setPdfFile(ctx, facture.id, stored.id, stored.storageKey);
+            } catch (_) { /* best-effort */ }
+          }
+        }
+        return [{ filename: `Facture_${effectiveNumero}.pdf`, content: pdfBuf, contentType: "application/pdf" }];
       })()
     : undefined;
 

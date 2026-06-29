@@ -184,4 +184,24 @@ describe.skipIf(!URL)("FactureRepositoryDrizzle (PG, RLS + scope tenant + lignes
     const montantNum = Number(updated?.montantPaye || "0");
     expect(montantNum).toBeLessThanOrEqual(144.005);
   });
+
+  it("setPdfFile : pose pdfFileId + pdfStorageKey ; lecture cohérente ; cross-tenant ignoré (OPE-687)", async () => {
+    await admin.query("insert into files (id,storage_key,mime_type,size_bytes,sha256,purpose,bucket) values ($1,$2,'application/pdf',1000,'abc','facture-pdf','test')", [99_000_001, "factures/test/99000001.pdf"]);
+    try {
+      const f = await repo.create(ctx(A), { clientId: clientA, numero: "FAC-PDF-01" });
+      expect(f.pdfFileId).toBeNull();
+      expect(f.pdfStorageKey).toBeNull();
+
+      await repo.setPdfFile(ctx(A), f.id, 99_000_001, "factures/test/99000001.pdf");
+      const reloaded = await repo.getById(ctx(A), f.id);
+      expect(reloaded?.pdfFileId).toBe(99_000_001);
+      expect(reloaded?.pdfStorageKey).toBe("factures/test/99000001.pdf");
+
+      await repo.setPdfFile(ctx(B), f.id, 99_000_001, "hack");
+      const unchanged = await repo.getById(ctx(A), f.id);
+      expect(unchanged?.pdfStorageKey).toBe("factures/test/99000001.pdf");
+    } finally {
+      await admin.query("delete from files where id=$1", [99_000_001]);
+    }
+  });
 });

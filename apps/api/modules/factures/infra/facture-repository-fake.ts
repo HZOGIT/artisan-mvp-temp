@@ -99,6 +99,8 @@ export class FakeFactureRepository implements IFactureRepository {
       updatedAt: now,
       nombreRelances: 0,
       regimeTVA: input.regimeTVA ?? "normal",
+      pdfFileId: null,
+      pdfStorageKey: null,
     };
     this.factureStore.push(f);
     return f;
@@ -163,6 +165,8 @@ export class FakeFactureRepository implements IFactureRepository {
       updatedAt: now,
       nombreRelances: 0,
       regimeTVA: header.regimeTVA ?? "normal",
+      pdfFileId: null,
+      pdfStorageKey: null,
     };
     this.factureStore.push(facture);
     const lignesAdded: number[] = [];
@@ -349,6 +353,8 @@ export class FakeFactureRepository implements IFactureRepository {
       updatedAt: now,
       nombreRelances: 0,
       regimeTVA: "normal",
+      pdfFileId: null,
+      pdfStorageKey: null,
     };
     this.factureStore.push(avoir);
     input.lignes.forEach((l, i) => {
@@ -411,6 +417,8 @@ export class FakeFactureRepository implements IFactureRepository {
       updatedAt: now,
       nombreRelances: 0,
       regimeTVA: "normal",
+      pdfFileId: null,
+      pdfStorageKey: null,
     };
     this.factureStore.push(facture);
     input.lignes.forEach((l) => {
@@ -519,6 +527,14 @@ export class FakeFactureRepository implements IFactureRepository {
     this.lignesStore = this.lignesStore.filter((l) => l.id !== ligneId);
     this.recalculerTotaux(ligne.factureId);
     return true;
+  }
+
+  async setPdfFile(ctx: TenantContext, factureId: number, fileId: number, storageKey: string): Promise<void> {
+    this.factureStore = this.factureStore.map((f) =>
+      f.id === factureId && f.artisanId === ctx.artisanId
+        ? { ...f, pdfFileId: fileId, pdfStorageKey: storageKey, updatedAt: new Date() }
+        : f,
+    );
   }
 
   withDb(_db: DbClient): FakeFactureRepository {

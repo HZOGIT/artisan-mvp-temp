@@ -767,6 +767,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       email: emailAdapter,
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
       modeleEmailRepo,
+      storage: facturesStorage,
+      db: deps.facturesDb ?? getDbHandle().db,
     },
     push: pushAdapter,
     outboxInTx: (artisanId, factureId, tx) =>
@@ -1463,6 +1465,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       getCgv: async (cgvCtx) => (await getParametres(deps.parametresRepo ?? new ParametresRepositoryDrizzle(getDbHandle().db), cgvCtx)).conditionsGenerales ?? null,
     },
     pdf: new JsPdfAdapter(),
+    storage: facturesStorage,
     rateLimiter: new SlidingWindowRateLimiter(60, 60 * 1000),
   });
 

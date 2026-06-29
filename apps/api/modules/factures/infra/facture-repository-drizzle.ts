@@ -60,6 +60,8 @@ function toFacture(r: FactureRow): Facture {
     updatedAt: r.updatedAt,
     nombreRelances: r.nombreRelances ?? 0,
     regimeTVA: (r.regimeTVA ?? "normal") as Facture["regimeTVA"],
+    pdfFileId: r.pdfFileId ?? null,
+    pdfStorageKey: r.pdfStorageKey ?? null,
   };
 }
 
@@ -703,6 +705,15 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
       .update(factures)
       .set({ totalHT: totaux.totalHT, totalTVA: totaux.totalTVA, totalTTC: totaux.totalTTC, updatedAt: new Date() })
       .where(eq(factures.id, factureId));
+  }
+
+  setPdfFile(ctx: TenantContext, factureId: number, fileId: number, storageKey: string): Promise<void> {
+    return withTenant(this.db, ctx, async (tx) => {
+      await tx
+        .update(factures)
+        .set({ pdfFileId: fileId, pdfStorageKey: storageKey, updatedAt: new Date() })
+        .where(and(eq(factures.id, factureId), eq(factures.artisanId, ctx.artisanId)));
+    });
   }
 
   withDb(db: DbClient): FactureRepositoryDrizzle {

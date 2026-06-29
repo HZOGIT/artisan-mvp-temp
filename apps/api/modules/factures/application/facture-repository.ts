@@ -88,6 +88,8 @@ export interface IFactureRepository {
   deleteLigne(ctx: TenantContext, ligneId: number): Promise<boolean>;
   /** Ajoute un reglement et recalcule montantPaye de la facture. Retourne le reglement créé. */
   ajouterReglement(ctx: TenantContext, input: CreateReglementInput): Promise<Reglement | null>;
+  /** Pose le file id + storage key du PDF figé (idempotent — appelé à l'émission). */
+  setPdfFile(ctx: TenantContext, factureId: number, fileId: number, storageKey: string): Promise<void>;
   /** Retourne une instance du repo scopée à la transaction `db` (nécessaire pour withOutbox). */
   withDb(db: DbClient): IFactureRepository;
 }

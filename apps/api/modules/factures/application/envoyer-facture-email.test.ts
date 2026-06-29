@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { FakeFactureRepository } from "../infra/facture-repository-fake";
 import { envoyerFactureParEmail, buildFactureEmail, type FactureMailingDeps } from "./envoyer-facture-email";
-import { FakeEmailPort, FakePdfPort, FakeRateLimiter } from "../../../shared/ports";
+import { FakeEmailPort, FakePdfPort, FakeRateLimiter, InMemoryStoragePort } from "../../../shared/ports";
 import { NotFoundError, ValidationError, TooManyRequestsError } from "../../../shared/errors";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import type { TenantContext } from "../../../shared/tenant";
@@ -142,5 +142,38 @@ describe("envoyerFactureParEmail", () => {
     await envoyerFactureParEmail(repo, deps, A, { factureId: f.id, attachPdf: false });
     const email = deps.email as FakeEmailPort;
     expect(email.sent[0].body).toContain("Veuillez trouver ci-joint");
+  });
+
+  it("OPE-687 — persistance PDF : stocke le PDF à l'émission si storage dispo et pdfStorageKey absent", async () => {
+    const repo = new FakeFactureRepository();
+    const storage = new InMemoryStoragePort();
+    const fakeDb = {} as never;
+    const f = await seedFacture(repo, A);
+    const deps = makeDeps({ storage, db: fakeDb });
+    expect(f.pdfFileId).toBeNull();
+
+    await envoyerFactureParEmail(repo, deps, A, { factureId: f.id, attachPdf: true });
+
+    const saved = await repo.getById(A, f.id);
+    expect(saved?.pdfStorageKey).not.toBeNull();
+    expect(saved?.pdfStorageKey).toMatch(/^factures\//);
+    expect(saved?.pdfFileId).not.toBeNull();
+    const storedBuf = await storage.get(saved!.pdfStorageKey!);
+    expect(storedBuf).not.toBeNull();
+  });
+
+  it("OPE-687 — réutilisation : si pdfStorageKey déjà posé, le PDF stocké est servi (pas de re-render)", async () => {
+    const repo = new FakeFactureRepository();
+    const storage = new InMemoryStoragePort();
+    const fakeDb = {} as never;
+    const f = await seedFacture(repo, A);
+    const deps = makeDeps({ storage, db: fakeDb });
+
+    await envoyerFactureParEmail(repo, deps, A, { factureId: f.id, attachPdf: true });
+    const pdf = deps.pdf as FakePdfPort;
+    expect(pdf.rendered).toHaveLength(1);
+
+    await envoyerFactureParEmail(repo, deps, A, { factureId: f.id, attachPdf: true });
+    expect(pdf.rendered).toHaveLength(1);
   });
 });
