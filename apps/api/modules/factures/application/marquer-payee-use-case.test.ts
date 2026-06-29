@@ -9,7 +9,7 @@ const A: TenantContext = { artisanId: 1, userId: 10 };
 const B: TenantContext = { artisanId: 2, userId: 20 };
 const fakeArtisanReader = { getArtisan: async () => ({ id: 1, nomEntreprise: null, email: null, siret: "73282932000074" }) };
 
-// Espionne le ComptaPort : capture les appels (ordre/ids) ; option d'échec pour le best-effort.
+/** Espionne le ComptaPort : capture les appels (ordre/ids) ; option d'échec pour tester la propagation. */
 class SpyComptaPort implements ComptaPort {
   readonly calls: string[] = [];
   constructor(private readonly fail = false) {}
@@ -21,6 +21,10 @@ class SpyComptaPort implements ComptaPort {
     this.calls.push(`encaissement:${factureId}`);
     if (this.fail) throw new Error("compta KO");
   }
+  async validerEcritures(_ctx: TenantContext, factureId: number): Promise<void> {
+    this.calls.push(`valider:${factureId}`);
+    if (this.fail) throw new Error("compta KO");
+  }
 }
 
 async function factureEmise(repo: FakeFactureRepository): Promise<number> {
@@ -30,12 +34,8 @@ async function factureEmise(repo: FakeFactureRepository): Promise<number> {
   return f.id;
 }
 
-// L1 — `marquerFacturePayee` (parité legacy `markAsPaid`) : écrase montantPaye, force statut=payee, puis
-// génère les écritures FEC (vente + encaissement) en best-effort. Couvre le happy path + ordre des
-// écritures, la garde date invalide AVANT toute écriture, l'anti-IDOR, et le best-effort (échec compta
-// ne casse pas le paiement). Gap détecté it.76 : ce use-case n'avait aucun test unitaire.
 describe("factures — marquerFacturePayee (markAsPaid + FEC)", () => {
-  it("force statut=payee, écrase montantPaye, génère vente puis encaissement (dans l'ordre)", async () => {
+  it("force statut=payee, écrase montantPaye, génère vente + encaissement + validerEcritures (dans l'ordre)", async () => {
     const repo = new FakeFactureRepository();
     repo.registerClient(A.artisanId, 100);
     const id = await factureEmise(repo);
@@ -43,7 +43,7 @@ describe("factures — marquerFacturePayee (markAsPaid + FEC)", () => {
     const f = await marquerFacturePayee(repo, A, id, { montantPaye: "120.00", datePaiement: "2026-03-10" }, compta);
     expect(f.statut).toBe("payee");
     expect(f.montantPaye).toBe("120.00");
-    expect(compta.calls).toEqual([`vente:${id}`, `encaissement:${id}`]);
+    expect(compta.calls).toEqual([`vente:${id}`, `encaissement:${id}`, `valider:${id}`]);
   });
 
   it("date de paiement invalide → ValidationError AVANT toute écriture (aucun appel compta)", async () => {
@@ -52,7 +52,7 @@ describe("factures — marquerFacturePayee (markAsPaid + FEC)", () => {
     const id = await factureEmise(repo);
     const compta = new SpyComptaPort();
     await expect(marquerFacturePayee(repo, A, id, { montantPaye: "120.00", datePaiement: "pas-une-date" }, compta)).rejects.toBeInstanceOf(ValidationError);
-    expect(compta.calls).toEqual([]); // garde AVANT l'écriture en base + compta
+    expect(compta.calls).toEqual([]);
   });
 
   it("facture d'un autre tenant → NotFoundError (anti-IDOR)", async () => {
@@ -62,13 +62,13 @@ describe("factures — marquerFacturePayee (markAsPaid + FEC)", () => {
     await expect(marquerFacturePayee(repo, B, id, { montantPaye: "120.00", datePaiement: "2026-03-10" })).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it("best-effort compta : un échec de génération d'écritures ne casse pas le paiement", async () => {
+  it("échec compta best-effort : paiement déjà committé reste accessible, pas d'exception", async () => {
     const repo = new FakeFactureRepository();
     repo.registerClient(A.artisanId, 100);
     const id = await factureEmise(repo);
-    const compta = new SpyComptaPort(true); // genererEcritures* throw
+    const compta = new SpyComptaPort(true);
     const f = await marquerFacturePayee(repo, A, id, { montantPaye: "120.00", datePaiement: "2026-03-10" }, compta);
-    expect(f.statut).toBe("payee"); // paiement bien enregistré malgré l'échec compta
-    expect(compta.calls).toContain(`vente:${id}`); // tenté
+    expect(f.statut).toBe("payee");
+    expect(compta.calls).toContain(`vente:${id}`);
   });
 });

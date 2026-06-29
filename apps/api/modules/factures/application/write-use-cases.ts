@@ -202,8 +202,14 @@ export async function enregistrerPaiementFacture(
    */
   if (soldee) {
     factureCounter.inc({ action: "paid" });
-    await compta.genererEcrituresVente(ctx, id);
-    await compta.genererEcrituresEncaissement(ctx, id, updated);
+    try {
+      await compta.genererEcrituresVente(ctx, id);
+      await compta.genererEcrituresEncaissement(ctx, id, updated);
+      await compta.validerEcritures(ctx, id);
+    } catch (err) {
+      /** Paiement déjà committé — échec compta non bloquant ; backfill via scripts/backfill-ecritures-compta.ts */
+      console.error("[compta] enregistrerPaiement: generer/valider échoué facture", id, err);
+    }
   }
   return updated;
 }
@@ -218,10 +224,11 @@ export type MarquerPayeeInput = { readonly montantPaye: string; readonly datePai
  * Marque une facture comme **payée** (parité legacy `markAsPaid`). ⚠️ Sémantique LEGACY (différente de
  * `enregistrerPaiementFacture`) : **écrase** `montantPaye`, force `statut=payee` (la facture émise est
  * soldée par cette action — le client n'appelle markAsPaid que sur une facture émise), puis génère les
- * **écritures FEC** (vente + encaissement) via le `ComptaPort`. L'invariant **Σ débit = Σ crédit** est
- * garanti par les use-cases de génération (domaine ecritures). Date invalide → ValidationError (400) AVANT
- * toute écriture (parité legacy : pas d'écriture sur une date NaN). Hors tenant → NotFoundError (404).
- * Génération d'écritures **best-effort** (try/catch — un échec compta ne casse pas le paiement, parité legacy).
+ * **écritures FEC** (vente + encaissement) et les **verrouille** (inaltérabilité). L'invariant
+ * **Σ débit = Σ crédit** est garanti par les use-cases de génération (domaine ecritures). Date invalide
+ * → ValidationError (400) AVANT toute écriture. Hors tenant → NotFoundError (404).
+ * Génération d'écritures **best-effort** : le paiement est déjà committé avant les appels compta
+ * (non-atomique) — un échec compta est logué et non renvoyé (backfill via backfill-ecritures-compta.ts).
  */
 export async function marquerFacturePayee(
   repo: IFactureRepository,
@@ -246,8 +253,10 @@ export async function marquerFacturePayee(
   try {
     await compta.genererEcrituresVente(ctx, id);
     await compta.genererEcrituresEncaissement(ctx, id, updated);
-  } catch {
-    /** Échec de génération des écritures : ne casse pas le paiement (parité legacy try/catch). */
+    await compta.validerEcritures(ctx, id);
+  } catch (err) {
+    /** Paiement déjà committé — échec compta non bloquant ; backfill via scripts/backfill-ecritures-compta.ts */
+    console.error("[compta] marquerPayee: generer/valider échoué facture", id, err);
   }
   return updated;
 }
@@ -377,16 +386,12 @@ export async function creerAvoir(
     lignes,
   });
   if (!avoir) throw new NotFoundError("Facture d'origine introuvable");
-  /*
-   * L'avoir est émis (`validee`) : on génère immédiatement ses écritures de vente (journal VE,
-   * TVA INVERSÉE — `genererEcrituresVente` gère `isAvoir`) pour que la note de crédit RÉDUISE la
-   * TVA collectée / le grand livre / la balance. Idempotent (purge+réinsertion). Best-effort : un
-   * échec d'écriture ne casse pas l'émission du document avoir.
-   */
   try {
     await compta.genererEcrituresVente(ctx, avoir.id);
-  } catch {
-    /** écritures non bloquantes pour le document (cohérent avec les autres flux compta best-effort) */
+    await compta.validerEcritures(ctx, avoir.id);
+  } catch (err) {
+    /** Avoir déjà committé — échec compta non bloquant ; backfill via scripts/backfill-ecritures-compta.ts */
+    console.error("[compta] creerAvoir: generer/valider échoué avoir", avoir.id, err);
   }
   return avoir;
 }
