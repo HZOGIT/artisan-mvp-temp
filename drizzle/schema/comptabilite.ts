@@ -44,6 +44,8 @@ export const ecrituresComptables = pgTable("ecritures_comptables", {
   lettrage: varchar("lettrage", { length: 10 }),
   pointage: boolean("pointage").default(false),
   statut: ecritureStatutEnum("statut").default("brouillon").notNull(),
+  /** Numéro de pièce permanent (A47 A-1 LPF) — assigné à la validation, immuable. */
+  ecritureNum: integer("ecritureNum"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type EcritureComptable = typeof ecrituresComptables.$inferSelect;

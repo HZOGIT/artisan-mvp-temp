@@ -232,6 +232,13 @@
       "when": 1751240580000,
       "tag": "20260629223000_fk-ecritures-factureid",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1751247540000,
+      "tag": "20260629235900_add_ecriturenum_persiste",
+      "breakpoints": true
     }
   ]
 }

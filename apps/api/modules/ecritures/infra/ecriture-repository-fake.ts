@@ -10,6 +10,7 @@ import type { EcritureComptable, CreateEcritureInput } from "../domain/ecriture"
 export class FakeEcritureRepository implements IEcritureRepository {
   private store: EcritureComptable[] = [];
   private seq = 0;
+  private numSeq = 0;
 
   async list(ctx: TenantContext): Promise<EcritureComptable[]> {
     return this.store.filter((e) => e.artisanId === ctx.artisanId);
@@ -37,6 +38,7 @@ export class FakeEcritureRepository implements IEcritureRepository {
       lettrage: l.lettrage ?? null,
       pointage: l.pointage ?? false,
       statut: "brouillon" as const,
+      ecritureNum: null,
       createdAt: now,
     }));
     this.store.push(...created);
@@ -72,11 +74,17 @@ export class FakeEcritureRepository implements IEcritureRepository {
   }
 
   async validateByFacture(ctx: TenantContext, factureId: number): Promise<number> {
+    const journaux = Array.from(new Set(
+      this.store
+        .filter((e) => e.artisanId === ctx.artisanId && e.factureId === factureId && e.statut === "brouillon")
+        .map((e) => e.journal),
+    ));
+    const numParJournal = new Map(journaux.map((j) => [j, ++this.numSeq]));
     let count = 0;
     this.store = this.store.map((e) => {
-      if (e.artisanId === ctx.artisanId && e.factureId === factureId && e.statut !== "validee") {
+      if (e.artisanId === ctx.artisanId && e.factureId === factureId && e.statut === "brouillon") {
         count++;
-        return { ...e, statut: "validee" as const };
+        return { ...e, statut: "validee" as const, ecritureNum: numParJournal.get(e.journal) ?? null };
       }
       return e;
     });

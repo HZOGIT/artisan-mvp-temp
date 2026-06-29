@@ -32,6 +32,8 @@ export interface EcritureComptable {
   readonly lettrage: string | null;
   readonly pointage: boolean;
   readonly statut: EcritureStatut;
+  /** Numéro de pièce permanent (A47 A-1 LPF) — assigné à la validation, null avant validation. */
+  readonly ecritureNum: number | null;
   readonly createdAt: Date;
 }
 

@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, max, sql } from "drizzle-orm";
 import { ecrituresComptables } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
@@ -24,6 +24,7 @@ function toEcriture(r: EcritureRow): EcritureComptable {
     lettrage: r.lettrage ?? null,
     pointage: r.pointage ?? false,
     statut: r.statut as EcritureComptable["statut"],
+    ecritureNum: r.ecritureNum ?? null,
     createdAt: r.createdAt,
   };
 }
@@ -141,17 +142,46 @@ export class EcritureRepositoryDrizzle implements IEcritureRepository {
 
   validateByFacture(ctx: TenantContext, factureId: number): Promise<number> {
     return withTenant(this.db, ctx, async (tx) => {
-      const updated = await tx
-        .update(ecrituresComptables)
-        .set({ statut: "validee" })
+      /* Récupère les journaux distincts des écritures brouillon à valider */
+      const toValidate = await tx
+        .select({ journal: ecrituresComptables.journal })
+        .from(ecrituresComptables)
         .where(
           and(
             eq(ecrituresComptables.artisanId, ctx.artisanId),
             eq(ecrituresComptables.factureId, factureId),
+            eq(ecrituresComptables.statut, "brouillon"),
           ),
-        )
-        .returning({ id: ecrituresComptables.id });
-      return updated.length;
+        );
+      if (toValidate.length === 0) return 0;
+
+      /* Prochain ecritureNum : MAX actuel pour cet artisan + 1 (dans la transaction) */
+      const [{ maxNum }] = await tx
+        .select({ maxNum: max(ecrituresComptables.ecritureNum) })
+        .from(ecrituresComptables)
+        .where(eq(ecrituresComptables.artisanId, ctx.artisanId));
+      let nextNum = (maxNum ?? 0) + 1;
+
+      /* Une pièce = un journal (même factureId) → un ecritureNum par journal */
+      const journaux = Array.from(new Set(toValidate.map((r) => r.journal)));
+      let updated = 0;
+      for (const journal of journaux) {
+        const ecritureNum = nextNum++;
+        const rows = await tx
+          .update(ecrituresComptables)
+          .set({ statut: "validee", ecritureNum })
+          .where(
+            and(
+              eq(ecrituresComptables.artisanId, ctx.artisanId),
+              eq(ecrituresComptables.factureId, factureId),
+              eq(ecrituresComptables.journal, journal),
+              eq(ecrituresComptables.statut, "brouillon"),
+            ),
+          )
+          .returning({ id: ecrituresComptables.id });
+        updated += rows.length;
+      }
+      return updated;
     });
   }
 }

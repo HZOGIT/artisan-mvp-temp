@@ -44,19 +44,23 @@ function clePiece(e: EcritureComptable): string {
 
 /*
  * Génère le contenu FEC (string) à partir d'écritures déjà filtrées par période. Trie par date,
- * puis par pièce (EcritureNum stable), puis par id. `validDate` = date de validation (par défaut
- * la date d'écriture).
+ * puis par ecritureNum, puis par id. Utilise ecritureNum persisté (permanent, A47 A-1 LPF) ;
+ * repli calculé pour les écritures en brouillon ou non encore backfillées.
  */
 export function exporterFEC(ecritures: readonly EcritureComptable[]): string {
-  /** Attribue un EcritureNum incrémental par pièce, dans l'ordre chronologique d'apparition. */
   const tri = ecritures
     .slice()
     .sort((a, b) => a.dateEcriture.getTime() - b.dateEcriture.getTime() || a.id - b.id);
+
+  /* Offset calculé au-delà des ecritureNum déjà persistés pour éviter les collisions */
+  const maxPersisted = ecritures.reduce((m, e) => (e.ecritureNum != null && e.ecritureNum > m ? e.ecritureNum : m), 0);
+  let prochainNum = maxPersisted;
   const numParPiece = new Map<string, number>();
-  let prochainNum = 0;
   for (const e of tri) {
     const cle = clePiece(e);
-    if (!numParPiece.has(cle)) numParPiece.set(cle, ++prochainNum);
+    if (!numParPiece.has(cle)) {
+      numParPiece.set(cle, e.ecritureNum ?? ++prochainNum);
+    }
   }
 
   const lignes = [FEC_HEADER.join(SEP)];
