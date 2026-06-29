@@ -70,6 +70,7 @@ Après 3 rounds de corrections sans avancée → `notify.sh human BLOCKED`.
 **Types de messages bus** :
 - `PR_READY` — envoyé par la session worker quand la PR est prête
 - `REVIEW_FEEDBACK` — envoyé par le reviewer vers la session worker (demande de corrections)
+- `SLOT_FREE` — envoyé par `slot-watcher` vers `project-manager` quand un slot se libère (format payload : `<actifs>/<cap> — <libres> libre(s)`) ; usage : `./scripts/agents/slot-watcher.sh start`
 
 ## Linear CLI — linearis
 
@@ -261,7 +262,8 @@ le TYPE, puis, si une étape suivante existe, renotifie l'agent concerné.
 TASK_DELEGATE (prends cette tâche) · TASK_DONE (j'ai fini, enchaîne) ·
 REQUEST_REVIEW (relis/valide) · BLOCKED (je suis bloqué) · ALERT (incident) ·
 ACK (accusé de réception, optionnel) · PR_READY (PR GitHub prête pour review) ·
-REVIEW_FEEDBACK (corrections demandées par le reviewer — injecté comme prompt humain).
+REVIEW_FEEDBACK (corrections demandées par le reviewer — injecté comme prompt humain) ·
+SLOT_FREE (slot worktree libéré — envoyé par slot-watcher vers project-manager).
 
 ### Superviser
     ./scripts/agents/agents-status.sh   # agents actifs + messages en attente
