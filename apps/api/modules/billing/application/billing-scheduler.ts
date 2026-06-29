@@ -508,6 +508,19 @@ async function activateExpiredTrials(deps: SchedulerDeps, now: Date): Promise<nu
       }
       const amountCents = plan.amountCentsByInterval[interval];
 
+      if (!sub.payment_method_id) {
+        await deps.repo.updateSubscriptionPeriod(sub.id, "past_due", trialEnd, periodEnd);
+        await deps.repo.appendEvent({
+          entityType: "billing_subscription",
+          entityId: sub.id,
+          eventType: "subscription.trial_expired_no_payment_method",
+          payload: { artisanId: sub.artisan_id, planId: sub.plan_id, interval },
+          actor: "scheduler",
+        });
+        activated++;
+        continue;
+      }
+
       /*
        * Cycle créé AVANT updateSubscriptionPeriod(active).
        * Si createCycle échoue, la sub reste trialing → retentée au tick suivant (idempotent).

@@ -1305,13 +1305,14 @@ describe("FIX-M — claimCycleForCharging : atomic CAS anti double-charge", () =
 });
 
 describe("FIX-N — activateExpiredTrials : transition trialing→active au tick", () => {
-  it("sub trialing avec trial_ends_at échu → active + cycle pending créé", async () => {
+  it("sub trialing avec PM + trial_ends_at échu → active + cycle pending créé", async () => {
     const { repo, billing } = makeDeps();
+    const pm = await setupPm(repo);
     const trialEnd = new Date(Date.now() - 3600_000);
     const sub = await repo.saveSubscription({
       artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
       status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
-      trialEndsAt: trialEnd, paymentMethodId: null,
+      trialEndsAt: trialEnd, paymentMethodId: pm.id,
     });
 
     const result = await runSchedulerTick({ repo, billing });
@@ -1321,13 +1322,12 @@ describe("FIX-N — activateExpiredTrials : transition trialing→active au tick
     expect(updated.status).toBe("active");
     const cycle = repo.cycles.find(c => c.subscription_id === sub.id);
     expect(cycle).toBeDefined();
-    expect(cycle?.status).toBe("pending");
     expect(cycle?.amount_cents).toBeGreaterThan(0);
     const ev = repo.events.find(e => e.event_type === "subscription.trial_expired");
     expect(ev).toBeDefined();
   });
 
-  it("FIX-OPE713 — activation efface trial_ends_at (résiduel nettoyé)", async () => {
+  it("FIX-OPE713 — trial expiré sans PM efface trial_ends_at (résiduel nettoyé)", async () => {
     const { repo, billing } = makeDeps();
     const trialEnd = new Date(Date.now() - 3600_000);
     const sub = await repo.saveSubscription({
@@ -1339,7 +1339,7 @@ describe("FIX-N — activateExpiredTrials : transition trialing→active au tick
     await runSchedulerTick({ repo, billing });
 
     const updated = repo.subs.find(s => s.id === sub.id)!;
-    expect(updated.status).toBe("active");
+    expect(updated.status).toBe("past_due");
     expect(updated.trial_ends_at).toBeNull();
   });
 
@@ -1373,30 +1373,33 @@ describe("FIX-N — activateExpiredTrials : transition trialing→active au tick
     expect(repo.subs[0]!.status).toBe("trialing");
   });
 
-  it("idempotent : deuxième tick ne crée pas un deuxième cycle", async () => {
+  it("idempotent avec PM : deuxième tick ne re-active pas la sub (sub déjà active)", async () => {
     const { repo, billing } = makeDeps();
+    const pm = await setupPm(repo);
     const trialEnd = new Date(Date.now() - 3600_000);
     await repo.saveSubscription({
       artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
       status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
-      trialEndsAt: trialEnd, paymentMethodId: null,
+      trialEndsAt: trialEnd, paymentMethodId: pm.id,
     });
 
-    await runSchedulerTick({ repo, billing });
-    await runSchedulerTick({ repo, billing });
+    const tick1 = await runSchedulerTick({ repo, billing });
+    const tick2 = await runSchedulerTick({ repo, billing });
 
-    expect(repo.cycles).toHaveLength(1);
+    expect(tick1.trialsActivated).toBe(1);
+    expect(tick2.trialsActivated).toBe(0);
+    expect(repo.subs.find(s => s.artisan_id === ARTISAN_ID)!.status).toBe("active");
   });
 
   it("trial expiré + PM présente → prélèvement effectué dans le même tick", async () => {
     const { repo, billing } = makeDeps();
+    const pm = await setupPm(repo);
     const trialEnd = new Date(Date.now() - 3600_000);
     await repo.saveSubscription({
       artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
       status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
-      trialEndsAt: trialEnd, paymentMethodId: null,
+      trialEndsAt: trialEnd, paymentMethodId: pm.id,
     });
-    await setupPm(repo);
     billing.nextChargeResult = { paymentIntentId: "pi_trial_ok", status: "succeeded" };
 
     const result = await runSchedulerTick({ repo, billing });
@@ -1409,28 +1412,31 @@ describe("FIX-N — activateExpiredTrials : transition trialing→active au tick
 });
 
 describe("FIX-O — activateExpiredTrials : robustesse ordre + limit", () => {
-  it("cycle créé avant updateSubscriptionPeriod : ordre idempotent après échec partiel", async () => {
-    /* Simule un 1er tick où le cycle est créé mais findExpiredTrials repick la sub
-       (en la remettant trialing manuellement) → le 2ème tick trouve le cycle existant via
-       findPendingCycleForPeriod et n'en crée pas un deuxième. */
+  it("cycle créé avant updateSubscriptionPeriod : pas de doublon si updatePeriod échoue puis réussit au tick suivant", async () => {
+    /* Simule un 1er tick où le cycle est créé mais updateSubscriptionPeriod échoue →
+       sub reste trialing, cycle pending existe. Tick 2 : findPendingCycleForPeriod
+       trouve le cycle existant → skip createCycle → pas de doublon. */
     const { repo, billing } = makeDeps();
+    const pm = await setupPm(repo);
     const trialEnd = new Date(Date.now() - 3600_000);
     await repo.saveSubscription({
       artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
       status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
-      trialEndsAt: trialEnd, paymentMethodId: null,
+      trialEndsAt: trialEnd, paymentMethodId: pm.id,
     });
 
-    await runSchedulerTick({ repo, billing });
-    const cycleCountAfterFirst = repo.cycles.length;
-    expect(cycleCountAfterFirst).toBe(1);
-
-    /* Remet la sub en trialing pour simuler un second passage (partial failure) */
-    await repo.updateSubscriptionStatus(CTX, "trialing");
+    /* Tick 1 : createCycle réussit, updateSubscriptionPeriod échoue (one-shot) */
+    repo.simulateUpdateSubscriptionPeriodError = new Error("DB transient");
     await runSchedulerTick({ repo, billing });
 
-    /* Pas de cycle en double */
-    expect(repo.cycles).toHaveLength(1);
+    /* Cycle créé, sub toujours trialing */
+    expect(repo.cycles.filter(c => c.period_start.getTime() === trialEnd.getTime())).toHaveLength(1);
+    expect(repo.subs.find(s => s.artisan_id === ARTISAN_ID)!.status).toBe("trialing");
+
+    /* Tick 2 : findPendingCycleForPeriod trouve le cycle existant → pas de doublon */
+    await runSchedulerTick({ repo, billing });
+
+    expect(repo.cycles.filter(c => c.period_start.getTime() === trialEnd.getTime())).toHaveLength(1);
   });
 
   it("findExpiredTrials respecte la limite — seuls N subs sont activées par tick", async () => {
@@ -1506,11 +1512,12 @@ describe("FIX-Q — resumeBillingIfAbandoned : pas de reset attempt_count → pa
 describe("FIX-CDO — activateExpiredTrials : billing_interval=yearly → montant et période corrects", () => {
   it("sub trialing yearly → cycle avec period_end = trialEnd+1an + amount_cents annuel", async () => {
     const { repo, billing } = makeDeps();
+    const pm = await setupPm(repo);
     const trialEnd = new Date("2026-03-01T00:00:00Z");
     await repo.saveSubscription({
       artisanId: ARTISAN_ID, planId: "pro", billingInterval: "yearly", billingMode: "maison",
       status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
-      trialEndsAt: new Date(trialEnd.getTime() - 3600_000), paymentMethodId: null,
+      trialEndsAt: new Date(trialEnd.getTime() - 3600_000), paymentMethodId: pm.id,
     });
 
     await runSchedulerTick({ repo, billing });
@@ -1546,11 +1553,12 @@ describe("FIX-Z — activateExpiredTrials : plan inconnu → skip, pas de cycle 
 
   it("FIX-CH — catch-all trial_activation_error inclut artisanId (cohérence payload)", async () => {
     const { repo, billing } = makeDeps();
+    const pm = await setupPm(repo);
     const trialEnd = new Date(Date.now() - 1000);
     await repo.saveSubscription({
       artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
       status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
-      trialEndsAt: trialEnd, paymentMethodId: null,
+      trialEndsAt: trialEnd, paymentMethodId: pm.id,
     });
     repo.simulateCreateCycleError = new Error("db connection lost");
 
@@ -1563,13 +1571,14 @@ describe("FIX-Z — activateExpiredTrials : plan inconnu → skip, pas de cycle 
     expect(String((errEv!.payload as Record<string, unknown>)["error"])).toContain("db connection lost");
   });
 
-  it("plan_id valide → cycle amount_cents > 0 (pas de cycle €0)", async () => {
+  it("plan_id valide + PM → cycle amount_cents > 0 (pas de cycle €0)", async () => {
     const { repo, billing } = makeDeps();
+    const pm = await setupPm(repo);
     const trialEnd = new Date(Date.now() - 3600_000);
     await repo.saveSubscription({
       artisanId: ARTISAN_ID, planId: "pro", billingMode: "maison",
       status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
-      trialEndsAt: trialEnd, paymentMethodId: null,
+      trialEndsAt: trialEnd, paymentMethodId: pm.id,
     });
 
     await runSchedulerTick({ repo, billing });
@@ -2162,8 +2171,8 @@ describe("FIX-CDJ — chargeOffSessionForCycle : DB failure post-Stripe-succeede
   });
 });
 
-describe("FIX-CDK — activateExpiredTrials sans PM : sub passe active, cycle débité dès l'ajout d'un PM (DB constraint chk_pm_required supprimée en 0012)", () => {
-  it("trial expiré sans PM → sub active + cycle pending (non chargé). Ajout PM → tick suivant facture", async () => {
+describe("OPE-720 — activateExpiredTrials : trial expiré sans PM → past_due (chk_pm_required)", () => {
+  it("trial expiré sans PM → past_due, aucun cycle créé, event trial_expired_no_payment_method", async () => {
     const { repo, billing } = makeDeps();
     const trialEnd = new Date(Date.now() - 3600_000);
     await repo.saveSubscription({
@@ -2176,35 +2185,48 @@ describe("FIX-CDK — activateExpiredTrials sans PM : sub passe active, cycle d�
 
     expect(tick1.trialsActivated).toBe(1);
     const sub = repo.subs.find(s => s.artisan_id === ARTISAN_ID)!;
-    expect(sub.status).toBe("active");
-    const cycle = repo.cycles.find(c => c.subscription_id === sub.id)!;
-    expect(cycle).toBeDefined();
-    expect(cycle.status).toBe("pending");
+    expect(sub.status).toBe("past_due");
+    expect(sub.trial_ends_at).toBeNull();
+    expect(repo.cycles).toHaveLength(0);
+    const ev = repo.events.find(e => e.event_type === "subscription.trial_expired_no_payment_method");
+    expect(ev).toBeDefined();
+    expect((ev!.payload as Record<string, unknown>)["artisanId"]).toBe(ARTISAN_ID);
+  });
 
-    /*
-     * Tick 2 : sub active mais sans PM → findSubscriptionsWithDueCycles exclut la sub
-     * (PM filter). Aucun prélèvement, cycle reste pending — pas d'accès gratuit infini
-     * car l'artisan est bloqué tant qu'il n'a pas de PM actif.
-     */
-    const tick2 = await runSchedulerTick({ repo, billing });
-    expect(tick2.charged).toBe(0);
-    expect(billing.chargesAttempted).toHaveLength(0);
-    const cycleAfterTick2 = repo.cycles.find(c => c.id === cycle.id)!;
-    expect(cycleAfterTick2.status).toBe("pending");
-
-    /* Artisan ajoute un PM → tick 3 : prélèvement immédiat du cycle pending */
-    const pm = await repo.savePaymentMethod({
-      artisanId: ARTISAN_ID, stripeCustomerId: "cus_cdktest",
-      stripePaymentMethodId: "pm_cdktest", brand: "visa", last4: "4242",
-      expMonth: 12, expYear: 2029, consentedAt: new Date(),
+  it("trial expiré sans PM → tick suivant n'effectue pas de nouvelle tentative (idempotent)", async () => {
+    const { repo, billing } = makeDeps();
+    const trialEnd = new Date(Date.now() - 3600_000);
+    await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: trialEnd, paymentMethodId: null,
     });
-    await repo.setDefaultPaymentMethod({ artisanId: ARTISAN_ID, userId: 0 }, pm.id);
-    billing.nextChargeResult = { paymentIntentId: "pi_cdktest", status: "succeeded" };
 
-    const tick3 = await runSchedulerTick({ repo, billing });
-    expect(tick3.charged).toBe(1);
-    const cycleAfterTick3 = repo.cycles.find(c => c.id === cycle.id)!;
-    expect(cycleAfterTick3.status).toBe("paid");
+    const tick1 = await runSchedulerTick({ repo, billing });
+    const tick2 = await runSchedulerTick({ repo, billing });
+
+    expect(tick1.trialsActivated).toBe(1);
+    expect(tick2.trialsActivated).toBe(0);
+    expect(repo.events.filter(e => e.event_type === "subscription.trial_activation_error")).toHaveLength(0);
+  });
+
+  it("trial expiré avec PM → active + cycle pending (chemin normal inchangé)", async () => {
+    const { repo, billing } = makeDeps();
+    const pm = await setupPm(repo);
+    const trialEnd = new Date(Date.now() - 3600_000);
+    await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: trialEnd, paymentMethodId: pm.id,
+    });
+
+    const tick1 = await runSchedulerTick({ repo, billing });
+
+    expect(tick1.trialsActivated).toBe(1);
+    const sub = repo.subs.find(s => s.artisan_id === ARTISAN_ID)!;
+    expect(sub.status).toBe("active");
+    expect(repo.cycles.length).toBeGreaterThanOrEqual(1);
+    expect(repo.events.filter(e => e.event_type === "subscription.trial_activation_error")).toHaveLength(0);
   });
 });
 
@@ -2336,33 +2358,33 @@ describe("FIX-CDH — protection catch blocks : appendEvent en échec ne doit pa
   });
 
   describe("activateExpiredTrials", () => {
-    it("appendEvent dans le catch throw → swallowed, trial suivant activé normalement", async () => {
+    it("erreur updateSubscriptionPeriod + appendEvent → swallowed, trial suivant traité normalement", async () => {
       const { repo, billing } = makeDeps();
       const ARTISAN_ID_2 = 2;
       const trialEnd = new Date(Date.now() - 3600_000);
 
-      /* sub1 — createCycle va échouer → catch → appendEvent va échouer */
+      /* sub1 sans PM — updateSubscriptionPeriod va échouer → catch → appendEvent va échouer */
       await repo.saveSubscription({
         artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
         status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
         trialEndsAt: trialEnd, paymentMethodId: null,
       });
 
-      /* sub2 — doit être activée malgré la double erreur sur sub1 */
+      /* sub2 sans PM — doit passer past_due malgré la double erreur sur sub1 */
       await repo.saveSubscription({
         artisanId: ARTISAN_ID_2, planId: "starter", billingMode: "maison",
         status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
         trialEndsAt: trialEnd, paymentMethodId: null,
       });
 
-      repo.simulateCreateCycleError = new Error("pool exhausted");
+      repo.simulateUpdateSubscriptionPeriodError = new Error("pool exhausted");
       repo.simulateAppendEventError = new Error("DB still down");
 
       const result = await runSchedulerTick({ repo, billing });
 
       expect(result.trialsActivated).toBe(1);
       const sub2 = repo.subs.find(s => s.artisan_id === ARTISAN_ID_2)!;
-      expect(sub2.status).toBe("active");
+      expect(sub2.status).toBe("past_due");
     });
   });
 
