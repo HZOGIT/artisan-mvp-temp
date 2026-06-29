@@ -16,7 +16,7 @@ const selectOptionInput = z.object({ token: z.string().min(1).max(64), optionId:
 const signInput = z.object({
   token: z.string().min(1).max(64),
   /** image base64 d'une signature manuscrite (~500 Ko) */
-  signatureData: z.string().max(500000),
+  signatureData: z.string().max(500000).regex(/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/]/, "Format attendu : data URL image base64 (png ou jpeg)"),
   signataireName: z.string().max(200),
   signataireEmail: z.string().email().max(320),
 });
