@@ -162,6 +162,13 @@
       "when": 1751201987,
       "tag": "20260629125947_date-verrouillage-compta",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1782741996762,
+      "tag": "20260629140636_facture-acompte",
+      "breakpoints": true
     }
   ]
 }
