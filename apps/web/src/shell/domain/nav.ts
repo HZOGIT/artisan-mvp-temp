@@ -4,7 +4,7 @@ import {
   RefreshCw, Users, Upload, Star, Globe, MessageCircle, Clock, Calendar, CalendarDays, Wrench, MapPin,
   HardHat, Route, Truck, Car, Package, Boxes, ShoppingCart, Building2, Calculator, Bell, CalendarOff,
   Trophy, Medal, Wallet, PiggyBank, BarChart3, Wand2, Settings, BookOpen, HelpCircle, User, LayoutGrid,
-  Mail, Briefcase, Activity, Zap,
+  Mail, Briefcase, Activity, Zap, CreditCard,
 } from "lucide-react";
 
 /*
@@ -78,6 +78,7 @@ export const NAV_GROUPS: NavGroup[] = [
     { icon: Wand2, label: "Règles auto", path: "/regles-depenses" },
   ] },
   { id: "parametres", title: "Paramètres", icon: Settings, color: "slate", items: [
+    { icon: CreditCard, label: "Abonnement", path: "/abonnement" },
     { icon: Zap, label: "Facturation électronique", path: "/facturation-electronique" },
     { icon: BookOpen, label: "Guide d'utilisation", path: "/documentation" },
     { icon: HelpCircle, label: "Support", path: "/support" },
@@ -104,7 +105,7 @@ export const pathPermissionMap: Record<string, string> = {
   "/chantiers": "chantiers.voir", "/planification": "interventions.gerer", "/articles": "articles.voir",
   "/stocks": "articles.voir", "/rapport-commande": "exports.voir", "/commandes": "articles.voir",
   "/fournisseurs": "articles.voir", "/rapports": "exports.voir", "/comptabilite": "comptabilite.voir",
-  "/previsions": "comptabilite.voir", "/parametres": "parametres.voir", "/ma-vitrine": "vitrine.gerer",
+  "/previsions": "comptabilite.voir", "/parametres": "parametres.voir", "/abonnement": "parametres.voir", "/ma-vitrine": "vitrine.gerer",
   "/modeles-email": "parametres.voir", "/modeles-email-transactionnels": "parametres.voir",
   "/facturation-electronique": "parametres.voir",
   "/utilisateurs": "utilisateurs.gerer", "/profil": "", "/assistant": "", "/notifications": "",
@@ -143,7 +144,7 @@ export const MODULE_TO_LABELS: Record<string, string[]> = {
 };
 
 export const ALWAYS_VISIBLE_LABELS = new Set([
-  "Tableau de bord", "Statistiques", "Mon profil", "Paramètres", "Guide d'utilisation", "Mes modules",
+  "Tableau de bord", "Statistiques", "Mon profil", "Paramètres", "Guide d'utilisation", "Mes modules", "Abonnement",
 ]);
 
 /** Filtre les items d'un groupe selon les modules actifs. null (loading/déconnecté) → show-all. PUR. */

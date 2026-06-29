@@ -1,4 +1,6 @@
 {
+  "pageTitre": "Mon abonnement",
+  "pageSousTitre": "Gérez votre abonnement et vos moyens de paiement.",
   "trialTitre": "Essai gratuit — {{count}} jour restant",
   "trialTitre_other": "Essai gratuit — {{count}} jours restants",
   "trialSousTitre": "Se termine le {{date}}",

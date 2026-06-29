@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { Settings, FileText, Bell, Save, Palette, Upload, Trash2, Image, CreditCard, Globe, ExternalLink, Download, Shield } from "lucide-react";
+import { Settings, FileText, Bell, Save, Palette, Upload, Trash2, Image, Globe, ExternalLink, Download, Shield } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Label } from "@/shared/ui/label";
 import { Textarea } from "@/shared/ui/textarea";
 import { Switch } from "@/shared/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
-import { AbonnementSection } from "@/features/abonnement/ui/abonnement-section";
 import { BACKEND_URL, apiUrl } from "@/shared/backend-url";
 import { useParametres } from "../application/use-parametres";
 import {
@@ -32,9 +30,6 @@ export default function ParametresPage() {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const initialTab = new URLSearchParams(window.location.search).get("tab") === "abonnement" ? "abonnement" : "general";
-  const [activeTab, setActiveTab] = useState<string>(initialTab);
-
   useEffect(() => {
     if (parametres) setFormData(parametresToForm(parametres, artisan?.slug ?? ""));
   }, [parametres, artisan]);
@@ -48,15 +43,11 @@ export default function ParametresPage() {
     if (vitrineSettings) setFormData((prev) => applyVitrineToForm(prev, vitrineSettings));
   }, [vitrineSettings]);
 
-  /** Toast post-checkout Stripe (?success=1 / ?canceled=1), puis on nettoie l'URL. */
+  /** Stripe redirige encore sur /parametres?success=1 — on renvoie vers /abonnement qui gère le toast. */
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("success") === "1") {
-      toast.success("Abonnement actif. Bienvenue !");
-      window.history.replaceState(null, "", "/parametres?tab=abonnement");
-    } else if (params.get("canceled") === "1") {
-      toast("Paiement annulé, vous pouvez réessayer quand vous voulez.");
-      window.history.replaceState(null, "", "/parametres?tab=abonnement");
+    if (params.get("success") === "1" || params.get("canceled") === "1") {
+      window.location.replace(`/abonnement?${params.toString()}`);
     }
   }, []);
 
@@ -125,17 +116,7 @@ export default function ParametresPage() {
         <p className="text-muted-foreground mt-1">{t("subtitle")}</p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="general" className="gap-2"><Settings className="h-4 w-4" />{t("tabGeneral")}</TabsTrigger>
-          <TabsTrigger value="abonnement" className="gap-2"><CreditCard className="h-4 w-4" />{t("tabAbonnement")}</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="abonnement" className="mt-6">
-          <AbonnementSection />
-        </TabsContent>
-
-        <TabsContent value="general" className="mt-6">
+      <div>
           <form onSubmit={handleSubmit} className="space-y-6">
             <Card>
               <CardHeader>
@@ -408,8 +389,7 @@ export default function ParametresPage() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+      </div>
     </div>
   );
 }

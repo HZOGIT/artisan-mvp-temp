@@ -18,7 +18,7 @@ import { AssistantDrawer } from "./assistant-drawer";
 import { readPanelSize, writePanelSize, initialAssistantOpen, PANEL_MARGIN_CLASS, type AssistantPanelSize } from "../domain/assistant-panel";
 
 /** Routes authentifiées accessibles MEME quand l'onboarding n'est pas terminé (gate ci-dessous). */
-const ONBOARDING_BYPASS = new Set(["/onboarding", "/profil", "/parametres", "/assistant", "/assistant/conversations", "/notifications"]);
+const ONBOARDING_BYPASS = new Set(["/onboarding", "/profil", "/parametres", "/abonnement", "/assistant", "/assistant/conversations", "/notifications"]);
 
 /*
  * MOUNT du SHELL modern — composant du layout `app-shell` (routeur unifié). Branche données (useShell +
