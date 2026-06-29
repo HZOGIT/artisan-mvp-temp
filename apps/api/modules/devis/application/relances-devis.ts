@@ -94,8 +94,8 @@ export async function envoyerRelanceDevis(
 ): Promise<{ success: boolean; message: string }> {
   const devis = await deps.devisRepo.getById(ctx, input.devisId);
   if (!devis) throw new NotFoundError("Devis introuvable");
-  if (devis.statut === "accepte" || devis.statut === "refuse") {
-    throw new ValidationError("Impossible d'envoyer une relance sur un devis accepté ou refusé");
+  if (devis.statut !== "envoye") {
+    throw new ValidationError("Seul un devis envoyé peut être relancé");
   }
 
   const client = await deps.clientReader.getClient(ctx, devis.clientId);
@@ -145,6 +145,7 @@ export async function envoyerRelancesAutomatiques(
   let relancesEnvoyees = 0;
 
   for (const d of nonSignes) {
+    if (d.statut !== "envoye") continue;
     if (jours(d.dateDevis) < joursMinimum) continue;
     const relances = await deps.relanceRepo.listByDevis(ctx, d.id);
     const derniere = relances.reduce<Date | null>((max, r) => (!max || r.createdAt > max ? r.createdAt : max), null);

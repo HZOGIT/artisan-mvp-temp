@@ -59,8 +59,10 @@ describe("envoyerRelanceDevis", () => {
     expect((await relanceRepo.listByDevis(A, d.id))[0].statut).toBe("echec");
   });
 
-  it("devis accepté ou refusé → 400 (ValidationError)", async () => {
+  it("devis brouillon, accepté ou refusé → 400 (ValidationError)", async () => {
     const devisRepo = new FakeDevisRepository();
+    const dB = await seedDevis(devisRepo, A, "brouillon");
+    await expect(envoyerRelanceDevis(makeDeps({ devisRepo }), A, { devisId: dB.id })).rejects.toBeInstanceOf(ValidationError);
     const dA = await seedDevis(devisRepo, A, "accepte");
     await expect(envoyerRelanceDevis(makeDeps({ devisRepo }), A, { devisId: dA.id })).rejects.toBeInstanceOf(ValidationError);
     const dR = await seedDevis(devisRepo, A, "refuse");
@@ -98,6 +100,17 @@ describe("envoyerRelancesAutomatiques", () => {
     // 2e passage immédiat : throttle (relance récente < joursEntreRelances) → 0
     const res2 = await envoyerRelancesAutomatiques(deps, A, { joursMinimum: 7, joursEntreRelances: 7 });
     expect(res2.relancesEnvoyees).toBe(0);
+  });
+
+  it("devis brouillon ancien (> joursMinimum) → ignoré par l'auto-relance", async () => {
+    const devisRepo = new FakeDevisRepository();
+    const relanceRepo = new FakeRelanceDevisRepository();
+    const now = new Date("2026-06-14T00:00:00Z");
+    const d = await seedDevis(devisRepo, A, "brouillon", new Date("2026-05-01T00:00:00Z"));
+    const deps = makeDeps({ devisRepo, relanceRepo, maintenant: () => now });
+    const res = await envoyerRelancesAutomatiques(deps, A, { joursMinimum: 7, joursEntreRelances: 7 });
+    expect(res.relancesEnvoyees).toBe(0);
+    expect(await relanceRepo.listByDevis(A, d.id)).toHaveLength(0);
   });
 
   it("rate-limit en masse → 429", async () => {
