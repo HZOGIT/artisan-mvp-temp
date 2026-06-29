@@ -302,7 +302,7 @@ export default function DevisDetailPage() {
 
         <TabsContent value="lignes" className="mt-4">
           <Card>
-            <CardHeader><div className="flex items-center justify-between"><CardTitle>{t("lignesDevis")}</CardTitle><Button size="sm" onClick={() => { window.location.href = `/devis/${id}/ligne/nouvelle`; }}><Plus className="h-4 w-4 mr-2" />{t("ajouterLigne")}</Button></div></CardHeader>
+            <CardHeader><div className="flex items-center justify-between"><CardTitle>{t("lignesDevis")}</CardTitle>{statut === "brouillon" && <Button size="sm" onClick={() => { window.location.href = `/devis/${id}/ligne/nouvelle`; }}><Plus className="h-4 w-4 mr-2" />{t("ajouterLigne")}</Button>}</div></CardHeader>
             <CardContent>
               {devis.lignes.length > 0 ? (
                 <div className="overflow-x-auto">
@@ -315,7 +315,7 @@ export default function DevisDetailPage() {
                           return (
                             <tr key={ligne.id} className={ligne.type === "section" ? "bg-muted/50" : ""}>
                               <td colSpan={6} className={ligne.type === "section" ? "font-semibold" : "italic text-muted-foreground"}>{ligne.type === "section" ? "§ " : ""}{ligne.designation}</td>
-                              <td><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteLine(ligne.id)}><Trash2 className="h-4 w-4" /></Button></td>
+                              <td>{statut === "brouillon" && <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteLine(ligne.id)}><Trash2 className="h-4 w-4" /></Button>}</td>
                             </tr>
                           );
                         }
@@ -328,7 +328,7 @@ export default function DevisDetailPage() {
                               <td className="text-right">{formatCurrency(ligne.prixUnitaireHT)}</td>
                               <td className="text-right">{ligne.tauxTVA}%</td>
                               <td className="text-right font-medium">{formatCurrency(ligne.montantTTC)}</td>
-                              <td><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteLine(ligne.id)}><Trash2 className="h-4 w-4" /></Button></td>
+                              <td>{statut === "brouillon" && <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteLine(ligne.id)}><Trash2 className="h-4 w-4" /></Button>}</td>
                             </tr>
                             {st && (
                               <tr key={`st-${i}`} className="bg-slate-100/80 border-t border-slate-200">
@@ -348,7 +348,7 @@ export default function DevisDetailPage() {
                   </table>
                 </div>
               ) : (
-                <div className="text-center py-8 text-muted-foreground"><FileText className="h-8 w-8 mx-auto mb-2 opacity-50" /><p>{t("aucuneLigne")}</p><Button variant="link" onClick={() => { window.location.href = `/devis/${id}/ligne/nouvelle`; }}>{t("ajouterLigne")}</Button></div>
+                <div className="text-center py-8 text-muted-foreground"><FileText className="h-8 w-8 mx-auto mb-2 opacity-50" /><p>{t("aucuneLigne")}</p>{statut === "brouillon" && <Button variant="link" onClick={() => { window.location.href = `/devis/${id}/ligne/nouvelle`; }}>{t("ajouterLigne")}</Button>}</div>
               )}
             </CardContent>
           </Card>

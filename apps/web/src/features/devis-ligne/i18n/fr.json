@@ -2,6 +2,7 @@
   "ajouterLigne": "Ajouter une ligne",
   "devisSousTitre": "Devis {{numero}} - {{objet}}",
   "devisNonTrouve": "Devis non trouvé",
+  "devisNonModifiable": "Ce devis a déjà été envoyé et ne peut plus être modifié.",
   "retourDevis": "Retour aux devis",
   "typeLigne": "Type de ligne",
   "typeLigneDesc1": "Une ",

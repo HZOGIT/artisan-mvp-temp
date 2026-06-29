@@ -131,10 +131,17 @@ describe.skipIf(!URL)("devis.router e2e (HTTP → tRPC → use-case → repo →
     expect((await callMutation(server, "devis.envoyerRelance", { devisId: id }, tA)).statusCode).toBe(400);
   });
 
+  it("IMMUTABILITÉ : un devis envoyé → update/addLigne → 409 (Conflict)", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "devis.create", { clientId: clientA }, tA)).json().result.data.id as number;
+    await admin.query('update devis set statut=$1 where id=$2', ["envoye", id]);
+    expect((await callMutation(server, "devis.update", { id, objet: "x" }, tA)).statusCode).toBe(409);
+    expect((await callMutation(server, "devis.addLigne", { devisId: id, designation: "Y", prixUnitaireHT: "1" }, tA)).statusCode).toBe(409);
+  });
+
   it("IMMUTABILITÉ : un devis accepté → update/addLigne → 409 (Conflict)", async () => {
     const tA = await token(UA);
     const id = (await callMutation(server, "devis.create", { clientId: clientA }, tA)).json().result.data.id as number;
-    // Force le statut accepté côté admin (le transport n'expose pas statut).
     await admin.query('update devis set statut=$1 where id=$2', ["accepte", id]);
     expect((await callMutation(server, "devis.update", { id, objet: "x" }, tA)).statusCode).toBe(409);
     expect((await callMutation(server, "devis.addLigne", { devisId: id, designation: "Y", prixUnitaireHT: "1" }, tA)).statusCode).toBe(409);

@@ -49,6 +49,13 @@ describe("devis — use-cases d'écriture", () => {
     await expectCrossTenantDenied(() => modifierDevis(repo, B, d.id, { objet: "hack" }));
   });
 
+  it("IMMUTABILITÉ : un devis envoyé ne peut plus être modifié → Conflict", async () => {
+    const repo = repoWithClient(A, 100);
+    const d = await creerDevis(repo, A, { clientId: 100 });
+    repo.setStatutForTest(d.id, "envoye");
+    await expect(modifierDevis(repo, A, d.id, { objet: "x" })).rejects.toBeInstanceOf(ConflictError);
+  });
+
   it("IMMUTABILITÉ : un devis accepté ne peut plus être modifié/supprimé → Conflict", async () => {
     const repo = repoWithClient(A, 100);
     const d = await creerDevis(repo, A, { clientId: 100 });
@@ -79,6 +86,16 @@ describe("devis — use-cases d'écriture", () => {
     const repo = repoWithClient(A, 100);
     const d = await creerDevis(repo, A, { clientId: 100 });
     await expect(ajouterLigneDevis(repo, B, d.id, { designation: "Vol", prixUnitaireHT: "1" })).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("IMMUTABILITÉ lignes : pas d'ajout/modif/suppr de ligne sur un devis envoyé → Conflict", async () => {
+    const repo = repoWithClient(A, 100);
+    const d = await creerDevis(repo, A, { clientId: 100 });
+    const l = await ajouterLigneDevis(repo, A, d.id, { designation: "Pose", quantite: "1", prixUnitaireHT: "100.00" });
+    repo.setStatutForTest(d.id, "envoye");
+    await expect(ajouterLigneDevis(repo, A, d.id, { designation: "Y", prixUnitaireHT: "1" })).rejects.toBeInstanceOf(ConflictError);
+    await expect(modifierLigneDevis(repo, A, d.id, l.id, { quantite: "9" })).rejects.toBeInstanceOf(ConflictError);
+    await expect(supprimerLigneDevis(repo, A, d.id, l.id)).rejects.toBeInstanceOf(ConflictError);
   });
 
   it("IMMUTABILITÉ lignes : pas d'ajout/modif/suppr de ligne sur un devis accepté → Conflict", async () => {
