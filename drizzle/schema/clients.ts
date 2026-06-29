@@ -7,6 +7,7 @@ import {
   text,
   timestamp,
   boolean,
+  index,
 } from "drizzle-orm/pg-core";
 
 export const clientTypeEnum = pgEnum("client_type", ["particulier", "professionnel"]);
@@ -33,7 +34,9 @@ export const clients = pgTable("clients", {
   archivedAt: timestamp("archivedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
-});
+}, (t) => [
+  index("idx_clients_artisan").on(t.artisanId),
+]);
 export type Client = typeof clients.$inferSelect;
 export type InsertClient = typeof clients.$inferInsert;
 

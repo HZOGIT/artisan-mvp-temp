@@ -8,6 +8,7 @@ import {
   timestamp,
   boolean,
   numeric,
+  index,
 } from "drizzle-orm/pg-core";
 
 export const interventionStatutEnum = pgEnum("intervention_statut", ["planifiee", "en_cours", "terminee", "annulee"]);
@@ -40,7 +41,10 @@ export const interventions = pgTable("interventions", {
   avisDemandeEnvoyeAt: timestamp("avisDemandeEnvoyeAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
-});
+}, (t) => [
+  index("idx_interventions_artisan").on(t.artisanId),
+  index("idx_interventions_client").on(t.clientId),
+]);
 export type Intervention = typeof interventions.$inferSelect;
 export type InsertIntervention = typeof interventions.$inferInsert;
 
