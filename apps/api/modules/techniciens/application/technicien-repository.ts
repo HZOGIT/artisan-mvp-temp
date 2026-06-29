@@ -36,6 +36,8 @@ export interface ITechnicienRepository {
    * position (lecture sans oracle ; la table n'a pas d'artisanId → anti-IDOR géoloc).
    */
   getDernierePosition(ctx: TenantContext, technicienId: number): Promise<Position | null>;
+  /** Batch : dernière position GPS de chaque technicien — absent de la Map si aucune position. Sécurisé tenant via JOIN. */
+  getDernierePositionBatch(ctx: TenantContext, technicienIds: number[]): Promise<Map<number, Position>>;
   /** Enregistre une position GPS — null si le technicien n'appartient pas au tenant. */
   enregistrerPosition(ctx: TenantContext, technicienId: number, input: EnregistrerPositionInput): Promise<Position | null>;
   /** Active ou désactive le suivi GPS du technicien (CNIL) — null si hors tenant. */

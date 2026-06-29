@@ -50,30 +50,32 @@ export async function getSuggestionsTechniciens(
   dayStart.setUTCHours(0, 0, 0, 0);
   const dayEnd = new Date(input.dateIntervention);
   dayEnd.setUTCHours(23, 59, 59, 999);
-  const dayInterventions = await interventionRepo.listJour(ctx, dayStart, dayEnd);
-  const targetHour = input.dateIntervention.getUTCHours();
 
-  const suggestions = await Promise.all(
-    techs.map(async (tech) => {
-      const busy = dayInterventions.some((i) => i.technicienId === tech.id && Math.abs(i.dateDebut.getUTCHours() - targetHour) < 2);
-      const position = await technicienRepo.getDernierePosition(ctx, tech.id);
-      let distance = 0;
-      let tempsTrajet = 0;
-      if (position) {
-        distance = haversineKm(Number(position.latitude), Number(position.longitude), input.latitude, input.longitude);
-        tempsTrajet = Math.round((distance / 40) * 60);
-      }
-      const score = (busy ? 0 : 50) + Math.max(0, 50 - distance);
-      return {
-        technicien: { id: tech.id, nom: `${tech.prenom ?? ""} ${tech.nom}`.trim(), couleur: tech.couleur, specialite: tech.specialite },
-        distance: Math.round(distance * 10) / 10,
-        tempsTrajet,
-        disponible: !busy,
-        position: position ? { latitude: position.latitude, longitude: position.longitude } : null,
-        score,
-      };
-    }),
-  );
+  const [dayInterventions, positions] = await Promise.all([
+    interventionRepo.listJour(ctx, dayStart, dayEnd),
+    technicienRepo.getDernierePositionBatch(ctx, techs.map((t) => t.id)),
+  ]);
+
+  const targetHour = input.dateIntervention.getUTCHours();
+  const suggestions = techs.map((tech) => {
+    const busy = dayInterventions.some((i) => i.technicienId === tech.id && Math.abs(i.dateDebut.getUTCHours() - targetHour) < 2);
+    const position = positions.get(tech.id) ?? null;
+    let distance = 0;
+    let tempsTrajet = 0;
+    if (position) {
+      distance = haversineKm(Number(position.latitude), Number(position.longitude), input.latitude, input.longitude);
+      tempsTrajet = Math.round((distance / 40) * 60);
+    }
+    const score = (busy ? 0 : 50) + Math.max(0, 50 - distance);
+    return {
+      technicien: { id: tech.id, nom: `${tech.prenom ?? ""} ${tech.nom}`.trim(), couleur: tech.couleur, specialite: tech.specialite },
+      distance: Math.round(distance * 10) / 10,
+      tempsTrajet,
+      disponible: !busy,
+      position: position ? { latitude: position.latitude, longitude: position.longitude } : null,
+      score,
+    };
+  });
 
   return suggestions.sort((a, b) => b.score - a.score);
 }

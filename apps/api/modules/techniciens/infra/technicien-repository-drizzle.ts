@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
 import {
   techniciens,
   positionsTechniciens,
@@ -231,6 +231,21 @@ export class TechnicienRepositoryDrizzle implements ITechnicienRepository {
         .orderBy(desc(positionsTechniciens.id))
         .limit(1);
       return row ? toPosition(row) : null;
+    });
+  }
+
+  getDernierePositionBatch(ctx: TenantContext, technicienIds: number[]): Promise<Map<number, Position>> {
+    return withTenant(this.db, ctx, async (tx) => {
+      if (technicienIds.length === 0) return new Map();
+      const rows = await tx
+        .selectDistinctOn([positionsTechniciens.technicienId], { pos: positionsTechniciens })
+        .from(positionsTechniciens)
+        .innerJoin(techniciens, and(eq(techniciens.id, positionsTechniciens.technicienId), eq(techniciens.artisanId, ctx.artisanId)))
+        .where(inArray(positionsTechniciens.technicienId, technicienIds))
+        .orderBy(asc(positionsTechniciens.technicienId), desc(positionsTechniciens.id));
+      const map = new Map<number, Position>();
+      for (const { pos } of rows) map.set(pos.technicienId, toPosition(pos));
+      return map;
     });
   }
 

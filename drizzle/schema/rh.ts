@@ -77,7 +77,10 @@ export const positionsTechniciens = pgTable(
     expiresAt: timestamp("expiresAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
-  (t) => [index("idx_positions_techniciens_expires_at").on(t.expiresAt)],
+  (t) => [
+    index("idx_positions_techniciens_expires_at").on(t.expiresAt),
+    index("idx_positions_techniciens_id_ts").on(t.technicienId, t.timestamp),
+  ],
 );
 export type PositionTechnicien = typeof positionsTechniciens.$inferSelect;
 export type InsertPositionTechnicien = typeof positionsTechniciens.$inferInsert;
