@@ -77,12 +77,27 @@ describe("envoyerFactureParEmail", () => {
     expect((await repo.getById(A, f.id))!.statut).toBe("envoyee");
   });
 
-  it("attachPdf=false : aucun PDF rendu ni pièce jointe", async () => {
+  it("attachPdf=false sans storage : aucun PDF rendu ni pièce jointe", async () => {
     const repo = new FakeFactureRepository();
     const f = await seedFacture(repo, A);
     const deps = makeDeps();
     await envoyerFactureParEmail(repo, deps, A, { factureId: f.id, attachPdf: false });
     expect((deps.pdf as FakePdfPort).rendered).toHaveLength(0);
+    expect((deps.email as FakeEmailPort).sent[0].attachments).toBeUndefined();
+  });
+
+  it("OPE-722 — attachPdf=false + storage dispo : PDF stocké sans pièce jointe dans l'email", async () => {
+    const repo = new FakeFactureRepository();
+    const storage = new InMemoryStoragePort();
+    const fakeDb = {} as never;
+    const f = await seedFacture(repo, A);
+    const deps = makeDeps({ storage, db: fakeDb });
+
+    await envoyerFactureParEmail(repo, deps, A, { factureId: f.id, attachPdf: false });
+
+    const saved = await repo.getById(A, f.id);
+    expect(saved?.pdfStorageKey).toMatch(/^factures\//);
+    expect(saved?.pdfFileId).not.toBeNull();
     expect((deps.email as FakeEmailPort).sent[0].attachments).toBeUndefined();
   });
 
