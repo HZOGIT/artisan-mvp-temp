@@ -1,5 +1,5 @@
 import { and, eq, gte, inArray, notInArray, sql } from "drizzle-orm";
-import { artisans, billingEvents, billingSubscriptions, clients, conversations, factures, llmUsage, messages, permissionsUtilisateur, rdvEnLigne, users } from "../../../../../drizzle/schema.pg";
+import { artisans, billingCycles, billingEvents, billingSubscriptions, clients, conversations, factures, llmUsage, messages, permissionsUtilisateur, rdvEnLigne, users } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import type { IAuthRepository } from "../application/auth-repository";
 import type { AuthCredentials, AuthUser } from "../domain/auth";
@@ -177,5 +177,23 @@ export class AuthRepositoryDrizzle implements IAuthRepository {
         .set({ email: null, telephone: null, iban: null, adresse: null, codePostal: null, ville: null, logo: null, pendingDeletionAt: sql`now()` })
         .where(eq(artisans.id, artisanId));
     });
+
+    /**
+     * 7. Billing : subscriptions sans billing_cycles (trialing test) + leurs billing_events — best-effort.
+     * Les subscriptions avec billing_cycles (historique réel) ne peuvent pas être supprimées (FK RESTRICT).
+     */
+    try {
+      const subs = await this.db.select({ id: billingSubscriptions.id }).from(billingSubscriptions).where(eq(billingSubscriptions.artisan_id, artisanId));
+      const subIds = subs.map((s) => s.id);
+      if (subIds.length > 0) {
+        const hasCycles = await this.db.select({ id: billingCycles.id }).from(billingCycles).where(inArray(billingCycles.subscription_id, subIds)).limit(1);
+        if (hasCycles.length === 0) {
+          await this.db.delete(billingEvents).where(and(eq(billingEvents.entity_type, "billing_subscription"), inArray(billingEvents.entity_id, subIds)));
+          await this.db.delete(billingSubscriptions).where(eq(billingSubscriptions.artisan_id, artisanId));
+        }
+      }
+    } catch {
+      /* best-effort */
+    }
   }
 }
