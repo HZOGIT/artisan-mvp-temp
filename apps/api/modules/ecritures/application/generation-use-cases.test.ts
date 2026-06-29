@@ -53,10 +53,9 @@ describe("ecritures — génération écritures de VENTE (FEC)", () => {
     assertEquilibre(ecr);
   });
 
-  it("TVA ventilée par taux (20% + 10%) ; Σdébit=Σcrédit", async () => {
+  it("TVA ventilée par taux (20% + 10%) : 445711+445712 crédit, aucun 445710 générique ; Σdébit=Σcrédit", async () => {
     const repo = new FakeEcritureRepository();
     const reader = new FakeFactureReader();
-    // HT 200 (100@20% + 100@10%) → TVA 30 (20 + 10), TTC 230.
     reader.register(facture({ totalHT: "200.00", totalTVA: "30.00", totalTTC: "230.00" }), [
       { tauxTVA: "20.00", montantTVA: "20.00" },
       { tauxTVA: "10.00", montantTVA: "10.00" },
@@ -64,6 +63,8 @@ describe("ecritures — génération écritures de VENTE (FEC)", () => {
     const ecr = await genererEcrituresVente(repo, reader, A, 501);
     expect(ecr.find((e) => e.numeroCompte === "445711")!.credit).toBe("20.00");
     expect(ecr.find((e) => e.numeroCompte === "445712")!.credit).toBe("10.00");
+    /** anti-régression OPE-755 : le compte générique 445710 ne doit jamais apparaître */
+    expect(ecr.some((e) => e.numeroCompte === "445710")).toBe(false);
     assertEquilibre(ecr);
   });
 

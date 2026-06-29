@@ -125,6 +125,23 @@ describe.skipIf(!URL)("FEC e2e (facture → écritures comptables équilibrées 
     expect(d).toBeCloseTo(480, 2); // VE débit 411=240 + BQ débit 512=240 = 480
   });
 
+  it("taux mixtes (20%+10%) : pièce VE ventilée 445711+445712, aucun 445710 générique — anti-régression OPE-755", async () => {
+    const tA = await token(UA);
+    const id = (await mut(server, "factures.create", { clientId: clientA, objet: "TVA mixte" }, tA)).json().result.data.id as number;
+    await mut(server, "factures.addLigne", { factureId: id, designation: "Prestation 20%", quantite: "1", prixUnitaireHT: "1000.00", tvaCategorieId: "FR_20" }, tA);
+    await mut(server, "factures.addLigne", { factureId: id, designation: "Fourniture 10%", quantite: "1", prixUnitaireHT: "300.00", tvaCategorieId: "FR_10" }, tA);
+
+    expect((await mut(server, "factures.envoyer", { id }, tA)).json().result.data.statut).toBe("envoyee");
+    const ve = (await ecritureRepo.listByFacture(ctx(artisanA), id)).filter((e) => e.journal === "VE");
+    /** anti-régression OPE-755 : pas de 445710 générique, ventilation obligatoire par taux */
+    expect(ve.some((e) => e.numeroCompte === "445710")).toBe(false);
+    expect(ve.find((e) => e.numeroCompte === "445711")!.credit).toBe("200.00"); /* 1000 × 20% */
+    expect(ve.find((e) => e.numeroCompte === "445712")!.credit).toBe("30.00");  /* 300 × 10% */
+    const dVE = ve.reduce((s, e) => s + Number(e.debit), 0);
+    const cVE = ve.reduce((s, e) => s + Number(e.credit), 0);
+    expect(dVE).toBeCloseTo(cVE, 2); /* Σdébit = Σcrédit invariant FEC */
+  });
+
   it("isolation cross-tenant : B ne lit pas les écritures de A", async () => {
     expect((await ecritureRepo.list(ctx(artisanB))).length).toBe(0);
   });
