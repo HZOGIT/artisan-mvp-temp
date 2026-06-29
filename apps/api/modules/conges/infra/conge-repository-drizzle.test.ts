@@ -5,6 +5,7 @@ import { CongeRepositoryDrizzle } from "./conge-repository-drizzle";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import type { TenantContext } from "../../../shared/tenant";
 import { getSoldeConge, listSoldesConges } from "../application/read-use-cases";
+import { exerciceCourant } from "../application/solde";
 
 const URL = process.env.DATABASE_URL;
 const APP_URL =
@@ -88,7 +89,8 @@ describe.skipIf(!URL)("CongeRepositoryDrizzle (PG, RLS + scope tenant)", () => {
 
   it("getSoldeConge (use-case) : joursAcquis calculés depuis createdAt, non nuls", async () => {
     /* techA créé en beforeAll (environ now) — au moins 0 mois acquis, toujours ≥ 0 */
-    const rows = await getSoldeConge(repo, ctx(A), techA, new Date().getFullYear());
+    const periodeDebut = `${Number(exerciceCourant().split("-")[0])}-06-01`;
+    const rows = await getSoldeConge(repo, ctx(A), techA, periodeDebut);
     const cp = rows.find((r) => r.type === "conge_paye");
     expect(cp).toBeDefined();
     expect(typeof cp!.joursAcquis).toBe("number");
@@ -97,7 +99,8 @@ describe.skipIf(!URL)("CongeRepositoryDrizzle (PG, RLS + scope tenant)", () => {
   });
 
   it("listSoldesConges (use-case) : retourne une entrée par technicien du tenant A", async () => {
-    const soldes = await listSoldesConges(repo, ctx(A), new Date().getFullYear());
+    const periodeDebut = `${Number(exerciceCourant().split("-")[0])}-06-01`;
+    const soldes = await listSoldesConges(repo, ctx(A), periodeDebut);
     expect(soldes.some((s) => s.technicienId === techA)).toBe(true);
     const cpA = soldes.find((s) => s.technicienId === techA);
     expect(cpA!.joursAcquis).toBeGreaterThanOrEqual(0);

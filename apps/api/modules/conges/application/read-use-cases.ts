@@ -2,7 +2,7 @@ import { NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ICongeRepository, SoldeResult } from "./conge-repository";
 import type { Conge } from "../domain/conge";
-import { calculerJoursAcquisAnnee, calculerJoursAcquisPeriode, periodeReference } from "./solde";
+import { calculerJoursAcquisPeriode, periodeReference } from "./solde";
 
 /*
  * Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté par le
@@ -27,26 +27,24 @@ export async function getConge(repo: ICongeRepository, ctx: TenantContext, id: n
 
 /**
  * Solde CP enrichi : `joursAcquis` calculé à la lecture depuis `techniciens.createdAt`.
- * Accepte un `exercice` (ex. « 2025-2026 ») ou un `annee` civil (legacy) pour la requête.
+ * `periodeDebut` = premier jour de la période de référence (ex. « 2025-06-01 »).
  */
 export async function getSoldeConge(
   repo: ICongeRepository,
   ctx: TenantContext,
   technicienId: number,
-  annee: number,
-  periodeDebutArg?: string,
+  periodeDebut: string,
 ): Promise<SoldeResult[]> {
+  const periode = periodeReference(periodeDebut);
+  const annee = Number(periodeDebut.split("-")[0]);
   const [dateEmbauche, rows] = await Promise.all([
     repo.getTechnicienDateEmbauche(ctx, technicienId),
-    repo.getSolde(ctx, technicienId, annee, periodeDebutArg),
+    repo.getSolde(ctx, technicienId, annee, periodeDebut),
   ]);
   const joursAcquis = dateEmbauche
-    ? periodeDebutArg
-      ? calculerJoursAcquisPeriode(dateEmbauche, periodeDebutArg, periodeReference(periodeDebutArg).periodeFin)
-      : calculerJoursAcquisAnnee(dateEmbauche, annee)
+    ? calculerJoursAcquisPeriode(dateEmbauche, periodeDebut, periode.periodeFin)
     : 0;
 
-  const periode = periodeDebutArg ? periodeReference(periodeDebutArg) : null;
   const cpRow = rows.find((r) => r.type === "conge_paye");
   const autres = rows.filter((r) => r.type !== "conge_paye");
   const joursReportes = cpRow?.joursReportes ?? 0;
@@ -55,9 +53,9 @@ export async function getSoldeConge(
     : {
         type: "conge_paye",
         annee,
-        periodeDebut: periode?.periodeDebut ?? null,
-        periodeFin: periode?.periodeFin ?? null,
-        exercice: periode?.exercice ?? null,
+        periodeDebut: periode.periodeDebut,
+        periodeFin: periode.periodeFin,
+        exercice: periode.exercice,
         soldeInitial: 0,
         joursAcquis,
         joursPris: 0,
@@ -82,20 +80,18 @@ export interface SoldeResume {
 export async function listSoldesConges(
   repo: ICongeRepository,
   ctx: TenantContext,
-  annee: number,
-  periodeDebutArg?: string,
+  periodeDebut: string,
 ): Promise<SoldeResume[]> {
-  const rows = await repo.listTechniciensSolde(ctx, annee, periodeDebutArg);
-  const periode = periodeDebutArg ? periodeReference(periodeDebutArg) : null;
+  const annee = Number(periodeDebut.split("-")[0]);
+  const periode = periodeReference(periodeDebut);
+  const rows = await repo.listTechniciensSolde(ctx, annee, periodeDebut);
   return rows.map(({ technicienId, dateEmbauche, joursPris, joursReportes }) => {
-    const joursAcquis = periodeDebutArg
-      ? calculerJoursAcquisPeriode(dateEmbauche, periodeDebutArg, periodeReference(periodeDebutArg).periodeFin)
-      : calculerJoursAcquisAnnee(dateEmbauche, annee);
+    const joursAcquis = calculerJoursAcquisPeriode(dateEmbauche, periodeDebut, periode.periodeFin);
     return {
       technicienId,
-      exercice: periode?.exercice ?? null,
-      periodeDebut: periode?.periodeDebut ?? null,
-      periodeFin: periode?.periodeFin ?? null,
+      exercice: periode.exercice,
+      periodeDebut: periode.periodeDebut,
+      periodeFin: periode.periodeFin,
       joursAcquis,
       joursPris,
       joursReportes,

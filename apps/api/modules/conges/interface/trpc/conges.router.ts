@@ -128,34 +128,28 @@ export function createCongesRouter(repo: ICongeRepository, db?: DbClient) {
         });
       }),
 
+    /** Solde CP d'un technicien pour une période. `exercice` format « 2025-2026 », défaut = courant. */
     getSolde: protectedProcedure
       .input(z.object({
         technicienId: z.number().int(),
-        annee: z.number().int().optional(),
-        /** Format « 2025-2026 » — prioritaire sur `annee` si fourni. */
         exercice: z.string().regex(/^\d{4}-\d{4}$/).optional(),
       }))
       .query(({ ctx, input }) => {
-        if (input.exercice) {
-          const anneeDebut = Number(input.exercice.split("-")[0]);
-          const periodeDebut = `${anneeDebut}-06-01`;
-          return getSoldeConge(repo, ctx.tenant, input.technicienId, anneeDebut, periodeDebut);
-        }
-        return getSoldeConge(repo, ctx.tenant, input.technicienId, input.annee ?? new Date().getFullYear());
+        const ex = input.exercice ?? exerciceCourant();
+        const periodeDebut = `${Number(ex.split("-")[0])}-06-01`;
+        return getSoldeConge(repo, ctx.tenant, input.technicienId, periodeDebut);
       }),
 
     /** Soldes CP de tous les techniciens du tenant — calcul à la lecture (idempotent). */
     soldesTous: protectedProcedure
       .input(z.object({
-        annee: z.number().int().optional(),
-        /** Format « 2025-2026 » — prioritaire sur `annee` si fourni. Défaut = exercice courant. */
+        /** Format « 2025-2026 ». Défaut = exercice courant. */
         exercice: z.string().regex(/^\d{4}-\d{4}$/).optional(),
       }))
       .query(({ ctx, input }) => {
         const ex = input.exercice ?? exerciceCourant();
-        const anneeDebut = Number(ex.split("-")[0]);
-        const periodeDebut = `${anneeDebut}-06-01`;
-        return listSoldesConges(repo, ctx.tenant, anneeDebut, periodeDebut);
+        const periodeDebut = `${Number(ex.split("-")[0])}-06-01`;
+        return listSoldesConges(repo, ctx.tenant, periodeDebut);
       }),
 
     /**
