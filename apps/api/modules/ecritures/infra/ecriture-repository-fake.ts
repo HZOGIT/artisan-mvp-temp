@@ -57,6 +57,14 @@ export class FakeEcritureRepository implements IEcritureRepository {
     return before - this.store.length;
   }
 
+  async deleteByJournalPieceRef(ctx: TenantContext, journal: EcritureComptable["journal"], pieceRef: string): Promise<number> {
+    const before = this.store.length;
+    this.store = this.store.filter(
+      (e) => !(e.artisanId === ctx.artisanId && e.journal === journal && e.pieceRef === pieceRef),
+    );
+    return before - this.store.length;
+  }
+
   async hasValidatedEcritures(ctx: TenantContext, factureId: number): Promise<boolean> {
     return this.store.some(
       (e) => e.artisanId === ctx.artisanId && e.factureId === factureId && e.statut === "validee",

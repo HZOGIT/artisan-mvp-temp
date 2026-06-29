@@ -250,6 +250,7 @@ import type { ComptaPort } from "./modules/factures/application/compta-port";
 import { EcritureRepositoryDrizzle } from "./modules/ecritures/infra/ecriture-repository-drizzle";
 import { FactureReaderDrizzle } from "./modules/ecritures/infra/facture-reader-drizzle";
 import { ComptaEcrituresAdapter } from "./modules/ecritures/infra/compta-ecritures-adapter";
+import { ComptaDepensesAdapter } from "./modules/ecritures/infra/compta-depenses-adapter";
 import { createEcrituresModule } from "./modules/ecritures/ecritures.module";
 import type { IEcritureRepository } from "./modules/ecritures/application/ecriture-repository";
 import { createArticlesModule } from "./modules/articles/articles.module";
@@ -714,6 +715,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     transactionRepository: deps.transactionBancaireRepo ?? new TransactionBancaireRepositoryDrizzle(getDbHandle().db),
     factureLettreur: deps.factureLettreur ?? new FactureLettrerDrizzle(getDbHandle().db),
     fecReader: deps.fecReader ?? new FecReaderDrizzle(getDbHandle().db),
+    comptaAchat: new ComptaDepensesAdapter(new EcritureRepositoryDrizzle(getDbHandle().db)),
     db: deps.depensesDb ?? getDbHandle().db,
     /** OCR justificatif : Gemini vision + rate-limiter IA dédié (injectables en test : FakeVisionPort). */
     ocr: deps.ocrVision

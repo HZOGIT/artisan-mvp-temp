@@ -36,6 +36,12 @@ export async function grandLivreComptable(
   return grandLivre(await repo.list(ctx), numeroCompte);
 }
 
+/** Résultat d'un export FEC (contenu tabulé + conformité DGFiP). */
+export interface FecExport {
+  readonly fec: string;
+  readonly conformite: { readonly equilibre: boolean };
+}
+
 /*
  * Export FEC (format légal DGFiP) du tenant, sur une période [debut, fin] inclusive. ⚠️ Dette :
  * le filtrage par période est fait en mémoire (`repo.list` puis filtre) — pour de gros volumes,
@@ -46,9 +52,12 @@ export async function genererExportFEC(
   ctx: TenantContext,
   debut: Date,
   fin: Date,
-): Promise<string> {
+): Promise<FecExport> {
   const dans = (await repo.list(ctx)).filter(
     (e) => e.dateEcriture.getTime() >= debut.getTime() && e.dateEcriture.getTime() <= fin.getTime(),
   );
-  return exporterFEC(dans);
+  const fec = exporterFEC(dans);
+  const totalDebit = dans.reduce((s, e) => s + Number(e.debit), 0);
+  const totalCredit = dans.reduce((s, e) => s + Number(e.credit), 0);
+  return { fec, conformite: { equilibre: Math.abs(totalDebit - totalCredit) < 0.01 } };
 }
