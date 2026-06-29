@@ -142,6 +142,9 @@ export class EcritureRepositoryDrizzle implements IEcritureRepository {
 
   validateByFacture(ctx: TenantContext, factureId: number): Promise<number> {
     return withTenant(this.db, ctx, async (tx) => {
+      /* Sérialise les attributions concurrentes par tenant — relâché au commit de la tx */
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('ecriture_num:' || ${String(ctx.artisanId)}))`);
+
       /* Récupère les journaux distincts des écritures brouillon à valider */
       const toValidate = await tx
         .select({ journal: ecrituresComptables.journal })
