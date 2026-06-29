@@ -96,6 +96,24 @@ describe("ecritures — invariants métier (synthèse)", () => {
     expect(fecResult.conformite.equilibre).toBe(true);
   });
 
+  it("INV-7b : ecritureNum — 2 validations du même tenant → nums distincts (anti-doublons FEC)", async () => {
+    const repo = new FakeEcritureRepository();
+    const reader = new FakeFactureReader();
+    const f1 = facture({ id: 701 });
+    const f2 = facture({ id: 702, numero: "FAC-00002" });
+    reader.register(f1);
+    reader.register(f2);
+    await genererEcrituresVente(repo, reader, A, 701);
+    await genererEcrituresVente(repo, reader, A, 702);
+    await repo.validateByFacture(A, 701);
+    await repo.validateByFacture(A, 702);
+    const e1 = (await repo.listByFacture(A, 701))[0];
+    const e2 = (await repo.listByFacture(A, 702))[0];
+    expect(e1.ecritureNum).not.toBeNull();
+    expect(e2.ecritureNum).not.toBeNull();
+    expect(e1.ecritureNum).not.toBe(e2.ecritureNum);
+  });
+
   it("INV-7 : encaissement conditionné (statut≠payee ou avoir [TTC≤0] → rien)", async () => {
     const repo = new FakeEcritureRepository();
     const reader = new FakeFactureReader();
