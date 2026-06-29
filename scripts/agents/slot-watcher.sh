@@ -3,12 +3,14 @@
 # slot-watcher.sh — watch feat/* slot count and notify PM on release.
 #
 # On every 30-second tick it calls slot-count.sh. When the count DECREASES
-# (a slot freed), it sends SLOT_FREE to project-manager. Anti-spam: notifies
-# only on change (not every tick).
+# (a slot freed), it confirms the decrease with a second read after DEBOUNCE_DELAY
+# seconds before notifying. Anti-spam: notifies only on confirmed, non-transient
+# change.
 #
-# Robust: the inner loop never exits on partial failures (|| true everywhere).
-# Race-safe: relies on slot-count.sh UNION logic (PR still open = still counts
-# even if worktree is being cleaned; dead screen without worktree = doesn't count).
+# Debounce rationale: during git commit/rebase, git worktree list momentarily
+# omits the worktree being locked, causing slot-count to return a falsely low
+# count for 1-2 seconds. Without debounce this triggers spurious SLOT_FREE,
+# risking over-dispatch and OOM.
 #
 # Usage:
 #   ./scripts/agents/slot-watcher.sh start    # launch loop in screen slot-watcher (idempotent)
@@ -18,6 +20,7 @@
 #
 # Env:
 #   SLOT_CAP         capacity ceiling (default: 4, must match slot-count.sh)
+#   DEBOUNCE_DELAY   seconds between the two confirmation reads (default: 2)
 #   AGENT_BUS_DIR    bus root (default: ~/.agent-bus)
 # ---------------------------------------------------------------------------
 set -euo pipefail
@@ -26,22 +29,42 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUS_DIR="${AGENT_BUS_DIR:-$HOME/.agent-bus}"
 STATE_FILE="$BUS_DIR/slot-watcher.state"
 SLOT_CAP="${SLOT_CAP:-4}"
+DEBOUNCE_DELAY="${DEBOUNCE_DELAY:-2}"
 
 _tick() {
-  local active prev libres
+  local active prev libres active2
   active="$("$HERE/slot-count.sh" 2>/dev/null || echo "")"
   [[ "$active" =~ ^[0-9]+$ ]] || return 0
 
   prev="$(cat "$STATE_FILE" 2>/dev/null || echo "")"
-  echo "$active" >"$STATE_FILE"
 
-  [[ "$prev" =~ ^[0-9]+$ ]] || return 0  # first tick: no previous state, skip
-  [[ "$active" -lt "$prev" ]] || return 0  # no decrease → no notification
+  if [[ ! "$prev" =~ ^[0-9]+$ ]]; then
+    echo "$active" >"$STATE_FILE"
+    return 0
+  fi
 
-  libres=$(( SLOT_CAP - active ))
+  if [[ "$active" -ge "$prev" ]]; then
+    echo "$active" >"$STATE_FILE"
+    return 0
+  fi
+
+  # Potential decrease — confirm after debounce to filter git lock transients
+  sleep "$DEBOUNCE_DELAY"
+  active2="$("$HERE/slot-count.sh" 2>/dev/null || echo "")"
+  [[ "$active2" =~ ^[0-9]+$ ]] || return 0
+
+  if [[ "$active2" -ge "$prev" ]]; then
+    # Transient glitch (e.g. git worktree locked during commit/rebase) — ignore
+    echo "$active2" >"$STATE_FILE"
+    return 0
+  fi
+
+  # Confirmed decrease — emit SLOT_FREE
+  echo "$active2" >"$STATE_FILE"
+  libres=$(( SLOT_CAP - active2 ))
   [[ "$libres" -lt 0 ]] && libres=0
   "$HERE/notify.sh" project-manager SLOT_FREE \
-    "${active}/${SLOT_CAP} — ${libres} libre(s)" || true
+    "${active2}/${SLOT_CAP} — ${libres} libre(s)" || true
 }
 
 _loop() {
@@ -84,6 +107,30 @@ case "${1:-}" in
     echo "=== slot-watcher self-check ==="
     local_fail=0
 
+    tmpdir="$(mktemp -d)"
+    tmpstate="$(mktemp)"
+    trap 'rm -rf "$tmpdir" "$tmpstate"' EXIT
+
+    # Mock notify.sh — appends "<type> <payload>" to notify.log
+    export MOCK_NOTIFY_LOG="$tmpdir/notify.log"
+    cat >"$tmpdir/notify.sh" <<'NOTIFY_MOCK'
+#!/usr/bin/env bash
+echo "$2 $3" >>"$MOCK_NOTIFY_LOG"
+NOTIFY_MOCK
+    chmod +x "$tmpdir/notify.sh"
+
+    # Helper: create slot-count.sh that pops values from a space-separated queue file
+    _make_slot_count() {
+      local queue_file="$1"
+      cat >"$tmpdir/slot-count.sh" <<SCRIPT
+#!/usr/bin/env bash
+vals=(\$(cat "$queue_file" 2>/dev/null || true))
+echo "\${vals[0]:-0}"
+printf '%s\n' "\${vals[@]:1}" >"$queue_file"
+SCRIPT
+      chmod +x "$tmpdir/slot-count.sh"
+    }
+
     # Test 1: slot-count returns a valid integer
     count="$("$HERE/slot-count.sh" 2>/dev/null || echo "")"
     if [[ "$count" =~ ^[0-9]+$ ]]; then
@@ -93,29 +140,45 @@ case "${1:-}" in
       local_fail=1
     fi
 
-    # Test 2: transition detection (prev > current → notify)
-    tmp="$(mktemp)"
-    trap 'rm -f "$tmp"' EXIT
-    echo $(( ${count:-0} + 2 )) >"$tmp"
-    prev_val="$(cat "$tmp")"
-    if [[ "${count:-0}" -lt "$prev_val" ]]; then
-      libres=$(( SLOT_CAP - ${count:-0} ))
-      [[ "$libres" -lt 0 ]] && libres=0
-      echo "OK  transition detected (prev=$prev_val current=${count:-0}) → would send SLOT_FREE ${count:-0}/${SLOT_CAP} — ${libres} libre(s)"
+    # Test 2: isolated low reading (transient) → no SLOT_FREE
+    qf="$(mktemp)"
+    echo "3 4" >"$qf"        # first call: 3 (dip), second call: 4 (restored)
+    _make_slot_count "$qf"
+    echo "4" >"$tmpstate"    # prev = 4
+    rm -f "$MOCK_NOTIFY_LOG"
+    (
+      HERE="$tmpdir"
+      STATE_FILE="$tmpstate"
+      DEBOUNCE_DELAY=0
+      _tick
+    )
+    if [[ ! -s "$MOCK_NOTIFY_LOG" ]]; then
+      echo "OK  transient decrease ignored — no SLOT_FREE"
     else
-      echo "FAIL transition logic broken (prev=$prev_val current=${count:-0})" >&2
+      echo "FAIL spurious SLOT_FREE on transient dip: $(cat "$MOCK_NOTIFY_LOG")" >&2
       local_fail=1
     fi
+    rm -f "$qf"
 
-    # Test 3: no notification when count stays the same
-    echo "${count:-0}" >"$tmp"
-    prev_same="$(cat "$tmp")"
-    if [[ "${count:-0}" -lt "$prev_same" ]]; then
-      echo "FAIL spurious notification when count unchanged" >&2
-      local_fail=1
+    # Test 3: persistent decrease → SLOT_FREE emitted once
+    qf="$(mktemp)"
+    echo "3 3" >"$qf"        # both calls return 3 (real release)
+    _make_slot_count "$qf"
+    echo "4" >"$tmpstate"    # prev = 4
+    rm -f "$MOCK_NOTIFY_LOG"
+    (
+      HERE="$tmpdir"
+      STATE_FILE="$tmpstate"
+      DEBOUNCE_DELAY=0
+      _tick
+    )
+    if [[ -f "$MOCK_NOTIFY_LOG" ]] && grep -q "SLOT_FREE" "$MOCK_NOTIFY_LOG"; then
+      echo "OK  persistent decrease triggers SLOT_FREE: $(cat "$MOCK_NOTIFY_LOG")"
     else
-      echo "OK  no notification when count unchanged (prev=${prev_same} current=${count:-0})"
+      echo "FAIL no SLOT_FREE on confirmed decrease" >&2
+      local_fail=1
     fi
+    rm -f "$qf"
 
     [[ "$local_fail" -eq 0 ]] && echo "=== all tests passed ===" || { echo "=== FAILED ===" >&2; exit 1; }
     ;;
