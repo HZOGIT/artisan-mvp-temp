@@ -12,3 +12,4 @@ export * from "./einvoicing";
 export * from "./files";
 export * from "./message-files";
 export * from "./pieces-jointes";
+export * from "./scheduler";
