@@ -230,6 +230,25 @@ describe.skipIf(!URL)("ClientRepositoryDrizzle (PG, RLS + scope tenant)", () => 
     expect(arch2.rows[0].archivedAt.getTime()).toBe(archAvant.getTime());
   });
 
+  it("listByIds : renvoie le batch exact, respecte le scope tenant, ids vide → []", async () => {
+    const c1 = await repo.create(ctx(A), { nom: "Alpha" });
+    await repo.create(ctx(A), { nom: "Beta" });
+    const c3 = await repo.create(ctx(A), { nom: "Gamma" });
+    const cB = await repo.create(ctx(B), { nom: "CrossTenant" });
+
+    /** Batch partiel : seulement c1 et c3 (pas Beta). */
+    const res = await repo.listByIds(ctx(A), [c1.id, c3.id]);
+    expect(res.map((c) => c.id).sort()).toEqual([c1.id, c3.id].sort());
+
+    /** Cross-tenant : l'ID de B dans un batch A → absent du résultat. */
+    const avecB = await repo.listByIds(ctx(A), [c1.id, cB.id]);
+    expect(avecB.map((c) => c.id)).not.toContain(cB.id);
+    expect(avecB.map((c) => c.id)).toContain(c1.id);
+
+    /** ids vide → [] sans requête DB. */
+    expect(await repo.listByIds(ctx(A), [])).toEqual([]);
+  });
+
   it("fusionner : isolation RLS — refus de fusionner vers/depuis le client d'un autre tenant", async () => {
     const survivantA = await repo.create(ctx(A), { nom: "Survivant A" });
     const doublonA = await repo.create(ctx(A), { nom: "Doublon A" });

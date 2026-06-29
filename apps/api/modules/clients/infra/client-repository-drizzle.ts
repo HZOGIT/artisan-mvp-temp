@@ -1,4 +1,4 @@
-import { and, asc, eq, ilike, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import {
   clients,
   clientPortalAccess,
@@ -77,6 +77,17 @@ export class ClientRepositoryDrizzle implements IClientRepository {
         .where(and(eq(clients.id, id), eq(clients.artisanId, ctx.artisanId)))
         .limit(1);
       return row ? toClient(row) : null;
+    });
+  }
+
+  listByIds(ctx: TenantContext, ids: number[]): Promise<Client[]> {
+    if (ids.length === 0) return Promise.resolve([]);
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(clients)
+        .where(and(inArray(clients.id, ids), eq(clients.artisanId, ctx.artisanId)));
+      return rows.map(toClient);
     });
   }
 

@@ -28,9 +28,11 @@ export async function listRdvsAvecClient(
   ctx: TenantContext,
 ): Promise<RdvAvecClient[]> {
   const rdvs = await rdvRepo.list(ctx);
-  return Promise.all(
-    rdvs.map(async (rdv) => ({ ...rdv, client: await clientRepo.getById(ctx, rdv.clientId) })),
-  );
+  if (rdvs.length === 0) return [];
+  const clientIds = Array.from(new Set(rdvs.map((r) => r.clientId)));
+  const fetched = await clientRepo.listByIds(ctx, clientIds);
+  const byId = new Map(fetched.map((c) => [c.id, c]));
+  return rdvs.map((rdv) => ({ ...rdv, client: byId.get(rdv.clientId) ?? null }));
 }
 
 export async function getRdv(repo: IRdvRepository, ctx: TenantContext, id: number): Promise<Rdv> {

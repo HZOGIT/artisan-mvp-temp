@@ -35,6 +35,11 @@ export class FakeClientRepository implements IClientRepository {
     return this.store.find((c) => c.id === id && c.artisanId === ctx.artisanId) ?? null;
   }
 
+  async listByIds(ctx: TenantContext, ids: number[]): Promise<Client[]> {
+    const set = new Set(ids);
+    return this.store.filter((c) => c.artisanId === ctx.artisanId && set.has(c.id));
+  }
+
   async create(ctx: TenantContext, input: CreateClientInput): Promise<Client> {
     const now = new Date();
     const c: Client = {
