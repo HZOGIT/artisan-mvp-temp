@@ -169,7 +169,9 @@ export const fournisseurs = pgTable("fournisseurs", {
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
-});
+}, (t) => [
+  index("idx_fournisseurs_artisan").on(t.artisanId),
+]);
 export type Fournisseur = typeof fournisseurs.$inferSelect;
 export type InsertFournisseur = typeof fournisseurs.$inferInsert;
 
@@ -195,7 +197,9 @@ export const commandesFournisseurs = pgTable("commandes_fournisseurs", {
   alerteRetardEnvoyee: boolean("alerteRetardEnvoyee").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_commandes_fournisseurs_artisan").on(t.artisanId),
+]);
 export type CommandeFournisseur = typeof commandesFournisseurs.$inferSelect;
 export type InsertCommandeFournisseur = typeof commandesFournisseurs.$inferInsert;
 
@@ -237,7 +241,9 @@ export const chantiers = pgTable("chantiers", {
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
-});
+}, (t) => [
+  index("idx_chantiers_artisan").on(t.artisanId),
+]);
 export type Chantier = typeof chantiers.$inferSelect;
 export type InsertChantier = typeof chantiers.$inferInsert;
 

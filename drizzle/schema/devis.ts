@@ -8,6 +8,7 @@ import {
   timestamp,
   boolean,
   numeric,
+  index,
 } from "drizzle-orm/pg-core";
 import { tvaCategories, ligneTypeEnum } from "./factures";
 
@@ -33,7 +34,10 @@ export const devis = pgTable("devis", {
   montantDejaFacture: numeric("montantDejaFacture", { precision: 10, scale: 2 }).default("0.00"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
-});
+}, (t) => [
+  index("idx_devis_artisan").on(t.artisanId),
+  index("idx_devis_client").on(t.clientId),
+]);
 export type Devis = typeof devis.$inferSelect;
 export type InsertDevis = typeof devis.$inferInsert;
 
@@ -54,7 +58,9 @@ export const devisLignes = pgTable("devis_lignes", {
   montantTTC: numeric("montantTTC", { precision: 10, scale: 2 }).default("0.00"),
   type: ligneTypeEnum("type").default("produit"),
   tvaCategorieId: varchar("tvaCategorieId", { length: 30 }).references(() => tvaCategories.id),
-});
+}, (t) => [
+  index("idx_devis_lignes_devis").on(t.devisId),
+]);
 export type DevisLigne = typeof devisLignes.$inferSelect;
 export type InsertDevisLigne = typeof devisLignes.$inferInsert;
 

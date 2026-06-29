@@ -9,6 +9,7 @@ import {
   boolean,
   numeric,
   date,
+  index,
 } from "drizzle-orm/pg-core";
 import { files } from "./files";
 
@@ -73,7 +74,11 @@ export const factures = pgTable("factures", {
   pdfStorageKey: varchar("pdfStorageKey", { length: 500 }),
   estAcompte: boolean("estAcompte").notNull().default(false),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
-});
+}, (t) => [
+  index("idx_factures_artisan").on(t.artisanId),
+  index("idx_factures_client").on(t.clientId),
+  index("idx_factures_devis").on(t.devisId),
+]);
 export type Facture = typeof factures.$inferSelect;
 export type InsertFacture = typeof factures.$inferInsert;
 
@@ -95,7 +100,9 @@ export const facturesLignes = pgTable("factures_lignes", {
   montantTTC: numeric("montantTTC", { precision: 10, scale: 2 }).default("0.00"),
   type: ligneTypeEnum("type").default("produit"),
   tvaCategorieId: varchar("tvaCategorieId", { length: 30 }).references(() => tvaCategories.id),
-});
+}, (t) => [
+  index("idx_factures_lignes_facture").on(t.factureId),
+]);
 export type FactureLigne = typeof facturesLignes.$inferSelect;
 export type InsertFactureLigne = typeof facturesLignes.$inferInsert;
 

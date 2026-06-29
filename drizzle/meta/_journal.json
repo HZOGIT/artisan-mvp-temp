@@ -176,6 +176,13 @@
       "when": 1751230893000,
       "tag": "20260629201453_signature-statut-annulee",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1751233290000,
+      "tag": "20260629211450_indexes-core",
+      "breakpoints": true
     }
   ]
 }
