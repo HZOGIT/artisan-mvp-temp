@@ -72,6 +72,46 @@ describe("interventions — use-cases d'écriture (create / update)", () => {
     await expect(modifierIntervention(repo, B, i.id, { titre: "hack" })).rejects.toBeInstanceOf(NotFoundError);
   });
 
+  it("garde de transition : planifiee → en_cours OK ; planifiee → terminee refusé", async () => {
+    const repo = repoAvecClientA();
+    const i = await creerIntervention(repo, A, base());
+    expect(i.statut).toBe("planifiee");
+    const enCours = await modifierIntervention(repo, A, i.id, { statut: "en_cours" });
+    expect(enCours.statut).toBe("en_cours");
+    await expect(modifierIntervention(repo, A, i.id, { statut: "planifiee" })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("garde de transition : en_cours → terminee OK ; en_cours → planifiee refusé", async () => {
+    const repo = repoAvecClientA();
+    const i = await creerIntervention(repo, A, base({ statut: "en_cours" }));
+    const terminee = await modifierIntervention(repo, A, i.id, { statut: "terminee" });
+    expect(terminee.statut).toBe("terminee");
+    await expect(modifierIntervention(repo, A, i.id, { statut: "en_cours" })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("garde de transition : états terminaux (terminee, annulee) → tout refusé", async () => {
+    const repo = repoAvecClientA();
+    const t = await creerIntervention(repo, A, base({ statut: "terminee" }));
+    await expect(modifierIntervention(repo, A, t.id, { statut: "planifiee" })).rejects.toBeInstanceOf(ValidationError);
+    await expect(modifierIntervention(repo, A, t.id, { statut: "annulee" })).rejects.toBeInstanceOf(ValidationError);
+    const ann = await creerIntervention(repo, A, base({ statut: "annulee" }));
+    await expect(modifierIntervention(repo, A, ann.id, { statut: "planifiee" })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("garde de transition : même statut → idempotent (pas d'erreur)", async () => {
+    const repo = repoAvecClientA();
+    const i = await creerIntervention(repo, A, base());
+    const r = await modifierIntervention(repo, A, i.id, { statut: "planifiee" });
+    expect(r.statut).toBe("planifiee");
+  });
+
+  it("garde de transition : pas de statut dans l'input → pas de vérification", async () => {
+    const repo = repoAvecClientA();
+    const i = await creerIntervention(repo, A, base({ statut: "terminee" }));
+    const r = await modifierIntervention(repo, A, i.id, { titre: "Nouveau titre" });
+    expect(r.statut).toBe("terminee");
+  });
+
   it("supprimerIntervention OK / cross-tenant → NotFound", async () => {
     const repo = repoAvecClientA();
     const i = await creerIntervention(repo, A, base());

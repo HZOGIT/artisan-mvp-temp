@@ -1,7 +1,14 @@
 import { NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IInterventionRepository, InterventionRefKind } from "./intervention-repository";
-import type { Intervention, CreateInterventionInput, UpdateInterventionInput } from "../domain/intervention";
+import type { Intervention, CreateInterventionInput, UpdateInterventionInput, InterventionStatut } from "../domain/intervention";
+
+const TRANSITIONS: Record<InterventionStatut, ReadonlySet<InterventionStatut>> = {
+  planifiee: new Set<InterventionStatut>(["en_cours", "annulee"]),
+  en_cours: new Set<InterventionStatut>(["terminee", "annulee"]),
+  terminee: new Set<InterventionStatut>(),
+  annulee: new Set<InterventionStatut>(),
+};
 
 /*
  * Use-cases d'écriture — purs, repository injecté. Validation métier (titre, cohérence des
@@ -56,6 +63,13 @@ export async function modifierIntervention(
 ): Promise<Intervention> {
   if (input.titre !== undefined && !input.titre.trim()) throw new ValidationError("Le titre est requis");
   assertDatesCoherentes(input.dateDebut, input.dateFin ?? undefined);
+  if (input.statut !== undefined) {
+    const current = await repo.getById(ctx, id);
+    if (!current) throw new NotFoundError("Intervention introuvable");
+    if (input.statut !== current.statut && !TRANSITIONS[current.statut].has(input.statut)) {
+      throw new ValidationError(`Transition de statut "${current.statut}" → "${input.statut}" non autorisée`);
+    }
+  }
   /** Une FK (re)liée doit appartenir au tenant (anti-IDOR-FK). `null` = on détache, pas de vérif. */
   if (input.technicienId != null) await assertRefOwned(repo, ctx, "technicien", input.technicienId);
   if (input.devisId != null) await assertRefOwned(repo, ctx, "devis", input.devisId);
