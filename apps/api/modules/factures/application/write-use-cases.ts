@@ -238,6 +238,9 @@ export async function marquerFacturePayee(
   compta: ComptaPort = NOOP_COMPTA,
 ): Promise<Facture> {
   const facture = await getFactureOwned(repo, ctx, id);
+  if (facture.statut !== "envoyee" && facture.statut !== "en_retard") {
+    throw new ConflictError("Seule une facture émise (envoyée ou en retard) peut être marquée payée");
+  }
   const datePaiement = new Date(input.datePaiement);
   if (Number.isNaN(datePaiement.getTime())) throw new ValidationError("Date de paiement invalide");
   const updated = await repo.enregistrerPaiement(ctx, id, {

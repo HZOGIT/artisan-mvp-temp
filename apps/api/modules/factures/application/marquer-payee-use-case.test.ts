@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { FakeFactureRepository } from "../infra/facture-repository-fake";
 import { creerFacture, ajouterLigneFacture, changerStatutFacture, marquerFacturePayee } from "./write-use-cases";
 import type { ComptaPort } from "./compta-port";
-import { NotFoundError, ValidationError } from "../../../shared/errors";
+import { ConflictError, NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 
 const A: TenantContext = { artisanId: 1, userId: 10 };
@@ -70,5 +70,34 @@ describe("factures — marquerFacturePayee (markAsPaid + FEC)", () => {
     const f = await marquerFacturePayee(repo, A, id, { montantPaye: "120.00", datePaiement: "2026-03-10" }, compta);
     expect(f.statut).toBe("payee");
     expect(compta.calls).toContain(`vente:${id}`);
+  });
+
+  it("brouillon → ConflictError (garde statut source)", async () => {
+    const repo = new FakeFactureRepository();
+    repo.registerClient(A.artisanId, 100);
+    const f = await creerFacture(repo, A, { clientId: 100 });
+    await expect(
+      marquerFacturePayee(repo, A, f.id, { montantPaye: "100.00", datePaiement: "2026-03-10" }),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("payee → ConflictError (statut terminal)", async () => {
+    const repo = new FakeFactureRepository();
+    repo.registerClient(A.artisanId, 100);
+    const id = await factureEmise(repo);
+    await marquerFacturePayee(repo, A, id, { montantPaye: "120.00", datePaiement: "2026-03-10" });
+    await expect(
+      marquerFacturePayee(repo, A, id, { montantPaye: "120.00", datePaiement: "2026-03-10" }),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("annulee → ConflictError (statut terminal)", async () => {
+    const repo = new FakeFactureRepository();
+    repo.registerClient(A.artisanId, 100);
+    const f = await creerFacture(repo, A, { clientId: 100 });
+    await repo.setStatut(A, f.id, "annulee");
+    await expect(
+      marquerFacturePayee(repo, A, f.id, { montantPaye: "0.00", datePaiement: "2026-03-10" }),
+    ).rejects.toBeInstanceOf(ConflictError);
   });
 });
