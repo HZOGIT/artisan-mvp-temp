@@ -8,7 +8,7 @@ import { buildFastifyLoggerConfig } from "./shared/ports/logger-fastify";
 import { fastifyTRPCPlugin } from "@trpc/server/adapters/fastify";
 import { createAppRouter } from "./interface/trpc/router";
 import { makeCreateContext, type ContextDeps } from "./interface/trpc/context";
-import { getDbHandle, createDbClient, type DbClient } from "./shared/db";
+import { getDbHandle, getOwnerDbHandle, createDbClient, type DbClient } from "./shared/db";
 import { DrizzleTenantResolver } from "./shared/tenant/drizzle-tenant-resolver";
 import { DrizzleUserRoleReader } from "./shared/tenant/role-reader";
 import { DrizzlePermissionsReader } from "./shared/tenant/permissions-reader";
@@ -1148,7 +1148,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     deps: { repo: billingRepo, billing: new BillingAdapter(), stripe: deps.stripePort ?? new StripeAdapter() },
   });
 
-  const platformAdmin = createPlatformAdminModule(getDbHandle().db);
+  const platformAdmin = createPlatformAdminModule(getOwnerDbHandle().db);
 
   const events = createEventsModule({ db: getDbHandle().db });
 

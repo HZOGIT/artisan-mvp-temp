@@ -42,3 +42,19 @@ export function getDbHandle(): DbHandle {
   defaultHandle = createDbClient(url);
   return defaultHandle;
 }
+
+/*
+ * Pool owner (artisan_user) — bypass FORCE ROW LEVEL SECURITY (rolbypassrls=true).
+ * Usage STRICTEMENT RESTREINT aux modules cross-tenant (platformAdmin). Ne jamais injecter
+ * ce handle dans une procédure tenant-scoped : le bypass désactiverait l'isolation.
+ */
+let ownerHandle: DbHandle | null = null;
+export function getOwnerDbHandle(): DbHandle {
+  if (ownerHandle) return ownerHandle;
+  const url = getSecret("DATABASE_URL");
+  if (!url) {
+    throw new Error("DATABASE_URL manquant — le pool owner est requis pour les requêtes cross-tenant (platformAdmin)");
+  }
+  ownerHandle = createDbClient(url, 2);
+  return ownerHandle;
+}
