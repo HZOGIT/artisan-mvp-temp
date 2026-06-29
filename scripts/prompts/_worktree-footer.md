@@ -75,7 +75,9 @@ DATABASE_URL="$(grep ^DATABASE_URL= .env.test.local | cut -d= -f2-)" \
 Si tu **ajoutes une migration** en cours de session, provisionne-la manuellement sur ta base de test :
 
 ```bash
-cd /tmp/wt-__SESSION_NAME__ && DATABASE_URL="$(grep ^DATABASE_URL= .env.test.local | cut -d= -f2-)" \
+cd /tmp/wt-__SESSION_NAME__ && \
+  DATABASE_URL="$(grep ^DATABASE_URL= .env.test.local | cut -d= -f2-)" \
+  APP_DATABASE_URL="$(grep ^APP_DATABASE_URL= .env.test.local | cut -d= -f2-)" \
   pnpm exec tsx apps/api/shared/db/provision-cli.ts
 ```
 

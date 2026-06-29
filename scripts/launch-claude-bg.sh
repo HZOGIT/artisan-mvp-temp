@@ -112,6 +112,7 @@ if $USE_WORKTREE; then
   TEST_DB_SUFFIX="$(echo "$SESSION_NAME" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '_' | sed 's/_*$//;s/^_*//' | cut -c1-54)"
   TEST_DB="ope_test_${TEST_DB_SUFFIX}"
   TEST_DB_URL="postgres://artisan_user:artisan_password@localhost:5432/${TEST_DB}"
+  TEST_DB_APP_URL="postgres://app_tenant:app_tenant_pw@localhost:5432/${TEST_DB}"
 
   # Find the dev postgres container (port 5432) — container name varies by compose project.
   PG_DEV_CONTAINER="$(docker ps --format '{{.Names}}\t{{.Ports}}' 2>/dev/null \
@@ -130,7 +131,8 @@ if $USE_WORKTREE; then
          exit 1; }
 
   echo "Provisioning ${TEST_DB} from ${WORKTREE_PATH}/drizzle..."
-  ( cd "$WORKTREE_PATH" && DATABASE_URL="${TEST_DB_URL}" \
+  ( cd "$WORKTREE_PATH" && \
+    DATABASE_URL="${TEST_DB_URL}" APP_DATABASE_URL="${TEST_DB_APP_URL}" \
     pnpm exec tsx apps/api/shared/db/provision-cli.ts ) \
     || { echo "ERROR: provision of ${TEST_DB} failed." >&2; \
          docker exec "$PG_DEV_CONTAINER" psql -U artisan_user -d postgres \
@@ -138,7 +140,8 @@ if $USE_WORKTREE; then
          git -C "$MAIN_REPO" worktree remove "$WORKTREE_PATH" --force 2>/dev/null || true; \
          exit 1; }
 
-  printf 'DATABASE_URL=%s\nTEST_DB_NAME=%s\n' "${TEST_DB_URL}" "${TEST_DB}" \
+  printf 'DATABASE_URL=%s\nAPP_DATABASE_URL=%s\nTEST_DB_NAME=%s\n' \
+    "${TEST_DB_URL}" "${TEST_DB_APP_URL}" "${TEST_DB}" \
     > "${WORKTREE_PATH}/.env.test.local"
   echo "Test database ready: ${TEST_DB}"
 

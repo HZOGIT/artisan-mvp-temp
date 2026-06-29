@@ -122,9 +122,11 @@ $BIN/eslint -c eslint.web.config.mjs --concurrency=auto apps/web/src  # si apps/
 
 # Tests (gate L1/L2/L3). La base de test est isolée par worktree (.env.test.local) :
 TEST_DB_URL="$(grep ^DATABASE_URL= "$WT/.env.test.local" 2>/dev/null | cut -d= -f2-)"
+TEST_DB_APP_URL="$(grep ^APP_DATABASE_URL= "$WT/.env.test.local" 2>/dev/null | cut -d= -f2-)"
 if [[ -z "$TEST_DB_URL" ]]; then
   echo "WARN: .env.test.local absent — base de test non provisionnée. Cf. launch-claude-bg.sh."
   TEST_DB_URL="postgres://artisan_user:artisan_password@localhost:5432/artisan_mvp"
+  TEST_DB_APP_URL="postgres://app_tenant:app_tenant_pw@localhost:5432/artisan_mvp"
 fi
 DATABASE_URL="$TEST_DB_URL" \
   $BIN/vitest run -c vitest.api.config.ts --no-file-parallelism <chemins des fichiers/modules touchés>
@@ -134,7 +136,8 @@ DATABASE_URL="$TEST_DB_URL" \
 de test n'est pas à jour (test L3 casse en `column "X" does not exist`), provisionne la base de test depuis
 le worktree (idempotent) :
 ```bash
-DATABASE_URL="$TEST_DB_URL" cd "$WT" && pnpm exec tsx apps/api/shared/db/provision-cli.ts
+cd "$WT" && DATABASE_URL="$TEST_DB_URL" APP_DATABASE_URL="$TEST_DB_APP_URL" \
+  pnpm exec tsx apps/api/shared/db/provision-cli.ts
 ```
 
 #### c. Décision : corrections nécessaires
