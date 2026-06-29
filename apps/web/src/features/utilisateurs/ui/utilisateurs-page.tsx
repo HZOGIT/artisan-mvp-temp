@@ -56,9 +56,8 @@ export default function UtilisateursPage() {
     if (!permDialogOpen) setPermsLoaded(false);
   }, [permDialogOpen]);
 
-  /** Garde admin : redirige les non-admins vers le dashboard legacy (page non migrée). */
   useEffect(() => {
-    if (currentUser && currentUser.role !== "admin") window.location.assign("/dashboard");
+    if (currentUser && !currentUser.permissions?.includes("utilisateurs.gerer")) window.location.assign("/dashboard");
   }, [currentUser]);
 
   const roleLabel = (r: string) => t(`role.${r}`, r);
@@ -90,7 +89,7 @@ export default function UtilisateursPage() {
   const defaults = useMemo(() => roleDefaults(permUser?.role ?? ""), [permUser]);
   const hasCustomization = hasAnyCustomization(defaults, localPerms);
 
-  if (currentUser && currentUser.role !== "admin") return null;
+  if (currentUser && !currentUser.permissions?.includes("utilisateurs.gerer")) return null;
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-6xl">
