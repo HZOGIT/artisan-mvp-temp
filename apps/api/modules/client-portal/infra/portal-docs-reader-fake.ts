@@ -1,11 +1,12 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { IPortalDocsReader, PortalContrat, PortalDevis, PortalFacture, PortalIntervention } from "../application/portal-docs-reader";
+import type { IPortalDocsReader, PortalContrat, PortalDevis, PortalDevisOption, PortalFacture, PortalIntervention } from "../application/portal-docs-reader";
 
 export interface PortalDocsFakeState {
   devis?: Record<number, PortalDevis[]>;
   factures?: Record<number, PortalFacture[]>;
   interventions?: Record<number, PortalIntervention[]>;
   contrats?: Record<number, PortalContrat[]>;
+  options?: Record<number, PortalDevisOption[]>;
 }
 
 /** Fake en mémoire des lectures de documents du portail (indexé par clientId). */
@@ -22,5 +23,8 @@ export class PortalDocsReaderFake implements IPortalDocsReader {
   }
   async listContrats(_ctx: TenantContext, clientId: number): Promise<PortalContrat[]> {
     return this.state.contrats?.[clientId] ?? [];
+  }
+  async getOptionsDevis(_ctx: TenantContext, _clientId: number, devisId: number): Promise<PortalDevisOption[]> {
+    return this.state.options?.[devisId] ?? [];
   }
 }

@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { FileText, Receipt, Calendar, User, Loader2, Phone, Mail, MessageCircle, CalendarDays, HardHat, Sparkles, Download, ExternalLink, CreditCard, MapPin, CheckCircle2, CheckCircle, Send, ArrowRight, ArrowLeft, Clock } from "lucide-react";
+import { FileText, Receipt, Calendar, User, Loader2, Phone, Mail, MessageCircle, CalendarDays, HardHat, Sparkles, Download, ExternalLink, CreditCard, MapPin, CheckCircle2, CheckCircle, Send, ArrowRight, ArrowLeft, Clock, ChevronDown, ChevronUp, Star } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -16,6 +16,7 @@ import { ScrollArea } from "@/shared/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 import { usePortailAccess } from "../application/use-portail-access";
 import { usePortailDocuments } from "../application/use-portail-documents";
+import { usePortailOptions } from "../application/use-portail-options";
 import { usePortailActivity } from "../application/use-portail-activity";
 import { usePortailRdv } from "../application/use-portail-rdv";
 import { usePortailChat } from "../application/use-portail-chat";
@@ -49,6 +50,8 @@ export default function PortailClientPage() {
   const { token } = useParams({ strict: false }) as { token?: string };
   const [activeTab, setActiveTab] = useState("devis");
   const [payingFactureId, setPayingFactureId] = useState<number | null>(null);
+  const [expandedDevisId, setExpandedDevisId] = useState<number | null>(null);
+  const { options: devisOptions, isLoading: optionsLoading, select: selectOption, isPending: selectPending } = usePortailOptions(token || "", expandedDevisId);
   const { access, isLoading } = usePortailAccess(token || "");
   const { devis, factures } = usePortailDocuments(token || "", !!access?.valid);
   const { interventions, chantiers } = usePortailActivity(token || "", !!access?.valid);
@@ -247,9 +250,61 @@ export default function PortailClientPage() {
                                 <a href={`/signature/${d.tokenSignature}`} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4 mr-1" />{t("signer")}</a>
                               </Button>
                             )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setExpandedDevisId(expandedDevisId === d.id ? null : d.id)}
+                            >
+                              <Star className="h-4 w-4 mr-1 text-amber-500" />
+                              {expandedDevisId === d.id ? t("masquerFormules") : t("voirFormules")}
+                              {expandedDevisId === d.id ? <ChevronUp className="h-3.5 w-3.5 ml-1" /> : <ChevronDown className="h-3.5 w-3.5 ml-1" />}
+                            </Button>
                           </div>
                         </div>
                       </div>
+
+                      {expandedDevisId === d.id && (
+                        <div className="mt-4 pt-4 border-t">
+                          {optionsLoading ? (
+                            <div className="flex items-center gap-2 text-gray-500 text-sm"><Loader2 className="h-4 w-4 animate-spin" /> {t("optionsChargement")}</div>
+                          ) : devisOptions.length === 0 ? (
+                            <p className="text-sm text-gray-400">{t("optionsAucune")}</p>
+                          ) : (
+                            <div className="space-y-2">
+                              <p className="text-sm font-semibold text-gray-700">{t("optionsFormuleTitre")}</p>
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                {devisOptions.map((opt) => (
+                                  <div key={opt.id} className={`rounded-lg border p-3 flex flex-col gap-2 transition-colors ${opt.selectionnee ? "border-green-400 bg-green-50" : opt.recommandee ? "border-amber-300 bg-amber-50" : "border-gray-200 bg-white"}`}>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="font-semibold text-gray-900 text-sm">{opt.nom}</span>
+                                      <div className="flex gap-1">
+                                        {opt.recommandee && <Badge className="bg-amber-100 text-amber-700 border-amber-300 text-xs">{t("optionRecommandee")}</Badge>}
+                                        {opt.selectionnee && <Badge className="bg-green-100 text-green-700 border-green-300 text-xs"><CheckCircle2 className="h-3 w-3 mr-1" />{t("optionSelectionnee")}</Badge>}
+                                      </div>
+                                    </div>
+                                    {opt.description && <p className="text-xs text-gray-500">{opt.description}</p>}
+                                    <div className="flex items-center justify-between mt-1">
+                                      <span className="font-bold text-gray-900">{formatCurrency(opt.totalTTC)}</span>
+                                      {!opt.selectionnee && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          disabled={selectPending}
+                                          onClick={() => selectOption(opt.id)}
+                                          className="text-xs"
+                                        >
+                                          {selectPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <CheckCircle className="h-3.5 w-3.5 mr-1" />}
+                                          {t("choisirFormule")}
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 ))

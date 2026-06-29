@@ -1,9 +1,9 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
-import { devis, factures, interventions, contratsMaintenance, paiementsStripe } from "../../../../../drizzle/schema.pg";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { devis, devisOptions, devisOptionsLignes, factures, interventions, contratsMaintenance, paiementsStripe } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
-import type { IPortalDocsReader, PortalContrat, PortalDevis, PortalFacture, PortalIntervention } from "../application/portal-docs-reader";
+import type { IPortalDocsReader, PortalContrat, PortalDevis, PortalDevisOption, PortalDevisOptionLigne, PortalFacture, PortalIntervention } from "../application/portal-docs-reader";
 
 /*
  * Lecteur Drizzle des documents du portail. Tables SOUS RLS (devis/factures/interventions/contrats/
@@ -54,6 +54,38 @@ export class PortalDocsReaderDrizzle implements IPortalDocsReader {
         .from(interventions)
         .where(and(eq(interventions.clientId, clientId), eq(interventions.artisanId, ctx.artisanId)));
       return rows.map((i) => ({ id: i.id, titre: i.titre, description: i.description ?? null, dateIntervention: i.dateDebut, statut: i.statut ?? null, adresse: i.adresse ?? null }));
+    });
+  }
+
+  getOptionsDevis(ctx: TenantContext, clientId: number, devisId: number): Promise<PortalDevisOption[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      /** Anti-IDOR : vérifier que le devis appartient à ce client (RLS scope le tenant). */
+      const [d] = await tx.select({ id: devis.id }).from(devis).where(and(eq(devis.id, devisId), eq(devis.clientId, clientId))).limit(1);
+      if (!d) return [];
+      const optionsRows = await tx.select().from(devisOptions).where(eq(devisOptions.devisId, devisId)).orderBy(asc(devisOptions.ordre));
+      return Promise.all(
+        optionsRows.map(async (o): Promise<PortalDevisOption> => {
+          const lignesRows = await tx.select().from(devisOptionsLignes).where(eq(devisOptionsLignes.optionId, o.id)).orderBy(asc(devisOptionsLignes.ordre));
+          return {
+            id: o.id,
+            nom: o.nom,
+            description: o.description ?? null,
+            ordre: o.ordre ?? 0,
+            totalHT: o.totalHT ?? "0.00",
+            totalTTC: o.totalTTC ?? "0.00",
+            recommandee: o.recommandee ?? false,
+            selectionnee: o.selectionnee ?? false,
+            lignes: lignesRows.map((l): PortalDevisOptionLigne => ({
+              id: l.id,
+              designation: l.designation,
+              quantite: l.quantite ?? null,
+              unite: l.unite ?? null,
+              prixUnitaireHT: l.prixUnitaireHT ?? null,
+              montantTTC: l.montantTTC ?? null,
+            })),
+          };
+        }),
+      );
     });
   }
 

@@ -132,5 +132,15 @@
   "infosModifNotifie": "Votre artisan a été notifié par email.",
   "infosModifAutre": "Envoyer une autre demande",
   "infosModifEnvoyer": "Envoyer la demande",
-  "infosModifErreur": "Erreur lors de la demande de modification"
+  "infosModifErreur": "Erreur lors de la demande de modification",
+  "voirFormules": "Voir les formules",
+  "masquerFormules": "Masquer",
+  "optionsFormuleTitre": "Choisissez votre formule",
+  "optionRecommandee": "Recommandée",
+  "optionSelectionnee": "Choisie",
+  "choisirFormule": "Choisir cette formule",
+  "formulaChoisie": "Choisie",
+  "optionErreur": "Erreur lors de la sélection de la formule",
+  "optionsChargement": "Chargement…",
+  "optionsAucune": "Aucune formule disponible pour ce devis."
 }

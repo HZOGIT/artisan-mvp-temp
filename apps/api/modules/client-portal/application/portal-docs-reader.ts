@@ -51,6 +51,27 @@ export interface PortalContrat {
   readonly statut: string | null;
 }
 
+export interface PortalDevisOptionLigne {
+  readonly id: number;
+  readonly designation: string;
+  readonly quantite: string | null;
+  readonly unite: string | null;
+  readonly prixUnitaireHT: string | null;
+  readonly montantTTC: string | null;
+}
+
+export interface PortalDevisOption {
+  readonly id: number;
+  readonly nom: string;
+  readonly description: string | null;
+  readonly ordre: number;
+  readonly totalHT: string;
+  readonly totalTTC: string;
+  readonly recommandee: boolean;
+  readonly selectionnee: boolean;
+  readonly lignes: PortalDevisOptionLigne[];
+}
+
 /*
  * Port de lecture des documents du client pour le portail. Toutes les lectures sont SCOPÉES au tenant
  * résolu (artisanId) ET filtrées par `clientId` (anti-IDOR : un client ne voit QUE ses documents).
@@ -60,4 +81,6 @@ export interface IPortalDocsReader {
   listFactures(ctx: TenantContext, clientId: number): Promise<PortalFacture[]>;
   listInterventions(ctx: TenantContext, clientId: number): Promise<PortalIntervention[]>;
   listContrats(ctx: TenantContext, clientId: number): Promise<PortalContrat[]>;
+  /** Anti-IDOR : vérifie que le devis appartient au clientId avant de lire ses options. */
+  getOptionsDevis(ctx: TenantContext, clientId: number, devisId: number): Promise<PortalDevisOption[]>;
 }
