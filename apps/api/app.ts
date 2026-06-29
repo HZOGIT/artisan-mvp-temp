@@ -167,6 +167,8 @@ import { registerBillingSchedulerRoute } from "./interface/http/billing-schedule
 import { handleBillingWebhookEvent } from "./modules/billing/interface/http/billing-webhook-handler";
 import fastifySchedule from "@fastify/schedule";
 import { billingCronPlugin } from "./shared/infra/billing-cron";
+import { schedulerPlugin } from "./platform/scheduler";
+import { createRelancesDevisJob } from "./modules/devis/application/relances-devis-job";
 import { paOutboxDrainerPlugin } from "./shared/infra/pa-outbox-drainer";
 import { paInboundPollerPlugin } from "./shared/infra/pa-inbound-poller";
 import { paReconciliationPollerPlugin } from "./shared/infra/pa-reconciliation-poller";
@@ -1340,6 +1342,43 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   app.register(rappelRdvClientCronPlugin, {
     db: getDbHandle().db,
     email: emailAdapter,
+  });
+
+  /**
+   * Scheduler de jobs idempotents — tick toutes les 5 min, un seul claim par (job, période).
+   * Branché avec le job relances-devis (clé daily) : un seul passage par jour, best-effort par artisan.
+   */
+  app.register(schedulerPlugin, {
+    db: getDbHandle().db,
+    configure: (registry) => {
+      registry.register(
+        createRelancesDevisJob({
+          listArtiasnsActifs: async () => {
+            /*
+             * config_relances_auto a RLS (tenant) → pas de requête cross-tenant possible.
+             * On itère la table artisans (pas de RLS) et on lit la config par tenant via withTenant.
+             */
+            const rows = await getDbHandle().db.select({ id: artisansTable.id }).from(artisansTable);
+            const active: number[] = [];
+            for (const { id } of rows) {
+              const cfg = await configRelances.deps.repository.get({ artisanId: id, userId: 0 });
+              if (cfg.actif) active.push(id);
+            }
+            return active;
+          },
+          makeRelanceDeps: (_artisanId) => ({
+            devisRepo,
+            relanceRepo: relanceDevisRepo,
+            clientReader: new SharedClientReaderDrizzle(getDbHandle().db),
+            artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
+            email: emailAdapter,
+            /* ponytail: rate-limiter permissif dédié au job daily (100/h vs 5/10min en API) */
+            rateLimiter: new SlidingWindowRateLimiter(100, 60 * 60 * 1000),
+            modeleEmailRepo,
+          }),
+        }),
+      );
+    },
   });
 
   /** Upload/suppression du logo artisan `/api/upload-logo` (auth cookie JWT). Stocké en data-URL base64. */
