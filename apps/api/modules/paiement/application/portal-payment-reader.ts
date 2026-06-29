@@ -49,4 +49,6 @@ export interface PortalPaymentReader {
   /** Coordonnées du client (destinataire Stripe) + raison sociale de l'artisan (libellé produit). */
   getClientContact(ctx: TenantContext, clientId: number): Promise<ClientContact | null>;
   getArtisanNom(ctx: TenantContext): Promise<string | null>;
+  /** Retourne une session paiement en_attente existante pour cette facture, ou null. Anti double-session. */
+  getSessionEnAttente(ctx: TenantContext, factureId: number): Promise<{ url: string | null } | null>;
 }

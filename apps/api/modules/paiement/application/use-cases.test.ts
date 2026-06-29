@@ -89,6 +89,15 @@ describe("createInvoiceCheckout (public par token portail)", () => {
     expect((await createInvoiceCheckout(deps, { factureId: 43, token: "tok", origin: "https://o.test" })).kind).toBe("bad-request");
   });
 
+  it("OPE-780 — session en_attente existante → bad-request (anti double-encaissement)", async () => {
+    const { reader, deps } = build();
+    seedFacturePayable(reader);
+    reader.seedSessionEnAttente(7, 42, { url: "https://checkout.stripe.test/existing" });
+    const out = await createInvoiceCheckout(deps, { factureId: 42, token: "tok", origin: "https://o.test" });
+    expect(out.kind).toBe("bad-request");
+    if (out.kind === "bad-request") expect(out.message).toContain("en cours");
+  });
+
   it("succès : crée la session Stripe (mode payment) + la ligne paiement en_attente", async () => {
     const { reader, writer, stripe, deps } = build();
     seedFacturePayable(reader);

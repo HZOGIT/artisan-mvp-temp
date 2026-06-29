@@ -96,4 +96,15 @@ export class PortalPaymentReaderDrizzle implements PortalPaymentReader {
     const [a] = await this.db.select({ nomEntreprise: artisans.nomEntreprise }).from(artisans).where(eq(artisans.id, ctx.artisanId)).limit(1);
     return a?.nomEntreprise ?? null;
   }
+
+  getSessionEnAttente(ctx: TenantContext, factureId: number): Promise<{ url: string | null } | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [p] = await tx
+        .select({ url: paiementsStripe.lienPaiement })
+        .from(paiementsStripe)
+        .where(and(eq(paiementsStripe.factureId, factureId), eq(paiementsStripe.artisanId, ctx.artisanId), eq(paiementsStripe.statut, "en_attente")))
+        .limit(1);
+      return p ? { url: p.url } : null;
+    });
+  }
 }

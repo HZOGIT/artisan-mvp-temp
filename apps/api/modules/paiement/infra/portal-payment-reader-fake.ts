@@ -18,6 +18,7 @@ export class FakePortalPaymentReader implements PortalPaymentReader {
   private checkouts = new Map<string, FactureCheckout>();
   private contacts = new Map<string, ClientContact>();
   private artisanNoms = new Map<number, string>();
+  private sessionsEnAttente = new Map<string, { url: string | null }>();
 
   seedCheckout(artisanId: number, factureId: number, f: FactureCheckout): void {
     this.checkouts.set(`${artisanId}:${factureId}`, f);
@@ -27,6 +28,9 @@ export class FakePortalPaymentReader implements PortalPaymentReader {
   }
   seedArtisanNom(artisanId: number, nom: string): void {
     this.artisanNoms.set(artisanId, nom);
+  }
+  seedSessionEnAttente(artisanId: number, factureId: number, session: { url: string | null }): void {
+    this.sessionsEnAttente.set(`${artisanId}:${factureId}`, session);
   }
 
   seedAccess(token: string, a: PortalAccess): void {
@@ -56,6 +60,9 @@ export class FakePortalPaymentReader implements PortalPaymentReader {
   }
   async getArtisanNom(ctx: TenantContext): Promise<string | null> {
     return this.artisanNoms.get(ctx.artisanId) ?? null;
+  }
+  async getSessionEnAttente(ctx: TenantContext, factureId: number): Promise<{ url: string | null } | null> {
+    return this.sessionsEnAttente.get(`${ctx.artisanId}:${factureId}`) ?? null;
   }
 }
 
