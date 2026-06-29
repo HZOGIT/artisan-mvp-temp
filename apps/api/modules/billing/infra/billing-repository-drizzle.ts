@@ -28,8 +28,9 @@ import type {
 } from "../application/billing-repository";
 
 /**
- * billing_payment_methods : RLS tenant — accès via withTenant (UI uniquement).
- * billing_subscriptions / billing_invoices : HORS RLS — scope explicite artisan_id.
+ * billing_payment_methods : RLS tenant — accès via withTenant.
+ * billing_invoices : RLS tenant (20260628) — accès via withTenant.
+ * billing_subscriptions : RLS désactivé — scope explicite artisan_id.
  */
 export class BillingRepositoryDrizzle implements IBillingRepository {
   constructor(private readonly db: DbClient) {}
@@ -405,16 +406,19 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
   }
 
   async findInvoicesByArtisan(ctx: TenantContext, limit = 24): Promise<BillingInvoice[]> {
-    return this.db
-      .select()
-      .from(billingInvoices)
-      .where(eq(billingInvoices.artisan_id, ctx.artisanId))
-      .orderBy(desc(billingInvoices.created_at))
-      .limit(limit);
+    return withTenant(this.db, ctx, (tx) =>
+      tx
+        .select()
+        .from(billingInvoices)
+        .where(eq(billingInvoices.artisan_id, ctx.artisanId))
+        .orderBy(desc(billingInvoices.created_at))
+        .limit(limit),
+    );
   }
 
   async createInvoiceForCycle(params: CreateInvoiceForCycleParams): Promise<BillingInvoice> {
-    return this.db.transaction(async (tx) => {
+    const ctx: TenantContext = { artisanId: params.artisanId, userId: 0 };
+    return withTenant(this.db, ctx, async (tx) => {
       const existing = await tx
         .select()
         .from(billingInvoices)
