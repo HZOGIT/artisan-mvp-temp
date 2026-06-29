@@ -1,6 +1,7 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { ICongeRepository, AjustementSolde, SoldeResult } from "../application/conge-repository";
+import type { ICongeRepository, AjustementSolde, ReportSolde, SoldeResult } from "../application/conge-repository";
 import type { Conge, CongeStatut, CreateCongeInput, UpdateCongeInput } from "../domain/conge";
+import { periodeReference } from "../application/solde";
 
 /*
  * Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
@@ -14,14 +15,33 @@ export class FakeCongeRepository implements ICongeRepository {
   private ownedTechniciens = new Set<string>();
   /** Lien utilisateur → fiche technicien (injectable) : clé `${artisanId}:${userId}` → technicienId. */
   private userTechnicien = new Map<string, number>();
-  /** Solde décompté (joursPris) : clé `${artisanId}:${technicienId}:${type}:${annee}` → jours. */
-  private joursPris = new Map<string, number>();
+  /** Solde décompté (joursPris) : clé `${artisanId}:${technicienId}:${type}:${periodeDebut}` → jours. */
+  private joursPrisMap = new Map<string, number>();
+  /** Jours reportés : clé `${artisanId}:${technicienId}:${type}:${periodeDebut}` → jours. */
+  private joursReportesMap = new Map<string, number>();
   /** Date d'embauche par technicien (injectable) : clé `${artisanId}:${technicienId}`. */
   private technicienDates = new Map<string, Date>();
 
-  /** Aide de test : lit le total de jours pris (décompté) pour une clé de solde. */
-  getJoursPris(artisanId: number, technicienId: number, type: string, annee: number): number {
-    return this.joursPris.get(`${artisanId}:${technicienId}:${type}:${annee}`) ?? 0;
+  /**
+   * Aide de test : lit le total de jours pris pour une clé de solde.
+   * `annee` utilisé pour dériver periodeDebut (juin→mai) si `periodeDebut` absent.
+   */
+  getJoursPris(artisanId: number, technicienId: number, type: string, annee: number, periodeDebutOverride?: string): number {
+    if (periodeDebutOverride) {
+      return this.joursPrisMap.get(`${artisanId}:${technicienId}:${type}:${periodeDebutOverride}`) ?? 0;
+    }
+    /** Somme des deux périodes d'une même année civile (rétrocompatibilité tests existants). */
+    const p1 = `${annee - 1}-06-01`;
+    const p2 = `${annee}-06-01`;
+    return (
+      (this.joursPrisMap.get(`${artisanId}:${technicienId}:${type}:${p1}`) ?? 0) +
+      (this.joursPrisMap.get(`${artisanId}:${technicienId}:${type}:${p2}`) ?? 0)
+    );
+  }
+
+  /** Aide de test : lit les jours reportés pour une période. */
+  getJoursReportes(artisanId: number, technicienId: number, type: string, periodeDebut: string): number {
+    return this.joursReportesMap.get(`${artisanId}:${technicienId}:${type}:${periodeDebut}`) ?? 0;
   }
 
   /** Aide de test : déclare qu'un technicien appartient au tenant. */
@@ -117,42 +137,69 @@ export class FakeCongeRepository implements ICongeRepository {
     return updated;
   }
 
-  async ajusterSolde(ctx: TenantContext, { technicienId, type, annee, deltaJours }: AjustementSolde): Promise<void> {
-    const key = `${ctx.artisanId}:${technicienId}:${type}:${annee}`;
-    const present = this.joursPris.has(key);
+  async ajusterSolde(ctx: TenantContext, { technicienId, type, periodeDebut, deltaJours }: AjustementSolde): Promise<void> {
+    const key = `${ctx.artisanId}:${technicienId}:${type}:${periodeDebut}`;
+    const present = this.joursPrisMap.has(key);
     if (present) {
-      this.joursPris.set(key, (this.joursPris.get(key) ?? 0) + deltaJours);
+      this.joursPrisMap.set(key, (this.joursPrisMap.get(key) ?? 0) + deltaJours);
     } else if (deltaJours > 0) {
-      this.joursPris.set(key, deltaJours);
+      this.joursPrisMap.set(key, deltaJours);
     }
-    /** absente + recrédit (≤0) → no-op */
+  }
+
+  async reporterSolde(ctx: TenantContext, { technicienId, type, periodeDebut, joursReportes }: ReportSolde): Promise<void> {
+    const key = `${ctx.artisanId}:${technicienId}:${type}:${periodeDebut}`;
+    this.joursReportesMap.set(key, joursReportes);
   }
 
   async getTechnicienDateEmbauche(ctx: TenantContext, technicienId: number): Promise<Date | null> {
     return this.technicienDates.get(`${ctx.artisanId}:${technicienId}`) ?? null;
   }
 
-  async listTechniciensSolde(ctx: TenantContext, annee: number): Promise<Array<{ technicienId: number; dateEmbauche: Date; joursPris: number }>> {
+  async listTechniciensSolde(ctx: TenantContext, annee: number, periodeDebut?: string): Promise<Array<{ technicienId: number; dateEmbauche: Date; joursPris: number; joursReportes: number }>> {
     return Array.from(this.ownedTechniciens)
       .filter((key) => Number(key.split(":")[0]) === ctx.artisanId)
       .map((key) => {
         const [artId, techId] = key.split(":").map(Number);
+        const soldeKey = periodeDebut
+          ? `${artId}:${techId}:conge_paye:${periodeDebut}`
+          : `${artId}:${techId}:conge_paye:${annee - 1}-06-01`;
         return {
           technicienId: techId,
           dateEmbauche: this.technicienDates.get(key) ?? new Date(0),
-          joursPris: this.joursPris.get(`${artId}:${techId}:conge_paye:${annee}`) ?? 0,
+          joursPris: this.joursPrisMap.get(soldeKey) ?? 0,
+          joursReportes: this.joursReportesMap.get(soldeKey) ?? 0,
         };
       });
   }
 
-  async getSolde(ctx: TenantContext, technicienId: number, annee: number): Promise<SoldeResult[]> {
+  async getSolde(ctx: TenantContext, technicienId: number, annee: number, periodeDebut?: string): Promise<SoldeResult[]> {
     const results: SoldeResult[] = [];
-    for (const key of Array.from(this.joursPris.keys())) {
-      const [artId, techId, type, yr] = key.split(":");
-      if (Number(artId) === ctx.artisanId && Number(techId) === technicienId && Number(yr) === annee) {
-        const joursPris = this.joursPris.get(key) ?? 0;
-        results.push({ type: type as SoldeResult["type"], annee, soldeInitial: 0, soldeRestant: 0, joursAcquis: 0, joursPris });
+    for (const key of Array.from(this.joursPrisMap.keys())) {
+      const parts = key.split(":");
+      const [artId, techId, type, pd] = [parts[0], parts[1], parts[2], parts.slice(3).join(":")];
+      if (Number(artId) !== ctx.artisanId || Number(techId) !== technicienId) continue;
+      if (periodeDebut && pd !== periodeDebut) continue;
+      if (!periodeDebut) {
+        const { periodeDebut: pd1 } = { periodeDebut: `${annee - 1}-06-01` };
+        const { periodeDebut: pd2 } = { periodeDebut: `${annee}-06-01` };
+        if (pd !== pd1 && pd !== pd2) continue;
       }
+      const joursPris = this.joursPrisMap.get(key) ?? 0;
+      const joursReportes = this.joursReportesMap.get(key) ?? 0;
+      const periode = periodeReference(pd);
+      results.push({
+        type: type as SoldeResult["type"],
+        annee,
+        periodeDebut: pd,
+        periodeFin: periode.periodeFin,
+        exercice: periode.exercice,
+        soldeInitial: 0,
+        soldeRestant: 0,
+        joursAcquis: 0,
+        joursPris,
+        joursReportes,
+      });
     }
     return results;
   }

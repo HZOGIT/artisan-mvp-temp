@@ -6,8 +6,8 @@
  * - jours = nombre de jours ouvrés dans [dateDebut, dateFin] (sam/dim + jours fériés FR exclus),
  *   moins 0,5 par demi-journée (début/fin) ;
  * - seuls les types `conge_paye`/`rtt` impactent le solde (`soldes_conges`) ;
- * - l'imputation se fait sur **l'année de `dateDebut`** (évite la corruption inter-exercices :
- *   un congé approuvé en N et annulé en N+1 doit recréditer l'année N).
+ * - l'imputation se fait sur **la période de référence de `dateDebut`** (anti-corruption : un
+ *   congé approuvé en déc N et annulé en jan N+1 recrédite la même période).
  */
 
 export type SoldeCongeType = "conge_paye" | "rtt";
@@ -28,6 +28,52 @@ export interface CongeDuree {
 export interface CalculSolde {
   readonly jours: number;
   readonly annee: number;
+  /** Période de référence légale CP : 1er juin N → 31 mai N+1. */
+  readonly periodeDebut: string;
+  readonly periodeFin: string;
+  readonly exercice: string;
+}
+
+/**
+ * Période de référence légale CP (France) pour une date donnée.
+ * Juin–décembre N  → période N/06/01 – (N+1)/05/31 = exercice « N–N+1 ».
+ * Janvier–mai N    → période (N-1)/06/01 – N/05/31  = exercice « N-1–N ».
+ */
+export function periodeReference(dateStr: string): { periodeDebut: string; periodeFin: string; exercice: string } {
+  const [y, m] = dateStr.split("-").map(Number);
+  if (m >= 6) {
+    return { periodeDebut: `${y}-06-01`, periodeFin: `${y + 1}-05-31`, exercice: `${y}-${y + 1}` };
+  }
+  return { periodeDebut: `${y - 1}-06-01`, periodeFin: `${y}-05-31`, exercice: `${y - 1}-${y}` };
+}
+
+/** Exercice courant (format « 2025-2026 ») basé sur `today`. */
+export function exerciceCourant(today = new Date()): string {
+  return periodeReference(today.toISOString().slice(0, 10)).exercice;
+}
+
+/**
+ * Jours CP acquis sur une période de référence (1er juin → 31 mai).
+ * Règle MVP : chaque mois calendaire entièrement écoulé dans la période = 2,5 j.
+ * `today` injectable pour les tests.
+ */
+export function calculerJoursAcquisPeriode(
+  dateEmbauche: Date,
+  periodeDebutStr: string,
+  periodeFinStr: string,
+  today = new Date(),
+): number {
+  const debutPeriode = new Date(periodeDebutStr);
+  const finPeriode = new Date(periodeFinStr);
+  if (dateEmbauche > finPeriode || today < debutPeriode) return 0;
+
+  const absMonth = (d: Date) => d.getFullYear() * 12 + d.getMonth();
+  const effectiveStart = dateEmbauche > debutPeriode ? dateEmbauche : debutPeriode;
+  const startAbs = absMonth(effectiveStart) + (effectiveStart.getDate() === 1 ? 0 : 1);
+  /** Période terminée → +1 pour compter le dernier mois complet. */
+  const endAbs = today > finPeriode ? absMonth(finPeriode) + 1 : absMonth(today);
+
+  return Math.max(0, endAbs - startAbs) * 2.5;
 }
 
 /**
@@ -136,5 +182,6 @@ export function calculerJoursConge(conge: CongeDuree): CalculSolde {
   }
   if (conge.demiJourneeDebut) jours -= 0.5;
   if (conge.demiJourneeFin) jours -= 0.5;
-  return { jours, annee: debut.getFullYear() };
+  const periode = periodeReference(conge.dateDebut);
+  return { jours, annee: Number(periode.periodeDebut.split("-")[0]), ...periode };
 }

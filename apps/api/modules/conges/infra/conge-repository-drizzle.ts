@@ -3,8 +3,9 @@ import { conges, techniciens, soldesConges } from "../../../../../drizzle/schema
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
-import type { ICongeRepository, AjustementSolde, SoldeResult } from "../application/conge-repository";
+import type { ICongeRepository, AjustementSolde, ReportSolde, SoldeResult } from "../application/conge-repository";
 import type { Conge, CongeStatut, CreateCongeInput, UpdateCongeInput } from "../domain/conge";
+import { periodeReference } from "../application/solde";
 
 type CongeRow = typeof conges.$inferSelect;
 
@@ -149,9 +150,9 @@ export class CongeRepositoryDrizzle implements ICongeRepository {
     });
   }
 
-  ajusterSolde(ctx: TenantContext, { technicienId, type, annee, deltaJours }: AjustementSolde): Promise<void> {
+  ajusterSolde(ctx: TenantContext, { technicienId, type, annee, periodeDebut, periodeFin, deltaJours }: AjustementSolde): Promise<void> {
     return withTenant(this.db, ctx, async (tx) => {
-      /** Check-then-act scopé tenant (pas de clé unique sur (technicien,type,annee)). */
+      /** Préférer la recherche par période (new-stack) ; fallback annee sans période (legacy). */
       const [existing] = await tx
         .select({ id: soldesConges.id })
         .from(soldesConges)
@@ -160,7 +161,7 @@ export class CongeRepositoryDrizzle implements ICongeRepository {
             eq(soldesConges.technicienId, technicienId),
             eq(soldesConges.artisanId, ctx.artisanId),
             eq(soldesConges.type, type),
-            eq(soldesConges.annee, annee),
+            eq(soldesConges.periodeDebut, periodeDebut),
           ),
         )
         .limit(1);
@@ -174,42 +175,89 @@ export class CongeRepositoryDrizzle implements ICongeRepository {
           })
           .where(eq(soldesConges.id, existing.id));
       } else if (deltaJours > 0) {
-        /** Absente + décompte → insert (trace le décompte ; soldeRestant planché à 0). */
         await tx.insert(soldesConges).values({
           technicienId,
           artisanId: ctx.artisanId,
           type,
           annee,
+          periodeDebut,
+          periodeFin,
+          joursReportes: "0.00",
           soldeInitial: "0.00",
           soldeRestant: "0.00",
           joursAcquis: "0.00",
           joursPris: String(deltaJours),
         });
       }
-      /** Absente + recrédit (≤0) → no-op (rien n'avait été décompté). */
     });
   }
 
-  getSolde(ctx: TenantContext, technicienId: number, annee: number): Promise<SoldeResult[]> {
+  reporterSolde(ctx: TenantContext, { technicienId, type, annee, periodeDebut, periodeFin, joursReportes }: ReportSolde): Promise<void> {
     return withTenant(this.db, ctx, async (tx) => {
-      const rows = await tx
-        .select()
+      const [existing] = await tx
+        .select({ id: soldesConges.id })
         .from(soldesConges)
         .where(
           and(
             eq(soldesConges.technicienId, technicienId),
             eq(soldesConges.artisanId, ctx.artisanId),
-            eq(soldesConges.annee, annee),
+            eq(soldesConges.type, type),
+            eq(soldesConges.periodeDebut, periodeDebut),
           ),
-        );
-      return rows.map((r) => ({
-        type: r.type as SoldeResult["type"],
-        annee: r.annee,
-        soldeInitial: Number(r.soldeInitial),
-        soldeRestant: Number(r.soldeRestant),
-        joursAcquis: Number(r.joursAcquis),
-        joursPris: Number(r.joursPris),
-      }));
+        )
+        .limit(1);
+      if (existing) {
+        await tx
+          .update(soldesConges)
+          .set({ joursReportes: String(joursReportes), updatedAt: new Date() })
+          .where(eq(soldesConges.id, existing.id));
+      } else {
+        await tx.insert(soldesConges).values({
+          technicienId,
+          artisanId: ctx.artisanId,
+          type,
+          annee,
+          periodeDebut,
+          periodeFin,
+          joursReportes: String(joursReportes),
+          soldeInitial: "0.00",
+          soldeRestant: "0.00",
+          joursAcquis: "0.00",
+          joursPris: "0.00",
+        });
+      }
+    });
+  }
+
+  getSolde(ctx: TenantContext, technicienId: number, annee: number, periodeDebut?: string): Promise<SoldeResult[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const cond = periodeDebut
+        ? and(
+            eq(soldesConges.technicienId, technicienId),
+            eq(soldesConges.artisanId, ctx.artisanId),
+            eq(soldesConges.periodeDebut, periodeDebut),
+          )
+        : and(
+            eq(soldesConges.technicienId, technicienId),
+            eq(soldesConges.artisanId, ctx.artisanId),
+            eq(soldesConges.annee, annee),
+          );
+      const rows = await tx.select().from(soldesConges).where(cond);
+      return rows.map((r) => {
+        const exercice = r.periodeDebut ? periodeReference(r.periodeDebut).exercice : null;
+        return {
+          type: r.type as SoldeResult["type"],
+          annee: r.annee,
+          periodeDebut: r.periodeDebut ?? null,
+          periodeFin: r.periodeFin ?? null,
+          exercice,
+          soldeInitial: Number(r.soldeInitial),
+          soldeRestant: Number(r.soldeRestant),
+          joursAcquis: Number(r.joursAcquis),
+          joursPris: Number(r.joursPris),
+          joursReportes: Number(r.joursReportes),
+        };
+      });
     });
   }
 
@@ -224,24 +272,30 @@ export class CongeRepositoryDrizzle implements ICongeRepository {
     });
   }
 
-  listTechniciensSolde(ctx: TenantContext, annee: number): Promise<Array<{ technicienId: number; dateEmbauche: Date; joursPris: number }>> {
+  listTechniciensSolde(ctx: TenantContext, annee: number, periodeDebut?: string): Promise<Array<{ technicienId: number; dateEmbauche: Date; joursPris: number; joursReportes: number }>> {
     return withTenant(this.db, ctx, async (tx) => {
+      const joinCond = periodeDebut
+        ? and(
+            eq(soldesConges.technicienId, techniciens.id),
+            eq(soldesConges.artisanId, techniciens.artisanId),
+            eq(soldesConges.type, "conge_paye"),
+            eq(soldesConges.periodeDebut, periodeDebut),
+          )
+        : and(
+            eq(soldesConges.technicienId, techniciens.id),
+            eq(soldesConges.artisanId, techniciens.artisanId),
+            eq(soldesConges.type, "conge_paye"),
+            eq(soldesConges.annee, annee),
+          );
       const rows = await tx
         .select({
           technicienId: techniciens.id,
           dateEmbauche: techniciens.createdAt,
           joursPris: sql<number>`COALESCE(${soldesConges.joursPris}, 0)::float`,
+          joursReportes: sql<number>`COALESCE(${soldesConges.joursReportes}, 0)::float`,
         })
         .from(techniciens)
-        .leftJoin(
-          soldesConges,
-          and(
-            eq(soldesConges.technicienId, techniciens.id),
-            eq(soldesConges.artisanId, techniciens.artisanId),
-            eq(soldesConges.type, "conge_paye"),
-            eq(soldesConges.annee, annee),
-          ),
-        )
+        .leftJoin(soldesConges, joinCond)
         .where(eq(techniciens.artisanId, ctx.artisanId));
       return rows;
     });

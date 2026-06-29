@@ -12,6 +12,7 @@ export type CongeEnAttente = RouterOutputs["conges"]["enAttente"][number];
 export type Technicien = RouterOutputs["techniciens"]["getAll"][number];
 export type TypeConge = RouterInputs["conges"]["create"]["type"];
 export type StatutConge = Conge["statut"];
+export type SoldeResume = RouterOutputs["conges"]["soldesTous"][number];
 
 /** Ordre/valeurs canoniques (parité legacy) — les libellés vivent dans l'i18n, pas ici. */
 export const TYPES_CONGE = ["conge_paye", "rtt", "maladie", "sans_solde", "formation", "autre"] as const;

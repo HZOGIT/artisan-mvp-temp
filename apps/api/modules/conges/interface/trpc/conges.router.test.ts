@@ -50,10 +50,10 @@ describe.skipIf(!URL)("conges.router e2e (HTTP → tRPC → use-case → repo �
     await admin.query("delete from users where id=$1", [uid]);
   };
 
-  async function joursPris(artisanId: number, technicienId: number, annee: number): Promise<number> {
+  async function joursPrisParPeriode(artisanId: number, technicienId: number, periodeDebut: string): Promise<number> {
     const r = await admin.query(
-      'select "joursPris" from soldes_conges where "artisanId"=$1 and "technicienId"=$2 and type=\'conge_paye\' and annee=$3',
-      [artisanId, technicienId, annee],
+      'select "joursPris" from soldes_conges where "artisanId"=$1 and "technicienId"=$2 and type=\'conge_paye\' and "periodeDebut"=$3',
+      [artisanId, technicienId, periodeDebut],
     );
     return r.rows[0] ? Number(r.rows[0].joursPris) : 0;
   }
@@ -214,13 +214,13 @@ describe.skipIf(!URL)("conges.router e2e (HTTP → tRPC → use-case → repo �
     expect((await callMutation(server, "conges.refuser", { id: 1 }, tC)).statusCode).toBe(403);
   });
 
-  it("getSolde : retourne les lignes soldes_conges du technicien pour l'année", async () => {
+  it("getSolde par exercice : jan 2028 (exercice 2027-2028) → joursPris=3", async () => {
     const tA = await token(UA);
     await admin.query('delete from soldes_conges where "artisanId"=$1 and "technicienId"=$2', [artisanA, techA]);
-    /* 2028-01-03 lundi → 2028-01-05 mercredi = 3 jours ouvrés (jan02 2028 = dimanche, exclure). */
+    /* 2028-01-03 lundi → 2028-01-05 mercredi = 3 jours ouvrés ; exercice 2027-2028 (jan < juin). */
     const id = (await callMutation(server, "conges.create", { technicienId: techA, type: "conge_paye", dateDebut: "2028-01-03", dateFin: "2028-01-05" }, tA)).json().result.data.id as number;
     await callMutation(server, "conges.approuver", { id }, tA);
-    const res = await callQuery(server, "conges.getSolde", { technicienId: techA, annee: 2028 }, tA);
+    const res = await callQuery(server, "conges.getSolde", { technicienId: techA, exercice: "2027-2028" }, tA);
     expect(res.statusCode).toBe(200);
     const soldes = res.json().result.data as Array<{ type: string; joursPris: number }>;
     const cp = soldes.find((s) => s.type === "conge_paye");
@@ -232,16 +232,14 @@ describe.skipIf(!URL)("conges.router e2e (HTTP → tRPC → use-case → repo �
   it("SOLDE e2e : approuver décompte (5 j), ré-approuver idempotent, annuler recrédite", async () => {
     const tA = await token(UA);
     await admin.query('delete from soldes_conges where "artisanId"=$1 and "technicienId"=$2', [artisanA, techA]);
+    /* 2027-03-01 (lun) → 2027-03-05 (ven) = 5 j ; exercice 2026-2027 (mars < juin → période précédente). */
     const id = (await callMutation(server, "conges.create", { technicienId: techA, type: "conge_paye", dateDebut: "2027-03-01", dateFin: "2027-03-05" }, tA)).json().result.data.id as number;
-    // approuver → décompte 5 jours sur l'année 2027 (année de dateDebut)
     expect((await callMutation(server, "conges.approuver", { id }, tA)).statusCode).toBe(200);
-    expect(await joursPris(artisanA, techA, 2027)).toBe(5);
-    // ré-approuver → idempotent (toujours 5, pas 10)
+    expect(await joursPrisParPeriode(artisanA, techA, "2026-06-01")).toBe(5);
     await callMutation(server, "conges.approuver", { id }, tA);
-    expect(await joursPris(artisanA, techA, 2027)).toBe(5);
-    // annuler un congé approuvé → recrédit (retour à 0)
+    expect(await joursPrisParPeriode(artisanA, techA, "2026-06-01")).toBe(5);
     expect((await callMutation(server, "conges.annuler", { id }, tA)).statusCode).toBe(200);
-    expect(await joursPris(artisanA, techA, 2027)).toBe(0);
+    expect(await joursPrisParPeriode(artisanA, techA, "2026-06-01")).toBe(0);
     await admin.query('delete from soldes_conges where "artisanId"=$1 and "technicienId"=$2', [artisanA, techA]);
   });
 });

@@ -15,6 +15,7 @@ const stubRepo: ICongeRepository = {
   findTechnicienIdForUser: async () => null,
   setStatut: async () => null,
   ajusterSolde: async () => undefined,
+  reporterSolde: async () => undefined,
   getSolde: async () => [],
   getTechnicienDateEmbauche: async () => null,
   listTechniciensSolde: async () => [],
@@ -42,6 +43,7 @@ describe("conges.module", () => {
       "listEnAttente",
       "listTechniciensSolde",
       "ownsTechnicien",
+      "reporterSolde",
       "setStatut",
       "update",
       "withDb",
@@ -51,6 +53,6 @@ describe("conges.module", () => {
   it("expose un routeur tRPC assemblé (procédures parité)", () => {
     const module = createCongesModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["annuler", "approuver", "create", "delete", "enAttente", "getById", "getSolde", "list", "refuser", "soldesTous", "update"]);
+    expect(procedures).toEqual(["annuler", "approuver", "cloturerPeriode", "create", "delete", "enAttente", "getById", "getSolde", "list", "refuser", "soldesTous", "update"]);
   });
 });
