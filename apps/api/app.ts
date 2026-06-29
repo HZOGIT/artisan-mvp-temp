@@ -148,6 +148,7 @@ import { VitrineSettingsRepositoryDrizzle } from "./modules/vitrine/infra/vitrin
 import { createClientPortalModule } from "./modules/client-portal/client-portal.module";
 import { PortalAccessRepositoryDrizzle } from "./modules/client-portal/infra/portal-access-repository-drizzle";
 import { PortalDocsReaderDrizzle } from "./modules/client-portal/infra/portal-docs-reader-drizzle";
+import { PortalDevisOptionsWriterDrizzle } from "./modules/client-portal/infra/portal-devis-options-writer-drizzle";
 import { PortalSchedulingReaderDrizzle } from "./modules/client-portal/infra/portal-scheduling-reader-drizzle";
 import { createIntegrationsComptablesModule } from "./modules/integrations-comptables/integrations-comptables.module";
 import { IntegrationsComptablesRepositoryDrizzle } from "./modules/integrations-comptables/infra/integrations-comptables-repository-drizzle";
@@ -1098,6 +1099,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     rateLimiter: new SlidingWindowRateLimiter(5, 15 * 60 * 1000),
     llm: deps.llm ?? new GeminiLlmAdapter(app.log),
     trackLlm: makeLlmUsageTracker(getDbHandle().db),
+    devisOptionsWriter: new PortalDevisOptionsWriterDrizzle(getDbHandle().db),
   });
   /*
    * Module `integrationsComptables` (exports/sync vers logiciels tiers). FEC réutilise le générateur du

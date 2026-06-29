@@ -9,7 +9,8 @@ import type { IPortalDocsReader } from "../../application/portal-docs-reader";
 import type { IPortalSchedulingReader } from "../../application/portal-scheduling-reader";
 import type { ChatRepoForPortal } from "../../application/chat-use-cases";
 import { generateAccess, getStatus, deactivate, verifyAccess, getClientInfo } from "../../application/use-cases";
-import { getDevis, getFactures, getInterventions, getContrats } from "../../application/doc-use-cases";
+import { getDevis, getFactures, getInterventions, getContrats, listerOptionsDevis, selectionnerOption } from "../../application/doc-use-cases";
+import type { IPortalDevisOptionsWriter } from "../../application/portal-devis-options-writer";
 import { getCreneauxDisponibles, demanderRdv, getMesRdv, getSuiviChantiers } from "../../application/scheduling-use-cases";
 import { getConversations, getConversationMessages, sendClientMessage, markClientMessagesAsRead, demanderModification } from "../../application/chat-use-cases";
 import { soumettreDemandeIA } from "../../application/ia-use-cases";
@@ -35,6 +36,7 @@ export interface ClientPortalRouterDeps {
   readonly llm: LlmPort;
   readonly trackLlm?: LlmUsageTracker;
   readonly genToken?: () => string;
+  readonly devisOptionsWriter: IPortalDevisOptionsWriter;
 }
 
 const tokenInput = z.object({ token: z.string() });
@@ -82,5 +84,16 @@ export function createClientPortalRouter(deps: ClientPortalRouterDeps) {
     markClientMessagesAsRead: publicProcedure.input(z.object({ token: z.string(), conversationId: z.number().int().positive() })).mutation(({ input }) => markClientMessagesAsRead(deps, input.token, input.conversationId)),
     demanderModification: publicProcedure.input(z.object({ token: z.string(), message: z.string().min(1).max(5000) })).mutation(({ input }) => demanderModification(deps, input.token, input.message)),
     soumettreDemandeIA: publicProcedure.input(z.object({ token: z.string(), description: z.string().min(10).max(2000) })).mutation(({ ctx, input }) => soumettreDemandeIA(deps, input.token, input.description, ctx.log as unknown as AppLogger)),
+
+    /** ── PUBLIC (token) — options/variantes d'un devis ── */
+    listerOptionsDevis: publicProcedure
+      .input(z.object({ token: z.string(), devisId: z.number().int().positive() }))
+      .query(({ input }) => listerOptionsDevis(deps, input.token, input.devisId)),
+
+    selectionnerOption: publicProcedure
+      .input(z.object({ token: z.string(), optionId: z.number().int().positive() }))
+      .mutation(({ input }) =>
+        selectionnerOption({ access: deps.access, docs: deps.docs, devisOptionsWriter: deps.devisOptionsWriter, rateLimiter: deps.rateLimiter }, input.token, input.optionId),
+      ),
   });
 }
