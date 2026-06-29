@@ -120,5 +120,14 @@
     "succes": "Succès",
     "erreur": "Erreur",
     "en_attente": "En attente"
-  }
+  },
+  "verrouillageTitre": "Verrouillage de la période comptable",
+  "verrouillageDesc": "Empêche la modification des écritures sur les périodes clôturées",
+  "periodeVerrouilleeJusquau": "Période verrouillée jusqu'au {{date}}",
+  "deverrouiller": "Déverrouiller",
+  "verrouillerJusquau": "Verrouiller jusqu'au",
+  "verrouiller": "Verrouiller",
+  "toastVerrouille": "Période verrouillée jusqu'au {{date}}",
+  "toastDeverrouille": "Verrouillage supprimé",
+  "verrouillageExplication": "Les créations et modifications de pièces dont la date est antérieure ou égale à la date de verrouillage seront refusées."
 }
