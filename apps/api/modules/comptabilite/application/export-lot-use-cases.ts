@@ -1,6 +1,7 @@
 import { NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { PdfPort } from "../../../shared/ports/pdf";
+import type { StoragePort } from "../../../shared/ports/storage";
 import { generateFacturXML } from "../../../shared/pdf/facturx";
 import { ymdCompact } from "../domain/csv-export";
 
@@ -19,6 +20,7 @@ interface FactureLotItem {
   readonly clientId: number;
   readonly dateFacture: Date;
   readonly statut: string;
+  readonly pdfStorageKey?: string | null;
 }
 
 export interface ExportLotReaderDeps {
@@ -29,6 +31,8 @@ export interface ExportLotReaderDeps {
 }
 export interface ExportLotPdfDeps extends ExportLotReaderDeps {
   readonly pdf: PdfPort;
+  /** Optionnel : si présent et pdfStorageKey posé, sert le PDF stocké sans régénérer. */
+  readonly storage?: StoragePort;
 }
 
 export interface LotEntry {
@@ -97,7 +101,13 @@ export async function collectFacturePdfLot(deps: ExportLotPdfDeps, ctx: TenantCo
   for (const facture of factures) {
     const [lignes, client] = await Promise.all([deps.factureReader.listLignes(ctx, facture.id), deps.clientReader.getById(ctx, facture.clientId)]);
     if (!client) continue;
-    const buffer = await deps.pdf.render("facture", { facture: { ...facture, lignes }, artisan, client });
+    let buffer: Buffer | null = null;
+    if (facture.pdfStorageKey && deps.storage) {
+      buffer = await deps.storage.get(facture.pdfStorageKey);
+    }
+    if (!buffer) {
+      buffer = await deps.pdf.render("facture", { facture: { ...facture, lignes }, artisan, client });
+    }
     entries.push({ name: `${facture.numero ?? ""}_${sanitizeName(client.nom)}.pdf`, content: buffer });
   }
   return { entries, filename: `Factures_PDF_${ymdCompact(debut)}_${ymdCompact(fin)}.zip` };

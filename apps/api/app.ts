@@ -1498,6 +1498,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     clientReader: clientRepo,
     artisanReader: deps.artisanRepo ?? new ArtisanRepositoryDrizzle(getDbHandle().db),
     pdf: new JsPdfAdapter(),
+    storage: facturesStorage,
   });
 
   /*
