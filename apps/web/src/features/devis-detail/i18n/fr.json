@@ -118,5 +118,12 @@
   "toastSituationCreee": "Facture de situation créée",
   "errSituation": "Erreur lors de la création de la situation",
   "errPourcentageInvalide": "Veuillez saisir un pourcentage entre 1 et 100",
-  "sousTotalLot": "Sous-total {{label}} — {{montant}}"
+  "sousTotalLot": "Sous-total {{label}} — {{montant}}",
+  "ongletPieces": "Pièces jointes",
+  "piecesJointes": "Pièces jointes",
+  "ajouterPiece": "Ajouter",
+  "envoi": "Envoi…",
+  "aucunePiece": "Aucune pièce jointe. Formats : PDF, JPG, PNG, WEBP (max 10 Mo).",
+  "supprimerPiece": "Supprimer cette pièce jointe ?",
+  "piecesJointesEmail": "Pièces jointes"
 }

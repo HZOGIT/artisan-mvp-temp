@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { ArrowLeft, Plus, Trash2, FileText, User, Receipt, Download, Mail, Copy, Pen, Layers, Star, Check, ArrowRight, Bell, Circle, AlarmClock, TrendingUp } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, FileText, User, Receipt, Download, Mail, Copy, Pen, Layers, Star, Check, ArrowRight, Bell, Circle, AlarmClock, TrendingUp, Paperclip, X } from "lucide-react";
 import { generateDevisPDF } from "@/shared/lib/pdf-generator";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
@@ -27,11 +27,13 @@ export default function DevisDetailPage() {
   const { id: idParam } = useParams({ strict: false }) as { id?: string };
   const id = parseInt(idParam || "0");
   const D = useDevisDetail(id);
-  const { devis, isLoading, artisan, parametres, activites, refetchActivites, signature, variantes, refetchVariantes, inv } = D;
+  const { devis, isLoading, artisan, parametres, activites, refetchActivites, signature, variantes, refetchVariantes, pieces, refetchPieces, inv } = D;
 
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
   const [emailMessage, setEmailMessage] = useState("");
   const [attachPdf, setAttachPdf] = useState(true);
+  const [emailPieceIds, setEmailPieceIds] = useState<number[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const [isSignatureDialogOpen, setIsSignatureDialogOpen] = useState(false);
   const [isNewVarianteOpen, setIsNewVarianteOpen] = useState(false);
   const [newVarianteForm, setNewVarianteForm] = useState({ nom: "", description: "", recommandee: false });
@@ -66,10 +68,23 @@ export default function DevisDetailPage() {
 
   const handleSendByEmail = () => {
     if (!devis?.client?.email) { toast.error(t("errPasEmail")); return; }
-    D.sendByEmail.mutate({ devisId: id, customMessage: emailMessage || undefined, attachPdf }, {
-      onSuccess: (result) => { if (result.success) { toast.success(result.message); inv(); setIsEmailDialogOpen(false); setEmailMessage(""); } else toast.error(result.message); },
+    D.sendByEmail.mutate({ devisId: id, customMessage: emailMessage || undefined, attachPdf, pieceJointeIds: emailPieceIds.length ? emailPieceIds : undefined }, {
+      onSuccess: (result) => { if (result.success) { toast.success(result.message); inv(); setIsEmailDialogOpen(false); setEmailMessage(""); setEmailPieceIds([]); } else toast.error(result.message); },
       onError: (error) => toast.error(error.message || t("errEmailEnvoi")),
     });
+  };
+
+  const handleUploadPiece = async (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("devisId", String(id));
+    setIsUploading(true);
+    try {
+      const res = await fetch("/api/pieces-jointes", { method: "POST", body: form, credentials: "include" });
+      if (!res.ok) { const err = await res.json().catch(() => ({})); toast.error((err as { message?: string }).message ?? "Erreur upload"); return; }
+      toast.success("Pièce jointe ajoutée");
+      void refetchPieces();
+    } catch { toast.error("Erreur réseau"); } finally { setIsUploading(false); }
   };
 
   const handleDeleteLine = (lineId: number) => { if (confirm(t("confirmSupprimerLigne"))) D.deleteLigne.mutate({ id: lineId, devisId: id }, { onSuccess: () => toast.success(t("toastLigneSupprimee")) }); };
@@ -122,6 +137,20 @@ export default function DevisDetailPage() {
               <div className="space-y-4 py-4">
                 <div className="space-y-2"><Label>{t("messagePersonnalise")}</Label><Textarea placeholder={t("messagePlaceholder")} value={emailMessage} onChange={(e) => setEmailMessage(e.target.value)} rows={4} /></div>
                 <label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={attachPdf} onChange={(e) => setAttachPdf(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /><span className="text-sm font-medium text-gray-700">{t("joindrePdf")}</span></label>
+                {pieces.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-700">{t("piecesJointesEmail")}</p>
+                    <div className="space-y-1.5">
+                      {pieces.map((p) => (
+                        <label key={p.id} className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={emailPieceIds.includes(p.id)} onChange={(e) => setEmailPieceIds(prev => e.target.checked ? [...prev, p.id] : prev.filter(x => x !== p.id))} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                          <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-sm text-gray-700 truncate">{p.filename}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               <DialogFooter><Button variant="outline" onClick={() => setIsEmailDialogOpen(false)}>{t("annuler")}</Button><Button onClick={handleSendByEmail} disabled={D.sendByEmail.isPending}>{D.sendByEmail.isPending ? t("envoiEnCours") : t("envoyer")}</Button></DialogFooter>
             </DialogContent>
@@ -217,9 +246,10 @@ export default function DevisDetailPage() {
       )}
 
       <Tabs defaultValue="lignes" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
+        <TabsList className="grid w-full grid-cols-3 max-w-lg">
           <TabsTrigger value="lignes" className="min-h-[44px] sm:min-h-0"><FileText className="h-4 w-4 mr-2" />{t("ongletLignes", { n: devis.lignes.length })}</TabsTrigger>
           <TabsTrigger value="variantes" className="min-h-[44px] sm:min-h-0"><Layers className="h-4 w-4 mr-2" />{t("ongletVariantes", { n: variantes.length })}</TabsTrigger>
+          <TabsTrigger value="pieces" className="min-h-[44px] sm:min-h-0"><Paperclip className="h-4 w-4 mr-2" />{t("ongletPieces")}{pieces.length > 0 && <span className="ml-1 text-xs opacity-70">({pieces.length})</span>}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="lignes" className="mt-4">
@@ -331,6 +361,36 @@ export default function DevisDetailPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+        </TabsContent>
+
+        <TabsContent value="pieces" className="mt-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2"><Paperclip className="h-5 w-5" />{t("piecesJointes")}</CardTitle>
+                <label className="cursor-pointer">
+                  <input type="file" className="sr-only" accept=".pdf,.jpg,.jpeg,.png,.webp" disabled={isUploading || pieces.length >= 10} onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleUploadPiece(f); e.target.value = ""; }} />
+                  <Button size="sm" variant="outline" asChild disabled={isUploading || pieces.length >= 10}><span><Plus className="h-4 w-4 mr-2" />{isUploading ? t("envoi") : t("ajouterPiece")}</span></Button>
+                </label>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {pieces.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground"><Paperclip className="h-8 w-8 mx-auto mb-2 opacity-40" /><p className="text-sm">{t("aucunePiece")}</p></div>
+              ) : (
+                <div className="space-y-2">
+                  {pieces.map((p) => (
+                    <div key={p.id} className="flex items-center gap-3 p-3 rounded-lg border">
+                      <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="flex-1 text-sm truncate">{p.filename}</span>
+                      <a href={p.url} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline shrink-0"><Download className="h-3.5 w-3.5" /></a>
+                      <button type="button" title={t("supprimer")} onClick={() => { if (confirm(t("supprimerPiece"))) D.deletePiece.mutate({ id: p.id }); }} className="text-muted-foreground hover:text-rose-500 shrink-0"><X className="h-4 w-4" /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

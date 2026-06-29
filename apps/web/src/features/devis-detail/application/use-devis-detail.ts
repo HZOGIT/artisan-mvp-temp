@@ -16,6 +16,7 @@ export function useDevisDetail(id: number) {
   const activitesQ = trpc.activites.list.useQuery();
   const signatureQ = trpc.signature.getSignatureByDevis.useQuery(enabled ? { devisId: id } : skipToken);
   const variantesQ = trpc.devisOptions.getByDevisId.useQuery(enabled ? { devisId: id } : skipToken);
+  const piecesQ = trpc.piecesJointes.listByDevis.useQuery(enabled ? { devisId: id } : skipToken);
 
   return {
     devis: devisQ.data, isLoading: devisQ.isLoading,
@@ -23,6 +24,7 @@ export function useDevisDetail(id: number) {
     activites: activitesQ.data ?? [], refetchActivites: activitesQ.refetch,
     signature: signatureQ.data,
     variantes: variantesQ.data ?? [], refetchVariantes: variantesQ.refetch,
+    pieces: piecesQ.data ?? [], refetchPieces: piecesQ.refetch,
     inv,
     /** transitions de statut (machine à états dédiée) */
     envoyer: trpc.devis.envoyer.useMutation(),
@@ -46,5 +48,7 @@ export function useDevisDetail(id: number) {
     selectVariante: trpc.devisOptions.select.useMutation(),
     deleteVariante: trpc.devisOptions.delete.useMutation(),
     convertirVariante: trpc.devisOptions.convertirEnDevis.useMutation(),
+    /** pièces jointes */
+    deletePiece: trpc.piecesJointes.delete.useMutation({ onSuccess: () => piecesQ.refetch() }),
   };
 }

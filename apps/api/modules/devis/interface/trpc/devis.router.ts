@@ -348,6 +348,7 @@ export function createDevisRouter(
           devisId: z.number().int(),
           customMessage: z.string().max(5000).optional(),
           attachPdf: z.boolean().optional().default(true),
+          pieceJointeIds: z.array(z.number().int()).max(10).optional(),
         }),
       )
       .mutation(({ ctx, input }) =>
@@ -355,6 +356,7 @@ export function createDevisRouter(
           devisId: input.devisId,
           customMessage: input.customMessage,
           attachPdf: input.attachPdf,
+          pieceJointeIds: input.pieceJointeIds,
         }),
       ),
   });

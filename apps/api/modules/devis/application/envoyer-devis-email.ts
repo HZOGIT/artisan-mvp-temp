@@ -3,11 +3,13 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { EmailPort } from "../../../shared/ports/email";
 import type { PdfPort } from "../../../shared/ports/pdf";
 import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
+import type { StoragePort } from "../../../shared/ports/storage";
 import type { ArtisanReader, ClientReader } from "../../../shared/readers/contact-readers";
 import type { IDevisRepository } from "./devis-repository";
 import type { DevisSignatureReader } from "./devis-signature-reader";
 import type { IModeleEmailRepository } from "../../modeles-email/application/modele-email-repository";
 import { buildModeleEmail } from "../../modeles-email/domain/render";
+import type { IPiecesJointesRepository } from "../../pieces-jointes/application/pieces-jointes-repository";
 
 /*
  * Dépendances de l'envoi d'un devis par email (composition : artisan + client + PDF + email +
@@ -23,12 +25,17 @@ export interface DevisMailingDeps {
   readonly appUrl: string;
   /** Optionnel : si présent, le modèle `isDefault` du type `envoi_devis` remplace le gabarit codé en dur. */
   readonly modeleEmailRepo?: IModeleEmailRepository;
+  /** Optionnel : pièces jointes (plans, photos…) attachables à l'email. */
+  readonly piecesJointesRepo?: IPiecesJointesRepository;
+  readonly storage?: StoragePort;
 }
 
 export interface EnvoyerDevisEmailInput {
   readonly devisId: number;
   readonly customMessage?: string;
   readonly attachPdf: boolean;
+  /** Identifiants des pièces jointes à inclure (en plus du PDF). */
+  readonly pieceJointeIds?: readonly number[];
 }
 
 export interface EnvoiResult {
@@ -170,15 +177,25 @@ export async function envoyerDevisParEmail(
         portalUrl,
       });
 
-  const attachments = input.attachPdf
-    ? await (async () => {
-        const lignes = await repo.listLignes(ctx, devis.id);
-        const pdf = await deps.pdf.render("devis", { devis: { ...devis, lignes }, artisan, client });
-        return [{ filename: `Devis_${devis.numero}.pdf`, content: pdf, contentType: "application/pdf" }];
-      })()
-    : undefined;
+  const attachments: { filename: string; content: Buffer; contentType: string }[] = [];
 
-  await deps.email.send({ to: destinataireEmail, subject, body, ...(attachments ? { attachments } : {}), fromName: artisan.nomEntreprise ?? undefined, replyTo: artisan.email ?? undefined });
+  if (input.attachPdf) {
+    const lignes = await repo.listLignes(ctx, devis.id);
+    const pdf = await deps.pdf.render("devis", { devis: { ...devis, lignes }, artisan, client });
+    attachments.push({ filename: `Devis_${devis.numero}.pdf`, content: pdf, contentType: "application/pdf" });
+  }
+
+  if (input.pieceJointeIds?.length && deps.piecesJointesRepo && deps.storage) {
+    const requestedIds = input.pieceJointeIds;
+    const allPieces = await deps.piecesJointesRepo.listByDevis(ctx, devis.id);
+    const selected = allPieces.filter((p) => requestedIds.includes(p.id));
+    for (const piece of selected) {
+      const buf = await deps.storage.get(piece.storageKey);
+      if (buf) attachments.push({ filename: piece.filename ?? `piece-${piece.id}`, content: buf, contentType: piece.mimeType });
+    }
+  }
+
+  await deps.email.send({ to: destinataireEmail, subject, body, ...(attachments.length ? { attachments } : {}), fromName: artisan.nomEntreprise ?? undefined, replyTo: artisan.email ?? undefined });
 
   /** Envoi réussi : passage `envoye` depuis brouillon uniquement (ne régresse pas un devis émis/signé). */
   if (devis.statut === "brouillon") {

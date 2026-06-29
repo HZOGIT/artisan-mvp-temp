@@ -10,6 +10,7 @@ import type { IFactureRepository } from "./facture-repository";
 import type { ArtisanReader, ClientReader } from "./contact-readers";
 import type { IModeleEmailRepository } from "../../modeles-email/application/modele-email-repository";
 import { buildModeleEmail } from "../../modeles-email/domain/render";
+import type { IPiecesJointesRepository } from "../../pieces-jointes/application/pieces-jointes-repository";
 
 /*
  * Dépendances de l'envoi d'une facture par email (composition cross-domaine : artisan + client +
@@ -26,12 +27,16 @@ export interface FactureMailingDeps {
   /** Optionnel : stockage S3 pour lire/écrire le PDF figé à l'émission. */
   readonly storage?: StoragePort;
   readonly db?: DbClient;
+  /** Optionnel : pièces jointes (plans, photos…) attachables à l'email. */
+  readonly piecesJointesRepo?: IPiecesJointesRepository;
 }
 
 export interface EnvoyerFactureEmailInput {
   readonly factureId: number;
   readonly customMessage?: string;
   readonly attachPdf: boolean;
+  /** Identifiants des pièces jointes à inclure (en plus du PDF). */
+  readonly pieceJointeIds?: readonly number[];
 }
 
 /** Résultat aligné sur la surface client (`result.success` / `result.message`). */
@@ -173,28 +178,38 @@ export async function envoyerFactureParEmail(
         customMessage: input.customMessage ?? null,
       });
 
-  const attachments = input.attachPdf
-    ? await (async () => {
-        const lignes = await repo.listLignes(ctx, facture.id);
-        let pdfBuf: Buffer | null = null;
-        if (facture.pdfStorageKey && deps.storage) {
-          pdfBuf = await deps.storage.get(facture.pdfStorageKey);
-        }
-        if (!pdfBuf) {
-          pdfBuf = await deps.pdf.render("facture", { facture: { ...facture, lignes }, artisan, client });
-          if (deps.storage && deps.db && !facture.pdfStorageKey) {
-            try {
-              const s3Key = `factures/${ctx.artisanId}/${facture.id}.pdf`;
-              const stored = await deps.storage.withDb(deps.db).upload(s3Key, pdfBuf, { contentType: "application/pdf", artisanId: ctx.artisanId, filename: `Facture_${effectiveNumero}.pdf`, purpose: "facture-pdf" }, ctx);
-              await repo.setPdfFile(ctx, facture.id, stored.id, stored.storageKey);
-            } catch (_) { /* best-effort */ }
-          }
-        }
-        return [{ filename: `Facture_${effectiveNumero}.pdf`, content: pdfBuf, contentType: "application/pdf" }];
-      })()
-    : undefined;
+  const attachments: { filename: string; content: Buffer; contentType: string }[] = [];
 
-  await deps.email.send({ to: client.email, subject, body, ...(attachments ? { attachments } : {}), fromName: artisan.nomEntreprise ?? undefined, replyTo: artisan.email ?? undefined });
+  if (input.attachPdf) {
+    const lignes = await repo.listLignes(ctx, facture.id);
+    let pdfBuf: Buffer | null = null;
+    if (facture.pdfStorageKey && deps.storage) {
+      pdfBuf = await deps.storage.get(facture.pdfStorageKey);
+    }
+    if (!pdfBuf) {
+      pdfBuf = await deps.pdf.render("facture", { facture: { ...facture, lignes }, artisan, client });
+      if (deps.storage && deps.db && !facture.pdfStorageKey) {
+        try {
+          const s3Key = `factures/${ctx.artisanId}/${facture.id}.pdf`;
+          const stored = await deps.storage.withDb(deps.db).upload(s3Key, pdfBuf, { contentType: "application/pdf", artisanId: ctx.artisanId, filename: `Facture_${effectiveNumero}.pdf`, purpose: "facture-pdf" }, ctx);
+          await repo.setPdfFile(ctx, facture.id, stored.id, stored.storageKey);
+        } catch (_) { /* best-effort */ }
+      }
+    }
+    attachments.push({ filename: `Facture_${effectiveNumero}.pdf`, content: pdfBuf, contentType: "application/pdf" });
+  }
+
+  if (input.pieceJointeIds?.length && deps.piecesJointesRepo && deps.storage) {
+    const requestedIds = input.pieceJointeIds;
+    const allPieces = await deps.piecesJointesRepo.listByFacture(ctx, facture.id);
+    const selected = allPieces.filter((p) => requestedIds.includes(p.id));
+    for (const piece of selected) {
+      const buf = await deps.storage.get(piece.storageKey);
+      if (buf) attachments.push({ filename: piece.filename ?? `piece-${piece.id}`, content: buf, contentType: piece.mimeType });
+    }
+  }
+
+  await deps.email.send({ to: client.email, subject, body, ...(attachments.length ? { attachments } : {}), fromName: artisan.nomEntreprise ?? undefined, replyTo: artisan.email ?? undefined });
 
   /** Envoi réussi (pas d'exception) : passage `envoyee` depuis brouillon/validee uniquement. */
   if (facture.statut === "brouillon" || facture.statut === "validee") {

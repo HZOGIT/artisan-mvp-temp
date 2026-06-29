@@ -130,5 +130,11 @@
   "uploaderSigneeTitre": "Importer l'attestation signée",
   "uploaderSigneeDesc": "Importez le PDF de l'attestation signé par le client.",
   "toastAttestationSigneeUplodee": "Attestation signée enregistrée",
-  "sousTotalLot": "Sous-total {{label}} — {{montant}}"
+  "sousTotalLot": "Sous-total {{label}} — {{montant}}",
+  "piecesJointes": "Pièces jointes",
+  "ajouterPiece": "Ajouter",
+  "envoi": "Envoi…",
+  "aucunePiece": "Aucune pièce jointe. Formats : PDF, JPG, PNG, WEBP (max 10 Mo).",
+  "supprimerPiece": "Supprimer cette pièce jointe ?",
+  "piecesJointesEmail": "Pièces jointes"
 }
