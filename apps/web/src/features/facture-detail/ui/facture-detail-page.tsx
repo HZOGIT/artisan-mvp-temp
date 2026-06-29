@@ -14,6 +14,7 @@ import { Label } from "@/shared/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Badge } from "@/shared/ui/badge";
 import { Textarea } from "@/shared/ui/textarea";
+import { apiUrl } from "@/shared/backend-url";
 import { useFactureDetail, useSearchArticles } from "../application/use-facture-detail";
 import { formatCurrency, isAvoirDoc, avoirSolde, avoirLignesMontantTTC, buildAvoirTotalLignes, pdfLignes, activitesForFacture, pendingCount, allowedNext, statutAction, STATUS_LABEL_KEY, STATUS_COLORS, RAPPEL_TYPE_KEY, sectionSousTotaux, type ArticleSearchResult, type AvoirLigneForm, type RappelType } from "../domain/facture-detail";
 import { TVA_CATEGORIES } from "@/shared/tva/taux-tva-fr";
@@ -440,7 +441,7 @@ export default function FactureDetailPage() {
             <Button
               variant="outline"
               disabled={F.genererAttestation.isPending}
-              onClick={() => F.genererAttestation.mutate({ factureId }, { onSuccess: (r) => { toast.success(t("toastAttestationGeneree")); window.open(r.url, "_blank"); }, onError: (e) => toast.error(e.message) })}
+              onClick={() => F.genererAttestation.mutate({ factureId }, { onSuccess: (r) => { toast.success(t("toastAttestationGeneree")); window.open(apiUrl(`/api/factures/attestations-tva/${r.id}/download`), "_blank"); }, onError: (e) => toast.error(e.message) })}
             >
               {F.genererAttestation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
               {t("genererAttestation")}
@@ -455,6 +456,9 @@ export default function FactureDetailPage() {
                       <span className="text-muted-foreground text-xs">{format(new Date(att.createdAt), "dd/MM/yyyy")}</span>
                     </div>
                     <div className="flex gap-2">
+                      <a href={apiUrl(`/api/factures/attestations-tva/${att.id}/download`)} target="_blank" rel="noopener noreferrer">
+                        <Button size="sm" variant="outline"><Download className="h-3.5 w-3.5 mr-1" />{t("telechargerAttestation")}</Button>
+                      </a>
                       {att.statut !== "signe" && (
                         <Button size="sm" variant="outline" onClick={() => { setAttestationSigneeId(att.id); setIsAttestationSigneeDialogOpen(true); }}>
                           <Upload className="h-3.5 w-3.5 mr-1" />{t("uploaderSignee")}

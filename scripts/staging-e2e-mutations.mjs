@@ -344,6 +344,39 @@ async function casSignupNeufNoLoop() {
 
 await casSignupRoutingStable();
 await casSignupNeufNoLoop();
+
+// ── CAS ATTESTATION TVA — route de download (OPE-705) ───────────────────────────────────────────────
+// Anti-régression : vérifie que GET /api/factures/attestations-tva/:id/download renvoie 200+PDF
+// (et non 404 comme avant la correction). Trouve une attestation existante ou en génère une.
+async function casAttestationTvaDownload() {
+  casesRun++;
+  const tag = 'attestation-tva.download-200';
+  try {
+    const factures = (await trpcGet('factures.list', null)) ?? [];
+    let attId = null;
+    for (const f of factures.slice(0, 10)) {
+      const atts = (await trpcGet('factures.attestationTva.getByFacture', { factureId: f.id })) ?? [];
+      if (atts.length > 0) { attId = atts[0].id; break; }
+    }
+    if (!attId) {
+      issues.push({ tag, skipped: 'aucune attestation existante sur le compte e2e — générer manuellement pour tester' });
+      return;
+    }
+    const resp = await ctx.request.get(`${BACKEND}/api/factures/attestations-tva/${attId}/download`);
+    if (resp.status() !== 200) {
+      issues.push({ tag, id: attId, error: `attendu 200 got ${resp.status()}` });
+      return;
+    }
+    const ct = resp.headers()['content-type'] ?? '';
+    if (!ct.includes('pdf')) {
+      issues.push({ tag, id: attId, error: `content-type attendu pdf got "${ct}"` });
+    }
+  } catch (e) {
+    issues.push({ tag, error: String(e).slice(0, 200) });
+  }
+}
+
+await casAttestationTvaDownload();
 // ── (Ajouter ici les cas factures/contrats et tout futur bug d'intégration front↔tRPC) ─────────────
 
 console.log('=== E2E MUTATIONS RESULT ===');
