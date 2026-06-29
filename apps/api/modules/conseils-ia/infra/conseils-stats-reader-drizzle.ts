@@ -23,7 +23,7 @@ export class ConseilsStatsReaderDrizzle implements ConseilsStatsReader {
       const [factRow] = await tx
         .select({ n: sql<number>`count(*)::int`, total: sql<string>`coalesce(sum(${factures.totalTTC}), 0)` })
         .from(factures)
-        .where(and(eq(factures.artisanId, ctx.artisanId), notInArray(factures.statut, ["payee", "annulee", "brouillon"])));
+        .where(and(eq(factures.artisanId, ctx.artisanId), notInArray(factures.statut, ["payee", "annulee", "brouillon"]), eq(factures.typeDocument, "facture")));
 
       const [stockRow] = await tx
         .select({ n: sql<number>`count(*)::int` })

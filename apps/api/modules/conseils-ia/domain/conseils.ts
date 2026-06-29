@@ -53,7 +53,7 @@ export function buildConseilsPrompt(input: {
 
 Etat actuel :
 - ${input.stats.nbDevisEnAttente} devis en attente de reponse
-- ${input.stats.nbFacturesImpayees} factures impayees (${input.stats.montantImpayees.toFixed(0)} EUR)
+- ${input.stats.nbFacturesImpayees} factures en attente de reglement (${input.stats.montantImpayees.toFixed(0)} EUR)
 - ${input.stats.nbStocksBas} articles en stock bas
 - Mois en cours : ${input.moisLabel}
 
