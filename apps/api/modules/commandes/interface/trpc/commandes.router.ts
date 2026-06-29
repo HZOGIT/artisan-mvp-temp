@@ -6,7 +6,6 @@ import { withOutbox } from "../../../../shared/events/with-outbox";
 import type { ICommandeRepository } from "../../application/commande-repository";
 import type { IFournisseurRepository } from "../../../fournisseurs/application/fournisseur-repository";
 import type { IDevisRepository } from "../../../devis/application/devis-repository";
-import type { IClientRepository } from "../../../clients/application/client-repository";
 import { listCommandes, getCommande, listLignesCommande } from "../../application/read-use-cases";
 import { getPerformancesFournisseurs } from "../../application/performances-use-cases";
 import { listerDevisAcceptes } from "../../application/devis-acceptes-use-cases";
@@ -71,7 +70,6 @@ export function createCommandesRouter(
   repo: ICommandeRepository,
   fournisseurRepo: IFournisseurRepository,
   devisRepo: IDevisRepository,
-  clientRepo: IClientRepository,
   mailing: CommandeMailingDeps,
   ia: CommandeIaDeps,
   db?: DbClient,
@@ -161,7 +159,7 @@ export function createCommandesRouter(
      * Devis acceptés du tenant, enrichis du nom client (parité client `listDevisAcceptes`) — base
      * de création d'une commande fournisseur. Cross-domaine (devis × clients), scopé.
      */
-    listDevisAcceptes: protectedProcedure.query(({ ctx }) => listerDevisAcceptes(devisRepo, clientRepo, ctx.tenant)),
+    listDevisAcceptes: protectedProcedure.query(({ ctx }) => listerDevisAcceptes(devisRepo, ctx.tenant)),
 
     recevoir: protectedProcedure
       .input(
