@@ -261,9 +261,27 @@ describe("factures — use-cases d'écriture", () => {
     expect(avoir.typeDocument).toBe("avoir");
     expect(avoir.numero).toBe("AV-00001");
     expect(avoir.factureOrigineId).toBe(id);
-    expect(avoir.statut).toBe("validee");
+    expect(avoir.statut).toBe("brouillon");
     expect(avoir.totalHT).toBe("-100.00");
     expect(avoir.totalTTC).toBe("-120.00");
+  });
+
+  it("creerAvoir — cycle de vie : brouillon → envoyee → payee (transitions légales)", async () => {
+    const repo = repoWithClient(A, 100);
+    const origineId = await factureEmise(repo);
+    const avoir = await creerAvoir(repo, A, origineId, { lignes: [{ designation: "Remboursement", quantite: "1", prixUnitaireHT: "100.00", tauxTVA: "20" }] });
+    expect(avoir.statut).toBe("brouillon");
+    const envoyee = await changerStatutFacture(repo, A, avoir.id, "envoyee", undefined, fakeArtisanReader);
+    expect(envoyee.statut).toBe("envoyee");
+    const payee = await changerStatutFacture(repo, A, avoir.id, "payee");
+    expect(payee.statut).toBe("payee");
+  });
+
+  it("creerAvoir — transition illégale : brouillon → payee directement → Conflict", async () => {
+    const repo = repoWithClient(A, 100);
+    const origineId = await factureEmise(repo);
+    const avoir = await creerAvoir(repo, A, origineId, { lignes: [{ designation: "R", quantite: "1", prixUnitaireHT: "50.00" }] });
+    await expect(changerStatutFacture(repo, A, avoir.id, "payee")).rejects.toBeInstanceOf(ConflictError);
   });
 
   it("creerAvoir — sur un brouillon → Conflict ; origine d'un autre tenant → NotFound ; sans ligne → Validation", async () => {
