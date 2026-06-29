@@ -63,29 +63,39 @@ export class PortalDocsReaderDrizzle implements IPortalDocsReader {
       const [d] = await tx.select({ id: devis.id }).from(devis).where(and(eq(devis.id, devisId), eq(devis.clientId, clientId))).limit(1);
       if (!d) return [];
       const optionsRows = await tx.select().from(devisOptions).where(eq(devisOptions.devisId, devisId)).orderBy(asc(devisOptions.ordre));
-      return Promise.all(
-        optionsRows.map(async (o): Promise<PortalDevisOption> => {
-          const lignesRows = await tx.select().from(devisOptionsLignes).where(eq(devisOptionsLignes.optionId, o.id)).orderBy(asc(devisOptionsLignes.ordre));
-          return {
-            id: o.id,
-            nom: o.nom,
-            description: o.description ?? null,
-            ordre: o.ordre ?? 0,
-            totalHT: o.totalHT ?? "0.00",
-            totalTTC: o.totalTTC ?? "0.00",
-            recommandee: o.recommandee ?? false,
-            selectionnee: o.selectionnee ?? false,
-            lignes: lignesRows.map((l): PortalDevisOptionLigne => ({
-              id: l.id,
-              designation: l.designation,
-              quantite: l.quantite ?? null,
-              unite: l.unite ?? null,
-              prixUnitaireHT: l.prixUnitaireHT ?? null,
-              montantTTC: l.montantTTC ?? null,
-            })),
-          };
-        }),
-      );
+      const optionIds = optionsRows.map((o) => o.id);
+      const toutesLignes = !optionIds.length ? [] : await tx
+        .select()
+        .from(devisOptionsLignes)
+        .where(inArray(devisOptionsLignes.optionId, optionIds))
+        .orderBy(asc(devisOptionsLignes.ordre));
+      const lignesParOption = new Map<number, typeof toutesLignes>();
+      for (const l of toutesLignes) {
+        const arr = lignesParOption.get(l.optionId);
+        if (arr) arr.push(l);
+        else lignesParOption.set(l.optionId, [l]);
+      }
+      return optionsRows.map((o): PortalDevisOption => {
+        const lignesRows = lignesParOption.get(o.id) ?? [];
+        return {
+          id: o.id,
+          nom: o.nom,
+          description: o.description ?? null,
+          ordre: o.ordre ?? 0,
+          totalHT: o.totalHT ?? "0.00",
+          totalTTC: o.totalTTC ?? "0.00",
+          recommandee: o.recommandee ?? false,
+          selectionnee: o.selectionnee ?? false,
+          lignes: lignesRows.map((l): PortalDevisOptionLigne => ({
+            id: l.id,
+            designation: l.designation,
+            quantite: l.quantite ?? null,
+            unite: l.unite ?? null,
+            prixUnitaireHT: l.prixUnitaireHT ?? null,
+            montantTTC: l.montantTTC ?? null,
+          })),
+        };
+      });
     });
   }
 
