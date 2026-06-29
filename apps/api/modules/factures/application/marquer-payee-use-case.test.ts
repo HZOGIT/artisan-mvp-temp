@@ -62,13 +62,13 @@ describe("factures — marquerFacturePayee (markAsPaid + FEC)", () => {
     await expect(marquerFacturePayee(repo, B, id, { montantPaye: "120.00", datePaiement: "2026-03-10" })).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it("échec compta → erreur propagée (inaltérabilité : pas d'écriture sans verrouillage)", async () => {
+  it("échec compta best-effort : paiement déjà committé reste accessible, pas d'exception", async () => {
     const repo = new FakeFactureRepository();
     repo.registerClient(A.artisanId, 100);
     const id = await factureEmise(repo);
     const compta = new SpyComptaPort(true);
-    await expect(
-      marquerFacturePayee(repo, A, id, { montantPaye: "120.00", datePaiement: "2026-03-10" }, compta),
-    ).rejects.toThrow("compta KO");
+    const f = await marquerFacturePayee(repo, A, id, { montantPaye: "120.00", datePaiement: "2026-03-10" }, compta);
+    expect(f.statut).toBe("payee");
+    expect(compta.calls).toContain(`vente:${id}`);
   });
 });

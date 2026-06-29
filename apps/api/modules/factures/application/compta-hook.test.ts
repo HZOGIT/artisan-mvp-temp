@@ -89,4 +89,14 @@ describe("factures — hook compta (FEC) au paiement", () => {
     const f = await enregistrerPaiementFacture(repo, A, id, { montant: "120.00" });
     expect(f.statut).toBe("payee");
   });
+
+  it("paiement soldant : échec compta best-effort → paiement committé, pas d'exception", async () => {
+    const repo = new FakeFactureRepository();
+    repo.registerClient(A.artisanId, 100);
+    const id = await factureEmise(repo);
+    const comptaFail = new FakeComptaPort();
+    comptaFail.genererEcrituresVente = async () => { throw new Error("compta KO"); };
+    const f = await enregistrerPaiementFacture(repo, A, id, { montant: "120.00" }, comptaFail);
+    expect(f.statut).toBe("payee");
+  });
 });

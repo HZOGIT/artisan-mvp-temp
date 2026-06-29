@@ -202,9 +202,14 @@ export async function enregistrerPaiementFacture(
    */
   if (soldee) {
     factureCounter.inc({ action: "paid" });
-    await compta.genererEcrituresVente(ctx, id);
-    await compta.genererEcrituresEncaissement(ctx, id, updated);
-    await compta.validerEcritures(ctx, id);
+    try {
+      await compta.genererEcrituresVente(ctx, id);
+      await compta.genererEcrituresEncaissement(ctx, id, updated);
+      await compta.validerEcritures(ctx, id);
+    } catch (err) {
+      /** Paiement déjà committé — échec compta non bloquant ; backfill via scripts/backfill-ecritures-compta.ts */
+      console.error("[compta] enregistrerPaiement: generer/valider échoué facture", id, err);
+    }
   }
   return updated;
 }
@@ -222,6 +227,8 @@ export type MarquerPayeeInput = { readonly montantPaye: string; readonly datePai
  * **écritures FEC** (vente + encaissement) et les **verrouille** (inaltérabilité). L'invariant
  * **Σ débit = Σ crédit** est garanti par les use-cases de génération (domaine ecritures). Date invalide
  * → ValidationError (400) AVANT toute écriture. Hors tenant → NotFoundError (404).
+ * Génération d'écritures **best-effort** : le paiement est déjà committé avant les appels compta
+ * (non-atomique) — un échec compta est logué et non renvoyé (backfill via backfill-ecritures-compta.ts).
  */
 export async function marquerFacturePayee(
   repo: IFactureRepository,
@@ -243,9 +250,14 @@ export async function marquerFacturePayee(
   });
   if (!updated) throw new NotFoundError("Facture introuvable");
   factureCounter.inc({ action: "paid" });
-  await compta.genererEcrituresVente(ctx, id);
-  await compta.genererEcrituresEncaissement(ctx, id, updated);
-  await compta.validerEcritures(ctx, id);
+  try {
+    await compta.genererEcrituresVente(ctx, id);
+    await compta.genererEcrituresEncaissement(ctx, id, updated);
+    await compta.validerEcritures(ctx, id);
+  } catch (err) {
+    /** Paiement déjà committé — échec compta non bloquant ; backfill via scripts/backfill-ecritures-compta.ts */
+    console.error("[compta] marquerPayee: generer/valider échoué facture", id, err);
+  }
   return updated;
 }
 
@@ -374,8 +386,13 @@ export async function creerAvoir(
     lignes,
   });
   if (!avoir) throw new NotFoundError("Facture d'origine introuvable");
-  await compta.genererEcrituresVente(ctx, avoir.id);
-  await compta.validerEcritures(ctx, avoir.id);
+  try {
+    await compta.genererEcrituresVente(ctx, avoir.id);
+    await compta.validerEcritures(ctx, avoir.id);
+  } catch (err) {
+    /** Avoir déjà committé — échec compta non bloquant ; backfill via scripts/backfill-ecritures-compta.ts */
+    console.error("[compta] creerAvoir: generer/valider échoué avoir", avoir.id, err);
+  }
   return avoir;
 }
 
