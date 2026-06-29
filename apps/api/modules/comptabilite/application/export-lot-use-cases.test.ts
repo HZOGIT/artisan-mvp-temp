@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { NotFoundError } from "../../../shared/errors";
-import { FakePdfPort } from "../../../shared/ports";
+import { FakePdfPort, InMemoryStoragePort } from "../../../shared/ports";
 import type { TenantContext } from "../../../shared/tenant";
 import { collectFacturxLot, collectFacturePdfLot, type ExportLotPdfDeps } from "./export-lot-use-cases";
 
@@ -67,5 +67,33 @@ describe("collectFacturePdfLot", () => {
     const now = new Date("2026-06-15T10:00:00Z");
     const res = await collectFacturePdfLot(build(), ctx, {}, now);
     expect(res.filename).toBe("Factures_PDF_20260101_20260615.zip");
+  });
+
+  it("sert le PDF stocké (storage.get) quand pdfStorageKey présent — pas de render", async () => {
+    const storedBuffer = Buffer.from("PDF_STOCKE");
+    const storage = new InMemoryStoragePort();
+    await storage.upload("factures/1/1.pdf", storedBuffer);
+    const pdf = new FakePdfPort();
+    const lister = {
+      list: async () => [
+        { id: 1, numero: "FAC-2026-0001", clientId: 5, dateFacture: new Date("2026-03-10"), statut: "validee", pdfStorageKey: "factures/1/1.pdf" },
+      ],
+    };
+    const res = await collectFacturePdfLot(build({ pdf, storage, factureLister: lister }), ctx, PERIOD);
+    expect(res.entries).toHaveLength(1);
+    expect(Buffer.from(res.entries[0].content).equals(storedBuffer)).toBe(true);
+    expect(pdf.rendered).toHaveLength(0);
+  });
+
+  it("fallback render si pdfStorageKey absent ou storage absent", async () => {
+    const pdf = new FakePdfPort();
+    const lister = {
+      list: async () => [
+        { id: 1, numero: "FAC-2026-0001", clientId: 5, dateFacture: new Date("2026-03-10"), statut: "validee" },
+      ],
+    };
+    const res = await collectFacturePdfLot(build({ pdf, factureLister: lister }), ctx, PERIOD);
+    expect(res.entries).toHaveLength(1);
+    expect(pdf.rendered).toHaveLength(1);
   });
 });
