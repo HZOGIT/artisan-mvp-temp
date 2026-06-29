@@ -21,7 +21,7 @@ async function resolveArtisanEmail(db: DbClient, artisanId: number): Promise<str
  * Handlers best-effort : les erreurs sont silencieuses (pg-boss gère les retries).
  */
 export function registerWorkers(workers: WorkerPort, deps: WorkerDeps): void {
-  workers.register("FACTURE_PAYEE", async (event) => {
+  workers.register("facture.payee", async (event) => {
     try {
       const to = await resolveArtisanEmail(deps.db, event.artisanId);
       if (!to) return;
@@ -29,7 +29,7 @@ export function registerWorkers(workers: WorkerPort, deps: WorkerDeps): void {
     } catch { /* best-effort */ }
   });
 
-  workers.register("DEVIS_ACCEPTE", async (event) => {
+  workers.register("devis.accepte", async (event) => {
     try {
       const to = await resolveArtisanEmail(deps.db, event.artisanId);
       if (!to) return;
@@ -37,7 +37,7 @@ export function registerWorkers(workers: WorkerPort, deps: WorkerDeps): void {
     } catch { /* best-effort */ }
   });
 
-  workers.register("SIGNATURE_COMPLETE", async (event) => {
+  workers.register("devis.signe", async (event) => {
     try {
       const devisId = event.payload?.devisId as number;
       const [artisanTo, sigs] = await Promise.all([
@@ -50,7 +50,7 @@ export function registerWorkers(workers: WorkerPort, deps: WorkerDeps): void {
     } catch { /* best-effort */ }
   });
 
-  workers.register("ABONNEMENT_EXPIRE", async (event) => {
+  workers.register("abonnement.expire", async (event) => {
     try {
       const to = await resolveArtisanEmail(deps.db, event.artisanId);
       if (!to) return;

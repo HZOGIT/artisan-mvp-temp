@@ -119,14 +119,40 @@ describe("FakeWorkerPort", () => {
     await expect(workers.trigger("INCONNU", event)).rejects.toThrow(/handler/);
   });
 
-  it("registeredTypes liste les types enregistrés", () => {
+  it("registeredTypes liste les types enregistrés en convention dot-notation FR", () => {
     const workers = new FakeWorkerPort();
     registerWorkers(workers, { email: new FakeEmailPort(), db: {} as DbClient });
     expect(workers.registeredTypes()).toEqual(expect.arrayContaining([
-      "FACTURE_PAYEE",
-      "DEVIS_ACCEPTE",
-      "SIGNATURE_COMPLETE",
-      "ABONNEMENT_EXPIRE",
+      "facture.payee",
+      "devis.accepte",
+      "devis.signe",
+      "abonnement.expire",
     ]));
+  });
+
+  it("devis.signe — envoie email artisan ET email client de confirmation", async () => {
+    const workers = new FakeWorkerPort();
+    const email = new FakeEmailPort();
+    const db = {
+      select: (cols: Record<string, unknown>) => ({
+        from: () => ({
+          where: () => ({
+            limit: () => {
+              if ("userId" in cols) return Promise.resolve([{ userId: 1 }]);
+              if ("email" in cols) return Promise.resolve([{ email: "artisan@test.com" }]);
+              if ("signataireEmail" in cols) return Promise.resolve([{ signataireEmail: "client@test.com" }]);
+              return Promise.resolve([]);
+            },
+          }),
+        }),
+      }),
+    } as unknown as DbClient;
+    registerWorkers(workers, { email, db });
+    await workers.trigger("devis.signe", {
+      type: "devis.signe", aggregateType: "devis", aggregateId: 99, artisanId: 1, userId: null, occurredAt: new Date(), payload: { devisId: 99 },
+    });
+    expect(email.sent).toHaveLength(2);
+    expect(email.sent.some((m) => m.to === "artisan@test.com")).toBe(true);
+    expect(email.sent.some((m) => m.to === "client@test.com")).toBe(true);
   });
 });
