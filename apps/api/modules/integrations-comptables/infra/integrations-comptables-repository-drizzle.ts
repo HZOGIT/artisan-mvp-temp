@@ -16,7 +16,8 @@ function toConfig(r: ConfigRow): ConfigComptable {
     compteBanque: r.compteBanque ?? null, compteCaisse: r.compteCaisse ?? null, journalVentes: r.journalVentes ?? null, journalAchats: r.journalAchats ?? null, journalBanque: r.journalBanque ?? null,
     prefixeFacture: r.prefixeFacture ?? null, prefixeAvoir: r.prefixeAvoir ?? null, exerciceDebut: r.exerciceDebut ?? null, actif: r.actif ?? null,
     syncAutoFactures: r.syncAutoFactures ?? null, syncAutoPaiements: r.syncAutoPaiements ?? null, frequenceSync: r.frequenceSync ?? null, heureSync: r.heureSync ?? null,
-    notifierErreurs: r.notifierErreurs ?? null, notifierSucces: r.notifierSucces ?? null, regimeTVA: r.regimeTVA ?? null, derniereSync: r.derniereSync ?? null, prochainSync: r.prochainSync ?? null,
+    notifierErreurs: r.notifierErreurs ?? null, notifierSucces: r.notifierSucces ?? null, regimeTVA: r.regimeTVA ?? null,
+    dateVerrouillageCompta: r.dateVerrouillageCompta ?? null, derniereSync: r.derniereSync ?? null, prochainSync: r.prochainSync ?? null,
   };
 }
 
@@ -135,6 +136,24 @@ export class IntegrationsComptablesRepositoryDrizzle implements IIntegrationsCom
   async touchDerniereSync(ctx: TenantContext, now: Date): Promise<void> {
     await withTenant(this.db, ctx, async (tx) => {
       await tx.update(configurationsComptables).set({ derniereSync: now }).where(eq(configurationsComptables.artisanId, ctx.artisanId));
+    });
+  }
+
+  async getLockDate(ctx: TenantContext): Promise<string | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [r] = await tx.select({ dateVerrouillageCompta: configurationsComptables.dateVerrouillageCompta }).from(configurationsComptables).where(eq(configurationsComptables.artisanId, ctx.artisanId)).limit(1);
+      return r?.dateVerrouillageCompta ?? null;
+    });
+  }
+
+  async setLockDate(ctx: TenantContext, date: string | null): Promise<void> {
+    await withTenant(this.db, ctx, async (tx) => {
+      const [existing] = await tx.select({ id: configurationsComptables.id }).from(configurationsComptables).where(eq(configurationsComptables.artisanId, ctx.artisanId)).limit(1);
+      if (existing) {
+        await tx.update(configurationsComptables).set({ dateVerrouillageCompta: date }).where(eq(configurationsComptables.artisanId, ctx.artisanId));
+      } else {
+        await tx.insert(configurationsComptables).values({ artisanId: ctx.artisanId, dateVerrouillageCompta: date });
+      }
     });
   }
 }

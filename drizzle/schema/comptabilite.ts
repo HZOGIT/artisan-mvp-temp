@@ -121,6 +121,7 @@ export const configurationsComptables = pgTable("configurations_comptables", {
   heureSync: varchar("heureSync", { length: 5 }).default("02:00"),
   notifierErreurs: boolean("notifierErreurs").default(true),
   notifierSucces: boolean("notifierSucces").default(false),
+  dateVerrouillageCompta: date("dateVerrouillageCompta"),
   derniereSync: timestamp("derniereSync"),
   prochainSync: timestamp("prochainSync"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

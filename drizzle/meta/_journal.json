@@ -131,15 +131,22 @@
     {
       "idx": 18,
       "version": "7",
-      "when": 1782731916190,
-      "tag": "20260629111836_avis-demande-auto",
+      "when": 1782730775482,
+      "tag": "20260629105935_inventaires-physiques",
       "breakpoints": true
     },
     {
       "idx": 19,
       "version": "7",
-      "when": 1782730775482,
-      "tag": "20260629105935_inventaires-physiques",
+      "when": 1782731916190,
+      "tag": "20260629111836_avis-demande-auto",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1782737987142,
+      "tag": "20260629125947_date-verrouillage-compta",
       "breakpoints": true
     },
     {

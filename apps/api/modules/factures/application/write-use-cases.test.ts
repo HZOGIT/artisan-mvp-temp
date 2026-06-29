@@ -107,6 +107,22 @@ describe("factures — use-cases d'écriture", () => {
     await expect(supprimerFacture(repo, A, 999999)).rejects.toBeInstanceOf(NotFoundError);
   });
 
+  it("garde verrouillage — creerFacture avec lockDate future/passée → refus si aujourd'hui ≤ lockDate", async () => {
+    const repo = repoWithClient(A, 100);
+    const futurLockDate = "2099-12-31"; /* toujours dans le futur → today ≤ lock → refuse */
+    await expect(creerFacture(repo, A, { clientId: 100 }, undefined, futurLockDate)).rejects.toBeInstanceOf(ValidationError);
+    await expect(creerFacture(repo, A, { clientId: 100 }, undefined, null)).resolves.toBeDefined();
+  });
+
+  it("garde verrouillage — modifierFacture refuse si dateFacture ≤ lockDate, autorise sinon", async () => {
+    const repo = repoWithClient(A, 100);
+    const f = await creerFacture(repo, A, { clientId: 100 });
+    /* brouillon : dateFacture = null → coerced to today ; lockDate passée → OK */
+    await expect(modifierFacture(repo, A, f.id, { objet: "X" }, "2000-01-01")).resolves.toBeDefined();
+    /* lockDate dans le futur → today ≤ lock → refuse */
+    await expect(modifierFacture(repo, A, f.id, { objet: "Y" }, "2099-12-31")).rejects.toBeInstanceOf(ValidationError);
+  });
+
   it("ajouterLigneFacture — recalcule les totaux ; designation vide → Validation ; prix négatif → Validation", async () => {
     const repo = repoWithClient(A, 100);
     const f = await creerFacture(repo, A, { clientId: 100 });

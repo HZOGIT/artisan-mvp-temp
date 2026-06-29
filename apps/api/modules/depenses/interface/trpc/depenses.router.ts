@@ -7,6 +7,7 @@ import type { IDepenseRepository } from "../../application/depense-repository";
 import { listDepenses, getDepense, checkDoublons, getDepensesStats } from "../../application/read-use-cases";
 import { creerDepense, modifierDepense, supprimerDepense, creerIndemniteKm, convertirTrajetEnIndemnite } from "../../application/write-use-cases";
 import type { IDeplacementRepository } from "../../application/deplacement-repository";
+import type { TenantContext } from "../../../../shared/tenant";
 /*
  * Composition : le client appelle les catégories de dépense via `trpc.depenses.getCategories/...`
  * (le legacy les expose sous le routeur `depenses`). On délègue aux use-cases du domaine
@@ -142,6 +143,7 @@ export function createDepensesRouter(
   db?: DbClient,
   ocr?: { vision: VisionPort; rateLimiter: RateLimiterPort },
   deplacementRepo?: IDeplacementRepository,
+  lockDateReader?: { getLockDate(ctx: TenantContext): Promise<string | null> },
 ) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listDepenses(repo, ctx.tenant)),
@@ -153,8 +155,9 @@ export function createDepensesRouter(
     create: protectedProcedure
       .input(createSchema)
       .mutation(async ({ ctx, input }) => {
+        const lockDate = await lockDateReader?.getLockDate(ctx.tenant) ?? null;
         return withOutbox(db, repo, async (r, tx) => {
-          const result = await creerDepense(r, ctx.tenant, input);
+          const result = await creerDepense(r, ctx.tenant, input, lockDate);
           ctx.log.info(
             { event: "depense_creee", depenseId: result.id, montantHt: Number(input.montantHt), categorie: input.categorie, chantierId: input.chantierId ?? null, recurrente: input.recurrente ?? false },
             "Dépense enregistrée",
@@ -167,9 +170,10 @@ export function createDepensesRouter(
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
       .mutation(async ({ ctx, input }) => {
+        const lockDate = await lockDateReader?.getLockDate(ctx.tenant) ?? null;
         const { id, ...data } = input;
         return withOutbox(db, repo, async (r, tx) => {
-          const result = await modifierDepense(r, ctx.tenant, id, data);
+          const result = await modifierDepense(r, ctx.tenant, id, data, lockDate);
           if (tx) await outboxEvent(tx, ctx.tenant, { action: "depense.modifiee", entityType: "depense", entityId: id, payload: { depenseId: id } });
           return result;
         });

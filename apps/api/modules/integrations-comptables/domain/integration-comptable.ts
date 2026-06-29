@@ -36,6 +36,7 @@ export interface ConfigComptable {
   readonly notifierErreurs: boolean | null;
   readonly notifierSucces: boolean | null;
   readonly regimeTVA: RegimeTVA | null;
+  readonly dateVerrouillageCompta: string | null;
   readonly derniereSync: Date | null;
   readonly prochainSync: Date | null;
 }

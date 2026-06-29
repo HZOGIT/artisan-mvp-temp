@@ -1,5 +1,6 @@
 import { NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
+import { assertDateNonVerrouillee } from "../../../shared/compta-lock";
 import type { IDepenseRepository, DepenseRefKind } from "./depense-repository";
 import type { IDeplacementRepository } from "./deplacement-repository";
 import type { Depense, CreateDepenseInput, UpdateDepenseInput } from "../domain/depense";
@@ -72,7 +73,9 @@ export async function creerDepense(
   repo: IDepenseRepository,
   ctx: TenantContext,
   input: CreerDepenseInput,
+  lockDate?: string | null,
 ): Promise<Depense> {
+  assertDateNonVerrouillee(input.dateDepense, lockDate ?? null);
   if (!input.categorie?.trim()) throw new ValidationError("La catégorie est requise");
   assertMontantValide(input.montantHt);
   const tauxTva = input.tauxTva ?? "20";
@@ -89,6 +92,7 @@ export async function modifierDepense(
   ctx: TenantContext,
   id: number,
   input: ModifierDepenseInput,
+  lockDate?: string | null,
 ): Promise<Depense> {
   if (input.categorie !== undefined && !input.categorie.trim()) throw new ValidationError("La catégorie est requise");
   if (input.montantHt !== undefined) assertMontantValide(input.montantHt);
@@ -98,6 +102,7 @@ export async function modifierDepense(
   /** État courant (scopé tenant) requis pour recalculer la TVA sur les valeurs effectives. */
   const current = await repo.getById(ctx, id);
   if (!current) throw new NotFoundError("Dépense introuvable");
+  assertDateNonVerrouillee(input.dateDepense ?? current.dateDepense, lockDate ?? null);
 
   /** Recalcule montantTva/montantTtc dès que montantHt OU tauxTva change (TVA dérivée). */
   const patch: { -readonly [K in keyof UpdateDepenseInput]: UpdateDepenseInput[K] } = { ...input };

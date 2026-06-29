@@ -1,6 +1,6 @@
 {
-  "id": "0d9a7d72-5f55-4863-914b-ad10972eebb8",
-  "prevId": "8c232461-21df-4119-9f6f-ded802aa8249",
+  "id": "c1c36efb-de88-4d85-9ced-fdc96992aace",
+  "prevId": "0d9a7d72-5f55-4863-914b-ad10972eebb8",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2072,7 +2072,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -2713,7 +2713,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -2938,7 +2938,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -3146,7 +3146,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -5649,6 +5649,12 @@
           "primaryKey": false,
           "notNull": false,
           "default": false
+        },
+        "dateVerrouillageCompta": {
+          "name": "dateVerrouillageCompta",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
         },
         "derniereSync": {
           "name": "derniereSync",
@@ -8470,7 +8476,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -10102,6 +10108,140 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.inventaires": {
+      "name": "inventaires",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "artisanId": {
+          "name": "artisanId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "statut": {
+          "name": "statut",
+          "type": "inventaire_statut",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'brouillon'"
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "valeurEcart": {
+          "name": "valeurEcart",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.inventaires_lignes": {
+      "name": "inventaires_lignes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "inventaireId": {
+          "name": "inventaireId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stockId": {
+          "name": "stockId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reference": {
+          "name": "reference",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "designation": {
+          "name": "designation",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unite": {
+          "name": "unite",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'unité'"
+        },
+        "quantiteTheorique": {
+          "name": "quantiteTheorique",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "quantiteReelle": {
+          "name": "quantiteReelle",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ecart": {
+          "name": "ecart",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.lignes_commandes_fournisseurs": {
       "name": "lignes_commandes_fournisseurs",
       "schema": "",
@@ -10160,7 +10300,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixUnitaire": {
           "name": "prixUnitaire",
@@ -11113,7 +11253,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixAchat": {
           "name": "prixAchat",
@@ -11202,7 +11342,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixEstime": {
           "name": "prixEstime",
@@ -12699,6 +12839,14 @@
         "contrat",
         "facture",
         "autre"
+      ]
+    },
+    "public.inventaire_statut": {
+      "name": "inventaire_statut",
+      "schema": "public",
+      "values": [
+        "brouillon",
+        "valide"
       ]
     },
     "public.message_auteur": {

@@ -701,6 +701,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     repository: deps.chantierRepo ?? new ChantierRepositoryDrizzle(getDbHandle().db),
     db: deps.chantiersDb ?? getDbHandle().db,
   });
+  const integrationsComptablesRepo = new IntegrationsComptablesRepositoryDrizzle(getDbHandle().db);
   const depenses = createDepensesModule({
     repository: deps.depenseRepo ?? new DepenseRepositoryDrizzle(getDbHandle().db),
     categorieRepository: categorieDepenseRepo,
@@ -716,6 +717,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       ? { vision: deps.ocrVision, rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000) }
       : { vision: new GeminiVisionAdapter(), rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000) },
     deplacementRepository: new DeplacementRepositoryDrizzle(getDbHandle().db),
+    lockDateReader: integrationsComptablesRepo,
   });
   const devis = createDevisModule({
     repository: devisRepo,
@@ -785,6 +787,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     db: deps.facturesDb ?? getDbHandle().db,
     stockRepo,
     storage: facturesStorage,
+    lockDateReader: integrationsComptablesRepo,
   });
   /*
    * Domaine compta/écritures — lecture seule (balance/grand-livre/FEC). La génération est
@@ -1113,7 +1116,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
    * domaine comptabilité (Σdébit=Σcrédit, lecture seule). Tables SOUS RLS.
    */
   const integrationsComptables = createIntegrationsComptablesModule({
-    repo: new IntegrationsComptablesRepositoryDrizzle(getDbHandle().db),
+    repo: integrationsComptablesRepo,
     fec: { getFecContent: async (ctx, period) => (await getFecExport(comptabiliteReader, ctx, period)).content },
   });
   /*
