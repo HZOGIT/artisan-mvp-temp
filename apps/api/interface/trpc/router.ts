@@ -64,6 +64,7 @@ import type { DevisIAModule } from "../../modules/devis-ia/devis-ia.module";
 import type { BillingModule } from "../../modules/billing/billing.module";
 import type { EinvoicingModule } from "../../modules/einvoicing/einvoicing.module";
 import type { FeedbackModule } from "../../modules/feedback/feedback.module";
+import type { PiecesJointesModule } from "../../modules/pieces-jointes/pieces-jointes.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
@@ -131,6 +132,7 @@ export interface AppRouterDeps {
   readonly events: EventsModule;
   readonly einvoicing: EinvoicingModule;
   readonly feedback: FeedbackModule;
+  readonly piecesJointes: PiecesJointesModule;
 }
 
 /*
@@ -209,6 +211,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     events: deps.events.router,
     einvoicing: deps.einvoicing.router,
     feedback: deps.feedback.router,
+    piecesJointes: deps.piecesJointes.router,
   });
 }
 

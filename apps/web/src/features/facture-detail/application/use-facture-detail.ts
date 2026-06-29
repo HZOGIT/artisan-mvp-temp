@@ -26,6 +26,7 @@ export function useFactureDetail(id: number) {
 
   const invAttestation = () => utils.factures.attestationTva.getByFacture.invalidate({ factureId: id });
   const attestationsQ = trpc.factures.attestationTva.getByFacture.useQuery(enabled && facture ? { factureId: id } : skipToken);
+  const piecesQ = trpc.piecesJointes.listByFacture.useQuery(enabled ? { factureId: id } : skipToken);
 
   return {
     facture, isLoading: factureQ.isLoading,
@@ -33,6 +34,7 @@ export function useFactureDetail(id: number) {
     activites: activitesQ.data ?? [], refetchActivites: activitesQ.refetch,
     avoirs: avoirsQ.data ?? [], auditLogs: auditQ.data ?? [], inv,
     attestations: attestationsQ.data ?? [],
+    pieces: piecesQ.data ?? [], refetchPieces: piecesQ.refetch,
     update: trpc.factures.update.useMutation({ onSuccess: inv }),
     envoyer: trpc.factures.envoyer.useMutation(),
     marquerEnRetard: trpc.factures.marquerEnRetard.useMutation(),
@@ -45,5 +47,6 @@ export function useFactureDetail(id: number) {
     deleteRappel: trpc.activites.delete.useMutation(),
     genererAttestation: trpc.factures.attestationTva.generer.useMutation({ onSuccess: () => { inv(); invAttestation(); } }),
     attacherSigneeAttestation: trpc.factures.attestationTva.attacherSignee.useMutation({ onSuccess: () => { inv(); invAttestation(); } }),
+    deletePiece: trpc.piecesJointes.delete.useMutation({ onSuccess: () => piecesQ.refetch() }),
   };
 }

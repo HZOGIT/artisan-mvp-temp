@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { ArrowLeft, Plus, Trash2, Receipt, User, CheckCircle, Download, Mail, Search, Loader2, Lock, FileText, History, AlertTriangle, Bell, Circle, AlarmClock, ShieldCheck, Upload, FileCheck } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Receipt, User, CheckCircle, Download, Mail, Search, Loader2, Lock, FileText, History, AlertTriangle, Bell, Circle, AlarmClock, ShieldCheck, Upload, FileCheck, Paperclip, X } from "lucide-react";
 import { generateFacturePDF } from "@/shared/lib/pdf-generator";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
@@ -28,7 +28,7 @@ export default function FactureDetailPage() {
   const { id: idParam } = useParams({ strict: false }) as { id?: string };
   const factureId = parseInt(idParam || "0");
   const F = useFactureDetail(factureId);
-  const { facture, isLoading, artisan, parametres, activites, refetchActivites, avoirs, auditLogs, inv, attestations } = F;
+  const { facture, isLoading, artisan, parametres, activites, refetchActivites, avoirs, auditLogs, inv, attestations, pieces, refetchPieces } = F;
 
   const [isAddLineDialogOpen, setIsAddLineDialogOpen] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
@@ -36,6 +36,8 @@ export default function FactureDetailPage() {
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
   const [emailMessage, setEmailMessage] = useState("");
   const [attachPdf, setAttachPdf] = useState(true);
+  const [emailPieceIds, setEmailPieceIds] = useState<number[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const [avoirType, setAvoirType] = useState<"total" | "partiel">("total");
   const [avoirNotes, setAvoirNotes] = useState("");
   const [avoirLignes, setAvoirLignes] = useState<AvoirLigneForm[]>([]);
@@ -92,10 +94,23 @@ export default function FactureDetailPage() {
 
   const handleSendByEmail = () => {
     if (!facture?.client?.email) { toast.error(t("errPasEmail")); return; }
-    F.sendByEmail.mutate({ factureId, customMessage: emailMessage || undefined, attachPdf }, {
-      onSuccess: (result) => { if (result.success) { toast.success(result.message); inv(); setIsEmailDialogOpen(false); setEmailMessage(""); } else toast.error(result.message); },
+    F.sendByEmail.mutate({ factureId, customMessage: emailMessage || undefined, attachPdf, pieceJointeIds: emailPieceIds.length ? emailPieceIds : undefined }, {
+      onSuccess: (result) => { if (result.success) { toast.success(result.message); inv(); setIsEmailDialogOpen(false); setEmailMessage(""); setEmailPieceIds([]); } else toast.error(result.message); },
       onError: (error) => toast.error(error.message || t("errEmailEnvoi")),
     });
+  };
+
+  const handleUploadPiece = async (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("factureId", String(factureId));
+    setIsUploading(true);
+    try {
+      const res = await fetch("/api/pieces-jointes", { method: "POST", body: form, credentials: "include" });
+      if (!res.ok) { const err = await res.json().catch(() => ({})); toast.error((err as { message?: string }).message ?? "Erreur upload"); return; }
+      toast.success("Pièce jointe ajoutée");
+      void refetchPieces();
+    } catch { toast.error("Erreur réseau"); } finally { setIsUploading(false); }
   };
 
   const handleExportPDF = () => {
@@ -163,6 +178,20 @@ export default function FactureDetailPage() {
               <div className="space-y-4 py-4">
                 <div className="space-y-2"><Label>{t("messagePersonnalise")}</Label><Textarea placeholder={t("messagePlaceholder")} value={emailMessage} onChange={(e) => setEmailMessage(e.target.value)} rows={4} /></div>
                 <label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={attachPdf} onChange={(e) => setAttachPdf(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /><span className="text-sm font-medium text-gray-700">{t("joindrePdf")}</span></label>
+                {pieces.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-700">{t("piecesJointesEmail")}</p>
+                    <div className="space-y-1.5">
+                      {pieces.map((p) => (
+                        <label key={p.id} className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={emailPieceIds.includes(p.id)} onChange={(e) => setEmailPieceIds(prev => e.target.checked ? [...prev, p.id] : prev.filter(x => x !== p.id))} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                          <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-sm text-gray-700 truncate">{p.filename}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               <DialogFooter><Button variant="outline" onClick={() => setIsEmailDialogOpen(false)}>{t("annuler")}</Button><Button onClick={handleSendByEmail} disabled={F.sendByEmail.isPending}>{F.sendByEmail.isPending ? (dejaEnvoye ? t("renvoiEnCours") : t("envoiEnCours")) : (dejaEnvoye ? t("renvoyer") : t("envoyer"))}</Button></DialogFooter>
             </DialogContent>
@@ -495,6 +524,34 @@ export default function FactureDetailPage() {
               ))}
             </div>
           ) : (<p className="text-center py-6 text-sm text-muted-foreground">{t("aucunRappel")}</p>)}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2"><Paperclip className="h-5 w-5" />{t("piecesJointes")}</CardTitle>
+            <label className="cursor-pointer">
+              <input type="file" className="sr-only" accept=".pdf,.jpg,.jpeg,.png,.webp" disabled={isUploading || pieces.length >= 10} onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleUploadPiece(f); e.target.value = ""; }} />
+              <Button size="sm" variant="outline" asChild disabled={isUploading || pieces.length >= 10}><span><Plus className="h-4 w-4 mr-2" />{isUploading ? t("envoi") : t("ajouterPiece")}</span></Button>
+            </label>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {pieces.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground"><Paperclip className="h-8 w-8 mx-auto mb-2 opacity-40" /><p className="text-sm">{t("aucunePiece")}</p></div>
+          ) : (
+            <div className="space-y-2">
+              {pieces.map((p) => (
+                <div key={p.id} className="flex items-center gap-3 p-3 rounded-lg border">
+                  <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="flex-1 text-sm truncate">{p.filename}</span>
+                  <a href={p.url} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline shrink-0"><Download className="h-3.5 w-3.5" /></a>
+                  <button type="button" title={t("supprimer")} onClick={() => { if (confirm(t("supprimerPiece"))) F.deletePiece.mutate({ id: p.id }); }} className="text-muted-foreground hover:text-rose-500 shrink-0"><X className="h-4 w-4" /></button>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

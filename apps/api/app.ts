@@ -206,6 +206,10 @@ import { registerContratPdfRoute } from "./interface/http/contrat-pdf-route";
 import { registerInterventionPdfRoute } from "./interface/http/intervention-pdf-route";
 import { registerPortailDevisPdfRoute } from "./interface/http/portail-devis-pdf-route";
 import { registerPortailFacturePdfRoute } from "./interface/http/portail-facture-pdf-route";
+import { registerUploadPieceJointeRoute } from "./interface/http/upload-piece-jointe-route";
+import { registerPortailPieceJointeRoute } from "./interface/http/portail-piece-jointe-route";
+import { createPiecesJointesModule } from "./modules/pieces-jointes/pieces-jointes.module";
+import { PiecesJointesRepositoryDrizzle } from "./modules/pieces-jointes/infra/pieces-jointes-repository-drizzle";
 import { registerFacturxRoutes } from "./interface/http/facturx-route";
 import { registerExportLotRoutes } from "./interface/http/export-lot-route";
 import { registerFontsRoute } from "./interface/http/fonts-route";
@@ -728,6 +732,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db),
       appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
       modeleEmailRepo,
+      piecesJointesRepo: new PiecesJointesRepositoryDrizzle(getDbHandle().db),
+      storage: deps.storage ?? new OvhS3Adapter(getDbHandle().db),
     },
     /*
      * convertToFacture : délègue au domaine factures (devis accepté → facture brouillon). Partage
@@ -771,6 +777,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       modeleEmailRepo,
       storage: facturesStorage,
       db: deps.facturesDb ?? getDbHandle().db,
+      piecesJointesRepo: new PiecesJointesRepositoryDrizzle(getDbHandle().db),
     },
     push: pushAdapter,
     outboxInTx: (artisanId, factureId, tx) =>
@@ -1139,7 +1146,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   const events = createEventsModule({ db: getDbHandle().db });
 
-  const appRouter = createAppRouter({ vehiculeRepo, vehiculesDb: deps.vehiculesDb ?? getDbHandle().db, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp, interventionsMobile, vitrine, clientPortal, integrationsComptables, devisIA, billing, platformAdmin, events, einvoicing, feedback });
+  const piecesJointesRepo = new PiecesJointesRepositoryDrizzle(getDbHandle().db);
+  const piecesJointes = createPiecesJointesModule({ repository: piecesJointesRepo, storage: facturesStorage });
+
+  const appRouter = createAppRouter({ vehiculeRepo, vehiculesDb: deps.vehiculesDb ?? getDbHandle().db, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp, interventionsMobile, vitrine, clientPortal, integrationsComptables, devisIA, billing, platformAdmin, events, einvoicing, feedback, piecesJointes });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
@@ -1468,6 +1478,22 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       getCgv: async (cgvCtx) => (await getParametres(deps.parametresRepo ?? new ParametresRepositoryDrizzle(getDbHandle().db), cgvCtx)).conditionsGenerales ?? null,
     },
     pdf: new JsPdfAdapter(),
+    storage: facturesStorage,
+    rateLimiter: new SlidingWindowRateLimiter(60, 60 * 1000),
+  });
+
+  /** Upload multipart d'une pièce jointe (plan, photo, attestation) sur un devis ou une facture. Auth cookie. */
+  registerUploadPieceJointeRoute(app, {
+    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
+    storage: facturesStorage,
+    db: getDbHandle().db,
+    piecesJointesRepo,
+  });
+
+  /** Téléchargement d'une pièce jointe depuis le portail client (public, validé par token). */
+  registerPortailPieceJointeRoute(app, {
+    db: getDbHandle().db,
     storage: facturesStorage,
     rateLimiter: new SlidingWindowRateLimiter(60, 60 * 1000),
   });
