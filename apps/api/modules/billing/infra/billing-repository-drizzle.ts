@@ -512,4 +512,11 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
 
   async saveStripeCustomerId(_artisanId: number, _stripeCustomerId: string): Promise<void> {
   }
+
+  async countActiveUsers(ctx: TenantContext): Promise<number> {
+    const result = await this.db.execute(
+      sql`SELECT COUNT(*)::int AS count FROM users WHERE actif = true AND ("artisanId" = ${ctx.artisanId} OR id = (SELECT "userId" FROM artisans WHERE id = ${ctx.artisanId}))`,
+    );
+    return (result.rows[0]?.count as number | undefined) ?? 0;
+  }
 }

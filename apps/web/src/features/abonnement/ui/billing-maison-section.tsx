@@ -15,6 +15,7 @@ import {
 import { useBillingMaison } from "../application/use-billing-maison";
 import type { BillingPaymentMethod, BillingSubscription, BillingInvoice, PlanId } from "../application/use-billing-maison";
 import { AddCardDialog } from "./add-card-dialog";
+import { PlanChangeDialog } from "./plan-change-dialog";
 
 const fmtDate = (d: Date | string | null | undefined): string =>
   d ? format(new Date(d), "dd MMM yyyy", { locale: fr }) : "—";
@@ -351,72 +352,83 @@ function PlanSelectorCard({
   isChangingPlan: boolean;
 }) {
   const { t } = useTranslation("abonnement");
-  const [pendingPlanId, setPendingPlanId] = useState<PlanId | null>(null);
+  const [confirmingPlan, setConfirmingPlan] = useState<PlanId | null>(null);
 
-  const handleChange = async (planId: PlanId) => {
-    setPendingPlanId(planId);
+  const handleConfirm = async () => {
+    if (!confirmingPlan) return;
     try {
-      await onChangePlan(planId);
+      await onChangePlan(confirmingPlan);
       toast.success(t("billingMaison.planChange", "Plan mis à jour."));
+      setConfirmingPlan(null);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : undefined;
       toast.error(msg ?? t("billingMaison.erreurPlan", "Impossible de changer de plan."));
-    } finally {
-      setPendingPlanId(null);
     }
   };
 
+  const confirmingPlanDef = PLAN_CATALOG.find((p) => p.id === confirmingPlan);
+  const currentPlanDef = PLAN_CATALOG.find((p) => p.id === currentPlanId);
+
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          {t("billingMaison.changerPlan", "Changer de plan")}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {PLAN_CATALOG.map((plan) => {
-            const isCurrent = plan.id === currentPlanId;
-            const isPending = pendingPlanId === plan.id;
-            return (
-              <div
-                key={plan.id}
-                className={`flex flex-col gap-2 rounded-lg border p-4 ${isCurrent ? "border-primary bg-primary/5" : "border-border"}`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold">{plan.name}</span>
-                  {isCurrent && (
-                    <Badge variant="secondary" className="text-xs">
-                      {t("billingMaison.planActuel", "Actuel")}
-                    </Badge>
+    <>
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            {t("billingMaison.changerPlan", "Changer de plan")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {PLAN_CATALOG.map((plan) => {
+              const isCurrent = plan.id === currentPlanId;
+              return (
+                <div
+                  key={plan.id}
+                  className={`flex flex-col gap-2 rounded-lg border p-4 ${isCurrent ? "border-primary bg-primary/5" : "border-border"}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">{plan.name}</span>
+                    {isCurrent && (
+                      <Badge variant="secondary" className="text-xs">
+                        {t("billingMaison.planActuel", "Actuel")}
+                      </Badge>
+                    )}
+                  </div>
+                  <span className="text-2xl font-bold tabular-nums">
+                    {plan.monthly}€
+                    <span className="text-sm font-normal text-muted-foreground">{t("billingMaison.parMois", "/mois")}</span>
+                  </span>
+                  {!isCurrent && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={isChangingPlan}
+                      onClick={() => setConfirmingPlan(plan.id)}
+                      className="mt-auto"
+                    >
+                      {t("billingMaison.choisir", "Choisir")}
+                    </Button>
                   )}
                 </div>
-                <span className="text-2xl font-bold tabular-nums">
-                  {plan.monthly}€
-                  <span className="text-sm font-normal text-muted-foreground">{t("billingMaison.parMois", "/mois")}</span>
-                </span>
-                {!isCurrent && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={isChangingPlan}
-                    onClick={() => handleChange(plan.id)}
-                    className="mt-auto"
-                  >
-                    {isPending && isChangingPlan ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      t("billingMaison.choisir", "Choisir")
-                    )}
-                  </Button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {confirmingPlan && confirmingPlanDef && (
+        <PlanChangeDialog
+          open
+          targetPlanId={confirmingPlan}
+          targetPlanName={confirmingPlanDef.name}
+          currentPlanName={currentPlanDef?.name ?? currentPlanId}
+          onConfirm={handleConfirm}
+          onCancel={() => setConfirmingPlan(null)}
+          isConfirming={isChangingPlan}
+        />
+      )}
+    </>
   );
 }
 

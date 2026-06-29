@@ -48,6 +48,7 @@ export class FakeBillingRepository implements IBillingRepository {
   public simulateUpdateSubscriptionPeriodError: Error | null = null;
   /** Injecte une erreur dans le prochain appel appendEvent (test robustesse des catch blocks). */
   public simulateAppendEventError: Error | null = null;
+  public activeUserCount = 1;
 
   private now() { return new Date(); }
 
@@ -443,5 +444,9 @@ export class FakeBillingRepository implements IBillingRepository {
 
   async saveStripeCustomerId(artisanId: number, stripeCustomerId: string): Promise<void> {
     this.customerIds.set(artisanId, stripeCustomerId);
+  }
+
+  async countActiveUsers(_ctx: TenantContext): Promise<number> {
+    return this.activeUserCount;
   }
 }

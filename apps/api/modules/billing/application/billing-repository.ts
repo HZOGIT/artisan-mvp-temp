@@ -144,4 +144,7 @@ export interface IBillingRepository {
   /** Stripe customer ID pour l'artisan (via la table artisans) */
   findStripeCustomerId(artisanId: number): Promise<string | null>;
   saveStripeCustomerId(artisanId: number, stripeCustomerId: string): Promise<void>;
+
+  /** Nombre d'utilisateurs actifs du tenant (owner + collaborateurs actifs). */
+  countActiveUsers(ctx: TenantContext): Promise<number>;
 }

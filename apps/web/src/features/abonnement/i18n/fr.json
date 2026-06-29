@@ -47,5 +47,23 @@
   "errPortal": "Erreur portail",
   "errAnnulation": "Erreur annulation",
   "errReactivation": "Erreur reactivation",
-  "chargement": "..."
+  "chargement": "...",
+  "planChange": {
+    "titre": "Confirmer le changement de plan",
+    "planActuel": "Plan actuel",
+    "nouveauPlan": "Nouveau plan",
+    "maintenant": "Prélevé maintenant",
+    "zero": "0 €",
+    "prochainEcheance": "Prochaine échéance",
+    "montantProchain": "Nouveau montant récurrent",
+    "limitesImm": "Limites réduites immédiatement",
+    "maxUsers": "Utilisateurs max : {{n}}",
+    "sansRemboursement": "Aucun remboursement ni avoir pour la période en cours.",
+    "featuresImm": "Les fonctionnalités du nouveau plan sont débloquées immédiatement.",
+    "usageDepasse": "Vous avez {{actif}} utilisateur(s) actif(s) mais le plan {{plan}} n'en autorise que {{max}}. Désactivez des utilisateurs avant ou après le changement.",
+    "confirmDepasse": "Je comprends et je souhaite quand même changer de plan.",
+    "erreurPreview": "Impossible de charger l'aperçu.",
+    "annuler": "Annuler",
+    "confirmer": "Confirmer le changement"
+  }
 }

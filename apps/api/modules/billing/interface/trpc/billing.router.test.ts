@@ -278,6 +278,47 @@ describe.skipIf(!URL)("billing.router e2e (billing maison protégé)", () => {
     expect(rows[0]!.plan_id).toBe("pro");
   });
 
+  it("previewPlanChange → 200, champs requis présents", async () => {
+    const tok = await jwt(UID);
+    await admin.query(
+      `insert into billing_subscriptions (artisan_id, plan_id, billing_mode, status, trial_ends_at)
+       values ($1,'pro','maison','trialing','2026-09-01')
+       on conflict (artisan_id) do update set plan_id='pro', status='trialing', trial_ends_at='2026-09-01'`,
+      [ARTISAN_ID],
+    );
+
+    const res = await injectTrpc(app, "GET", "billing.previewPlanChange", { planId: "starter" }, tok);
+    expect(res.statusCode).toBe(200);
+    const data = res.json().result.data as {
+      currentPlanId: string;
+      targetPlanId: string;
+      targetAmountCents: number;
+      immediateAmountCents: number;
+      activeUserCount: number;
+      targetMaxUsers: number;
+    };
+    expect(data.currentPlanId).toBe("pro");
+    expect(data.targetPlanId).toBe("starter");
+    expect(data.targetAmountCents).toBe(2900);
+    expect(data.immediateAmountCents).toBe(0);
+    expect(typeof data.activeUserCount).toBe("number");
+    expect(data.targetMaxUsers).toBe(1);
+  });
+
+  it("previewPlanChange sans abonnement → 404", async () => {
+    const tok = await jwt(UID);
+    await admin.query("delete from billing_subscriptions where artisan_id=$1", [ARTISAN_ID]);
+
+    const res = await injectTrpc(app, "GET", "billing.previewPlanChange", { planId: "pro" }, tok);
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("previewPlanChange plan inconnu → 400", async () => {
+    const tok = await jwt(UID);
+    const res = await injectTrpc(app, "GET", "billing.previewPlanChange", { planId: "inexistant" as "starter" }, tok);
+    expect(res.statusCode).toBe(400);
+  });
+
   it("setDefaultPaymentMethod : event payment_method.set_default persisté en DB", async () => {
     // Symétrique avec le test revoke : vérifie que setDefaultPaymentMethod écrit aussi en billing_events.
     const { rows } = await admin.query<{ id: number }>(
