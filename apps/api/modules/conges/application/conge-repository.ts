@@ -6,21 +6,40 @@ import type { SoldeCongeType } from "./solde";
 export interface SoldeResult {
   readonly type: SoldeCongeType;
   readonly annee: number;
+  /** YYYY-MM-DD — null sur les lignes legacy (pré-migration période). */
+  readonly periodeDebut: string | null;
+  readonly periodeFin: string | null;
+  readonly exercice: string | null;
   readonly soldeInitial: number;
   readonly soldeRestant: number;
   readonly joursAcquis: number;
   readonly joursPris: number;
+  readonly joursReportes: number;
 }
 
 /*
  * Ajustement additif du solde de congés d'un technicien (décompte si deltaJours > 0,
- * recrédit si < 0), pour une année et un type donnés.
+ * recrédit si < 0), pour une période et un type donnés.
  */
 export interface AjustementSolde {
   readonly technicienId: number;
   readonly type: SoldeCongeType;
   readonly annee: number;
+  readonly periodeDebut: string;
+  readonly periodeFin: string;
   readonly deltaJours: number;
+}
+
+/** Report des CP non pris depuis une période source vers la période suivante. */
+export interface ReportSolde {
+  readonly technicienId: number;
+  readonly type: SoldeCongeType;
+  readonly anneeSource: number;
+  readonly periodeDebutSource: string;
+  readonly joursReportes: number;
+  readonly annee: number;
+  readonly periodeDebut: string;
+  readonly periodeFin: string;
 }
 
 /*
@@ -72,14 +91,19 @@ export interface ICongeRepository {
    * la transition en_attente→approuve, recrédit uniquement en quittant approuve).
    */
   ajusterSolde(ctx: TenantContext, ajustement: AjustementSolde): Promise<void>;
-  getSolde(ctx: TenantContext, technicienId: number, annee: number): Promise<SoldeResult[]>;
+  /**
+   * Crée ou met à jour la ligne de la période cible avec `joursReportes`.
+   * Idempotent : si la ligne existe déjà, `joursReportes` est mis à jour.
+   */
+  reporterSolde(ctx: TenantContext, report: ReportSolde): Promise<void>;
+  getSolde(ctx: TenantContext, technicienId: number, annee: number, periodeDebut?: string): Promise<SoldeResult[]>;
   /** Date d'embauche (techniciens.createdAt) du technicien, null s'il n'appartient pas au tenant. */
   getTechnicienDateEmbauche(ctx: TenantContext, technicienId: number): Promise<Date | null>;
   /**
-   * Tous les techniciens du tenant avec leur date d'embauche et CP pris pour `annee`.
+   * Tous les techniciens du tenant avec leur date d'embauche et CP pris pour `annee` / `periodeDebut`.
    * Une ligne par technicien actif (joursAcquis calculé par le use-case appelant).
    */
-  listTechniciensSolde(ctx: TenantContext, annee: number): Promise<Array<{ technicienId: number; dateEmbauche: Date; joursPris: number }>>;
+  listTechniciensSolde(ctx: TenantContext, annee: number, periodeDebut?: string): Promise<Array<{ technicienId: number; dateEmbauche: Date; joursPris: number; joursReportes: number }>>;
   /*
    * Vérifie si le technicien a déjà un congé (en_attente ou approuvé) dont la période
    * chevauche [dateDebut, dateFin]. `excludeId` exclut la demande elle-même (modification).

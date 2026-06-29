@@ -4,7 +4,8 @@ import type { DbClient } from "../../../../shared/db";
 import { outboxEvent } from "../../../../shared/events/outbox-event";
 import { withOutbox } from "../../../../shared/events/with-outbox";
 import type { ICongeRepository } from "../../application/conge-repository";
-import { listConges, listCongesEnAttente, getConge, getSoldeConge, listSoldesConges } from "../../application/read-use-cases";
+import { listConges, listCongesEnAttente, getConge, getSoldeConge, listSoldesConges, cloturerPeriode } from "../../application/read-use-cases";
+import { exerciceCourant } from "../../application/solde";
 import {
   creerConge,
   modifierConge,
@@ -128,16 +129,46 @@ export function createCongesRouter(repo: ICongeRepository, db?: DbClient) {
       }),
 
     getSolde: protectedProcedure
-      .input(z.object({ technicienId: z.number().int(), annee: z.number().int().optional() }))
-      .query(({ ctx, input }) =>
-        getSoldeConge(repo, ctx.tenant, input.technicienId, input.annee ?? new Date().getFullYear()),
-      ),
+      .input(z.object({
+        technicienId: z.number().int(),
+        annee: z.number().int().optional(),
+        /** Format « 2025-2026 » — prioritaire sur `annee` si fourni. */
+        exercice: z.string().regex(/^\d{4}-\d{4}$/).optional(),
+      }))
+      .query(({ ctx, input }) => {
+        if (input.exercice) {
+          const anneeDebut = Number(input.exercice.split("-")[0]);
+          const periodeDebut = `${anneeDebut}-06-01`;
+          return getSoldeConge(repo, ctx.tenant, input.technicienId, anneeDebut, periodeDebut);
+        }
+        return getSoldeConge(repo, ctx.tenant, input.technicienId, input.annee ?? new Date().getFullYear());
+      }),
 
     /** Soldes CP de tous les techniciens du tenant — calcul à la lecture (idempotent). */
     soldesTous: protectedProcedure
-      .input(z.object({ annee: z.number().int().optional() }))
-      .query(({ ctx, input }) =>
-        listSoldesConges(repo, ctx.tenant, input.annee ?? new Date().getFullYear()),
-      ),
+      .input(z.object({
+        annee: z.number().int().optional(),
+        /** Format « 2025-2026 » — prioritaire sur `annee` si fourni. Défaut = exercice courant. */
+        exercice: z.string().regex(/^\d{4}-\d{4}$/).optional(),
+      }))
+      .query(({ ctx, input }) => {
+        const ex = input.exercice ?? exerciceCourant();
+        const anneeDebut = Number(ex.split("-")[0]);
+        const periodeDebut = `${anneeDebut}-06-01`;
+        return listSoldesConges(repo, ctx.tenant, anneeDebut, periodeDebut);
+      }),
+
+    /**
+     * Clôture de période : calcule et écrit le report des CP non consommés vers la période
+     * suivante. Idempotent. Gate : conges.gerer.
+     * `exercice` format « 2025-2026 » (période à clôturer).
+     */
+    cloturerPeriode: gerer
+      .input(z.object({ exercice: z.string().regex(/^\d{4}-\d{4}$/) }))
+      .mutation(({ ctx, input }) => {
+        const anneeDebut = Number(input.exercice.split("-")[0]);
+        const periodeDebut = `${anneeDebut}-06-01`;
+        return cloturerPeriode(repo, ctx.tenant, periodeDebut);
+      }),
   });
 }

@@ -286,18 +286,27 @@ export const conges = pgTable("conges", {
 export type Conge = typeof conges.$inferSelect;
 export type InsertConge = typeof conges.$inferInsert;
 
-export const soldesConges = pgTable("soldes_conges", {
-  id: serial("id").primaryKey(),
-  technicienId: integer("technicienId").notNull(),
-  artisanId: integer("artisanId").notNull(),
-  type: soldeCongeTypeEnum("type").notNull(),
-  annee: integer("annee").notNull(),
-  soldeInitial: numeric("soldeInitial", { precision: 5, scale: 2 }).default("0.00"),
-  soldeRestant: numeric("soldeRestant", { precision: 5, scale: 2 }).default("0.00"),
-  joursAcquis: numeric("joursAcquis", { precision: 5, scale: 2 }).default("0.00"),
-  joursPris: numeric("joursPris", { precision: 5, scale: 2 }).default("0.00"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
-});
+export const soldesConges = pgTable(
+  "soldes_conges",
+  {
+    id: serial("id").primaryKey(),
+    technicienId: integer("technicienId").notNull(),
+    artisanId: integer("artisanId").notNull(),
+    type: soldeCongeTypeEnum("type").notNull(),
+    annee: integer("annee").notNull(),
+    /** Période de référence légale CP (1er juin N → 31 mai N+1). NULL sur les lignes legacy. */
+    periodeDebut: date("periodeDebut"),
+    periodeFin: date("periodeFin"),
+    /** Jours reportés depuis la période précédente (clôture 31 mai). */
+    joursReportes: numeric("joursReportes", { precision: 5, scale: 2 }).default("0.00").notNull(),
+    soldeInitial: numeric("soldeInitial", { precision: 5, scale: 2 }).default("0.00"),
+    soldeRestant: numeric("soldeRestant", { precision: 5, scale: 2 }).default("0.00"),
+    joursAcquis: numeric("joursAcquis", { precision: 5, scale: 2 }).default("0.00"),
+    joursPris: numeric("joursPris", { precision: 5, scale: 2 }).default("0.00"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+  },
+  (t) => [index("idx_soldes_conges_periode").on(t.artisanId, t.technicienId, t.type, t.periodeDebut)],
+);
 export type SoldeConge = typeof soldesConges.$inferSelect;
 export type InsertSoldeConge = typeof soldesConges.$inferInsert;

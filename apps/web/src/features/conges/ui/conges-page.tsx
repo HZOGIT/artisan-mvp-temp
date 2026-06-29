@@ -28,7 +28,7 @@ const STATUT_COLOR: Record<StatutConge, string> = {
 
 export default function CongesPage() {
   const { t } = useTranslation("conges");
-  const { conges, congesEnAttente, techniciens, soldes, isLoading, create, approuver, refuser } = useConges();
+  const { conges, congesEnAttente, techniciens, soldes, exercice, isLoading, create, approuver, refuser, cloturerPeriode } = useConges();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedTechnicien, setSelectedTechnicien] = useState<string>("");
@@ -260,11 +260,33 @@ export default function CongesPage() {
       {soldes.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-primary" />
-              {t("soldesTitre")}
-            </CardTitle>
-            <CardDescription>{t("soldesDescription")}</CardDescription>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  {t("soldesTitre", { exercice })}
+                </CardTitle>
+                <CardDescription>{t("soldesDescription")}</CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (window.confirm(t("cloturerPeriodeConfirm", { exercice }))) {
+                    cloturerPeriode.mutate(
+                      { exercice },
+                      {
+                        onSuccess: (r) => toast.success(t("cloturerPeriodeOk", { n: r.length })),
+                        onError: (e) => toast.error(e.message),
+                      },
+                    );
+                  }
+                }}
+                disabled={cloturerPeriode.isPending}
+              >
+                {t("cloturerPeriode")}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -274,17 +296,19 @@ export default function CongesPage() {
                     <th className="text-left py-2 pr-4 font-medium">{t("technicien")}</th>
                     <th className="text-right py-2 px-4 font-medium">{t("soldesAcquis")}</th>
                     <th className="text-right py-2 px-4 font-medium">{t("soldesPris")}</th>
+                    <th className="text-right py-2 px-4 font-medium">{t("soldesReportes")}</th>
                     <th className="text-right py-2 pl-4 font-medium">{t("soldesRestant")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {soldes.map((s) => {
-                    const tech = techniciens.find((t) => t.id === s.technicienId);
+                    const tech = techniciens.find((tt) => tt.id === s.technicienId);
                     return (
                       <tr key={s.technicienId} className="border-b last:border-0">
                         <td className="py-2 pr-4">{tech ? `${tech.prenom ?? ""} ${tech.nom}`.trim() : t("inconnu")}</td>
                         <td className="text-right py-2 px-4">{s.joursAcquis.toFixed(1)}</td>
                         <td className="text-right py-2 px-4">{s.joursPris.toFixed(1)}</td>
+                        <td className="text-right py-2 px-4 text-blue-700">{s.joursReportes.toFixed(1)}</td>
                         <td className="text-right py-2 pl-4 font-medium text-green-700">{s.soldeRestant.toFixed(1)}</td>
                       </tr>
                     );

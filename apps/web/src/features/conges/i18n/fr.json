@@ -46,12 +46,16 @@
     "formation": "Formation",
     "autre": "Autre"
   },
-  "soldesTitre": "Soldes congés payés",
-  "soldesDescription": "Jours acquis automatiquement (2,5 j/mois travaillé)",
+  "soldesTitre": "CP période {{exercice}}",
+  "soldesDescription": "Acquis (2,5 j/mois), pris, reportés N-1 et restants",
   "soldesAcquis": "Acquis",
   "soldesPris": "Pris",
+  "soldesReportes": "Reportés",
   "soldesRestant": "Restant",
   "soldesVide": "Aucun technicien enregistré",
+  "cloturerPeriode": "Clôturer la période",
+  "cloturerPeriodeConfirm": "Calculer et reporter les CP non pris de la période {{exercice}} vers la suivante ?",
+  "cloturerPeriodeOk": "Report calculé : {{n}} technicien(s) concerné(s)",
   "statut": {
     "en_attente": "En attente",
     "approuve": "Approuvé",

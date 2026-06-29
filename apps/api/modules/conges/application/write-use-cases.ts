@@ -16,8 +16,8 @@ async function ajusterSoldePourConge(
   signe: 1 | -1,
 ): Promise<void> {
   if (!typeAffecteSolde(conge.type)) return;
-  const { jours, annee } = calculerJoursConge(conge);
-  await repo.ajusterSolde(ctx, { technicienId: conge.technicienId, type: conge.type, annee, deltaJours: signe * jours });
+  const { jours, annee, periodeDebut, periodeFin } = calculerJoursConge(conge);
+  await repo.ajusterSolde(ctx, { technicienId: conge.technicienId, type: conge.type, annee, periodeDebut, periodeFin, deltaJours: signe * jours });
 }
 
 /*
