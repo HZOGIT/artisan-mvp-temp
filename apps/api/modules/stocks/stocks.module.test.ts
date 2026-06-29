@@ -65,6 +65,7 @@ describe("stocks.module", () => {
       "getMouvements",
       "getRapportCommande",
       "getStocksEnRupture",
+      "inventaire",
       "list",
       "update",
     ]);

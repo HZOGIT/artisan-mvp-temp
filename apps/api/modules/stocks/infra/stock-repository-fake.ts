@@ -8,6 +8,10 @@ import type {
   AdjustStockInput,
   MouvementStock,
   StockEntrant,
+  Inventaire,
+  InventaireLigne,
+  InventaireAvecLignes,
+  DemarrerInventaireInput,
 } from "../domain/stock";
 
 /*
@@ -132,5 +136,103 @@ export class FakeStockRepository implements IStockRepository {
 
   withDb(_db: unknown): this {
     return this;
+  }
+
+  /* ─── Inventaire physique (fake in-memory) ─── */
+
+  private invStore: Inventaire[] = [];
+  private lignesStore: (InventaireLigne & { _mvs: MouvementStock[] })[] = [];
+  private invSeq = 0;
+  private invLigneSeq = 0;
+
+  async demarrerInventaire(ctx: TenantContext, input: DemarrerInventaireInput): Promise<InventaireAvecLignes> {
+    const stockRows = await this.list(ctx);
+    const now = new Date();
+    const inv: Inventaire = {
+      id: ++this.invSeq,
+      artisanId: ctx.artisanId,
+      date: input.date ?? now.toISOString().slice(0, 10),
+      statut: "brouillon",
+      note: input.note ?? null,
+      valeurEcart: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.invStore.push(inv);
+    const lignes: InventaireLigne[] = stockRows.map((s) => {
+      const l: InventaireLigne = {
+        id: ++this.invLigneSeq,
+        inventaireId: inv.id,
+        stockId: s.id,
+        reference: s.reference,
+        designation: s.designation,
+        unite: s.unite,
+        quantiteTheorique: s.quantiteEnStock,
+        quantiteReelle: null,
+        ecart: null,
+      };
+      this.lignesStore.push({ ...l, _mvs: [] as MouvementStock[] });
+      return l;
+    });
+    return { inventaire: inv, lignes };
+  }
+
+  async getInventaire(ctx: TenantContext, id: number): Promise<InventaireAvecLignes | null> {
+    const inv = this.invStore.find((i) => i.id === id && i.artisanId === ctx.artisanId);
+    if (!inv) return null;
+    const lignes: InventaireLigne[] = this.lignesStore
+      .filter((l) => l.inventaireId === id)
+      .map(({ _mvs: _m, ...l }) => l);
+    return { inventaire: inv, lignes };
+  }
+
+  async listInventaires(ctx: TenantContext): Promise<Inventaire[]> {
+    return [...this.invStore].filter((i) => i.artisanId === ctx.artisanId).reverse();
+  }
+
+  async saisirComptage(ctx: TenantContext, ligneId: number, quantiteReelle: string): Promise<InventaireAvecLignes | null> {
+    const idx = this.lignesStore.findIndex((x) => x.id === ligneId);
+    if (idx === -1) return null;
+    const l = this.lignesStore[idx];
+    const inv = this.invStore.find((i) => i.id === l.inventaireId && i.artisanId === ctx.artisanId);
+    if (!inv || inv.statut === "valide") return null;
+    this.lignesStore[idx] = {
+      ...l,
+      quantiteReelle,
+      ecart: (Number(quantiteReelle) - Number(l.quantiteTheorique)).toFixed(2),
+    };
+    return this.getInventaire(ctx, inv.id);
+  }
+
+  async validerInventaire(ctx: TenantContext, id: number): Promise<InventaireAvecLignes | null> {
+    const inv = this.invStore.find((i) => i.id === id && i.artisanId === ctx.artisanId);
+    if (!inv) return null;
+    const lignes = this.lignesStore.filter((l) => l.inventaireId === id);
+    let valeurEcartTotal = 0;
+    for (const l of lignes) {
+      const ecartNum = Number(l.ecart ?? "0");
+      if (ecartNum === 0) continue;
+      const s = this.store.find((x) => x.id === l.stockId);
+      if (!s) continue;
+      const avant = Number(s.quantiteEnStock);
+      const apres = round2(avant + ecartNum).toFixed(2);
+      const updated: Stock = { ...s, quantiteEnStock: apres, updatedAt: new Date() };
+      this.store = this.store.map((x) => (x.id === s.id ? updated : x));
+      this.mouvements.push({
+        id: ++this.mvSeq,
+        stockId: s.id,
+        type: "ajustement",
+        quantite: Math.abs(ecartNum).toFixed(2),
+        quantiteAvant: avant.toFixed(2),
+        quantiteApres: apres,
+        motif: `Régularisation inventaire #${id}`,
+        reference: `INV-${id}`,
+        createdAt: new Date(),
+      });
+      valeurEcartTotal += Math.abs(ecartNum) * Number(s.prixAchat ?? "0");
+    }
+    const idx = this.invStore.findIndex((i) => i.id === id);
+    this.invStore[idx] = { ...inv, statut: "valide", valeurEcart: round2(valeurEcartTotal).toFixed(2), updatedAt: new Date() };
+    return this.getInventaire(ctx, id);
   }
 }

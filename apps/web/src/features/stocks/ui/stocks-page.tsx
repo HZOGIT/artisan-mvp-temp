@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 import { Badge } from "@/shared/ui/badge";
 import { useStocks, useMouvements } from "../application/use-stocks";
+import InventaireTab from "./inventaire-tab";
 import {
   filterStocks,
   indexEntrantByStock,
@@ -57,11 +58,13 @@ type MouvementFormData = {
   reference: string;
 };
 
+type ActiveTab = "all" | "low" | "inventaire";
+
 export default function StocksPage() {
   const { t } = useTranslation("stocks");
   const search = useSearch();
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<"all" | "low">(() => {
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
     if (typeof window === "undefined") return "all";
     const f = new URLSearchParams(window.location.search).get("filtre");
     return f === "rupture" || f === "alerte" ? "low" : "all";
@@ -418,21 +421,24 @@ export default function StocksPage() {
         </Card>
       )}
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "all" | "low")} className="space-y-4">
-        <div className="flex items-center justify-between">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ActiveTab)} className="space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <TabsList>
             <TabsTrigger value="all">{t("tabAll")}</TabsTrigger>
             <TabsTrigger value="low">{t("tabLow")}</TabsTrigger>
+            <TabsTrigger value="inventaire">{t("tabInventaire")}</TabsTrigger>
           </TabsList>
-          <div className="relative w-64">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder={t("searchPlaceholder")}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
+          {activeTab !== "inventaire" && (
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder={t("searchPlaceholder")}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          )}
         </div>
 
         <TabsContent value="all">
@@ -558,6 +564,10 @@ export default function StocksPage() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="inventaire">
+          <InventaireTab />
         </TabsContent>
       </Tabs>
 

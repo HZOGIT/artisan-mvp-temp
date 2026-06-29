@@ -134,6 +134,20 @@
       "when": 1782731916190,
       "tag": "20260629111836_avis-demande-auto",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1782730775482,
+      "tag": "20260629105935_inventaires-physiques",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1782732100895,
+      "tag": "20260629112140_inventaires-add-valeur-ecart",
+      "breakpoints": true
     }
   ]
 }
