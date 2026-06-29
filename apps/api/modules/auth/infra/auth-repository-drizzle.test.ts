@@ -117,4 +117,56 @@ describe.skipIf(!URL)("AuthRepositoryDrizzle (PG : users HORS RLS, accès par id
     const unique = new Set(ALL_PERMISSIONS);
     expect(unique.size).toBe(ALL_PERMISSIONS.length);
   });
+
+  it("OPE-737 — purgePersonalData : sub trialing SANS billing_cycle → supprimée", async () => {
+    const testUserId = 9943006;
+    try {
+      await admin.query("delete from users where id=$1", [testUserId]);
+      await admin.query("insert into users (id, email, password, name, role, actif) values ($1,'purge-nobill@t.fr','hash','Purge1','artisan',true)", [testUserId]);
+      await repo.bootstrapAccount(testUserId);
+      const artisanRow = (await admin.query<{ id: number }>("select id from artisans where \"userId\"=$1", [testUserId])).rows[0];
+      const subBefore = (await admin.query<{ id: number }>("select id from billing_subscriptions where artisan_id=$1", [artisanRow.id])).rows[0];
+      expect(subBefore, "sub créée par bootstrapAccount").toBeDefined();
+
+      await repo.purgePersonalData(testUserId);
+
+      const subAfter = (await admin.query("select id from billing_subscriptions where artisan_id=$1", [artisanRow.id])).rows[0];
+      expect(subAfter, "sub supprimée par purgePersonalData").toBeUndefined();
+      const evtAfter = (await admin.query("select id from billing_events where entity_type='billing_subscription' and entity_id=$1", [subBefore.id])).rows;
+      expect(evtAfter, "billing_events supprimés").toHaveLength(0);
+    } finally {
+      await admin.query("delete from users where id=$1", [testUserId]);
+    }
+  });
+
+  it("OPE-737 — purgePersonalData : sub AVEC billing_cycle → PRÉSERVÉE (historique réel)", async () => {
+    const testUserId = 9943007;
+    let subId: number | undefined;
+    let cycleId: number | undefined;
+    try {
+      await admin.query("delete from users where id=$1", [testUserId]);
+      await admin.query("insert into users (id, email, password, name, role, actif) values ($1,'purge-withbill@t.fr','hash','Purge2','artisan',true)", [testUserId]);
+      await repo.bootstrapAccount(testUserId);
+      const artisanRow = (await admin.query<{ id: number }>("select id from artisans where \"userId\"=$1", [testUserId])).rows[0];
+      const subRow = (await admin.query<{ id: number }>("select id from billing_subscriptions where artisan_id=$1", [artisanRow.id])).rows[0];
+      subId = subRow.id;
+
+      const now = new Date();
+      const cycleRow = (await admin.query<{ id: number }>(
+        "insert into billing_cycles (subscription_id, period_start, period_end, amount_cents) values ($1,$2,$3,$4) returning id",
+        [subId, now, new Date(now.getTime() + 30 * 86400_000), 1900],
+      )).rows[0];
+      cycleId = cycleRow.id;
+
+      await repo.purgePersonalData(testUserId);
+
+      const subAfter = (await admin.query("select id from billing_subscriptions where id=$1", [subId])).rows[0];
+      expect(subAfter, "sub préservée (billing_cycle présent)").toBeDefined();
+    } finally {
+      if (cycleId) await admin.query("delete from billing_cycles where id=$1", [cycleId]);
+      if (subId) await admin.query("delete from billing_events where entity_type='billing_subscription' and entity_id=$1", [subId]);
+      if (subId) await admin.query("delete from billing_subscriptions where id=$1", [subId]);
+      await admin.query("delete from users where id=$1", [testUserId]);
+    }
+  });
 });
