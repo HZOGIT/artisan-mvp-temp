@@ -183,6 +183,7 @@ import { genererAlertesRetardLivraison } from "./modules/commandes/application/a
 import { genererAlertesReconductionContrats } from "./modules/contrats-maintenance/application/alertes-reconduction-use-cases";
 import { artisans as artisansTable, paOutbox } from "../../drizzle/schema.pg";
 import { contratsFacturesCronPlugin } from "./shared/infra/contrats-factures-cron";
+import { makeDepensesRecurrentesJob } from "./modules/depenses/application/depenses-recurrentes-job";
 import { contratsVisitesCronPlugin } from "./shared/infra/contrats-visites-cron";
 import { rappelRdvClientCronPlugin } from "./shared/infra/rappel-rdv-client-cron";
 import { ensureStripeWebhookEndpoint } from "./shared/infra/stripe-webhook-setup";
@@ -1377,6 +1378,15 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
           repo: new AlertesPrevisionsRepositoryDrizzle(getDbHandle().db),
           email: emailAdapter,
           listArtisanIds: async () => {
+            const rows = await getDbHandle().db.select({ id: artisansTable.id }).from(artisansTable);
+            return rows.map((r) => r.id);
+          },
+        }),
+      );
+      registry.register(
+        makeDepensesRecurrentesJob({
+          repo: depenses.deps.repository,
+          getArtisanIds: async () => {
             const rows = await getDbHandle().db.select({ id: artisansTable.id }).from(artisansTable);
             return rows.map((r) => r.id);
           },

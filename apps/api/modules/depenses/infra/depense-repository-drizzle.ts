@@ -1,4 +1,4 @@
-import { and, between, desc, eq, gte, isNotNull, ne, sql } from "drizzle-orm";
+import { and, between, desc, eq, gte, isNotNull, lte, ne, sql } from "drizzle-orm";
 import { depenses, chantiers, interventions, clients } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
@@ -362,6 +362,25 @@ export class DepenseRepositoryDrizzle implements IDepenseRepository {
         .update(depenses)
         .set({ ocr_brut: JSON.stringify(data ?? {}).slice(0, 5000), ocr_traite: true })
         .where(and(eq(depenses.id, id), eq(depenses.artisan_id, ctx.artisanId)));
+    });
+  }
+
+  listRecurrentesDues(ctx: TenantContext, asOf: string): Promise<Depense[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(depenses)
+        .where(
+          and(
+            eq(depenses.artisan_id, ctx.artisanId),
+            eq(depenses.recurrente, true),
+            isNotNull(depenses.prochaine_occurrence),
+            isNotNull(depenses.frequence_recurrence),
+            lte(depenses.prochaine_occurrence, asOf),
+          ),
+        )
+        .orderBy(depenses.id);
+      return rows.map(toDepense);
     });
   }
 

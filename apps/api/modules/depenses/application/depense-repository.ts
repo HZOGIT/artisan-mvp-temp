@@ -52,5 +52,10 @@ export interface IDepenseRepository {
    * scopé tenant. No-op si la dépense n'appartient pas au tenant. Parité `markDepenseOcrTraite`.
    */
   setOcr(ctx: TenantContext, id: number, data: unknown): Promise<void>;
+  /*
+   * Dépenses récurrentes échues : `recurrente=true`, `prochaine_occurrence <= asOf` (YYYY-MM-DD),
+   * scopé tenant. Sert au job scheduler pour générer les occurrences dues.
+   */
+  listRecurrentesDues(ctx: TenantContext, asOf: string): Promise<Depense[]>;
   withDb(db: DbClient): IDepenseRepository;
 }
