@@ -9,6 +9,9 @@ import { matchSearch } from "@/shared/lib/normalize";
 export type Stock = RouterOutputs["stocks"]["list"][number];
 export type Mouvement = RouterOutputs["stocks"]["getMouvements"][number];
 export type StockEntrant = RouterOutputs["stocks"]["getEntrant"][number];
+export type Inventaire = RouterOutputs["stocks"]["inventaire"]["list"][number];
+export type InventaireAvecLignes = RouterOutputs["stocks"]["inventaire"]["getById"];
+export type InventaireLigne = InventaireAvecLignes["lignes"][number];
 
 const toNum = (v: unknown): number => {
   const n = typeof v === "string" ? parseFloat(v) : typeof v === "number" ? v : 0;

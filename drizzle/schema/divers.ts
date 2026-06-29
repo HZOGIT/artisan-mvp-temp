@@ -127,6 +127,35 @@ export const mouvementsStock = pgTable("mouvements_stock", {
 export type MouvementStock = typeof mouvementsStock.$inferSelect;
 export type InsertMouvementStock = typeof mouvementsStock.$inferInsert;
 
+export const inventaireStatutEnum = pgEnum("inventaire_statut", ["brouillon", "valide"]);
+
+export const inventaires = pgTable("inventaires", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  date: date("date").defaultNow().notNull(),
+  statut: inventaireStatutEnum("statut").default("brouillon").notNull(),
+  note: text("note"),
+  valeurEcart: numeric("valeurEcart", { precision: 12, scale: 2 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type Inventaire = typeof inventaires.$inferSelect;
+export type InsertInventaire = typeof inventaires.$inferInsert;
+
+export const inventairesLignes = pgTable("inventaires_lignes", {
+  id: serial("id").primaryKey(),
+  inventaireId: integer("inventaireId").notNull(),
+  stockId: integer("stockId").notNull(),
+  reference: varchar("reference", { length: 50 }).notNull(),
+  designation: varchar("designation", { length: 500 }).notNull(),
+  unite: varchar("unite", { length: 20 }).notNull().default("unité"),
+  quantiteTheorique: numeric("quantiteTheorique", { precision: 10, scale: 2 }).notNull(),
+  quantiteReelle: numeric("quantiteReelle", { precision: 10, scale: 2 }),
+  ecart: numeric("ecart", { precision: 10, scale: 2 }),
+});
+export type InventaireLigne = typeof inventairesLignes.$inferSelect;
+export type InsertInventaireLigne = typeof inventairesLignes.$inferInsert;
+
 export const fournisseurs = pgTable("fournisseurs", {
   id: serial("id").primaryKey(),
   artisanId: integer("artisanId").notNull(),

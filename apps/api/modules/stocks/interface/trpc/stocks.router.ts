@@ -22,6 +22,12 @@ import {
   supprimerStock,
   ajusterQuantiteStock,
 } from "../../application/write-use-cases";
+import {
+  demarrerInventaire,
+  saisirComptage,
+  validerInventaire,
+  getInventaire,
+} from "../../application/inventaire-use-cases";
 
 /** Décimal positif (≥ 0) : la regex (pas de signe) interdit déjà toute valeur négative. */
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Valeur décimale invalide");
@@ -154,5 +160,27 @@ export function createStocksRouter(
      * Cross-domaine : compose le repo fournisseurs (associations article↔fournisseur + fiches).
      */
     getRapportCommande: protectedProcedure.query(({ ctx }) => genererRapportCommande(repo, fournisseurRepo, ctx.tenant)),
+
+    /* ─── Inventaire physique ─── */
+
+    inventaire: router({
+      list: protectedProcedure.query(({ ctx }) => repo.listInventaires(ctx.tenant)),
+
+      getById: protectedProcedure
+        .input(z.object({ id: z.number().int() }))
+        .query(({ ctx, input }) => getInventaire(repo, ctx.tenant, input.id)),
+
+      demarrer: protectedProcedure
+        .input(z.object({ date: z.string().optional(), note: z.string().max(500).nullish() }))
+        .mutation(({ ctx, input }) => demarrerInventaire(repo, ctx.tenant, { date: input.date, note: input.note ?? undefined })),
+
+      saisirComptage: protectedProcedure
+        .input(z.object({ ligneId: z.number().int(), quantiteReelle: z.string().regex(/^\d+(\.\d{1,2})?$/, "Valeur décimale invalide") }))
+        .mutation(({ ctx, input }) => saisirComptage(repo, ctx.tenant, input.ligneId, input.quantiteReelle)),
+
+      valider: protectedProcedure
+        .input(z.object({ id: z.number().int() }))
+        .mutation(({ ctx, input }) => validerInventaire(repo, ctx.tenant, input.id)),
+    }),
   });
 }

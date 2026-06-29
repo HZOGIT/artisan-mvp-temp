@@ -7,6 +7,9 @@ import type {
   AdjustStockInput,
   MouvementStock,
   StockEntrant,
+  Inventaire,
+  InventaireAvecLignes,
+  DemarrerInventaireInput,
 } from "../domain/stock";
 
 /*
@@ -60,4 +63,20 @@ export interface IStockRepository {
    */
   listEntrant(ctx: TenantContext): Promise<StockEntrant[]>;
   withDb(db: DbClient): IStockRepository;
+
+  /* ─── Inventaire physique ─── */
+
+  /** Crée un inventaire en statut brouillon et fige les quantités théoriques courantes. */
+  demarrerInventaire(ctx: TenantContext, input: DemarrerInventaireInput): Promise<InventaireAvecLignes>;
+  /** Retourne l'inventaire avec ses lignes ; null si hors tenant ou inexistant. */
+  getInventaire(ctx: TenantContext, id: number): Promise<InventaireAvecLignes | null>;
+  /** Liste les inventaires du tenant (du plus récent au plus ancien). */
+  listInventaires(ctx: TenantContext): Promise<Inventaire[]>;
+  /** Met à jour la quantiteReelle et l'ecart d'une ligne. null si hors tenant. */
+  saisirComptage(ctx: TenantContext, ligneId: number, quantiteReelle: string): Promise<InventaireAvecLignes | null>;
+  /**
+   * Valide l'inventaire : pour chaque ligne avec ecart ≠ 0 crée un mouvement d'ajustement.
+   * Idempotent : rejette si déjà validé. null si hors tenant.
+   */
+  validerInventaire(ctx: TenantContext, id: number): Promise<InventaireAvecLignes | null>;
 }

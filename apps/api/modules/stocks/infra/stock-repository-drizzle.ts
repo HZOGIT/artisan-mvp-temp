@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
-import { stocks, mouvementsStock, commandesFournisseurs, lignesCommandesFournisseurs } from "../../../../../drizzle/schema.pg";
+import { stocks, mouvementsStock, commandesFournisseurs, lignesCommandesFournisseurs, inventaires, inventairesLignes } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
@@ -13,10 +13,43 @@ import type {
   MouvementStock,
   MouvementType,
   StockEntrant,
+  Inventaire,
+  InventaireLigne,
+  InventaireAvecLignes,
+  DemarrerInventaireInput,
 } from "../domain/stock";
 
 type StockRow = typeof stocks.$inferSelect;
 type MouvementRow = typeof mouvementsStock.$inferSelect;
+type InventaireRow = typeof inventaires.$inferSelect;
+type InventaireLigneRow = typeof inventairesLignes.$inferSelect;
+
+function toInventaire(r: InventaireRow): Inventaire {
+  return {
+    id: r.id,
+    artisanId: r.artisanId,
+    date: r.date,
+    statut: r.statut as Inventaire["statut"],
+    note: r.note ?? null,
+    valeurEcart: r.valeurEcart ?? null,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  };
+}
+
+function toLigne(r: InventaireLigneRow): InventaireLigne {
+  return {
+    id: r.id,
+    inventaireId: r.inventaireId,
+    stockId: r.stockId,
+    reference: r.reference,
+    designation: r.designation,
+    unite: r.unite,
+    quantiteTheorique: r.quantiteTheorique,
+    quantiteReelle: r.quantiteReelle ?? null,
+    ecart: r.ecart ?? null,
+  };
+}
 
 function toStock(r: StockRow): Stock {
   return {
@@ -240,6 +273,170 @@ export class StockRepositoryDrizzle implements IStockRepository {
 
   withDb(db: DbClient): StockRepositoryDrizzle {
     return new StockRepositoryDrizzle(db);
+  }
+
+  /* ─── Inventaire physique ─── */
+
+  demarrerInventaire(ctx: TenantContext, input: DemarrerInventaireInput): Promise<InventaireAvecLignes> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const stockRows = await tx
+        .select()
+        .from(stocks)
+        .where(eq(stocks.artisanId, ctx.artisanId))
+        .orderBy(asc(stocks.designation), asc(stocks.id));
+
+      const [inv] = await tx
+        .insert(inventaires)
+        .values({ artisanId: ctx.artisanId, date: input.date ?? new Date().toISOString().slice(0, 10), note: input.note ?? null })
+        .returning();
+
+      const lignesRows =
+        stockRows.length > 0
+          ? await tx
+              .insert(inventairesLignes)
+              .values(stockRows.map((s) => ({
+                inventaireId: inv.id,
+                stockId: s.id,
+                reference: s.reference,
+                designation: s.designation,
+                unite: s.unite ?? "unité",
+                quantiteTheorique: s.quantiteEnStock ?? "0.00",
+              })))
+              .returning()
+          : [];
+
+      return {
+        inventaire: toInventaire(inv),
+        lignes: lignesRows.map(toLigne),
+      };
+    });
+  }
+
+  getInventaire(ctx: TenantContext, id: number): Promise<InventaireAvecLignes | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [inv] = await tx
+        .select()
+        .from(inventaires)
+        .where(and(eq(inventaires.id, id), eq(inventaires.artisanId, ctx.artisanId)))
+        .limit(1);
+      if (!inv) return null;
+
+      const lignesRows = await tx
+        .select()
+        .from(inventairesLignes)
+        .where(eq(inventairesLignes.inventaireId, id))
+        .orderBy(asc(inventairesLignes.designation), asc(inventairesLignes.id));
+
+      return {
+        inventaire: toInventaire(inv),
+        lignes: lignesRows.map(toLigne),
+      };
+    });
+  }
+
+  listInventaires(ctx: TenantContext): Promise<Inventaire[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(inventaires)
+        .where(eq(inventaires.artisanId, ctx.artisanId))
+        .orderBy(desc(inventaires.createdAt), desc(inventaires.id));
+      return rows.map(toInventaire);
+    });
+  }
+
+  saisirComptage(ctx: TenantContext, ligneId: number, quantiteReelle: string): Promise<InventaireAvecLignes | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      /* Vérifie l'appartenance tenant via la jointure inventaire (inventaires_lignes n'a pas artisanId). */
+      const [ligneRow] = await tx
+        .select({ ligne: inventairesLignes, inv: inventaires })
+        .from(inventairesLignes)
+        .innerJoin(inventaires, eq(inventaires.id, inventairesLignes.inventaireId))
+        .where(and(eq(inventairesLignes.id, ligneId), eq(inventaires.artisanId, ctx.artisanId)))
+        .limit(1);
+      if (!ligneRow) return null;
+      if (ligneRow.inv.statut === "valide") return null;
+
+      const ecart = (Number(quantiteReelle) - Number(ligneRow.ligne.quantiteTheorique)).toFixed(2);
+      await tx
+        .update(inventairesLignes)
+        .set({ quantiteReelle, ecart })
+        .where(eq(inventairesLignes.id, ligneId));
+
+      /* Re-fetch inline dans la même tx pour éviter une 2ème connexion (non-committed reads). */
+      const invId = ligneRow.inv.id;
+      const [freshInv] = await tx.select().from(inventaires).where(eq(inventaires.id, invId)).limit(1);
+      const freshLignes = await tx
+        .select()
+        .from(inventairesLignes)
+        .where(eq(inventairesLignes.inventaireId, invId))
+        .orderBy(asc(inventairesLignes.designation), asc(inventairesLignes.id));
+      return { inventaire: toInventaire(freshInv), lignes: freshLignes.map(toLigne) };
+    });
+  }
+
+  validerInventaire(ctx: TenantContext, id: number): Promise<InventaireAvecLignes | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [inv] = await tx
+        .select()
+        .from(inventaires)
+        .where(and(eq(inventaires.id, id), eq(inventaires.artisanId, ctx.artisanId)))
+        .for("update")
+        .limit(1);
+      if (!inv) return null;
+
+      const lignesRows = await tx
+        .select({ ligne: inventairesLignes, stock: stocks })
+        .from(inventairesLignes)
+        .innerJoin(stocks, eq(stocks.id, inventairesLignes.stockId))
+        .where(eq(inventairesLignes.inventaireId, id));
+
+      let valeurEcartTotal = 0;
+
+      for (const { ligne, stock } of lignesRows) {
+        const ecartNum = Number(ligne.ecart ?? "0");
+        if (ecartNum === 0) continue;
+
+        const avant = Number(stock.quantiteEnStock ?? "0");
+        const apres = round2(avant + ecartNum).toFixed(2);
+        const deltaAbs = Math.abs(ecartNum).toFixed(2);
+        const motif = `Régularisation inventaire #${id}`;
+
+        await tx
+          .update(stocks)
+          .set({ quantiteEnStock: apres, updatedAt: new Date() })
+          .where(eq(stocks.id, stock.id));
+
+        await tx.insert(mouvementsStock).values({
+          stockId: stock.id,
+          type: "ajustement",
+          quantite: deltaAbs,
+          quantiteAvant: avant.toFixed(2),
+          quantiteApres: apres,
+          motif,
+          reference: `INV-${id}`,
+        });
+
+        /* Valorise l'écart : |ecart| × prixAchat (si connu). */
+        const px = Number(stock.prixAchat ?? "0");
+        valeurEcartTotal += Math.abs(ecartNum) * px;
+      }
+
+      const valeurEcartStr = round2(valeurEcartTotal).toFixed(2);
+      await tx
+        .update(inventaires)
+        .set({ statut: "valide", valeurEcart: valeurEcartStr, updatedAt: new Date() })
+        .where(eq(inventaires.id, id));
+
+      /* Re-fetch inline dans la même tx pour éviter une 2ème connexion (non-committed reads). */
+      const [freshInv] = await tx.select().from(inventaires).where(eq(inventaires.id, id)).limit(1);
+      const freshLignes = await tx
+        .select()
+        .from(inventairesLignes)
+        .where(eq(inventairesLignes.inventaireId, id))
+        .orderBy(asc(inventairesLignes.designation), asc(inventairesLignes.id));
+      return { inventaire: toInventaire(freshInv), lignes: freshLignes.map(toLigne) };
+    });
   }
 
   listEntrant(ctx: TenantContext): Promise<StockEntrant[]> {

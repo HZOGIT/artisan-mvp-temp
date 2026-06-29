@@ -55,3 +55,33 @@ export function useMouvements(stockId: number, enabled: boolean) {
   const q = trpc.stocks.getMouvements.useQuery({ stockId }, { enabled: enabled && stockId > 0 });
   return { mouvements: q.data ?? [], isLoading: q.isLoading };
 }
+
+/** Inventaire physique : liste + détail + mutations. */
+export function useInventaire() {
+  const utils = trpc.useUtils();
+  const listQ = trpc.stocks.inventaire.list.useQuery();
+
+  const invalidate = () => {
+    utils.stocks.inventaire.list.invalidate();
+    utils.stocks.list.invalidate();
+    utils.stocks.getLowStock.invalidate();
+  };
+
+  const demarrer = trpc.stocks.inventaire.demarrer.useMutation({ onSuccess: invalidate });
+  const saisirComptage = trpc.stocks.inventaire.saisirComptage.useMutation({ onSuccess: invalidate });
+  const valider = trpc.stocks.inventaire.valider.useMutation({ onSuccess: invalidate });
+
+  return {
+    inventaires: listQ.data ?? [],
+    isLoading: listQ.isLoading,
+    demarrer,
+    saisirComptage,
+    valider,
+  };
+}
+
+/** Détail d'un inventaire (query conditionnelle). */
+export function useInventaireDetail(id: number | null) {
+  const q = trpc.stocks.inventaire.getById.useQuery({ id: id ?? 0 }, { enabled: id !== null });
+  return { detail: q.data ?? null, isLoading: q.isLoading };
+}

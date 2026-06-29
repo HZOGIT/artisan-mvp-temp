@@ -85,3 +85,49 @@ export interface AdjustStockInput {
   readonly motif?: string | null;
   readonly reference?: string | null;
 }
+
+export type InventaireStatut = "brouillon" | "valide";
+
+export interface Inventaire {
+  readonly id: number;
+  readonly artisanId: number;
+  readonly date: string;
+  readonly statut: InventaireStatut;
+  readonly note: string | null;
+  readonly valeurEcart: string | null;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+}
+
+export interface InventaireLigne {
+  readonly id: number;
+  readonly inventaireId: number;
+  readonly stockId: number;
+  readonly reference: string;
+  readonly designation: string;
+  readonly unite: string;
+  readonly quantiteTheorique: string;
+  readonly quantiteReelle: string | null;
+  readonly ecart: string | null;
+}
+
+export interface InventaireAvecLignes {
+  readonly inventaire: Inventaire;
+  readonly lignes: InventaireLigne[];
+}
+
+export interface DemarrerInventaireInput {
+  readonly date?: string;
+  readonly note?: string;
+}
+
+export interface SaisirComptageInput {
+  readonly ligneId: number;
+  readonly quantiteReelle: string;
+}
+
+export interface ValiderInventaireResult {
+  readonly inventaire: Inventaire;
+  readonly ajustementsCreees: number;
+  readonly valeurEcart: number;
+}
