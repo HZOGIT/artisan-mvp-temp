@@ -191,6 +191,7 @@ import { WebhookPaymentWriterDrizzle } from "./modules/subscription/infra/webhoo
 import { SubscriptionEventNotifierDrizzle } from "./modules/subscription/infra/subscription-event-notifier-drizzle";
 import { registerUploadLogoRoute } from "./interface/http/upload-logo-route";
 import { ArtisanLogoWriterDrizzle } from "./modules/artisan/infra/artisan-logo-writer-drizzle";
+import type { ArtisanLogoWriter } from "./modules/artisan/application/artisan-logo-writer";
 import { registerComptabiliteExportRoute } from "./interface/http/comptabilite-export-route";
 import { FacturesCsvReaderDrizzle } from "./modules/comptabilite/infra/factures-csv-reader-drizzle";
 import { registerRgpdExportRoute } from "./interface/http/rgpd-export-route";
@@ -451,6 +452,8 @@ export interface AppDeps extends ContextDeps {
   readonly emailUnsubscribeSecret?: string;
   /** Tracker d'usage LLM injectable (tests : noopLlmTracker pour éviter les écritures llm_usage). */
   readonly trackLlm?: LlmUsageTracker;
+  /** Writer logo injectable (tests : simuler une erreur storage sur DELETE /api/upload-logo). */
+  readonly logoWriter?: ArtisanLogoWriter;
 }
 
 /** Construit l'instance Fastify : /health + tRPC monté sur /api/trpc. */
@@ -1486,7 +1489,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   registerUploadLogoRoute(app, {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
-    writer: new ArtisanLogoWriterDrizzle(getDbHandle().db),
+    writer: deps.logoWriter ?? new ArtisanLogoWriterDrizzle(getDbHandle().db),
   });
 
   /** Export FEC opposable `/api/comptabilite/fec` (auth cookie JWT) — Σdébit=Σcrédit, téléchargeable. */

@@ -51,8 +51,14 @@ export function registerUploadLogoRoute(app: FastifyInstance, deps: UploadLogoDe
       const auth = await authArtisanFromCookie(req, deps);
       if (auth.status === "unauthenticated") return reply.code(401).send({ error: "Non authentifié" });
       if (auth.status === "no-artisan") return reply.code(404).send({ error: "Artisan non trouvé" });
-      await deps.writer.setLogo(auth.artisanId, null);
-      return reply.send({ success: true });
+      try {
+        await deps.writer.setLogo(auth.artisanId, null);
+        req.log.info({ artisanId: auth.artisanId }, 'logo_deleted');
+        return reply.send({ success: true });
+      } catch (e) {
+        req.log.error({ artisanId: auth.artisanId, err: e instanceof Error ? e : new Error(String(e)) }, 'logo_delete_error');
+        return reply.code(500).send({ error: "Erreur lors de la suppression du logo" });
+      }
     });
   });
 }

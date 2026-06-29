@@ -1,7 +1,10 @@
 import { describe, it, expect, afterAll, beforeAll } from "vitest";
 import { SignJWT } from "jose";
 import { Pool } from "pg";
+import Fastify from "fastify";
+import cookie from "@fastify/cookie";
 import { buildApp } from "../../app";
+import { registerUploadLogoRoute } from "./upload-logo-route";
 
 const URL = process.env.DATABASE_URL;
 const SECRET = "test-secret-at-least-32-characters-long-upload";
@@ -79,6 +82,24 @@ describe.skipIf(!URL)("/api/upload-logo (HORS-tRPC, auth cookie + multipart)", (
     expect(res.statusCode).toBe(200);
     const { rows } = await admin.query("select logo from artisans where id=$1", [artisanId]);
     expect(rows[0].logo).toBeNull();
+  });
+
+  it("DELETE erreur storage → 500 propre (pas de stack fuitée)", async () => {
+    const token = await signToken(UID);
+    const minApp = Fastify({ logger: false });
+    minApp.register(cookie);
+    registerUploadLogoRoute(minApp, {
+      jwtSecret: SECRET,
+      resolver: { resolve: async () => ({ artisanId, userId: UID }) },
+      writer: { setLogo: async () => { throw new Error("IO failure"); } },
+    });
+    await minApp.ready();
+    const res = await minApp.inject({ method: "DELETE", url: "/api/upload-logo", headers: { cookie: `token=${token}` } });
+    await minApp.close();
+    expect(res.statusCode).toBe(500);
+    const body = res.json();
+    expect(body.error).toBe("Erreur lors de la suppression du logo");
+    expect(JSON.stringify(body)).not.toMatch(/IO failure/);
   });
 
   it("isolation tRPC : le multipart n'altère pas le JSON tRPC (health 200)", async () => {
