@@ -145,6 +145,12 @@ Applique les corrections **dans le worktree** (`/tmp/wt-__SESSION_NAME__/...`), 
   "Corrections appliquées — __SESSION_NAME__ — $(cd /tmp/wt-__SESSION_NAME__ && gh pr view feat/__SESSION_NAME__ --json url -q .url)"
 ```
 
+### Démons longue-durée — INTERDITS depuis un worktree
+
+**Ne jamais démarrer un processus longue-durée (screen, boucle cron, watcher) depuis `/tmp/wt-*`.**
+Le worktree est supprimé au merge → le daemon hérite d'un `cwd` mort et tous ses chemins relatifs
+(`$HERE/script.sh`) cassent silencieusement. Lancer depuis le **repo persistant** (`/home/developer/artisan-mvp-temp`).
+
 ### Fin
 
 Une fois mergé par le reviewer, ta mission est terminée. Le reviewer gère le cleanup du worktree et le déploiement.

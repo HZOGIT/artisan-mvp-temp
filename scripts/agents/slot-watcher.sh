@@ -59,6 +59,10 @@ case "${1:-}" in
       exit 0
     fi
     SELF="$(realpath "${BASH_SOURCE[0]}")"
+    # ponytail: daemon must survive worktree cleanup — re-exec from persistent repo
+    if [[ "$SELF" == /tmp/wt-* ]]; then
+      exec bash "/home/developer/artisan-mvp-temp/scripts/agents/slot-watcher.sh" start
+    fi
     screen -dmS slot-watcher bash "$SELF" _loop
     echo "slot-watcher started"
     ;;
