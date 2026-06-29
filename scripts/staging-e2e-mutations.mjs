@@ -35,29 +35,51 @@ let casesRun = 0;
 // ── CAS 1 — Changement de statut d'un DEVIS depuis l'UI (P1 2026-06-16) ────────────────────────────
 // Régression : le front appelait devis.update({statut}) -> ignoré. Doit router vers devis.envoyer/
 // accepter/refuser. On vérifie que le statut PERSISTE après l'action UI.
+// Fix OPE-764 : le test crée son propre devis jetable (brouillon→envoye via API, envoye→refuse
+// via UI) et le supprime au teardown. Ne consomme plus le pool réel. `refuse` est choisie car
+// terminal suppressible (contrairement à `accepte` qui est terminal non-suppressible).
 async function casDevisStatut() {
   casesRun++;
   const tag = 'devis.statut-change';
-  const list = (await trpcGet('devis.list', null)) ?? [];
-  const labelOf = { envoye: 'Envoyé', accepte: 'Accepté', refuse: 'Refusé' };
-  let target = list.find((d) => d.statut === 'envoye'); let to = 'accepte';
-  if (!target) { target = list.find((d) => d.statut === 'brouillon'); to = 'envoye'; }
-  if (!target) { issues.push({ tag, skipped: 'aucun devis envoye/brouillon testable' }); return; }
-  const { id, statut: from } = target;
+  const trpcPost = async (proc, input) => ctx.request.post(`${BACKEND}/api/trpc/${proc}?batch=1`, {
+    headers: { 'content-type': 'application/json' },
+    data: { '0': { json: input } },
+  });
+
+  const clients = (await trpcGet('clients.list', null)) ?? [];
+  if (clients.length === 0) { issues.push({ tag, skipped: 'aucun client disponible pour créer le devis de test' }); return; }
+  const clientId = clients[0].id;
+
+  let devisId = null;
   const page = await ctx.newPage();
   const apiErrors = [];
   page.on('response', (r) => { if (/\/api\//.test(r.url()) && r.status() >= 400) apiErrors.push(`${r.status()} ${r.url().split('?')[0]}`); });
   try {
-    await page.goto(`/devis/${id}`, { waitUntil: 'networkidle' });
+    const rc = await trpcPost('devis.create', { clientId, objet: `E2E-test-statut-${Date.now()}` });
+    if (!rc.ok()) { issues.push({ tag, step: 'create', error: `HTTP ${rc.status()}` }); return; }
+    const created = (await rc.json())[0]?.result?.data?.json;
+    if (!created?.id) { issues.push({ tag, step: 'create-id', error: 'id absent dans la réponse' }); return; }
+    devisId = created.id;
+
+    const re = await trpcPost('devis.envoyer', { id: devisId });
+    if (!re.ok()) { issues.push({ tag, step: 'envoyer', error: `HTTP ${re.status()}` }); return; }
+
+    await page.goto(`/devis/${devisId}`, { waitUntil: 'networkidle' });
     await page.getByRole('combobox').first().click();
-    await page.getByRole('option', { name: labelOf[to], exact: true }).click();
+    await page.getByRole('option', { name: 'Refusé', exact: true }).click();
     await page.waitForTimeout(2500);
-    const after = await trpcGet('devis.getById', { id });
-    if (after?.statut !== to) issues.push({ tag, id, from, expected: to, got: after?.statut, apiErrors });
+
+    const after = await trpcGet('devis.getById', { id: devisId });
+    if (after?.statut !== 'refuse') {
+      issues.push({ tag, id: devisId, from: 'envoye', expected: 'refuse', got: after?.statut, apiErrors });
+    }
   } catch (e) {
-    issues.push({ tag, id, error: String(e).slice(0, 200), apiErrors });
+    issues.push({ tag, id: devisId, error: String(e).slice(0, 200), apiErrors });
   } finally {
     await page.close();
+    if (devisId !== null) {
+      try { await trpcPost('devis.delete', { id: devisId }); } catch { /* best-effort */ }
+    }
   }
 }
 
