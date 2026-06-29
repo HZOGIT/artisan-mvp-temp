@@ -29,5 +29,5 @@ export function buildEpcPayload(input: EpcInput): string | null {
 export async function epcQrPngBuffer(input: EpcInput): Promise<Buffer | null> {
   const payload = buildEpcPayload(input);
   if (!payload) return null;
-  return QRCode.toBuffer(payload, { errorCorrectionLevel: "M", margin: 1 });
+  return await QRCode.toBuffer(payload, { errorCorrectionLevel: "M", margin: 1 });
 }
