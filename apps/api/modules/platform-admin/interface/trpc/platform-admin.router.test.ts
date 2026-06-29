@@ -111,8 +111,8 @@ describe.skipIf(!URL)("platformAdmin.artisans.list L3", () => {
   });
 });
 
-describe.skipIf(!URL)("platformAdmin.llmUsage.summary L2+L3 — RLS llm_usage ouverte (0044)", () => {
-  it("L2 — app_tenant voit les lignes cross-tenant (RLS désactivée)", async () => {
+describe.skipIf(!URL)("platformAdmin.llmUsage.summary L2+L3 — pool owner bypass FORCE RLS", () => {
+  it("L2 setup — insère des lignes de 2 artisans via owner pool", async () => {
     const artisanA = await admin.query<{ id: number }>('select id from artisans where "userId" = $1', [UID_LLM_A]);
     const artisanB = await admin.query<{ id: number }>('select id from artisans where "userId" = $1', [UID_LLM_B]);
     const idA = artisanA.rows[0]!.id;
@@ -128,14 +128,27 @@ describe.skipIf(!URL)("platformAdmin.llmUsage.summary L2+L3 — RLS llm_usage ou
     );
     llmUsageIds.push(rA.rows[0]!.id, rB.rows[0]!.id);
 
-    const rows = await appPool.query<{ artisan_id: number; total_tokens: string }>(
+    const ownerRows = await admin.query<{ artisan_id: number; total_tokens: string }>(
       "select artisan_id, sum(total_tokens) as total_tokens from llm_usage where artisan_id = any($1) group by artisan_id",
       [[idA, idB]],
     );
-    expect(rows.rows).toHaveLength(2);
-    const totals = rows.rows.map((r) => Number(r.total_tokens));
+    expect(ownerRows.rows).toHaveLength(2);
+    const totals = ownerRows.rows.map((r) => Number(r.total_tokens));
     expect(totals).toContain(150);
     expect(totals).toContain(280);
+  });
+
+  it("L2 isolation — app_tenant sans app.tenant retourne 0 lignes (FORCE RLS active)", async () => {
+    const artisanA = await admin.query<{ id: number }>('select id from artisans where "userId" = $1', [UID_LLM_A]);
+    const artisanB = await admin.query<{ id: number }>('select id from artisans where "userId" = $1', [UID_LLM_B]);
+    const idA = artisanA.rows[0]!.id;
+    const idB = artisanB.rows[0]!.id;
+
+    const tenantRows = await appPool.query<{ artisan_id: number }>(
+      "select artisan_id from llm_usage where artisan_id = any($1)",
+      [[idA, idB]],
+    );
+    expect(tenantRows.rows).toHaveLength(0);
   });
 
   it("L3 — staff admin voit le summary cross-tenant (les 2 artisans agrégés)", async () => {
