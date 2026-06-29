@@ -53,7 +53,7 @@ describe("calculerJoursConge (jours ouvrés, sam/dim exclus)", () => {
     expect(calculerJoursConge({ dateDebut: "2026-07-06", dateFin: "2026-07-06", demiJourneeDebut: true, demiJourneeFin: false }).jours).toBe(0.5);
   });
 
-  it("année d'imputation = année de dateDebut (anti-corruption inter-exercices)", () => {
+  it("année d'imputation = année de début de période (anti-corruption inter-exercices)", () => {
     expect(calculerJoursConge({ dateDebut: "2026-12-31", dateFin: "2027-01-02", demiJourneeDebut: false, demiJourneeFin: false }).annee).toBe(2026);
   });
 

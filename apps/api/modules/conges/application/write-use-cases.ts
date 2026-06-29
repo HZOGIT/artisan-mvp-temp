@@ -43,14 +43,13 @@ export async function creerConge(repo: ICongeRepository, ctx: TenantContext, inp
     throw new ConflictError("Le technicien a déjà une demande de congé sur cette période");
   }
   if (typeAffecteSolde(input.type)) {
-    const { jours } = calculerJoursConge({
+    const { jours, annee, periodeDebut } = calculerJoursConge({
       dateDebut: input.dateDebut,
       dateFin: input.dateFin,
       demiJourneeDebut: input.demiJourneeDebut ?? false,
       demiJourneeFin: input.demiJourneeFin ?? false,
     });
-    const annee = new Date(input.dateDebut).getFullYear();
-    const soldes = await repo.getSolde(ctx, input.technicienId, annee);
+    const soldes = await repo.getSolde(ctx, input.technicienId, annee, periodeDebut);
     const solde = soldes.find((s) => s.type === input.type);
     if (solde && solde.soldeRestant < jours) {
       throw new ConflictError(`Solde insuffisant : ${solde.soldeRestant} jour(s) disponible(s), ${jours} demandé(s)`);

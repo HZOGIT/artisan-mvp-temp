@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, isNull, lte, ne, notInArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte, ne, notInArray, sql } from "drizzle-orm";
 import { conges, techniciens, soldesConges } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
@@ -241,7 +241,6 @@ export class CongeRepositoryDrizzle implements ICongeRepository {
             eq(soldesConges.technicienId, technicienId),
             eq(soldesConges.artisanId, ctx.artisanId),
             eq(soldesConges.annee, annee),
-            isNull(soldesConges.periodeDebut),
           );
       const rows = await tx.select().from(soldesConges).where(cond);
       return rows.map((r) => {
@@ -287,7 +286,6 @@ export class CongeRepositoryDrizzle implements ICongeRepository {
             eq(soldesConges.artisanId, techniciens.artisanId),
             eq(soldesConges.type, "conge_paye"),
             eq(soldesConges.annee, annee),
-            isNull(soldesConges.periodeDebut),
           );
       const rows = await tx
         .select({

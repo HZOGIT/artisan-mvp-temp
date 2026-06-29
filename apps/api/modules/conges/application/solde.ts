@@ -6,8 +6,8 @@
  * - jours = nombre de jours ouvrés dans [dateDebut, dateFin] (sam/dim + jours fériés FR exclus),
  *   moins 0,5 par demi-journée (début/fin) ;
  * - seuls les types `conge_paye`/`rtt` impactent le solde (`soldes_conges`) ;
- * - l'imputation se fait sur **l'année de `dateDebut`** (évite la corruption inter-exercices :
- *   un congé approuvé en N et annulé en N+1 doit recréditer l'année N).
+ * - l'imputation se fait sur **la période de référence de `dateDebut`** (anti-corruption : un
+ *   congé approuvé en déc N et annulé en jan N+1 recrédite la même période).
  */
 
 export type SoldeCongeType = "conge_paye" | "rtt";
@@ -183,5 +183,5 @@ export function calculerJoursConge(conge: CongeDuree): CalculSolde {
   if (conge.demiJourneeDebut) jours -= 0.5;
   if (conge.demiJourneeFin) jours -= 0.5;
   const periode = periodeReference(conge.dateDebut);
-  return { jours, annee: debut.getFullYear(), ...periode };
+  return { jours, annee: Number(periode.periodeDebut.split("-")[0]), ...periode };
 }
