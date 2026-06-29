@@ -20,7 +20,7 @@ export class JsPdfAdapter implements PdfPort {
       case "devis":
         return Promise.resolve(generateDevisPDF(data as never));
       case "facture":
-        return Promise.resolve(generateFacturePDF(data as never));
+        return generateFacturePDF(data as never);
       case "bon-commande":
         return Promise.resolve(generateBonCommandePDF(data as never));
       case "contrat":

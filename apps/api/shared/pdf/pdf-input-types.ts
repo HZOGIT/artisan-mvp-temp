@@ -70,6 +70,7 @@ export interface Artisan {
   numeroRM?: string | null;
   codeAPE?: string | null;
   iban?: string | null;
+  bic?: string | null;
   assuranceDecennaleNom?: string | null;
   assuranceDecennalePolice?: string | null;
   assuranceDecennaleGarantie?: string | null;

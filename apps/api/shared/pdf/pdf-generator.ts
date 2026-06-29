@@ -5,6 +5,7 @@ import type { Devis, DevisLigne, Facture, FactureLigne, Artisan, Client, Contrat
 import { ROBOTO_REGULAR, ROBOTO_BOLD } from "./fonts";
 import { TVA_CATEGORIES_MAP } from "../tva/taux-tva-fr";
 import type { TvaCategorieId } from "../tva/taux-tva-fr";
+import { epcQrPngBuffer } from "./epc-qr";
 
 /*
  * ============================================================================
@@ -679,8 +680,19 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
  * ============================================================================
  */
 
-export function generateFacturePDF(data: PDFFactureData): Buffer {
+export async function generateFacturePDF(data: PDFFactureData): Promise<Buffer> {
   const { facture, artisan, client } = data;
+
+  const sepaQrBuf = artisan.iban && facture.typeDocument !== "avoir"
+    ? await epcQrPngBuffer({
+        beneficiary: artisan.nomEntreprise ?? "",
+        iban: artisan.iban,
+        bic: artisan.bic,
+        amountEur: parseFloat(String(facture.totalTTC ?? "0")) || 0,
+        reference: facture.numero ?? "",
+      })
+    : null;
+
   const doc = new jsPDF();
   registerFonts(doc);
 
@@ -858,6 +870,19 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
       doc.text("Règlement par virement bancaire :", MARGIN, footerY);
       doc.setFont("Roboto", "normal");
       doc.text(`IBAN : ${artisan.iban}`, MARGIN, footerY + 4);
+
+      if (sepaQrBuf) {
+        const qrSize = 25;
+        const qrX = PAGE_W - MARGIN - qrSize;
+        const qrY = footerY - 2;
+        doc.addImage(sepaQrBuf.toString("base64"), "PNG", qrX, qrY, qrSize, qrSize);
+        doc.setFontSize(6);
+        doc.setFont("Roboto", "normal");
+        doc.setTextColor(...TEXT_MUTED);
+        doc.text("Scannez pour payer", qrX + qrSize / 2, qrY + qrSize + 3, { align: "center" });
+        doc.text("par virement", qrX + qrSize / 2, qrY + qrSize + 6.5, { align: "center" });
+      }
+
       footerY += 10;
     }
 
