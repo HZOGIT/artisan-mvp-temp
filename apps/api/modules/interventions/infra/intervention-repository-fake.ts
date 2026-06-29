@@ -66,6 +66,8 @@ export class FakeInterventionRepository implements IInterventionRepository {
       technicienId: input.technicienId ?? null,
       heureArrivee: null,
       heureDepart: null,
+      avisDemandeEnvoye: false,
+      avisDemandeEnvoyeAt: null,
       createdAt: now,
       updatedAt: now,
     };
@@ -158,6 +160,13 @@ export class FakeInterventionRepository implements IInterventionRepository {
     const existing = this.couleurs.find((c) => c.artisanId === ctx.artisanId && c.interventionId === interventionId);
     if (existing) existing.couleur = couleur;
     else this.couleurs.push({ artisanId: ctx.artisanId, interventionId, couleur });
+  }
+
+  async marquerAvisEnvoye(ctx: TenantContext, id: number): Promise<void> {
+    const i = await this.getById(ctx, id);
+    if (!i) return;
+    const now = new Date();
+    this.store = this.store.map((x) => (x.id === id ? { ...x, avisDemandeEnvoye: true, avisDemandeEnvoyeAt: now } : x));
   }
 
   withDb(_db: unknown): this {
