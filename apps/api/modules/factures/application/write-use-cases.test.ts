@@ -21,7 +21,7 @@ import {
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import { ConflictError, NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
-import type { DevisReadModel } from "./devis-reader";
+import type { DevisReadModel, DevisLigneReadModel } from "./devis-reader";
 
 const A: TenantContext = { artisanId: 1, userId: 10 };
 const B: TenantContext = { artisanId: 2, userId: 20 };
@@ -448,42 +448,76 @@ const devisSituation = (over: Partial<DevisReadModel> = {}): DevisReadModel => (
   ...over,
 });
 
+/** Ligne de devis produit pour les tests (1000 HT @ 20%). */
+const ligneSituation20 = (over: Partial<DevisLigneReadModel> = {}): DevisLigneReadModel => ({
+  ordre: 1, reference: null, designation: "Travaux", description: null,
+  quantite: "1.00", unite: "u", prixUnitaireHT: "1000.00",
+  tauxTVA: "20.00", remise: "0.00", tvaCategorieId: "FR_20",
+  montantHT: "1000.00", montantTVA: "200.00", montantTTC: "1200.00", type: "produit",
+  ...over,
+});
+
 describe("calculerMontantSituation — fonction pure (L1)", () => {
+  const lignes20 = [ligneSituation20()];
+
   it("30% sur un devis de 1200€ TTC (TVA 20%) → 360€ TTC, 300€ HT, taux 20%", () => {
-    const r = calculerMontantSituation(30, "1200.00", "1000.00", "0.00");
+    const r = calculerMontantSituation(30, "1200.00", lignes20, "0.00");
     expect(r.montantSituationTTC).toBe(360);
-    expect(r.montantHT).toBe(300);
-    expect(r.tauxTVA).toBe("20.00");
+    expect(r.situationLignes).toHaveLength(1);
+    expect(r.situationLignes[0].montantHT).toBe(300);
+    expect(r.situationLignes[0].tauxTVA).toBe("20.00");
   });
 
   it("deux situations successives : 30% puis 40% (cumul 70%)", () => {
-    const s1 = calculerMontantSituation(30, "1200.00", "1000.00", "0.00");
-    const s2 = calculerMontantSituation(70, "1200.00", "1000.00", s1.montantSituationTTC.toFixed(2));
+    const s1 = calculerMontantSituation(30, "1200.00", lignes20, "0.00");
+    const s2 = calculerMontantSituation(70, "1200.00", lignes20, s1.montantSituationTTC.toFixed(2));
     expect(s1.montantSituationTTC).toBe(360);
     expect(s2.montantSituationTTC).toBe(480);
     expect(s1.montantSituationTTC + s2.montantSituationTTC).toBe(840);
   });
 
   it("situation à 100% : solde le devis entier (moins déjà facturé)", () => {
-    const r = calculerMontantSituation(100, "1200.00", "1000.00", "360.00");
+    const r = calculerMontantSituation(100, "1200.00", lignes20, "360.00");
     expect(r.montantSituationTTC).toBe(840);
   });
 
   it("pourcentage > 100 → ValidationError", () => {
-    expect(() => calculerMontantSituation(101, "1200.00", "1000.00", "0.00")).toThrow(ValidationError);
+    expect(() => calculerMontantSituation(101, "1200.00", lignes20, "0.00")).toThrow(ValidationError);
   });
 
   it("pourcentage <= 0 → ValidationError", () => {
-    expect(() => calculerMontantSituation(0, "1200.00", "1000.00", "0.00")).toThrow(ValidationError);
-    expect(() => calculerMontantSituation(-5, "1200.00", "1000.00", "0.00")).toThrow(ValidationError);
+    expect(() => calculerMontantSituation(0, "1200.00", lignes20, "0.00")).toThrow(ValidationError);
+    expect(() => calculerMontantSituation(-5, "1200.00", lignes20, "0.00")).toThrow(ValidationError);
   });
 
   it("situation déjà entièrement facturée → ValidationError (montant nul)", () => {
-    expect(() => calculerMontantSituation(100, "1200.00", "1000.00", "1200.00")).toThrow(ValidationError);
+    expect(() => calculerMontantSituation(100, "1200.00", lignes20, "1200.00")).toThrow(ValidationError);
   });
 
   it("cumul qui dépasserait le total → ValidationError", () => {
-    expect(() => calculerMontantSituation(30, "1200.00", "1000.00", "1100.00")).toThrow(ValidationError);
+    expect(() => calculerMontantSituation(30, "1200.00", lignes20, "1100.00")).toThrow(ValidationError);
+  });
+
+  it("devis multi-taux (10% + 20%) → deux lignes à taux légaux, jamais de taux composite", () => {
+    /* Devis 36 : 4 000 HT @ 10% + 6 250 HT @ 20% → totalHT 10 250, totalTTC 11 900. */
+    const lignesMulti: DevisLigneReadModel[] = [
+      ligneSituation20({ tauxTVA: "10.00", tvaCategorieId: "FR_10", montantHT: "4000.00", montantTVA: "400.00", montantTTC: "4400.00" }),
+      ligneSituation20({ tauxTVA: "20.00", tvaCategorieId: "FR_20", montantHT: "6250.00", montantTVA: "1250.00", montantTTC: "7500.00" }),
+    ];
+    const r = calculerMontantSituation(20, "11900.00", lignesMulti, "0.00");
+    /* montantSituationTTC = 20% × 11900 = 2380 */
+    expect(r.montantSituationTTC).toBe(2380);
+    expect(r.situationLignes).toHaveLength(2);
+    const l10 = r.situationLignes.find(l => l.tauxTVA === "10.00")!;
+    const l20 = r.situationLignes.find(l => l.tauxTVA === "20.00")!;
+    expect(l10).toBeDefined();
+    expect(l20).toBeDefined();
+    /* Ventilation : 800 HT @ 10% + 1250 HT @ 20% → HT total = 2050, TVA = 80+250 = 330, TTC = 2380. */
+    expect(l10.montantHT).toBe(800);
+    expect(l20.montantHT).toBe(1250);
+    /* Invariant : aucun taux illégal ne peut apparaître. */
+    const tauxLegaux = ["0.00", "2.10", "5.50", "10.00", "20.00"];
+    r.situationLignes.forEach(l => expect(tauxLegaux).toContain(l.tauxTVA));
   });
 });
 
@@ -498,7 +532,7 @@ describe("facturerSituation — use-case (L1 fakes)", () => {
 
   it("crée une facture brouillon liée au devis + met à jour montantDejaFacture", async () => {
     const { repo, reader } = setup();
-    reader.register(devisSituation());
+    reader.register(devisSituation(), [ligneSituation20()]);
     const f = await facturerSituation(repo, reader, A, { devisId: 42, pourcentageCumule: 30 });
     expect(f.devisId).toBe(42);
     expect(f.clientId).toBe(100);

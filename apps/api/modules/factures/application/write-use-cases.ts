@@ -6,7 +6,7 @@ import { assertDateNonVerrouillee } from "../../../shared/compta-lock";
 import { factureCounter } from "../../../shared/observability/business-metrics";
 import type { IFactureRepository, AvoirLigneData, CopiedLigneData, Reglement } from "./facture-repository";
 import type { DbClient } from "../../../shared/db";
-import type { IDevisReader } from "./devis-reader";
+import type { IDevisReader, DevisLigneReadModel } from "./devis-reader";
 import type { ComptaPort } from "./compta-port";
 import { NOOP_COMPTA } from "./compta-port";
 import type { ArtisanReader } from "./contact-readers";
@@ -657,19 +657,25 @@ export async function supprimerLigneFacture(
   if (!ok) throw new NotFoundError("Ligne introuvable");
 }
 
+/** Ligne de situation ventilée par taux TVA légal. */
+export type SituationLigneCalc = {
+  readonly tauxTVA: string;
+  readonly tvaCategorieId?: string | null;
+  readonly montantHT: number;
+};
+
 /**
- * Calcule le montant TTC d'une situation de travaux (fonction pure, testable).
- * Formule : montantSituationTTC = round(pourcentageCumule% × totalTTC) − montantDejaFacture.
- * Retourne également le montantHT et le tauxTVA effectif (proportionnel au devis).
+ * Calcule les lignes d'une situation de travaux ventilées par taux TVA.
+ * Formule : objectif = round(pourcentageCumule% × totalTTC) − montantDejaFacture.
+ * Le montantHT est réparti proportionnellement par groupe de taux issu des lignes du devis.
  */
 export function calculerMontantSituation(
   pourcentageCumule: number,
   totalTTC: string,
-  totalHT: string,
+  lignes: DevisLigneReadModel[],
   montantDejaFacture: string,
-): { montantSituationTTC: number; montantHT: number; tauxTVA: string } {
+): { montantSituationTTC: number; situationLignes: SituationLigneCalc[] } {
   const ttc = Number(totalTTC) || 0;
-  const ht = Number(totalHT) || 0;
   const dejaFacture = Number(montantDejaFacture) || 0;
 
   if (pourcentageCumule <= 0 || pourcentageCumule > 100) {
@@ -686,14 +692,43 @@ export function calculerMontantSituation(
     throw new ValidationError("Cette situation dépasserait le montant total TTC du devis");
   }
 
-  /** Proportion HT/TTC identique au devis (préserve la structure TVA). */
-  const proportion = ttc > 0 ? ht / ttc : 1 / 1.2;
-  const montantHT = round2(montantSituationTTC * proportion);
-  const tauxTVA = ht > 0 && ttc > ht
-    ? round2((ttc - ht) / ht * 100).toFixed(2)
-    : "20.00";
+  /* Lignes produit uniquement (sections et notes n'ont pas de montant TVA). */
+  const produits = lignes.filter(l => l.type === "produit");
 
-  return { montantSituationTTC, montantHT, tauxTVA };
+  /* Cas dégénéré (devis sans ligne produit) : une ligne 20% avec HT = TTC / 1.2. */
+  if (produits.length === 0) {
+    return { montantSituationTTC, situationLignes: [{ tauxTVA: "20.00", montantHT: round2(montantSituationTTC / 1.2) }] };
+  }
+
+  const totalHT = produits.reduce((s, l) => s + (Number(l.montantHT) || 0), 0);
+  const proportion = ttc > 0 ? totalHT / ttc : 1 / 1.2;
+  const montantHTSituation = round2(montantSituationTTC * proportion);
+
+  /* Grouper par taux TVA (ordre d'apparition pour stabilité). */
+  const groupes = new Map<string, { tauxTVA: string; tvaCategorieId?: string | null; groupHT: number }>();
+  for (const l of produits) {
+    const g = groupes.get(l.tauxTVA);
+    if (g) {
+      g.groupHT += Number(l.montantHT) || 0;
+    } else {
+      groupes.set(l.tauxTVA, { tauxTVA: l.tauxTVA, tvaCategorieId: l.tvaCategorieId, groupHT: Number(l.montantHT) || 0 });
+    }
+  }
+
+  /* Ventiler montantHTSituation proportionnellement ; le dernier groupe absorbe l'arrondi. */
+  const groupList = Array.from(groupes.values());
+  const situationLignes: SituationLigneCalc[] = [];
+  let htRestant = montantHTSituation;
+  for (let i = 0; i < groupList.length; i++) {
+    const g = groupList[i];
+    const montantHT = i === groupList.length - 1
+      ? htRestant
+      : round2(montantHTSituation * g.groupHT / totalHT);
+    situationLignes.push({ tauxTVA: g.tauxTVA, tvaCategorieId: g.tvaCategorieId, montantHT });
+    htRestant = round2(htRestant - montantHT);
+  }
+
+  return { montantSituationTTC, situationLignes };
 }
 
 /** Entrée pour facturer une situation de travaux. */
@@ -721,10 +756,11 @@ export async function facturerSituation(
     throw new ConflictError("Seul un devis accepté peut être facturé par situation");
   }
 
-  const { montantSituationTTC, montantHT, tauxTVA } = calculerMontantSituation(
+  const devisLignes = await devisReader.getLignes(ctx, input.devisId);
+  const { montantSituationTTC, situationLignes } = calculerMontantSituation(
     input.pourcentageCumule,
     devisData.totalTTC,
-    devisData.totalHT,
+    devisLignes,
     devisData.montantDejaFacture,
   );
 
@@ -736,13 +772,14 @@ export async function facturerSituation(
     devisId: devisData.id,
     objet: label,
     notes,
-    lignes: [{
-      designation: label,
-      prixUnitaireHT: montantHT.toFixed(2),
+    lignes: situationLignes.map((sl) => ({
+      designation: situationLignes.length > 1 ? `${label} — TVA ${sl.tauxTVA} %` : label,
+      prixUnitaireHT: sl.montantHT.toFixed(2),
       quantite: "1.00",
-      tauxTVA,
+      tauxTVA: sl.tauxTVA,
       remise: "0",
-    }],
+      tvaCategorieId: sl.tvaCategorieId ?? null,
+    })),
   }, (tx) => devisReader.updateMontantDejaFactureTx(tx, ctx, input.devisId, montantSituationTTC.toFixed(2)));
 
   return facture;
