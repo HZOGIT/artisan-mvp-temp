@@ -202,4 +202,35 @@ describe.skipIf(!URL)("clients.router e2e (HTTP → tRPC → use-case → repo �
     const noms = (await callQuery(server, "clients.list", undefined, tA)).json().result.data as Array<{ nom: string }>;
     expect(noms.map((c) => c.nom)).toEqual(expect.arrayContaining([`Import1-${sfx}`, `Import2-${sfx}`]));
   });
+
+  it("envoyerMessage : envoie à N clients, skippe les opt-outs, RLS (B ne peut pas écrire aux clients de A)", async () => {
+    const sfx = Date.now();
+    const tA = await token(UA);
+    const tB = await token(UB);
+
+    /* créer clients de A (2 avec email, 1 sans) */
+    const c1 = (await callMutation(server, "clients.create", { nom: `Msg1-${sfx}`, email: `msg1-${sfx}@a.fr` }, tA)).json().result.data as { id: number };
+    const c2 = (await callMutation(server, "clients.create", { nom: `Msg2-${sfx}`, email: `msg2-${sfx}@a.fr` }, tA)).json().result.data as { id: number };
+    const c3 = (await callMutation(server, "clients.create", { nom: `Msg3-${sfx}` }, tA)).json().result.data as { id: number };
+
+    /* inscrire c2 en opt-out */
+    await admin.query("insert into email_optouts (email) values ($1) on conflict do nothing", [`msg2-${sfx}@a.fr`]);
+
+    /* A envoie aux 3 clients (c3 sans email sera ignoré, c2 opt-out sera skippé) */
+    const res = await callMutation(server, "clients.envoyerMessage", { clientIds: [c1.id, c2.id, c3.id], sujet: "Test relance", corps: "<p>Bonjour</p>" }, tA);
+    expect(res.statusCode).toBe(200);
+    const data = res.json().result.data as { envoyes: number; skips: number; errors: number };
+    expect(data.envoyes).toBe(1);
+    expect(data.skips).toBe(1);
+    expect(data.errors).toBe(0);
+
+    /* RLS : B ne peut pas envoyer un message au client de A */
+    const resB = await callMutation(server, "clients.envoyerMessage", { clientIds: [c1.id], sujet: "Hack", corps: "<p>Hack</p>" }, tB);
+    /* B n'a aucun client → envoyes=0, pas d'erreur */
+    expect(resB.statusCode).toBe(200);
+    expect(resB.json().result.data).toMatchObject({ envoyes: 0, skips: 0, errors: 0 });
+
+    /* cleanup opt-out de test */
+    await admin.query("delete from email_optouts where email=$1", [`msg2-${sfx}@a.fr`]);
+  });
 });

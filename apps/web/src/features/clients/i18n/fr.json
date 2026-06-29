@@ -137,5 +137,20 @@
   "interventionStatut_planifiee": "Planifiée",
   "interventionStatut_en_cours": "En cours",
   "interventionStatut_terminee": "Terminée",
-  "interventionStatut_annulee": "Annulée"
+  "interventionStatut_annulee": "Annulée",
+
+  "selectAll": "Sélectionner les {{count}} avec email",
+  "deselectAll": "Tout désélectionner",
+  "selected": "{{count}} sélectionné(s)",
+  "selectClient": "Sélectionner {{nom}}",
+  "msgButton": "Message groupé ({{count}})",
+  "msgNoSelection": "Sélectionnez d'abord des clients avec email",
+  "msgDialogTitle": "Message à {{count}} client(s)",
+  "msgSujetLabel": "Objet *",
+  "msgCorpsLabel": "Message *",
+  "msgOptoutHint": "Les clients désinscrits ne recevront pas cet email. Un lien de désinscription sera ajouté automatiquement.",
+  "msgSend": "Envoyer à {{count}} client(s)",
+  "msgSending": "Envoi en cours…",
+  "msgSentSuccess": "{{envoyes}} email(s) envoyé(s) — {{skips}} désinscrits ignorés",
+  "msgSentError": "Erreur lors de l'envoi"
 }

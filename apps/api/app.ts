@@ -652,6 +652,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   });
   const clients = createClientsModule({
     repository: clientRepo,
+    email: emailAdapter,
+    optoutRepo: new EmailOptoutRepositoryDrizzle(getDbHandle().db),
+    db: getDbHandle().db,
+    appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+    unsubscribeSecret: deps.emailUnsubscribeSecret ?? process.env.EMAIL_UNSUBSCRIBE_SECRET ?? process.env.JWT_SECRET ?? "dev-unsubscribe-secret",
   });
   /*
    * Repo interventions partagé : module interventions ET composé par rdv (`confirm` crée une
