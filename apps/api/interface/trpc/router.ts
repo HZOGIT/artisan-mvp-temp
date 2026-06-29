@@ -210,6 +210,9 @@ function moduleRouters(deps: AppRouterDeps) {
   };
 }
 
+/** Clés tRPC des modules montés via {@link moduleRouters} (hors vehicules / health / whoami). */
+export type ModuleRouterKeys = keyof ReturnType<typeof moduleRouters>;
+
 /*
  * Routeur racine du nouveau stack. Le corps ne porte que les procédures racines (health/whoami)
  * et le cas spécial `vehicules` (routeur construit inline, pas un module assemblé) ; tous les

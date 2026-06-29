@@ -1,3 +1,5 @@
+import type { ModuleRouterKeys } from "../trpc/router";
+
 /*
  * Registre des domaines effectivement portés sur le nouveau stack (clean-archi) et
  * montés dans `createAppRouter`. Sert de garde-fou pour la bascule : un flag ne devrait
@@ -12,3 +14,16 @@ export type MigratedDomain = (typeof MIGRATED_DOMAINS)[number];
 export function isMigratedDomainAvailable(domain: string): domain is MigratedDomain {
   return (MIGRATED_DOMAINS as readonly string[]).includes(domain);
 }
+
+/**
+ * Garde de cohérence compilée (sans DB) : MIGRATED_DOMAINS doit couvrir exactement les clés
+ * de `moduleRouters` + `vehicules` (monté inline). Si un module est ajouté à `router.ts`
+ * sans être inscrit ici, `pnpm check` échoue avec "not assignable to type 'never'".
+ */
+type _DomainsEqRouterKeys = [(typeof MIGRATED_DOMAINS)[number]] extends [ModuleRouterKeys | "vehicules"]
+  ? [ModuleRouterKeys | "vehicules"] extends [(typeof MIGRATED_DOMAINS)[number]]
+    ? true
+    : never
+  : never;
+/** @internal échoue à la compilation si MIGRATED_DOMAINS diverge de moduleRouters + vehicules */
+export const _assertDomains: _DomainsEqRouterKeys = true;
