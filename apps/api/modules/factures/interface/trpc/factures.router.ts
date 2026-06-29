@@ -222,6 +222,21 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
           const result = await changerStatutFacture(r, ctx.tenant, input.id, "envoyee", compta, mailing.artisanReader, outboxInTx, stockRepo);
           ctx.log.info({ event: "facture_envoyee", factureId: input.id }, "Facture envoyée au client");
           if (tx) await outboxEvent(tx, ctx.tenant, { action: "facture.envoyee", entityType: "facture", entityId: input.id, payload: {} });
+          if (storage && db && !result.pdfFileId) {
+            try {
+              const [lignes, artisan, client] = await Promise.all([
+                r.listLignes(ctx.tenant, result.id),
+                mailing.artisanReader.getArtisan(ctx.tenant),
+                mailing.clientReader.getClient(ctx.tenant, result.clientId),
+              ]);
+              if (artisan && client) {
+                const pdfBuf = await mailing.pdf.render("facture", { facture: { ...result, lignes }, artisan, client });
+                const s3Key = `factures/${ctx.tenant.artisanId}/${result.id}.pdf`;
+                const stored = await storage.withDb(db).upload(s3Key, pdfBuf, { contentType: "application/pdf", artisanId: ctx.tenant.artisanId, filename: `Facture_${result.numero ?? result.id}.pdf`, purpose: "facture-pdf" }, ctx.tenant);
+                await r.setPdfFile(ctx.tenant, result.id, stored.id, stored.storageKey);
+              }
+            } catch (_) { /* best-effort — PDF régénéré à la demande si l'upload échoue */ }
+          }
           return result;
         });
       }),

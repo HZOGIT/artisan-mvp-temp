@@ -64,6 +64,8 @@ export interface Facture {
   readonly updatedAt: Date;
   readonly nombreRelances: number;
   readonly regimeTVA: RegimeTVA;
+  readonly pdfFileId: number | null;
+  readonly pdfStorageKey: string | null;
 }
 
 /*
