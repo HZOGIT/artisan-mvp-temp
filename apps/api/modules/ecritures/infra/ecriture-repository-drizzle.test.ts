@@ -1,5 +1,6 @@
 import { describe, it, expect, afterAll, beforeAll } from "vitest";
 import { Pool } from "pg";
+import { sql } from "drizzle-orm";
 import { createDbClient } from "../../../shared/db";
 import { EcritureRepositoryDrizzle } from "./ecriture-repository-drizzle";
 import type { TenantContext } from "../../../shared/tenant";
@@ -10,12 +11,11 @@ const APP_URL =
   process.env.APP_DATABASE_URL ||
   (URL ? URL.replace(/:\/\/[^@]+@/, "://app_tenant:app_tenant_pw@") : undefined);
 
-// Plage d'ids UNIQUE à ce fichier (anti-collision run parallèle — cf. hygiène des tests PG).
+/** Plage d'artisanIds unique à ce fichier (anti-collision run parallèle). */
 const A = 9941001;
 const B = 9941002;
 const ctx = (artisanId: number): TenantContext => ({ artisanId, userId: 1 });
 
-// Pièce de vente ÉQUILIBRÉE (411 débit 120 / 706 crédit 100 / 445 crédit 20) liée à une facture.
 const pieceVente = (factureId: number): CreateEcritureInput[] => {
   const d = new Date("2026-06-14T00:00:00Z");
   return [
@@ -25,37 +25,57 @@ const pieceVente = (factureId: number): CreateEcritureInput[] => {
   ];
 };
 
+/** IDs des factures créées en beforeAll (réels, requis par la FK). */
+let fIds: number[] = [];
+
 describe.skipIf(!URL)("EcritureRepositoryDrizzle (PG, RLS + scope tenant)", () => {
   const admin = new Pool({ connectionString: URL });
   const app = createDbClient(APP_URL!);
   const repo = new EcritureRepositoryDrizzle(app.db);
 
-  const cleanup = async () => {
-    await admin.query('delete from ecritures_comptables where "artisanId" in ($1,$2)', [A, B]);
+  const cleanupEcritures = async () => {
+    await admin.query('DELETE FROM ecritures_comptables WHERE "artisanId" IN ($1,$2)', [A, B]);
   };
 
-  beforeAll(cleanup);
+  const cleanupFactures = async () => {
+    if (fIds.length > 0) {
+      await admin.query(`DELETE FROM factures WHERE id = ANY($1::int[])`, [fIds]);
+    }
+  };
+
+  beforeAll(async () => {
+    await cleanupEcritures();
+    /* Créer des factures de test réelles pour satisfaire la FK fk_ecritures_facture_id. */
+    const now = new Date();
+    const res = await admin.query<{ id: number }>(`
+      INSERT INTO factures ("artisanId", "clientId", "dateFacture", "createdAt", "updatedAt")
+      SELECT $1, 1, $2, $2, $2 FROM generate_series(1, 8)
+      RETURNING id
+    `, [A, now]);
+    fIds = res.rows.map((r) => r.id);
+  });
+
   afterAll(async () => {
-    await cleanup();
+    await cleanupEcritures();
+    await cleanupFactures();
     await app.close();
     await admin.end();
   });
 
   it("createMany (pièce équilibrée) + list/listByFacture scopés au tenant ; artisanId forcé", async () => {
-    const created = await repo.createMany(ctx(A), pieceVente(501));
+    const created = await repo.createMany(ctx(A), pieceVente(fIds[0]));
     expect(created.length).toBe(3);
     expect(created.every((e) => e.artisanId === A)).toBe(true);
-    // Équilibre Σdébit = Σcrédit (l'invariant porté par le use-case, vérifié sur la pièce seedée).
     const sumD = created.reduce((s, e) => s + Number(e.debit), 0);
     const sumC = created.reduce((s, e) => s + Number(e.credit), 0);
     expect(sumD).toBeCloseTo(sumC, 2);
-    expect((await repo.listByFacture(ctx(A), 501)).length).toBe(3);
-    expect((await repo.list(ctx(A))).some((e) => e.factureId === 501)).toBe(true);
+    expect((await repo.listByFacture(ctx(A), fIds[0])).length).toBe(3);
+    expect((await repo.list(ctx(A))).some((e) => e.factureId === fIds[0])).toBe(true);
   });
 
   it("défauts : debit/credit '0.00' quand omis ; pointage false", async () => {
     const [e] = await repo.createMany(ctx(A), [
-      { dateEcriture: new Date(), journal: "OD", numeroCompte: "471000", libelle: "Attente", factureId: 502 },
+      { dateEcriture: new Date(), journal: "OD", numeroCompte: "471000", libelle: "Attente", factureId: fIds[1] },
     ]);
     expect(e.debit).toBe("0.00");
     expect(e.credit).toBe("0.00");
@@ -63,35 +83,56 @@ describe.skipIf(!URL)("EcritureRepositoryDrizzle (PG, RLS + scope tenant)", () =
   });
 
   it("isolation cross-tenant : B ne lit pas les écritures de A ; deleteByFacture(B) = 0", async () => {
-    await repo.createMany(ctx(A), pieceVente(503));
-    expect((await repo.listByFacture(ctx(B), 503))).toEqual([]);
-    expect((await repo.list(ctx(B))).some((e) => e.factureId === 503)).toBe(false);
-    expect(await repo.deleteByFacture(ctx(B), 503)).toBe(0); // B ne supprime pas la pièce de A
-    expect((await repo.listByFacture(ctx(A), 503)).length).toBe(3); // A intacte
+    await repo.createMany(ctx(A), pieceVente(fIds[2]));
+    expect(await repo.listByFacture(ctx(B), fIds[2])).toEqual([]);
+    expect((await repo.list(ctx(B))).some((e) => e.factureId === fIds[2])).toBe(false);
+    expect(await repo.deleteByFacture(ctx(B), fIds[2])).toBe(0);
+    expect((await repo.listByFacture(ctx(A), fIds[2])).length).toBe(3);
   });
 
-  it("deleteByFacture idempotent (delete-then-insert) : supprime la pièce puis re-crée proprement", async () => {
-    await repo.createMany(ctx(A), pieceVente(504));
-    expect(await repo.deleteByFacture(ctx(A), 504)).toBe(3);
-    expect((await repo.listByFacture(ctx(A), 504))).toEqual([]);
-    expect(await repo.deleteByFacture(ctx(A), 504)).toBe(0); // déjà vide → idempotent
-    const recree = await repo.createMany(ctx(A), pieceVente(504));
+  it("deleteByFacture idempotent : supprime la pièce puis re-crée proprement", async () => {
+    await repo.createMany(ctx(A), pieceVente(fIds[3]));
+    expect(await repo.deleteByFacture(ctx(A), fIds[3])).toBe(3);
+    expect(await repo.listByFacture(ctx(A), fIds[3])).toEqual([]);
+    expect(await repo.deleteByFacture(ctx(A), fIds[3])).toBe(0);
+    const recree = await repo.createMany(ctx(A), pieceVente(fIds[3]));
     expect(recree.length).toBe(3);
   });
 
-  it("validateByFacture + hasValidatedEcritures : inaltérabilité OPE-118 (écritures → validée)", async () => {
-    await repo.createMany(ctx(A), pieceVente(510));
-    expect(await repo.hasValidatedEcritures(ctx(A), 510)).toBe(false);
-    const count = await repo.validateByFacture(ctx(A), 510);
+  it("validateByFacture + hasValidatedEcritures : inaltérabilité (écritures → validée)", async () => {
+    await repo.createMany(ctx(A), pieceVente(fIds[4]));
+    expect(await repo.hasValidatedEcritures(ctx(A), fIds[4])).toBe(false);
+    const count = await repo.validateByFacture(ctx(A), fIds[4]);
     expect(count).toBe(3);
-    expect(await repo.hasValidatedEcritures(ctx(A), 510)).toBe(true);
-    const rows = await repo.listByFacture(ctx(A), 510);
+    expect(await repo.hasValidatedEcritures(ctx(A), fIds[4])).toBe(true);
+    const rows = await repo.listByFacture(ctx(A), fIds[4]);
     expect(rows.every((e) => e.statut === "validee")).toBe(true);
   });
 
   it("hasValidatedEcritures isolation tenant : B ne voit pas les validées de A", async () => {
-    await repo.createMany(ctx(A), pieceVente(511));
-    await repo.validateByFacture(ctx(A), 511);
-    expect(await repo.hasValidatedEcritures(ctx(B), 511)).toBe(false);
+    await repo.createMany(ctx(A), pieceVente(fIds[5]));
+    await repo.validateByFacture(ctx(A), fIds[5]);
+    expect(await repo.hasValidatedEcritures(ctx(B), fIds[5])).toBe(false);
+  });
+
+  /* ── FK fk_ecritures_facture_id (OPE-758) ── */
+
+  it("FK RESTRICT — DELETE facture avec écritures → refusé par la base", async () => {
+    await repo.createMany(ctx(A), pieceVente(fIds[6]));
+    await expect(
+      admin.query(`DELETE FROM factures WHERE id = $1`, [fIds[6]]),
+    ).rejects.toThrow(/foreign key/i);
+    expect((await repo.listByFacture(ctx(A), fIds[6])).length).toBe(3);
+  });
+
+  it("FK — INSERT écriture avec factureId inexistant → refusé par la base", async () => {
+    const fakeId = 999_999_999;
+    await expect(
+      admin.query(
+        `INSERT INTO ecritures_comptables ("artisanId", "dateEcriture", journal, "numeroCompte", libelle, "factureId", statut)
+         VALUES ($1, now(), 'VE', '411000', 'Test FK', $2, 'brouillon')`,
+        [A, fakeId],
+      ),
+    ).rejects.toThrow(/foreign key/i);
   });
 });

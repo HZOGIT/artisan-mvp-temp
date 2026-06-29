@@ -225,6 +225,13 @@
       "when": 1782771630444,
       "tag": "20260629222008_rls-disable-permissions-utilisateur",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1751240580000,
+      "tag": "20260629223000_fk-ecritures-factureid",
+      "breakpoints": true
     }
   ]
 }
