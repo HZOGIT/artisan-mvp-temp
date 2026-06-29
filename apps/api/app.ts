@@ -208,6 +208,7 @@ import { registerPortailDevisPdfRoute } from "./interface/http/portail-devis-pdf
 import { registerPortailFacturePdfRoute } from "./interface/http/portail-facture-pdf-route";
 import { registerUploadPieceJointeRoute } from "./interface/http/upload-piece-jointe-route";
 import { registerPortailPieceJointeRoute } from "./interface/http/portail-piece-jointe-route";
+import { registerAttestationTvaDownloadRoute } from "./interface/http/attestation-tva-download-route";
 import { createPiecesJointesModule } from "./modules/pieces-jointes/pieces-jointes.module";
 import { PiecesJointesRepositoryDrizzle } from "./modules/pieces-jointes/infra/pieces-jointes-repository-drizzle";
 import { registerFacturxRoutes } from "./interface/http/facturx-route";
@@ -1496,6 +1497,14 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     db: getDbHandle().db,
     storage: facturesStorage,
     rateLimiter: new SlidingWindowRateLimiter(60, 60 * 1000),
+  });
+
+  /** Téléchargement d'une attestation TVA depuis l'interface artisan (auth cookie). */
+  registerAttestationTvaDownloadRoute(app, {
+    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
+    db: getDbHandle().db,
+    storage: facturesStorage,
   });
 
   /*

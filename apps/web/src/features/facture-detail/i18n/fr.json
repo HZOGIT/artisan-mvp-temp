@@ -126,6 +126,7 @@
   "toastAttestationGeneree": "Attestation générée — le PDF s'ouvre dans un nouvel onglet",
   "attestationSignee": "Attestation signée",
   "attestationGeneree": "Attestation générée (non signée)",
+  "telechargerAttestation": "Télécharger",
   "uploaderSignee": "Uploader signée",
   "uploaderSigneeTitre": "Importer l'attestation signée",
   "uploaderSigneeDesc": "Importez le PDF de l'attestation signé par le client.",

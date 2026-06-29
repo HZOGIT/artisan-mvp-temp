@@ -429,8 +429,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
             s3Key: stored.storageKey,
           });
 
-          const url = await storage.url(stored.storageKey);
-          return { ...attestation, url };
+          return attestation;
         }),
 
       /** Attache un PDF signé (base64) à une attestation existante. */
@@ -450,8 +449,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
 
           const updated = await attestationRepo.attacherSignee(ctx.tenant, input.id, stored.storageKey);
           if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Attestation introuvable" });
-          const url = await storage.url(stored.storageKey);
-          return { ...updated, url };
+          return updated;
         }),
     }),
   });
