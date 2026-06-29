@@ -327,9 +327,19 @@ Sweep des bases de test orphelines (aucun worktree correspondant) — à chaque 
 PG_DEV_CONTAINER="$(docker ps --format '{{.Names}}\t{{.Ports}}' 2>/dev/null \
   | awk -F'\t' '$2 ~ /0\.0\.0\.0:5432->/ {print $1; exit}')"
 if [[ -n "$PG_DEV_CONTAINER" ]]; then
+  # ⚠️ Le nom de base sanitise la session (kebab-case → snake_case via `tr -cs 'a-z0-9' '_'`,
+  # cf. launch-claude-bg.sh). On NE PEUT PAS reconstruire `/tmp/wt-<session>` depuis le nom de
+  # base (un `feat/devis-factures-sections` → base `ope_test_devis_factures_sections`). On bâtit
+  # donc l'ensemble des bases ATTENDUES en re-sanitisant le nom de CHAQUE worktree existant.
+  declare -A VALID_DB
+  for wt in /tmp/wt-*; do
+    [[ -d "$wt" ]] || continue
+    s="$(basename "$wt" | sed 's/^wt-//' | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '_' | sed 's/_*$//;s/^_*//' | cut -c1-54)"
+    VALID_DB["ope_test_${s}"]=1
+  done
   while IFS= read -r db; do
-    session="${db#ope_test_}"
-    if ! [[ -d "/tmp/wt-${session}" ]]; then
+    [[ -z "$db" ]] && continue
+    if [[ -z "${VALID_DB[$db]:-}" ]]; then
       echo "Dropping orphan test DB: $db"
       docker exec "$PG_DEV_CONTAINER" psql -U artisan_user -d postgres \
         -c "DROP DATABASE IF EXISTS \"$db\" WITH (FORCE);" 2>/dev/null || true
