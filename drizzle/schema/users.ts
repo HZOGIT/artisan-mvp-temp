@@ -42,7 +42,7 @@ export const permissionsUtilisateur = pgTable("permissions_utilisateur", {
   permission: varchar("permission", { length: 50 }).notNull(),
   autorise: boolean("autorise").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => [unique("permissions_utilisateur_userid_permission_unique").on(t.userId, t.permission)]);
 export type PermissionUtilisateur = typeof permissionsUtilisateur.$inferSelect;
 export type InsertPermissionUtilisateur = typeof permissionsUtilisateur.$inferInsert;
 

@@ -122,12 +122,11 @@ export class AuthRepositoryDrizzle implements IAuthRepository {
     } catch {
       /* best-effort */
     }
-    /** 4. Permissions propriétaire = TOUTES (si aucune présente) — best-effort. */
+    /** 4. Permissions propriétaire = TOUTES — upsert idempotent (ON CONFLICT DO NOTHING). */
     try {
-      const existing = await this.db.select({ id: permissionsUtilisateur.id }).from(permissionsUtilisateur).where(and(eq(permissionsUtilisateur.userId, userId), eq(permissionsUtilisateur.autorise, true))).limit(1);
-      if (existing.length === 0) {
-        await this.db.insert(permissionsUtilisateur).values(ALL_PERMISSIONS.map((p) => ({ userId, permission: p, autorise: true })));
-      }
+      await this.db.insert(permissionsUtilisateur)
+        .values(ALL_PERMISSIONS.map((p) => ({ userId, permission: p, autorise: true })))
+        .onConflictDoNothing({ target: [permissionsUtilisateur.userId, permissionsUtilisateur.permission] });
     } catch {
       /* best-effort */
     }
