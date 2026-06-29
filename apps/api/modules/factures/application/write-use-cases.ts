@@ -152,6 +152,12 @@ export type EnregistrerPaiementInput = { readonly montant: string; readonly date
 /** tolérance de comparaison au centime */
 const EPS = 0.005;
 
+const VALID_REGLEMENT_MODES = new Set(["cheque", "virement", "especes", "carte", "autre"]);
+
+function toReglementMode(mode: string | null | undefined): "cheque" | "virement" | "especes" | "carte" | "autre" {
+  return VALID_REGLEMENT_MODES.has(mode ?? "") ? (mode as "cheque" | "virement" | "especes" | "carte" | "autre") : "autre";
+}
+
 /*
  * Enregistre un paiement (partiel ou soldant). ⚠️ Invariants financiers :
  *  - la facture doit être émise (`envoyee`/`en_retard`) → sinon Conflict (pas de paiement d'un
@@ -183,6 +189,11 @@ export async function enregistrerPaiementFacture(
     datePaiement: input.date ?? (soldee ? new Date() : facture.datePaiement),
     modePaiement: input.mode ?? facture.modePaiement,
     statut: soldee ? "payee" : facture.statut,
+    reglement: {
+      montant: input.montant,
+      date: input.date ?? new Date(),
+      mode: toReglementMode(input.mode),
+    },
   });
   if (!updated) throw new NotFoundError("Facture introuvable");
   /*

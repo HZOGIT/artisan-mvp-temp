@@ -125,6 +125,12 @@ export interface PaiementPatch {
   readonly datePaiement: Date | null;
   readonly modePaiement: string | null;
   readonly statut: FactureStatut;
+  /** Si fourni, insère atomiquement un reglement dans la même transaction. */
+  readonly reglement?: {
+    readonly montant: string;
+    readonly date: Date;
+    readonly mode: "cheque" | "virement" | "especes" | "carte" | "autre";
+  };
 }
 
 /** Ligne d'avoir avec montants NÉGATIFS déjà calculés (par le use-case). */

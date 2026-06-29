@@ -204,11 +204,28 @@ describe("factures — use-cases d'écriture", () => {
     const id = await factureEmise(repo);
     const p1 = await enregistrerPaiementFacture(repo, A, id, { montant: "50.00" });
     expect(p1.montantPaye).toBe("50.00");
-    expect(p1.statut).toBe("envoyee"); // pas encore soldée
+    expect(p1.statut).toBe("envoyee");
     const p2 = await enregistrerPaiementFacture(repo, A, id, { montant: "70.00", mode: "virement" });
     expect(p2.montantPaye).toBe("120.00");
-    expect(p2.statut).toBe("payee"); // soldée
+    expect(p2.statut).toBe("payee");
     expect(p2.modePaiement).toBe("virement");
+  });
+
+  it("enregistrerPaiement — crée un reglement ; invariant Σ(reglements) = montantPaye", async () => {
+    const repo = repoWithClient(A, 100);
+    const id = await factureEmise(repo);
+    await enregistrerPaiementFacture(repo, A, id, { montant: "50.00", mode: "cheque" });
+    const r1 = repo.getReglementsForTest(id);
+    expect(r1).toHaveLength(1);
+    expect(r1[0].montant).toBe("50.00");
+    expect(r1[0].mode).toBe("cheque");
+
+    await enregistrerPaiementFacture(repo, A, id, { montant: "70.00" });
+    const r2 = repo.getReglementsForTest(id);
+    expect(r2).toHaveLength(2);
+    const somme = r2.reduce((s, r) => s + Number(r.montant), 0);
+    const facture = await repo.getById(A, id);
+    expect(somme).toBeCloseTo(Number(facture?.montantPaye), 2);
   });
 
   it("enregistrerPaiement — sur-paiement → Validation ; montant ≤ 0 → Validation", async () => {
