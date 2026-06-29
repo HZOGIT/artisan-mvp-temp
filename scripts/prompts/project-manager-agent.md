@@ -22,30 +22,14 @@ Pour toute tâche (fix, feature, audit, investigation) :
 
 ## Règle fondamentale — limite de slots
 
-**Maximum 10 sessions worker actives en parallèle — toujours.** Compter l'**union** de : PRs ouvertes feat/* + worktrees feat/* avec screen vivant :
+**Maximum 4 sessions worker actives en parallèle — toujours (limite OOM non négociable).** Déléguer le comptage (union PRs ouvertes + worktrees avec screen vivant) à la source unique :
 
 ```bash
-cd /home/developer/artisan-mvp-temp
-# Union : PRs ouvertes + worktrees avec screen actif
-declare -A seen
-while IFS= read -r branch; do seen["$branch"]=1; done < <(
-  gh pr list --base staging --state open --json headRefName \
-    --jq '.[].headRefName' 2>/dev/null | grep "^feat/"
-)
-while IFS= read -r wt_line; do
-  branch=$(echo "$wt_line" | grep -o '\[feat/[^]]*\]' | tr -d '[]')
-  [ -z "$branch" ] && continue
-  session="${branch#feat/}"
-  screen -ls 2>/dev/null | grep -q "\.$session[[:space:]]" && seen["$branch"]=1
-done < <(git worktree list)
-active=${#seen[@]}
+active=$(cd /home/developer/artisan-mvp-temp && ./scripts/agents/slot-count.sh)
 echo "Slots actifs : $active"
-for b in "${!seen[@]}"; do echo "  $b"; done
 ```
 
-**Pourquoi l'union** : une session active sans PR encore créée n'apparaît que dans worktree+screen. Une session dont le worktree a été nettoyé (reviewer en cours) n'apparaît que dans les PRs. L'union couvre les deux cas.
-
-Si `$active >= 10` → log "10/10 actifs — tick skippé." et arrêter. **Cette limite est absolue.**
+Si `$active >= 4` → log "4/4 actifs — tick skippé." et arrêter. **Cette limite est absolue.**
 
 ---
 
@@ -54,8 +38,8 @@ Si `$active >= 10` → log "10/10 actifs — tick skippé." et arrêter. **Cette
 ### 1. Compter les slots libres
 
 ```bash
-git -C /home/developer/artisan-mvp-temp worktree list | grep -c "feat/"
-git -C /home/developer/artisan-mvp-temp worktree list | grep "feat/"
+active=$(cd /home/developer/artisan-mvp-temp && ./scripts/agents/slot-count.sh)
+echo "Slots actifs : $active"
 ```
 
 ### 2. Prioriser les issues
