@@ -170,6 +170,7 @@ import { billingCronPlugin } from "./shared/infra/billing-cron";
 import { schedulerPlugin } from "./platform/scheduler";
 import { createRelancesDevisJob } from "./modules/devis/application/relances-devis-job";
 import { createAlertesPrevisionsJob } from "./modules/alertes-previsions/application/alertes-previsions-job";
+import { createFacturesRecurrentesJob } from "./modules/contrats-maintenance/application/factures-recurrentes-job";
 import { paOutboxDrainerPlugin } from "./shared/infra/pa-outbox-drainer";
 import { paInboundPollerPlugin } from "./shared/infra/pa-inbound-poller";
 import { paReconciliationPollerPlugin } from "./shared/infra/pa-reconciliation-poller";
@@ -1341,7 +1342,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   /**
    * Scheduler de jobs idempotents — tick toutes les 5 min, un seul claim par (job, période).
-   * Branché avec le job relances-devis (clé daily) : un seul passage par jour, best-effort par artisan.
+   * Jobs daily : relances-devis + factures-recurrentes (anti-double-billing par ConflictError interne).
    */
   app.register(schedulerPlugin, {
     db: getDbHandle().db,
@@ -1390,6 +1391,16 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
             const rows = await getDbHandle().db.select({ id: artisansTable.id }).from(artisansTable);
             return rows.map((r) => r.id);
           },
+        }),
+      );
+      registry.register(
+        createFacturesRecurrentesJob({
+          listArtisanIds: async () => {
+            const rows = await getDbHandle().db.select({ id: artisansTable.id }).from(artisansTable);
+            return rows.map((r) => r.id);
+          },
+          contratRepo,
+          factureGen: new FacturesContratFactureGenerator(factureRepo),
         }),
       );
     },
