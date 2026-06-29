@@ -7,7 +7,7 @@ import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Card, CardContent } from "@/shared/ui/card";
 import { Label } from "@/shared/ui/label";
-import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Pencil, Trash2, Download, AlertTriangle } from "lucide-react";
+import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Pencil, Trash2, Download, AlertTriangle, Send } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/shared/ui/dropdown-menu";
 import { toast } from "sonner";
 import { matchSearch } from "@/shared/lib/normalize";
@@ -62,7 +62,61 @@ export default function ClientsListPage() {
   const { t } = useTranslation("clients");
   const [, navigate] = useLocation();
   const search = useSearch();
-  const { clients, encoursMap, isLoading, update, remove, fusionner } = useClients();
+  const { clients, encoursMap, isLoading, update, remove, fusionner, envoyerMessage } = useClients();
+
+  /** State pour la sélection multiple et le dialog de message groupé */
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false);
+  const [messageSujet, setMessageSujet] = useState("");
+  const [messageCorps, setMessageCorps] = useState("");
+
+  const toggleSelect = useCallback((id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleSelectAll = useCallback((clientsToSelect: Client[]) => {
+    const withEmail = clientsToSelect.filter((c) => c.email);
+    setSelectedIds((prev) => {
+      const allSelected = withEmail.every((c) => prev.has(c.id));
+      if (allSelected) return new Set();
+      return new Set(withEmail.map((c) => c.id));
+    });
+  }, []);
+
+  const handleOpenMessageDialog = useCallback(() => {
+    if (selectedIds.size === 0) {
+      toast.error(t("msgNoSelection"));
+      return;
+    }
+    setIsMessageDialogOpen(true);
+  }, [selectedIds, t]);
+
+  const handleCloseMessageDialog = useCallback(() => {
+    setIsMessageDialogOpen(false);
+    setMessageSujet("");
+    setMessageCorps("");
+  }, []);
+
+  const handleSendMessage = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    if (!messageSujet.trim() || !messageCorps.trim()) return;
+    envoyerMessage.mutate(
+      { clientIds: Array.from(selectedIds), sujet: messageSujet, corps: messageCorps },
+      {
+        onSuccess: (result) => {
+          toast.success(t("msgSentSuccess", { envoyes: result.envoyes, skips: result.skips }));
+          setSelectedIds(new Set());
+          handleCloseMessageDialog();
+        },
+        onError: (error) => toast.error(error.message || t("msgSentError")),
+      },
+    );
+  }, [envoyerMessage, selectedIds, messageSujet, messageCorps, t, handleCloseMessageDialog]);
 
   /** State pour le formulaire d'édition */
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -237,6 +291,12 @@ export default function ClientsListPage() {
             <Download className="h-4 w-4 mr-2" />
             {t("exportCsv")}
           </Button>
+          {selectedIds.size > 0 ? (
+            <Button variant="outline" onClick={handleOpenMessageDialog}>
+              <Send className="h-4 w-4 mr-2" />
+              {t("msgButton", { count: selectedIds.size })}
+            </Button>
+          ) : null}
           <Button onClick={() => navigate('/clients/nouveau')}>
             <Plus className="h-4 w-4 mr-2" />
             {t("newClient")}
@@ -255,6 +315,26 @@ export default function ClientsListPage() {
           className="pl-10"
         />
       </div>
+
+      {/* Sélection multiple — barre contextuelle */}
+      {!isLoading && filteredClients.some((c) => c.email) && (
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <button
+            type="button"
+            className="underline underline-offset-2 hover:text-foreground"
+            onClick={() => handleSelectAll(filteredClients)}
+          >
+            {filteredClients.filter((c) => c.email).every((c) => selectedIds.has(c.id))
+              ? t("deselectAll")
+              : t("selectAll", { count: filteredClients.filter((c) => c.email).length })}
+          </button>
+          {selectedIds.size > 0 && (
+            <span className="text-foreground font-medium">
+              {t("selected", { count: selectedIds.size })}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Bandeau doublons potentiels (informatif, dismissable) */}
       {!isLoading && !dupesDismissed && duplicateGroups.length > 0 && (
@@ -312,9 +392,20 @@ export default function ClientsListPage() {
       ) : (
         <div className="grid gap-4">
           {filteredClients.map(client => (
-            <Card key={client.id}>
+            <Card key={client.id} className={selectedIds.has(client.id) ? "ring-2 ring-primary" : ""}>
               <CardContent className="pt-6">
                 <div className="flex justify-between items-start">
+                  {client.email && (
+                    <div className="mr-3 pt-1">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(client.id)}
+                        onChange={() => toggleSelect(client.id)}
+                        aria-label={t("selectClient", { nom: client.nom })}
+                        className="h-4 w-4 cursor-pointer"
+                      />
+                    </div>
+                  )}
                   <div className="flex-1">
                     <div className="flex items-center flex-wrap gap-2">
                       <h3 className="font-semibold text-lg">{client.nom} {client.prenom}</h3>
@@ -681,6 +772,66 @@ export default function ClientsListPage() {
                 </div>
               </form>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dialog — message groupé */}
+      {isMessageDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-40 bg-black/50" onClick={handleCloseMessageDialog} />
+          <div className="bg-background rounded-lg border shadow-lg w-full max-w-lg z-50">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h2 className="text-lg font-semibold">{t("msgDialogTitle", { count: selectedIds.size })}</h2>
+              <button onClick={handleCloseMessageDialog} className="text-muted-foreground hover:text-foreground">✕</button>
+            </div>
+            <form onSubmit={handleSendMessage} className="p-6 space-y-4">
+              <div>
+                <Label htmlFor="msg-sujet" className="block text-sm font-medium mb-1">
+                  {t("msgSujetLabel")}
+                </Label>
+                <input
+                  id="msg-sujet"
+                  type="text"
+                  value={messageSujet}
+                  onChange={(e) => setMessageSujet(e.target.value)}
+                  required
+                  maxLength={500}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <Label htmlFor="msg-corps" className="block text-sm font-medium mb-1">
+                  {t("msgCorpsLabel")}
+                </Label>
+                <textarea
+                  id="msg-corps"
+                  value={messageCorps}
+                  onChange={(e) => setMessageCorps(e.target.value)}
+                  required
+                  rows={6}
+                  maxLength={50000}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">{t("msgOptoutHint")}</p>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleCloseMessageDialog}
+                  className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                  {t("cancel", { ns: "common" })}
+                </button>
+                <button
+                  type="submit"
+                  disabled={envoyerMessage.isPending}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-400"
+                >
+                  {envoyerMessage.isPending ? t("msgSending") : t("msgSend", { count: selectedIds.size })}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

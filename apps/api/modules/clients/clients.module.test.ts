@@ -42,6 +42,7 @@ describe("clients.module", () => {
     expect(procedures).toEqual([
       "create",
       "delete",
+      "envoyerMessage",
       "fusionner",
       "getById",
       "getEncours",

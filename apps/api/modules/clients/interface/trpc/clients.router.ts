@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { router, permissionProcedure } from "../../../../interface/trpc/trpc";
 import { SiretSchema } from "../../../../../../packages/contract/validation";
+import { ValidationError } from "../../../../shared/errors";
 
 /*
  * Procédures gatées par permission (parité legacy) : lecture = `clients.voir`, écriture = `clients.gerer`.
@@ -8,7 +9,7 @@ import { SiretSchema } from "../../../../../../packages/contract/validation";
  */
 const voir = permissionProcedure("clients.voir");
 const gerer = permissionProcedure("clients.gerer");
-import type { IClientRepository } from "../../application/client-repository";
+import type { ClientsModuleDeps } from "../../clients.module";
 import {
   listClients,
   getClient,
@@ -18,6 +19,7 @@ import {
 } from "../../application/read-use-cases";
 import { creerClient, modifierClient, supprimerClient, fusionnerClients } from "../../application/write-use-cases";
 import { importerClients } from "../../application/import-use-cases";
+import { envoyerMessageClients } from "../../application/email-use-cases";
 
 /*
  * Bornes alignées sur `ClientInputSchema` (shared/validation.ts) — defense-in-depth côté
@@ -68,7 +70,8 @@ const updateSchema = z.object({
  * délègue aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors
  * (NotFound→404, Validation→400, Conflict→409 pour une suppression refusée). Repo injecté (DI).
  */
-export function createClientsRouter(repo: IClientRepository) {
+export function createClientsRouter(deps: ClientsModuleDeps) {
+  const { repository: repo } = deps;
   return router({
     list: voir.query(({ ctx }) => listClients(repo, ctx.tenant)),
 
@@ -152,6 +155,35 @@ export function createClientsRouter(repo: IClientRepository) {
       .mutation(async ({ ctx, input }) => {
         const result = await importerClients(repo, ctx.tenant, input.clients);
         ctx.log.info({ event: "clients_imported", total: input.clients.length, imported: result.imported, skipped: result.skipped }, `Import clients : ${result.imported} importés, ${result.skipped} ignorés`);
+        return result;
+      }),
+
+    /*
+     * Envoi d'un message email à une sélection de clients du tenant (relance groupée, offre ponctuelle…).
+     * Respecte l'opt-out (email_optouts) : les désinscrits sont skippés silencieusement. Loggé.
+     * Gate `clients.gerer` (écriture) — un artisan n'écrit qu'à SES clients (scoping repo.list + RLS).
+     */
+    envoyerMessage: gerer
+      .input(
+        z.object({
+          clientIds: z.array(z.number().int()).min(1).max(200),
+          sujet: z.string().min(1).max(500),
+          corps: z.string().min(1).max(50000),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        if (!deps.email || !deps.optoutRepo || !deps.db) {
+          throw new ValidationError("Service email non disponible");
+        }
+        const result = await envoyerMessageClients(repo, deps.optoutRepo, deps.email, deps.db, ctx.tenant, {
+          ...input,
+          appUrl: deps.appUrl ?? "https://www.operioz.com",
+          unsubscribeSecret: deps.unsubscribeSecret ?? "dev-unsubscribe-secret",
+        });
+        ctx.log.info(
+          { event: "clients_message_envoye", envoyes: result.envoyes, skips: result.skips, errors: result.errors },
+          `Message envoyé à ${result.envoyes} client(s)`,
+        );
         return result;
       }),
   });

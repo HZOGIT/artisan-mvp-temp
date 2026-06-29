@@ -25,8 +25,10 @@ export function useClients() {
     },
   });
 
+  const envoyerMessage = trpc.clients.envoyerMessage.useMutation();
+
   const clients: Client[] = list.data ?? [];
   const encoursMap: EncoursMap = encours.data ?? ({} as EncoursMap);
 
-  return { clients, encoursMap, isLoading: list.isLoading, update, remove, fusionner };
+  return { clients, encoursMap, isLoading: list.isLoading, update, remove, fusionner, envoyerMessage };
 }
