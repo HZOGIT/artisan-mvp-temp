@@ -5,6 +5,25 @@ import { enrichirModules, isPlanInsuffisant, resolveGatingPlan } from "../domain
 import type { ModuleAvecEtat, OnboardingStatus } from "../domain/module";
 import type { IModulesRepository } from "./modules-repository";
 
+/**
+ * Garde plan centralisée : vérifie que le plan actif de l'artisan est suffisant pour le module
+ * identifié par `moduleSlug`. Lève `ForbiddenError` si insuffisant. No-op si le module est inconnu.
+ */
+export async function assertPlanModule(
+  subscriptionReader: ISubscriptionReader,
+  modulesRepo: IModulesRepository,
+  ctx: TenantContext,
+  moduleSlug: string,
+): Promise<void> {
+  const [mod, sub] = await Promise.all([
+    modulesRepo.getBySlug(moduleSlug),
+    subscriptionReader.getSubscription(ctx),
+  ]);
+  if (mod && isPlanInsuffisant(mod.planMinimum, resolveGatingPlan(sub))) {
+    throw new ForbiddenError("Passez au plan supérieur pour accéder à cette fonctionnalité");
+  }
+}
+
 /** Onboarding par défaut (artisan sans colonnes onboarding / introuvable) — parité legacy. */
 const DEFAULT_ONBOARDING: OnboardingStatus = { onboardingCompleted: true, metier: null, plan: null };
 

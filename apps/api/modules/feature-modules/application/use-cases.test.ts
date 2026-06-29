@@ -5,6 +5,7 @@ import { FakeModulesRepository } from "../infra/modules-repository-fake";
 import { FakeSubscriptionReader, blankSub } from "../../subscription/infra/subscription-reader-fake";
 import type { ModuleCatalogue } from "../domain/module";
 import {
+  assertPlanModule,
   completeOnboarding,
   getOnboardingStatus,
   listModules,
@@ -106,6 +107,41 @@ describe("modules use-cases", () => {
     const actifs = await repo.getSlugsActifs(ctx(A));
     expect(actifs.sort()).toEqual(["facturation", "stocks"]);
     expect(repo.prefsOf(A).has("compta")).toBe(false);
+  });
+
+  describe("assertPlanModule", () => {
+    const PRO_MODULE: ModuleCatalogue = { id: 99, slug: "assistant_ia", label: "IA", description: null, icon: "x", categorie: "ia", planMinimum: "pro", actifParDefaut: false, ordre: 99 };
+
+    it("module pro + artisan starter → ForbiddenError", async () => {
+      const repo = new FakeModulesRepository([PRO_MODULE]);
+      const reader = readerWithPlan(A, "starter");
+      await expect(assertPlanModule(reader, repo, ctx(A), "assistant_ia")).rejects.toBeInstanceOf(ForbiddenError);
+    });
+
+    it("module pro + artisan sans abonnement → ForbiddenError", async () => {
+      const repo = new FakeModulesRepository([PRO_MODULE]);
+      const reader = new FakeSubscriptionReader();
+      await expect(assertPlanModule(reader, repo, ctx(A), "assistant_ia")).rejects.toBeInstanceOf(ForbiddenError);
+    });
+
+    it("module pro + artisan pro → OK", async () => {
+      const repo = new FakeModulesRepository([PRO_MODULE]);
+      const reader = readerWithPlan(A, "pro");
+      await expect(assertPlanModule(reader, repo, ctx(A), "assistant_ia")).resolves.toBeUndefined();
+    });
+
+    it("module pro + trial actif → OK (trial = entreprise)", async () => {
+      const repo = new FakeModulesRepository([PRO_MODULE]);
+      const future = new Date(Date.now() + 7 * 24 * 3600 * 1000);
+      const reader = readerTrialing(A, future);
+      await expect(assertPlanModule(reader, repo, ctx(A), "assistant_ia")).resolves.toBeUndefined();
+    });
+
+    it("module inconnu → OK (pas de blocage)", async () => {
+      const repo = new FakeModulesRepository([]);
+      const reader = new FakeSubscriptionReader();
+      await expect(assertPlanModule(reader, repo, ctx(A), "assistant_ia")).resolves.toBeUndefined();
+    });
   });
 
   it("completeOnboarding sans moduleSlugs / skipOnboarding : applique les défauts", async () => {
