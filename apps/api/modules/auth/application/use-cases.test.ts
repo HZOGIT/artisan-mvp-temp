@@ -26,7 +26,7 @@ describe("auth use-cases", () => {
 
   it("signin : identifiants valides → user + JWT vérifiable (claims) + lastSignedIn touché", async () => {
     const repo = new FakeAuthRepository();
-    repo.seed({ id: 7, email: "ok@t.fr", password: "hashed:secret", role: "artisan" });
+    repo.seed({ id: 7, email: "ok@t.fr", password: "hashed:secret", role: "artisan", artisanId: 99 });
     const { user, token } = await signin(makeDeps(repo), { email: "ok@t.fr", password: "secret" });
     expect(user.id).toBe(7);
     expect((user as Record<string, unknown>).password).toBeUndefined(); // jamais le hash
@@ -55,6 +55,14 @@ describe("auth use-cases", () => {
     expect(repo.touched).toEqual([]); // pas de lastSignedIn touché
   });
 
+  it("OPE-723 — signin : artisan sans artisanId (compte incomplet) → ForbiddenError", async () => {
+    const repo = new FakeAuthRepository();
+    repo.seed({ id: 10, email: "orphan@t.fr", password: "hashed:secret", role: "artisan", artisanId: null });
+    const error = await signin(makeDeps(repo), { email: "orphan@t.fr", password: "secret" }).catch((e) => e);
+    expect(error).toBeInstanceOf(ForbiddenError);
+    expect(error.message).toContain("Inscription incomplète");
+  });
+
   it("signin : compte désactivé + MAUVAIS mot de passe → UnauthorizedError (anti-énumération)", async () => {
     const repo = new FakeAuthRepository();
     repo.seed({ id: 10, email: "disabled2@t.fr", password: "hashed:secret", actif: false });
@@ -72,13 +80,18 @@ describe("auth use-cases", () => {
     const { user, token } = await signup(deps, { email: "new@t.fr", password: "secret6", name: "Léa" });
     expect(user.email).toBe("new@t.fr");
     expect(await verifyAuthToken(token, SECRET)).toMatchObject({ email: "new@t.fr" });
-    expect(repo.bootstrapped).toEqual([user.id]); // provisionnement appelé
+    expect(repo.bootstrapped).toEqual([user.id]); // provisionnement appelé via createAndBootstrapUser
     expect(email.sent[0].subject).toContain("Bienvenue");
-    // Le mot de passe est haché (jamais en clair).
     expect((await repo.findCredentials("new@t.fr"))?.password).toBe("hashed:secret6");
-    // Email déjà pris → 409, pas de 2e bootstrap.
     await expect(signup(deps, { email: "new@t.fr", password: "secret6" })).rejects.toBeInstanceOf(ConflictError);
     expect(repo.bootstrapped).toEqual([user.id]);
+  });
+
+  it("OPE-723 — signup : user a un artisanId après inscription (invariant atomique)", async () => {
+    const repo = new FakeAuthRepository();
+    const deps: AuthDeps = { repo, hasher: new FakePasswordHasher(), jwtSecret: SECRET };
+    const { user } = await signup(deps, { email: "atom@t.fr", password: "pass123" });
+    expect(user.artisanId).not.toBeNull();
   });
 
   it("updateEmail : bon mot de passe → OK ; email pris par un autre → ConflictError", async () => {

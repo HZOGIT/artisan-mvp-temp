@@ -113,6 +113,20 @@ describe.skipIf(!URL)("AuthRepositoryDrizzle (PG : users HORS RLS, accès par id
     }
   });
 
+  it("OPE-723 — createAndBootstrapUser : user.artisanId jamais null après inscription (atomicité)", async () => {
+    const testEmail = "ope-723-atomic@t.fr";
+    try {
+      await admin.query("delete from users where email=$1", [testEmail]);
+      const created = await repo.createAndBootstrapUser({ email: testEmail, passwordHash: "hash-atomic", name: "Atomique" });
+      const u = await repo.getById(created.id);
+      expect(u?.artisanId).not.toBeNull();
+      const artisanRow = (await admin.query<{ id: number }>("select id from artisans where \"userId\"=$1", [created.id])).rows[0];
+      expect(artisanRow?.id).toBe(u?.artisanId);
+    } finally {
+      await admin.query("delete from users where email=$1", [testEmail]);
+    }
+  });
+
   it("ALL_PERMISSIONS ne contient aucun doublon", () => {
     const unique = new Set(ALL_PERMISSIONS);
     expect(unique.size).toBe(ALL_PERMISSIONS.length);

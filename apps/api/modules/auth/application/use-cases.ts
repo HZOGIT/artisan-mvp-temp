@@ -65,6 +65,9 @@ export async function signin(deps: AuthDeps, input: { email: string; password: s
   const token = await signAuthToken({ userId: cred.id, email: cred.email ?? "" }, deps.jwtSecret, deps.tokenTtl ?? "7d");
   const user = await deps.repo.getById(cred.id);
   if (!user) throw new UnauthorizedError("Invalid email or password");
+  if (user.role === "artisan" && user.artisanId == null) {
+    throw new ForbiddenError("Inscription incomplète : votre compte n'est pas associé à un artisan. Contactez le support.");
+  }
   return { user, token };
 }
 
@@ -77,9 +80,7 @@ export async function signup(deps: AuthDeps, input: { email: string; password: s
     throw new ConflictError("Email already in use");
   }
   const passwordHash = await deps.hasher.hash(input.password);
-  const created = await deps.repo.createUser({ email: input.email, passwordHash, name: input.name ?? null, registrationIp: input.registrationIp ?? null });
-  /** Provisionne le compte (artisan + abonnement d'essai + permissions owner) — requis pour utiliser l'app. */
-  await deps.repo.bootstrapAccount(created.id);
+  const created = await deps.repo.createAndBootstrapUser({ email: input.email, passwordHash, name: input.name ?? null, registrationIp: input.registrationIp ?? null });
   const token = await signAuthToken({ userId: created.id, email: created.email ?? input.email }, deps.jwtSecret, deps.tokenTtl ?? "7d");
   if (deps.email) {
     try {

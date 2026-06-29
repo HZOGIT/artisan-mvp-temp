@@ -39,6 +39,12 @@ export interface IAuthRepository {
    */
   bootstrapAccount(userId: number): Promise<void>;
   /**
+   * Inscription atomique : crée le user + son artisan + pose users.artisanId dans la même transaction.
+   * Garantit qu'il n'existe jamais de user role='artisan' avec artisanId NULL après un signup.
+   * Le billing d'essai et les permissions sont posés en best-effort après commit.
+   */
+  createAndBootstrapUser(data: { email: string; passwordHash: string; name?: string | null; registrationIp?: string | null }): Promise<{ id: number; email: string | null }>;
+  /**
    * Effacement RGPD Art. 17 — supprime ou pseudonymise les données personnelles du compte :
    * clients sans facture supprimés, clients avec facture pseudonymisés, conversations/messages/RDV
    * supprimés, PII artisan effacée. Pose `pendingDeletionAt` pour le job de purge différé 30j.

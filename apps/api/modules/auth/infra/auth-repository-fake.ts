@@ -99,6 +99,12 @@ export class FakeAuthRepository implements IAuthRepository {
     this.bootstrapped.push(userId);
   }
 
+  async createAndBootstrapUser(data: { email: string; passwordHash: string; name?: string | null; registrationIp?: string | null }): Promise<{ id: number; email: string | null }> {
+    const created = await this.createUser(data);
+    await this.bootstrapAccount(created.id);
+    return created;
+  }
+
   public purged: number[] = [];
 
   async purgePersonalData(userId: number): Promise<void> {

@@ -1,0 +1,11 @@
+-- OPE-723 : suppression des comptes artisan sans artisanId (inscription incomplète)
+-- Comptes smoke créés le 2026-06-14 (ids 10,11 = smoke+a/b, jamais finalisés).
+-- Script ONE-SHOT à exécuter manuellement sur 5433 AVANT de valider la contrainte CHECK.
+-- NE PAS inclure dans les migrations auto-appliquées au boot.
+--
+-- Usage : psql "$DATABASE_URL" -f scripts/cleanup-orphan-artisan-users.sql
+--
+-- Vérification préalable (adapter selon BDD cible) :
+--   SELECT id, email, role, "artisanId" FROM users WHERE role='artisan' AND "artisanId" IS NULL;
+--
+DELETE FROM users WHERE id IN (10, 11);
