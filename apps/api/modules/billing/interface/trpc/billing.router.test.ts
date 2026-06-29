@@ -341,4 +341,73 @@ describe.skipIf(!URL)("billing.router e2e (billing maison protégé)", () => {
     expect(evts).toHaveLength(1);
     expect(evts[0]!.actor).toBe(`user:${UID}`);
   });
+
+  it("setDefaultPaymentMethod avec sub active — sub.payment_method_id basculé vers la 2e PM (scénario prod OPE-725)", async () => {
+    const { rows: r1 } = await admin.query<{ id: number }>(
+      `insert into billing_payment_methods
+         (artisan_id, stripe_customer_id, stripe_payment_method_id, brand, last4, exp_month, exp_year, is_default, consented_at)
+       values ($1,'cus_ope725','pm_ope725_a','visa','1111',12,2028,false,now())
+       on conflict (stripe_payment_method_id) do update set artisan_id=$1 returning id`,
+      [ARTISAN_ID],
+    );
+    const pm1Id = r1[0]!.id;
+
+    const { rows: r2 } = await admin.query<{ id: number }>(
+      `insert into billing_payment_methods
+         (artisan_id, stripe_customer_id, stripe_payment_method_id, brand, last4, exp_month, exp_year, is_default, consented_at)
+       values ($1,'cus_ope725','pm_ope725_b','mastercard','2222',6,2030,false,now())
+       on conflict (stripe_payment_method_id) do update set artisan_id=$1 returning id`,
+      [ARTISAN_ID],
+    );
+    const pm2Id = r2[0]!.id;
+
+    /* Forcer pm1 default atomiquement (contourne le partial-unique is_default) */
+    await admin.query(
+      "update billing_payment_methods set is_default=(id=$2) where artisan_id=$1",
+      [ARTISAN_ID, pm1Id],
+    );
+
+    /* Sub active avec pm1 — chk_pm_required satisfait */
+    await admin.query(
+      `insert into billing_subscriptions (artisan_id, plan_id, billing_mode, status, payment_method_id, current_period_start, current_period_end)
+       values ($1,'starter','maison','active',$2,'2026-06-01','2026-07-01')
+       on conflict (artisan_id) do update set status='active', payment_method_id=$2, plan_id='starter', current_period_end='2026-07-01'`,
+      [ARTISAN_ID, pm1Id],
+    );
+
+    const tok = await jwt(UID);
+    const res = await injectTrpc(app, "POST", "billing.setDefaultPaymentMethod", { paymentMethodId: pm2Id }, tok);
+    expect(res.statusCode).toBe(200);
+
+    /* pm2 promu default */
+    const info = await injectTrpc(app, "GET", "billing.getBillingInfo", undefined, tok);
+    const pms = info.json().result.data.paymentMethods as Array<{ id: number; is_default: boolean }>;
+    expect(pms.find((p) => p.id === pm2Id)?.is_default).toBe(true);
+
+    /* sub.payment_method_id pointe sur pm2 (assertion DB directe) */
+    const { rows: subRows } = await admin.query<{ payment_method_id: number }>(
+      "select payment_method_id from billing_subscriptions where artisan_id=$1",
+      [ARTISAN_ID],
+    );
+    expect(subRows[0]!.payment_method_id).toBe(pm2Id);
+  });
+
+  it("setDefaultPaymentMethod : PM appartenant à un autre tenant → 404 (RLS isolation)", async () => {
+    /* PM d'un artisan fictif sans lien avec ARTISAN_ID */
+    const { rows } = await admin.query<{ id: number }>(
+      `insert into billing_payment_methods
+         (artisan_id, stripe_customer_id, stripe_payment_method_id, brand, last4, exp_month, exp_year, is_default, consented_at)
+       values (999999,'cus_other','pm_other_tenant','visa','9999',12,2029,false,now())
+       on conflict (stripe_payment_method_id) do update set artisan_id=999999
+       returning id`,
+      [],
+    );
+    const otherPmId = rows[0]!.id;
+
+    const tok = await jwt(UID);
+    const res = await injectTrpc(app, "POST", "billing.setDefaultPaymentMethod", { paymentMethodId: otherPmId }, tok);
+    expect(res.statusCode).toBe(404);
+
+    await admin.query("delete from billing_payment_methods where stripe_payment_method_id='pm_other_tenant'", []);
+  });
 });
