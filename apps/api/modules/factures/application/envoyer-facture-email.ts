@@ -180,7 +180,8 @@ export async function envoyerFactureParEmail(
 
   const attachments: { filename: string; content: Buffer; contentType: string }[] = [];
 
-  if (input.attachPdf) {
+  const shouldStorePdf = !!(deps.storage && deps.db && !facture.pdfStorageKey);
+  if (input.attachPdf || shouldStorePdf) {
     const lignes = await repo.listLignes(ctx, facture.id);
     let pdfBuf: Buffer | null = null;
     if (facture.pdfStorageKey && deps.storage) {
@@ -188,7 +189,7 @@ export async function envoyerFactureParEmail(
     }
     if (!pdfBuf) {
       pdfBuf = await deps.pdf.render("facture", { facture: { ...facture, lignes }, artisan, client });
-      if (deps.storage && deps.db && !facture.pdfStorageKey) {
+      if (shouldStorePdf && deps.storage && deps.db) {
         try {
           const s3Key = `factures/${ctx.artisanId}/${facture.id}.pdf`;
           const stored = await deps.storage.withDb(deps.db).upload(s3Key, pdfBuf, { contentType: "application/pdf", artisanId: ctx.artisanId, filename: `Facture_${effectiveNumero}.pdf`, purpose: "facture-pdf" }, ctx);
@@ -196,7 +197,9 @@ export async function envoyerFactureParEmail(
         } catch (_) { /* best-effort */ }
       }
     }
-    attachments.push({ filename: `Facture_${effectiveNumero}.pdf`, content: pdfBuf, contentType: "application/pdf" });
+    if (input.attachPdf) {
+      attachments.push({ filename: `Facture_${effectiveNumero}.pdf`, content: pdfBuf, contentType: "application/pdf" });
+    }
   }
 
   if (input.pieceJointeIds?.length && deps.piecesJointesRepo && deps.storage) {
