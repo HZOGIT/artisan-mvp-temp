@@ -182,8 +182,7 @@ import { genererAlertesRetardLivraison } from "./modules/commandes/application/a
 import { genererAlertesReconductionContrats } from "./modules/contrats-maintenance/application/alertes-reconduction-use-cases";
 import { artisans as artisansTable, paOutbox } from "../../drizzle/schema.pg";
 import { alertesPrevisionsCronPlugin } from "./shared/infra/alertes-previsions-cron";
-import { schedulerPlugin } from "./platform/scheduler";
-import { makeFacturesRecurrentesJob } from "./modules/contrats-maintenance/application/factures-recurrentes-job";
+import { contratsFacturesCronPlugin } from "./shared/infra/contrats-factures-cron";
 import { contratsVisitesCronPlugin } from "./shared/infra/contrats-visites-cron";
 import { rappelRdvClientCronPlugin } from "./shared/infra/rappel-rdv-client-cron";
 import { ensureStripeWebhookEndpoint } from "./shared/infra/stripe-webhook-setup";
@@ -1326,21 +1325,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     db: getDbHandle().db,
   });
 
-  /** Scheduler idempotent — factures récurrentes (une fois par jour, anti double-billing via scheduler_job_runs). */
-  app.register(schedulerPlugin, {
+  /** Cron factures contrats — tick horaire, génère les factures récurrentes dues (prochainFacturation <= now). */
+  app.register(contratsFacturesCronPlugin, {
+    repo: contratRepo,
+    factureGen: new FacturesContratFactureGenerator(factureRepo),
     db: getDbHandle().db,
-    configure: (registry) => {
-      registry.register(
-        makeFacturesRecurrentesJob(
-          contratRepo,
-          new FacturesContratFactureGenerator(factureRepo),
-          async () => {
-            const rows = await getDbHandle().db.select({ id: artisansTable.id }).from(artisansTable);
-            return rows.map((r) => r.id);
-          },
-        ),
-      );
-    },
   });
 
   /** Cron visites contrats — tick horaire, génère les interventions récurrentes dues (prochainPassage <= now). */
