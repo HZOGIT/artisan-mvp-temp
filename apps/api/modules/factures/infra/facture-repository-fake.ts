@@ -355,7 +355,7 @@ export class FakeFactureRepository implements IFactureRepository {
       numero: input.numero,
       dateFacture: now,
       dateEcheance: null,
-      statut: "validee",
+      statut: "brouillon",
       typeDocument: "avoir",
       factureOrigineId: input.factureOrigineId,
       objet: input.objet,

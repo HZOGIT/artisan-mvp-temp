@@ -492,7 +492,7 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
           numero: input.numero,
           typeDocument: "avoir",
           factureOrigineId: input.factureOrigineId,
-          statut: "validee",
+          statut: "brouillon",
           objet: input.objet,
           notes: input.notes,
           conditionsPaiement: input.conditionsPaiement,
