@@ -2,6 +2,7 @@ import { describe, it, expect, afterAll, beforeAll } from "vitest";
 import { Pool } from "pg";
 import { createDbClient } from "../../../shared/db";
 import { AuthRepositoryDrizzle } from "./auth-repository-drizzle";
+import { ALL_PERMISSIONS } from "../../../../../packages/contract/permissions";
 
 const URL = process.env.DATABASE_URL;
 const APP_URL =
@@ -74,5 +75,46 @@ describe.skipIf(!URL)("AuthRepositoryDrizzle (PG : users HORS RLS, accès par id
     } finally {
       await admin.query("delete from users where id=$1", [testUserId]);
     }
+  });
+
+  it("bootstrapAccount : owner reçoit TOUTES les permissions (incl utilisateurs.gerer)", async () => {
+    const testUserId = 9943004;
+    try {
+      await admin.query("delete from users where id=$1", [testUserId]);
+      await admin.query("insert into users (id, email, password, name, role, actif) values ($1,'bootstrap-perms@t.fr','hash','Owner','artisan',true)", [testUserId]);
+      await repo.bootstrapAccount(testUserId);
+      const { rows } = await admin.query<{ permission: string }>(
+        "select permission from permissions_utilisateur where \"userId\"=$1 and autorise=true",
+        [testUserId],
+      );
+      const granted = rows.map((r) => r.permission);
+      for (const p of ALL_PERMISSIONS) {
+        expect(granted, `permission manquante: ${p}`).toContain(p);
+      }
+    } finally {
+      await admin.query("delete from users where id=$1", [testUserId]);
+    }
+  });
+
+  it("bootstrapAccount : re-bootstrap idempotent (0 doublon)", async () => {
+    const testUserId = 9943005;
+    try {
+      await admin.query("delete from users where id=$1", [testUserId]);
+      await admin.query("insert into users (id, email, password, name, role, actif) values ($1,'idempotent@t.fr','hash','Idem','artisan',true)", [testUserId]);
+      await repo.bootstrapAccount(testUserId);
+      await repo.bootstrapAccount(testUserId);
+      const { rows } = await admin.query<{ count: string }>(
+        "select count(*) as count from permissions_utilisateur where \"userId\"=$1",
+        [testUserId],
+      );
+      expect(Number(rows[0].count)).toBe(ALL_PERMISSIONS.length);
+    } finally {
+      await admin.query("delete from users where id=$1", [testUserId]);
+    }
+  });
+
+  it("ALL_PERMISSIONS ne contient aucun doublon", () => {
+    const unique = new Set(ALL_PERMISSIONS);
+    expect(unique.size).toBe(ALL_PERMISSIONS.length);
   });
 });
