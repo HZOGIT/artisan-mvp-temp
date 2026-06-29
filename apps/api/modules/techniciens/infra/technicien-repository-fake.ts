@@ -127,6 +127,15 @@ export class FakeTechnicienRepository implements ITechnicienRepository {
     return pos;
   }
 
+  async getDernierePositionBatch(ctx: TenantContext, technicienIds: number[]): Promise<Map<number, Position>> {
+    const map = new Map<number, Position>();
+    for (const id of technicienIds) {
+      const p = await this.getDernierePosition(ctx, id);
+      if (p) map.set(id, p);
+    }
+    return map;
+  }
+
   async enregistrerPosition(
     ctx: TenantContext,
     technicienId: number,

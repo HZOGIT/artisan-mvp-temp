@@ -15,11 +15,19 @@ const tech = (over: Partial<Technicien>): Technicien =>
 const pos = (lat: string, lon: string): Position =>
   ({ id: 1, technicienId: 1, latitude: lat, longitude: lon, precision: null, vitesse: null, cap: null, batterie: null, enDeplacement: false, interventionEnCoursId: null, timestamp: new Date() } as Position);
 
-// Repo techniciens factice : liste + dernière position scriptées par technicienId.
-function techRepo(techs: Technicien[], positions: Record<number, Position | null>): ITechnicienRepository {
+/** Repo techniciens factice : liste + batch-position scriptés par technicienId. */
+function techRepo(techs: Technicien[], positions: Record<number, Position | null>, spy?: { batchCalls: number }): ITechnicienRepository {
   return {
     list: async () => techs,
-    getDernierePosition: async (_ctx: TenantContext, id: number) => positions[id] ?? null,
+    getDernierePositionBatch: async (_ctx: TenantContext, ids: number[]) => {
+      if (spy) spy.batchCalls++;
+      const map = new Map<number, Position>();
+      for (const id of ids) {
+        const p = positions[id];
+        if (p) map.set(id, p);
+      }
+      return map;
+    },
   } as unknown as ITechnicienRepository;
 }
 
@@ -71,5 +79,18 @@ describe("getSuggestionsTechniciens", () => {
     const repo = new FakeInterventionRepository();
     const out = await getSuggestionsTechniciens(repo, techRepo([tech({ statut: "inactif" })], {}), A, { latitude: 0, longitude: 0, dateIntervention: DATE });
     expect(out).toEqual([]);
+  });
+
+  it("N techniciens → 1 seul appel getDernierePositionBatch (pas N)", async () => {
+    const spy = { batchCalls: 0 };
+    const repo = new FakeInterventionRepository();
+    const techs = [
+      tech({ id: 1, statut: "actif" }),
+      tech({ id: 2, statut: "actif" }),
+      tech({ id: 3, statut: "actif" }),
+    ];
+    const positions = { 1: pos("48.85", "2.35"), 2: pos("45.76", "4.83"), 3: null };
+    await getSuggestionsTechniciens(repo, techRepo(techs, positions, spy), A, { latitude: 48.8566, longitude: 2.3522, dateIntervention: DATE });
+    expect(spy.batchCalls).toBe(1);
   });
 });
