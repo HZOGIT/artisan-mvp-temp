@@ -3,7 +3,7 @@ import { FakeCommandeRepository } from "../infra/commande-repository-fake";
 import { changerStatutCommande, listerCommandesEnRetard, recevoirCommande, definirStatutFacturation } from "./statut-use-cases";
 import { listLignesCommande } from "./read-use-cases";
 import { expectCrossTenantDenied } from "../../../shared/testing";
-import { NotFoundError, ValidationError } from "../../../shared/errors";
+import { NotFoundError, ValidationError, ConflictError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 
 const A: TenantContext = { artisanId: 1, userId: 10 };
@@ -24,13 +24,28 @@ describe("commandes — use-cases dérivés statut/retard (repo mocké)", () => 
   });
 
   it("changerStatutCommande : OK / cross-tenant → NotFound", async () => {
-    expect((await changerStatutCommande(repo, A, cmdA, "confirmee")).statut).toBe("confirmee");
+    expect((await changerStatutCommande(repo, A, cmdA, "envoyee")).statut).toBe("envoyee");
     await expect(changerStatutCommande(repo, B, cmdA, "annulee")).rejects.toBeInstanceOf(NotFoundError);
     await expectCrossTenantDenied(() => changerStatutCommande(repo, B, cmdA, "annulee"));
   });
 
+  it("changerStatutCommande : transition invalide → ConflictError (guard machine à états)", async () => {
+    await changerStatutCommande(repo, A, cmdA, "envoyee");
+    await changerStatutCommande(repo, A, cmdA, "annulee");
+    await expect(changerStatutCommande(repo, A, cmdA, "envoyee")).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("changerStatutCommande : livree terminal → ConflictError", async () => {
+    await changerStatutCommande(repo, A, cmdA, "envoyee");
+    await changerStatutCommande(repo, A, cmdA, "confirmee");
+    await changerStatutCommande(repo, A, cmdA, "livree");
+    await expect(changerStatutCommande(repo, A, cmdA, "brouillon")).rejects.toBeInstanceOf(ConflictError);
+  });
+
   it("changerStatutCommande : pose la date de livraison réelle si fournie", async () => {
     const d = new Date("2026-06-10");
+    await changerStatutCommande(repo, A, cmdA, "envoyee");
+    await changerStatutCommande(repo, A, cmdA, "confirmee");
     const c = await changerStatutCommande(repo, A, cmdA, "livree", d);
     expect(c.statut).toBe("livree");
     expect(c.dateLivraisonReelle?.toISOString()).toBe(d.toISOString());
@@ -43,6 +58,8 @@ describe("commandes — use-cases dérivés statut/retard (repo mocké)", () => 
     await repo.create(A, { fournisseurId: 10, dateLivraisonPrevue: demain, lignes: [ligne] });
     // commande A en retard mais livrée → exclue
     const livree = (await repo.create(A, { fournisseurId: 10, dateLivraisonPrevue: hier, lignes: [ligne] }))!.id;
+    await changerStatutCommande(repo, A, livree, "envoyee");
+    await changerStatutCommande(repo, A, livree, "confirmee");
     await changerStatutCommande(repo, A, livree, "livree");
     // commande B en retard → ne compte pas pour A
     await repo.create(B, { fournisseurId: 20, dateLivraisonPrevue: hier, lignes: [ligne] });
@@ -54,6 +71,7 @@ describe("commandes — use-cases dérivés statut/retard (repo mocké)", () => 
 
   it("recevoirCommande : réception partielle → partiellement_livree ; totale → livree", async () => {
     const cmd = (await repo.create(A, { fournisseurId: 10, lignes: [{ designation: "Tube", quantite: "10", prixUnitaire: "5" }] }))!;
+    await changerStatutCommande(repo, A, cmd.id, "envoyee");
     await changerStatutCommande(repo, A, cmd.id, "confirmee");
     const [l] = await listLignesCommande(repo, A, cmd.id);
     // partielle

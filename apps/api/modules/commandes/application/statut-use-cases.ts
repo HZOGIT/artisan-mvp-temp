@@ -1,4 +1,4 @@
-import { NotFoundError, ValidationError } from "../../../shared/errors";
+import { NotFoundError, ValidationError, ConflictError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ICommandeRepository, ReceptionLigne } from "./commande-repository";
 import type { Commande, CommandeStatut, CommandeStatutFacturation } from "../domain/commande";
@@ -8,6 +8,15 @@ import type { Commande, CommandeStatut, CommandeStatutFacturation } from "../dom
  * tenant ; une opération sur une commande hors tenant lève NotFoundError.
  */
 
+const TRANSITIONS: Record<CommandeStatut, readonly CommandeStatut[]> = {
+  brouillon: ["envoyee", "annulee"],
+  envoyee: ["confirmee", "annulee"],
+  confirmee: ["partiellement_livree", "livree", "annulee"],
+  partiellement_livree: ["livree", "annulee"],
+  livree: [],
+  annulee: [],
+};
+
 export async function changerStatutCommande(
   repo: ICommandeRepository,
   ctx: TenantContext,
@@ -15,6 +24,11 @@ export async function changerStatutCommande(
   statut: CommandeStatut,
   dateLivraisonReelle?: Date | null,
 ): Promise<Commande> {
+  const commande = await repo.getById(ctx, id);
+  if (!commande) throw new NotFoundError("Commande introuvable");
+  if (!TRANSITIONS[commande.statut].includes(statut)) {
+    throw new ConflictError(`Transition invalide : ${commande.statut} → ${statut}`);
+  }
   const updated = await repo.updateStatut(ctx, id, statut, dateLivraisonReelle);
   if (!updated) throw new NotFoundError("Commande introuvable");
   return updated;
