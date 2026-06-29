@@ -269,4 +269,26 @@ describe.skipIf(!URL)("rdv.router e2e (HTTP → tRPC → use-case → repo → R
     expect(rdvAfter).toBe(rdvBefore);
     expect(outboxAfter).toBe(outboxBefore);
   });
+
+  it("rdv.list robuste à un client supprimé : client null, pas de crash (anti-orphelin)", async () => {
+    const tA = await token(UA);
+    const artisanId = (await admin.query('select id from artisans where "userId"=$1', [UA])).rows[0].id as number;
+    /* Insère un client puis le supprime directement (contournement de la garde app-layer, simule l'état 5433). */
+    const orphClientId = (
+      await admin.query('insert into clients ("artisanId", nom) values ($1,$2) returning id', [artisanId, "Orphelin-rdv-test"])
+    ).rows[0].id as number;
+    await admin.query(
+      'insert into rdv_en_ligne ("artisanId","clientId",titre,"dateProposee") values ($1,$2,$3,now())',
+      [artisanId, orphClientId, "RDV Orphelin"],
+    );
+    /* rdv_en_ligne n'a pas de FK → la suppression directe du client est possible (audit p15). */
+    await admin.query('delete from clients where id=$1', [orphClientId]);
+
+    const list = (await q(server, "rdv.list", undefined, tA)).json().result.data as Array<{ clientId: number; client: unknown }>;
+    const orphanRdv = list.find((r) => r.clientId === orphClientId);
+    expect(orphanRdv).toBeDefined();
+    expect(orphanRdv!.client).toBeNull();
+
+    await admin.query('delete from rdv_en_ligne where "clientId"=$1', [orphClientId]);
+  });
 });

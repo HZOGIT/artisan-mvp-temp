@@ -142,6 +142,19 @@ describe.skipIf(!URL)("ClientRepositoryDrizzle (PG, RLS + scope tenant)", () => 
     await admin.query('delete from devis where "artisanId"=$1', [A]);
   });
 
+  it("countDocumentsLies : un rdv_en_ligne bloque la suppression (orphelin rdv)", async () => {
+    const c = await repo.create(ctx(A), { nom: "AvecRdv" });
+    expect(await repo.countDocumentsLies(ctx(A), c.id)).toBe(0);
+    await admin.query(
+      `insert into rdv_en_ligne ("artisanId","clientId",titre,"dateProposee") values ($1,$2,'RDV test',now())`,
+      [A, c.id],
+    );
+    expect(await repo.countDocumentsLies(ctx(A), c.id)).toBe(1);
+    // cleanup
+    await admin.query('delete from rdv_en_ligne where "artisanId"=$1 and "clientId"=$2', [A, c.id]);
+    expect(await repo.countDocumentsLies(ctx(A), c.id)).toBe(0);
+  });
+
   it("search : trouve par nom/e-mail scopé tenant ; un `%` est littéral (pas d'injection LIKE)", async () => {
     await repo.create(ctx(A), { nom: "Lefebvre", email: "lefebvre@a.fr" });
     await repo.create(ctx(A), { nom: "a%b", email: "wild@a.fr" });
