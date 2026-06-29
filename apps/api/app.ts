@@ -169,6 +169,7 @@ import fastifySchedule from "@fastify/schedule";
 import { billingCronPlugin } from "./shared/infra/billing-cron";
 import { schedulerPlugin } from "./platform/scheduler";
 import { createRelancesDevisJob } from "./modules/devis/application/relances-devis-job";
+import { createAlertesPrevisionsJob } from "./modules/alertes-previsions/application/alertes-previsions-job";
 import { paOutboxDrainerPlugin } from "./shared/infra/pa-outbox-drainer";
 import { paInboundPollerPlugin } from "./shared/infra/pa-inbound-poller";
 import { paReconciliationPollerPlugin } from "./shared/infra/pa-reconciliation-poller";
@@ -181,7 +182,6 @@ import { genererAlertesStock } from "./modules/stocks/application/alertes-use-ca
 import { genererAlertesRetardLivraison } from "./modules/commandes/application/alertes-retard-use-cases";
 import { genererAlertesReconductionContrats } from "./modules/contrats-maintenance/application/alertes-reconduction-use-cases";
 import { artisans as artisansTable, paOutbox } from "../../drizzle/schema.pg";
-import { alertesPrevisionsCronPlugin } from "./shared/infra/alertes-previsions-cron";
 import { contratsFacturesCronPlugin } from "./shared/infra/contrats-factures-cron";
 import { contratsVisitesCronPlugin } from "./shared/infra/contrats-visites-cron";
 import { rappelRdvClientCronPlugin } from "./shared/infra/rappel-rdv-client-cron";
@@ -1319,12 +1319,6 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     },
   });
 
-  /** Cron alertes CA — tick horaire, liste tous les artisans (hors RLS) puis verifierEtEnvoyer par tenant. */
-  app.register(alertesPrevisionsCronPlugin, {
-    repo: new AlertesPrevisionsRepositoryDrizzle(getDbHandle().db),
-    db: getDbHandle().db,
-  });
-
   /** Cron factures contrats — tick horaire, génère les factures récurrentes dues (prochainFacturation <= now). */
   app.register(contratsFacturesCronPlugin, {
     repo: contratRepo,
@@ -1376,6 +1370,16 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
             rateLimiter: new SlidingWindowRateLimiter(100, 60 * 60 * 1000),
             modeleEmailRepo,
           }),
+        }),
+      );
+      registry.register(
+        createAlertesPrevisionsJob({
+          repo: new AlertesPrevisionsRepositoryDrizzle(getDbHandle().db),
+          email: emailAdapter,
+          listArtisanIds: async () => {
+            const rows = await getDbHandle().db.select({ id: artisansTable.id }).from(artisansTable);
+            return rows.map((r) => r.id);
+          },
         }),
       );
     },
