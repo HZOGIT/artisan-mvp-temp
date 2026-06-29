@@ -183,6 +183,13 @@
       "when": 1751233290000,
       "tag": "20260629211450_indexes-core",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1782768689294,
+      "tag": "20260629213129_rls-child-tables",
+      "breakpoints": true
     }
   ]
 }
