@@ -120,22 +120,25 @@ $BIN/eslint -c eslint.api.config.mjs --concurrency=auto apps/api      # si apps/
 $BIN/eslint -c eslint.web.config.mjs --concurrency=auto apps/web/src  # si apps/web touché
 # Lint : seuls les ERRORS bloquent. Le repo a ~1000+ warnings pré-existants (normal, non bloquant).
 
-# Tests (gate L1/L2/L3). Le PG de test est sur 5432 :
-DATABASE_URL=postgres://artisan_user:artisan_password@localhost:5432/artisan_mvp \
-  $BIN/vitest run -c vitest.api.config.ts <chemins des fichiers/modules touchés>
+# Tests (gate L1/L2/L3). La base de test est isolée par worktree (.env.test.local) :
+TEST_DB_URL="$(grep ^DATABASE_URL= "$WT/.env.test.local" 2>/dev/null | cut -d= -f2-)"
+TEST_DB_APP_URL="$(grep ^APP_DATABASE_URL= "$WT/.env.test.local" 2>/dev/null | cut -d= -f2-)"
+if [[ -z "$TEST_DB_URL" ]]; then
+  echo "WARN: .env.test.local absent — base de test non provisionnée. Cf. launch-claude-bg.sh."
+  TEST_DB_URL="postgres://artisan_user:artisan_password@localhost:5432/artisan_mvp"
+  TEST_DB_APP_URL="postgres://app_tenant:app_tenant_pw@localhost:5432/artisan_mvp"
+fi
+DATABASE_URL="$TEST_DB_URL" \
+  $BIN/vitest run -c vitest.api.config.ts --no-file-parallelism <chemins des fichiers/modules touchés>
 ```
 
-⚠️ **PG de test périmé** : si un test L3 échoue en `500 / column "X" does not exist`, la base 5432 est en
-retard de migrations. Reprovisionne-la (mécanisme documenté, idempotent) puis relance les tests :
+⚠️ **Migration ajoutée par la PR** : si le worktree a ajouté une migration pendant la session et que la base
+de test n'est pas à jour (test L3 casse en `column "X" does not exist`), provisionne la base de test depuis
+le worktree (idempotent) :
 ```bash
-cd /home/developer/artisan-mvp-temp && task db:provision
+cd "$WT" && DATABASE_URL="$TEST_DB_URL" APP_DATABASE_URL="$TEST_DB_APP_URL" \
+  pnpm exec tsx apps/api/shared/db/provision-cli.ts
 ```
-Si la PR ajoute elle-même une migration pas encore sur staging, applique-la en lançant `provision-cli.ts`
-depuis le worktree (`DATABASE_URL=… APP_DATABASE_URL=… pnpm exec tsx apps/api/shared/db/provision-cli.ts`).
-
-⚠️ **Conflit de migration** (`gh pr view <numero> --json mergeable` = `CONFLICTING`) : si `staging` a gagné
-une migration au même numéro depuis la création de la PR, demande au worker de **rebaser sur `origin/staging`
-puis RÉGÉNÉRER** sa migration via `drizzle-kit generate` (jamais éditer `_journal.json` à la main).
 
 #### c. Décision : corrections nécessaires
 
@@ -219,8 +222,19 @@ fi
 
 # Worktree D'ABORD (sinon la suppression de branche échoue), puis la branche :
 WORKTREE="/tmp/wt-${SESSION_NAME}"
+# Lire le nom de la base de test avant de supprimer le worktree.
+TEST_DB_NAME_FROM_ENV="$(grep ^TEST_DB_NAME= "$WORKTREE/.env.test.local" 2>/dev/null | cut -d= -f2-)"
 [ -d "$WORKTREE" ] && git -C /home/developer/artisan-mvp-temp worktree remove "$WORKTREE" --force
 git branch -D "feat/${SESSION_NAME}" 2>/dev/null
+
+# Drop la base de test isolée du worktree.
+if [[ -n "$TEST_DB_NAME_FROM_ENV" ]]; then
+  PG_DEV_CONTAINER="$(docker ps --format '{{.Names}}\t{{.Ports}}' 2>/dev/null \
+    | awk -F'\t' '$2 ~ /0\.0\.0\.0:5432->/ {print $1; exit}')"
+  [[ -n "$PG_DEV_CONTAINER" ]] && \
+    docker exec "$PG_DEV_CONTAINER" psql -U artisan_user -d postgres \
+      -c "DROP DATABASE IF EXISTS \"${TEST_DB_NAME_FROM_ENV}\" WITH (FORCE);" 2>/dev/null || true
+fi
 
 # (la mise à jour du working tree avant deploy est gérée à l'étape 4 — garde-fou anti-périmé)
 ```
@@ -306,6 +320,23 @@ Pour trouver l'`id` de l'issue depuis son identifiant OPE-XXX : utiliser `get_is
 git -C /home/developer/artisan-mvp-temp worktree prune
 git -C /home/developer/artisan-mvp-temp worktree list
 screen -ls
+```
+
+Sweep des bases de test orphelines (aucun worktree correspondant) — à chaque cycle cron :
+```bash
+PG_DEV_CONTAINER="$(docker ps --format '{{.Names}}\t{{.Ports}}' 2>/dev/null \
+  | awk -F'\t' '$2 ~ /0\.0\.0\.0:5432->/ {print $1; exit}')"
+if [[ -n "$PG_DEV_CONTAINER" ]]; then
+  while IFS= read -r db; do
+    session="${db#ope_test_}"
+    if ! [[ -d "/tmp/wt-${session}" ]]; then
+      echo "Dropping orphan test DB: $db"
+      docker exec "$PG_DEV_CONTAINER" psql -U artisan_user -d postgres \
+        -c "DROP DATABASE IF EXISTS \"$db\" WITH (FORCE);" 2>/dev/null || true
+    fi
+  done < <(docker exec "$PG_DEV_CONTAINER" psql -U artisan_user -d postgres -tAc \
+    "SELECT datname FROM pg_database WHERE datname LIKE 'ope_test_%';" 2>/dev/null || true)
+fi
 ```
 
 > 🚨 **ERREUR GRAVE déjà commise — ne PAS supprimer un worktree « parce que sa branche est ancêtre de `origin/staging` »**. Une branche **fraîchement créée** (0 commit propre) est trivialement un ancêtre de staging → faux positif « mergé ». J'ai ainsi détruit 4 worktrees que le `project-manager` venait de lancer. Un worktree n'est un orphelin supprimable que si **TOUS** ces critères sont réunis :

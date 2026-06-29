@@ -55,11 +55,41 @@ cd /tmp/wt-__SESSION_NAME__ && pnpm check:parallel &
 
 Le pre-commit hook utilise `check:parallel` (incremental). Sans ce warm-up, le premier commit compile tout from scratch (~2 min).
 
+### Base de test du worktree — déjà provisionnée
+
+Au lancement, une base PostgreSQL dédiée a été créée et provisionnée depuis le `drizzle/` de ton worktree.
+Le nom et l'URL sont dans `.env.test.local` :
+
+```bash
+cat /tmp/wt-__SESSION_NAME__/.env.test.local   # DATABASE_URL + TEST_DB_NAME
+```
+
+Pour les tests L2/L3 (vitest), passe cette URL :
+
+```bash
+cd /tmp/wt-__SESSION_NAME__
+DATABASE_URL="$(grep ^DATABASE_URL= .env.test.local | cut -d= -f2-)" \
+  node_modules/.bin/vitest run -c vitest.api.config.ts --no-file-parallelism <fichiers>
+```
+
+Si tu **ajoutes une migration** en cours de session, provisionne-la manuellement sur ta base de test :
+
+```bash
+cd /tmp/wt-__SESSION_NAME__ && \
+  DATABASE_URL="$(grep ^DATABASE_URL= .env.test.local | cut -d= -f2-)" \
+  APP_DATABASE_URL="$(grep ^APP_DATABASE_URL= .env.test.local | cut -d= -f2-)" \
+  pnpm exec tsx apps/api/shared/db/provision-cli.ts
+```
+
+**Pas de `task db:provision`** — cette tâche cible la base partagée `artisan_mvp` (5432), pas ta base isolée.
+
 ### REGLE 4 — migrations Drizzle : GÉNÉRER DEPUIS LE WORKTREE
 
 **Génère toujours depuis ton worktree**, jamais depuis le repo principal :
 ```bash
-cd /tmp/wt-__SESSION_NAME__ && DATABASE_URL=… pnpm exec drizzle-kit generate --name=<nom>
+cd /tmp/wt-__SESSION_NAME__ && \
+  DATABASE_URL="$(grep ^DATABASE_URL= .env.test.local | cut -d= -f2-)" \
+  pnpm exec drizzle-kit generate --name=<nom>
 ```
 Ainsi drizzle-kit lit **ton** schéma (tes edits) et écrit dans **ton** `drizzle/`. Lancé depuis
 `__MAIN_REPO__`, il lirait le schéma périmé du repo principal et y écrirait la migration → contenu faux + fichier orphelin dans le mauvais repo.
