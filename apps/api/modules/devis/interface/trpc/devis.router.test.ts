@@ -122,6 +122,15 @@ describe.skipIf(!URL)("devis.router e2e (HTTP → tRPC → use-case → repo →
     expect((await callMutation(server, "devis.addLigne", { devisId: id, designation: "X", prixUnitaireHT: "abc" }, tA)).statusCode).toBe(400);
   });
 
+  it("envoyerRelance : devis accepté → 400 ; devis refusé → 400", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "devis.create", { clientId: clientA }, tA)).json().result.data.id as number;
+    await admin.query("update devis set statut=$1 where id=$2", ["accepte", id]);
+    expect((await callMutation(server, "devis.envoyerRelance", { devisId: id }, tA)).statusCode).toBe(400);
+    await admin.query("update devis set statut=$1 where id=$2", ["refuse", id]);
+    expect((await callMutation(server, "devis.envoyerRelance", { devisId: id }, tA)).statusCode).toBe(400);
+  });
+
   it("IMMUTABILITÉ : un devis accepté → update/addLigne → 409 (Conflict)", async () => {
     const tA = await token(UA);
     const id = (await callMutation(server, "devis.create", { clientId: clientA }, tA)).json().result.data.id as number;

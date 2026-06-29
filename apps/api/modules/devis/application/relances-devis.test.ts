@@ -26,7 +26,7 @@ function makeDeps(over: Partial<DevisRelanceDeps> & { client?: ClientInfo | null
   };
 }
 
-async function seedDevis(repo: FakeDevisRepository, ctx: TenantContext, statut: "brouillon" | "envoye" | "accepte", dateDevis?: Date) {
+async function seedDevis(repo: FakeDevisRepository, ctx: TenantContext, statut: "brouillon" | "envoye" | "accepte" | "refuse", dateDevis?: Date) {
   const d = await repo.create(ctx, { clientId: CLIENT.id, numero: "DEV-00001" });
   if (statut !== "brouillon") repo.setStatutForTest(d.id, statut);
   if (dateDevis) repo.setDateDevisForTest?.(d.id, dateDevis);
@@ -57,6 +57,14 @@ describe("envoyerRelanceDevis", () => {
     const res = await envoyerRelanceDevis(deps, A, { devisId: d.id });
     expect(res.success).toBe(true);
     expect((await relanceRepo.listByDevis(A, d.id))[0].statut).toBe("echec");
+  });
+
+  it("devis accepté ou refusé → 400 (ValidationError)", async () => {
+    const devisRepo = new FakeDevisRepository();
+    const dA = await seedDevis(devisRepo, A, "accepte");
+    await expect(envoyerRelanceDevis(makeDeps({ devisRepo }), A, { devisId: dA.id })).rejects.toBeInstanceOf(ValidationError);
+    const dR = await seedDevis(devisRepo, A, "refuse");
+    await expect(envoyerRelanceDevis(makeDeps({ devisRepo }), A, { devisId: dR.id })).rejects.toBeInstanceOf(ValidationError);
   });
 
   it("client sans email → 400 ; devis hors tenant → 404 ; rate-limit → 429", async () => {

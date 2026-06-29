@@ -94,6 +94,9 @@ export async function envoyerRelanceDevis(
 ): Promise<{ success: boolean; message: string }> {
   const devis = await deps.devisRepo.getById(ctx, input.devisId);
   if (!devis) throw new NotFoundError("Devis introuvable");
+  if (devis.statut === "accepte" || devis.statut === "refuse") {
+    throw new ValidationError("Impossible d'envoyer une relance sur un devis accepté ou refusé");
+  }
 
   const client = await deps.clientReader.getClient(ctx, devis.clientId);
   if (!client || !client.email) throw new ValidationError("Le client n'a pas d'adresse email");
