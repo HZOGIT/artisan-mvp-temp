@@ -144,7 +144,11 @@ export class ClientRepositoryDrizzle implements IClientRepository {
         .select({ n })
         .from(contratsMaintenance)
         .where(and(eq(contratsMaintenance.clientId, clientId), eq(contratsMaintenance.artisanId, a)));
-      return (d?.n ?? 0) + (f?.n ?? 0) + (i?.n ?? 0) + (c?.n ?? 0) + (ct?.n ?? 0);
+      const [r] = await tx
+        .select({ n })
+        .from(rdvEnLigne)
+        .where(and(eq(rdvEnLigne.clientId, clientId), eq(rdvEnLigne.artisanId, a)));
+      return (d?.n ?? 0) + (f?.n ?? 0) + (i?.n ?? 0) + (c?.n ?? 0) + (ct?.n ?? 0) + (r?.n ?? 0);
     });
   }
 

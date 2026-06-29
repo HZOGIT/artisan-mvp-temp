@@ -21,7 +21,7 @@ export interface IClientRepository {
   /** false si le client n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
   /*
-   * Nombre de documents métier (devis/factures/interventions/chantiers/contrats) liés à ce
+   * Nombre de documents métier (devis/factures/interventions/chantiers/contrats/rdv) liés à ce
    * client dans le tenant. Garde d'intégrité référentielle avant suppression : on refuse de
    * supprimer un client encore référencé (évite des documents orphelins / factures cassées).
    */
