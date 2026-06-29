@@ -437,7 +437,17 @@ export function createDepensesRouter(
       .mutation(({ ctx, input }) => ignorerTransaction(transactionRepo, ctx.tenant, input.id)),
 
     importReleve: protectedProcedure
-      .input(z.object({ nomFichier: z.string().max(255), contenuCsv: z.string().max(5_000_000, "Fichier trop volumineux (max ~5 Mo)") }))
+      .input(z.object({
+        nomFichier: z.string().max(255),
+        contenuCsv: z.string().max(5_000_000, "Fichier trop volumineux (max ~5 Mo)"),
+        mapping: z.object({
+          date:    z.string(),
+          libelle: z.string(),
+          montant: z.string().optional(),
+          debit:   z.string().optional(),
+          credit:  z.string().optional(),
+        }).optional(),
+      }))
       .mutation(({ ctx, input }) => importReleve({ transactionRepo, regleRepo }, ctx.tenant, input)),
 
     /** ⚠️ Idempotence anti double-dépense (FEC/TVA) : refuse si déjà convertie. */

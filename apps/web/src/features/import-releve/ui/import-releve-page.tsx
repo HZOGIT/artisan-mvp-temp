@@ -9,11 +9,11 @@ import { Button } from "@/shared/ui/button";
 import { Badge } from "@/shared/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { useImportReleve } from "../application/use-import-releve";
-import { eur, parsePreview, type Transaction, type Categorie, type ImportResult } from "../domain/import-releve";
+import { eur, parsePreview, parseHeaders, autoDetectMapping, type Transaction, type Categorie, type ImportResult, type ReleveMapping } from "../domain/import-releve";
 
-/*
+/**
  * Page `import-releve` (import CSV de relevé bancaire) — migration clean-archi de `pages/ImportReleve.tsx`.
- * Markup à l'identique. Parsing d'aperçu CSV en domain (pur), tRPC encapsulé dans `use-import-releve`.
+ * Ajout : mapping de colonnes (auto-détection + override manuel) entre aperçu et import.
  */
 export default function ImportRelevePage() {
   const { t } = useTranslation("importReleve");
@@ -22,6 +22,11 @@ export default function ImportRelevePage() {
   const [fileName, setFileName] = useState("");
   const [previewRows, setPreviewRows] = useState<string[][]>([]);
   const [importDone, setImportDone] = useState<ImportResult | null>(null);
+  const [headers, setHeaders] = useState<string[]>([]);
+  const [montantMode, setMontantMode] = useState<"signe" | "debit_credit">("signe");
+  const [mapping, setMapping] = useState<{ date: string; libelle: string; montant: string; debit: string; credit: string }>({
+    date: "", libelle: "", montant: "", debit: "", credit: "",
+  });
 
   const { categories, transactions, importReleve, convertir, ignorer } = useImportReleve(importDone?.releveId ?? null);
 
@@ -34,14 +39,33 @@ export default function ImportRelevePage() {
       setCsvContent(text);
       setFileName(file.name);
       setPreviewRows(parsePreview(text));
+      const hdrs = parseHeaders(text);
+      setHeaders(hdrs);
+      const detected = autoDetectMapping(hdrs);
+      setMapping({
+        date:    detected.date    ?? "",
+        libelle: detected.libelle ?? "",
+        montant: detected.montant ?? "",
+        debit:   detected.debit   ?? "",
+        credit:  detected.credit  ?? "",
+      });
+      setMontantMode(detected.debit || detected.credit ? "debit_credit" : "signe");
     };
     reader.readAsText(file, "utf-8");
+  }
+
+  function buildMapping(): ReleveMapping | undefined {
+    const { date, libelle, montant, debit, credit } = mapping;
+    if (!date || !libelle) return undefined;
+    if (montantMode === "signe" && montant) return { date, libelle, montant };
+    if (montantMode === "debit_credit" && (debit || credit)) return { date, libelle, debit: debit || undefined, credit: credit || undefined };
+    return undefined;
   }
 
   function lancerImport() {
     if (!csvContent) { toast.error(t("errCharge")); return; }
     importReleve.mutate(
-      { nomFichier: fileName || "releve.csv", contenuCsv: csvContent },
+      { nomFichier: fileName || "releve.csv", contenuCsv: csvContent, mapping: buildMapping() },
       { onSuccess: (res) => { toast.success(t("toastImport", { count: res.nbImportees })); setImportDone(res); }, onError: (e) => toast.error(e.message || t("errImport")) },
     );
   }
@@ -87,7 +111,9 @@ export default function ImportRelevePage() {
     );
   }
 
-  /** ÉTAPES 1 + 2 : Upload + preview */
+  const headerOptions = headers.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>);
+
+  /** ÉTAPES 1 + 2 : Upload + preview + mapping */
   return (
     <div className="space-y-4 max-w-3xl mx-auto">
       <div className="flex items-center gap-2">
@@ -115,7 +141,7 @@ export default function ImportRelevePage() {
                 <span className="text-sm font-medium truncate">{fileName}</span>
                 <span className="text-xs text-muted-foreground shrink-0">{t("kb", { kb: Math.round(csvContent.length / 1024) })}</span>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => { setCsvContent(""); setFileName(""); setPreviewRows([]); }}><X className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" onClick={() => { setCsvContent(""); setFileName(""); setPreviewRows([]); setHeaders([]); }}><X className="h-4 w-4" /></Button>
             </div>
           )}
         </CardContent>
@@ -124,7 +150,7 @@ export default function ImportRelevePage() {
       {previewRows.length > 0 && (
         <Card>
           <CardHeader><CardTitle className="text-base">{t("etape2")}</CardTitle></CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead className="border-b">
@@ -139,7 +165,64 @@ export default function ImportRelevePage() {
                 </tbody>
               </table>
             </div>
-            <p className="text-xs text-muted-foreground mt-2"><AlertCircle className="h-3 w-3 inline mr-1" /> {t("detectionAuto")}</p>
+
+            <div className="border-t pt-3 space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">{t("etapeMapping")}</p>
+              <p className="text-xs text-muted-foreground"><AlertCircle className="h-3 w-3 inline mr-1" /> {t("detectionAuto")}</p>
+
+              <div className="grid grid-cols-2 gap-2">
+                {([["date", t("colonneDate")], ["libelle", t("colonneLibelle")]] as const).map(([key, label]) => (
+                  <div key={key} className="flex flex-col gap-1">
+                    <span className="text-xs text-muted-foreground">{label}</span>
+                    <Select value={mapping[key]} onValueChange={(v) => setMapping((m) => ({ ...m, [key]: v }))}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder={t("choisirColonne")} /></SelectTrigger>
+                      <SelectContent>{headerOptions}</SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={montantMode === "signe" ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setMontantMode("signe")}
+                >
+                  {t("modeMontantSigne")}
+                </Button>
+                <Button
+                  variant={montantMode === "debit_credit" ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setMontantMode("debit_credit")}
+                >
+                  {t("modeDebitCredit")}
+                </Button>
+              </div>
+
+              {montantMode === "signe" ? (
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs text-muted-foreground">{t("colonneMontant")}</span>
+                  <Select value={mapping.montant} onValueChange={(v) => setMapping((m) => ({ ...m, montant: v }))}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder={t("choisirColonne")} /></SelectTrigger>
+                    <SelectContent>{headerOptions}</SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {([["debit", t("colonneDebit")], ["credit", t("colonneCredit")]] as const).map(([key, label]) => (
+                    <div key={key} className="flex flex-col gap-1">
+                      <span className="text-xs text-muted-foreground">{label}</span>
+                      <Select value={mapping[key]} onValueChange={(v) => setMapping((m) => ({ ...m, [key]: v }))}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder={t("choisirColonne")} /></SelectTrigger>
+                        <SelectContent>{headerOptions}</SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}

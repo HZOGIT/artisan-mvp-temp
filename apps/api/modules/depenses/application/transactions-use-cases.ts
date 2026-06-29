@@ -6,7 +6,7 @@ import type { IRegleCategorisationRepository } from "../../regles-categorisation
 import type { TransactionBancaire, ImportReleveResult, ReleveItem } from "../domain/transaction-bancaire";
 import type { Depense } from "../domain/depense";
 import type { RegleCategorisation } from "../../regles-categorisation/domain/regle-categorisation";
-import { parseReleveCsv } from "./parse-releve-csv";
+import { parseReleveCsv, type ReleveMapping } from "./parse-releve-csv";
 import { round2 } from "../../../shared/money";
 
 /*
@@ -35,6 +35,7 @@ export function suggererCategorie(libelle: string, regles: readonly RegleCategor
 export interface ImportReleveInput {
   readonly nomFichier: string;
   readonly contenuCsv: string;
+  readonly mapping?: ReleveMapping;
 }
 
 /*
@@ -47,7 +48,7 @@ export async function importReleve(
   input: ImportReleveInput,
 ): Promise<ImportReleveResult> {
   /** peut lever ValidationError (>5000 lignes) */
-  const transactions = parseReleveCsv(input.contenuCsv);
+  const transactions = parseReleveCsv(input.contenuCsv, input.mapping);
   if (transactions.length === 0) return { releveId: 0, nbImportees: 0, message: "CSV vide ou invalide" };
   let regles: RegleCategorisation[] = [];
   try {
