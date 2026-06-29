@@ -218,6 +218,13 @@
       "when": 1782770212805,
       "tag": "20260629215652_rdv-index-artisan-statut",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1782771630444,
+      "tag": "20260629222008_rls-disable-permissions-utilisateur",
+      "breakpoints": true
     }
   ]
 }
