@@ -13,6 +13,8 @@ export interface SuperpdpOauthDeps {
   readonly adapter: SuperPdpPaAdapter;
   readonly baseUrl: string;
   readonly clientId: string;
+  readonly clientSecret: string;
+  readonly redirectUri: string;
   readonly jwtSecret: string;
   readonly resolver: TenantResolver;
   readonly db: DbClient;
@@ -59,6 +61,7 @@ export function registerSuperpdpOauthRoutes(app: FastifyInstance, deps: Superpdp
       const params = new URLSearchParams({
         response_type: "code",
         client_id: deps.clientId,
+        redirect_uri: deps.redirectUri,
         state,
         superpdp_company_number: siren,
         superpdp_company_number_scheme: "fr_siren",
@@ -94,6 +97,8 @@ export function registerSuperpdpOauthRoutes(app: FastifyInstance, deps: Superpdp
         grant_type: "authorization_code",
         code,
         client_id: deps.clientId,
+        client_secret: deps.clientSecret,
+        redirect_uri: deps.redirectUri,
       });
 
       const tokenRes = await fetch(`${deps.baseUrl}/oauth2/token`, {

@@ -1209,6 +1209,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       adapter: einvoicing.superpdpAdapter,
       baseUrl: superpdpBaseUrl,
       clientId: process.env.SUPERPDP_CLIENT_ID ?? "",
+      clientSecret: process.env.SUPERPDP_CLIENT_SECRET ?? "",
+      redirectUri: process.env.SUPERPDP_REDIRECT_URI ?? "https://staging.operioz.com/api/einvoicing/oauth/callback",
       jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
       resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
       db: getDbHandle().db,
