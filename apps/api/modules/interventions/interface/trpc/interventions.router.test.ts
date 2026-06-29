@@ -145,6 +145,15 @@ describe.skipIf(!URL)("interventions.router e2e (HTTP → tRPC → use-case → 
     await admin.query('delete from techniciens where id=$1', [techB]);
   });
 
+  it("garde de transition : terminee → planifiee refusé (400) ; planifiee → en_cours OK", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "interventions.create", { clientId: clientA, titre: "Transition", dateDebut: "2026-06-14T08:00:00Z" }, tA)).json().result.data.id as number;
+    expect((await callMutation(server, "interventions.update", { id, statut: "en_cours" }, tA)).statusCode).toBe(200);
+    expect((await callMutation(server, "interventions.update", { id, statut: "terminee" }, tA)).statusCode).toBe(200);
+    expect((await callMutation(server, "interventions.update", { id, statut: "planifiee" }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "interventions.update", { id, statut: "annulee" }, tA)).statusCode).toBe(400);
+  });
+
   it("update : dateFin < dateDebut (fournies ensemble) → 400", async () => {
     const tA = await token(UA);
     const id = (await callMutation(server, "interventions.create", { clientId: clientA, titre: "Dates", dateDebut: "2026-06-10T08:00:00Z" }, tA)).json().result.data.id as number;
