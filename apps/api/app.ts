@@ -673,6 +673,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     congeRepository: congeRepo,
     technicienRepository: technicienRepo,
     badgeRepository: badgeRepo,
+    demandeAvisDeps: avis.deps.demande,
     db: deps.interventionsDb ?? getDbHandle().db,
   });
   const conges = createCongesModule({

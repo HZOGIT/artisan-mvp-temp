@@ -32,6 +32,8 @@ function toIntervention(r: InterventionRow): Intervention {
     technicienId: r.technicienId ?? null,
     heureArrivee: r.heureArrivee ?? null,
     heureDepart: r.heureDepart ?? null,
+    avisDemandeEnvoye: r.avisDemandeEnvoye ?? false,
+    avisDemandeEnvoyeAt: r.avisDemandeEnvoyeAt ?? null,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };
@@ -275,6 +277,15 @@ export class InterventionRepositoryDrizzle implements IInterventionRepository {
         .insert(couleursInterventions)
         .values({ artisanId: ctx.artisanId, interventionId, couleur })
         .onConflictDoUpdate({ target: [couleursInterventions.artisanId, couleursInterventions.interventionId], set: { couleur } });
+    });
+  }
+
+  marquerAvisEnvoye(ctx: TenantContext, id: number): Promise<void> {
+    return withTenant(this.db, ctx, async (tx) => {
+      await tx
+        .update(interventions)
+        .set({ avisDemandeEnvoye: true, avisDemandeEnvoyeAt: new Date() })
+        .where(and(eq(interventions.id, id), eq(interventions.artisanId, ctx.artisanId)));
     });
   }
 

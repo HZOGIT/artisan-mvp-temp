@@ -28,6 +28,7 @@ import type { ICongeRepository } from "../../../conges/application/conge-reposit
 import type { ITechnicienRepository } from "../../../techniciens/application/technicien-repository";
 import type { IBadgeRepository } from "../../../badges/application/badge-repository";
 import { verifierBadges } from "../../../badges/application/write-use-cases";
+import { envoyerDemandeAvis, type DemandeAvisDeps } from "../../../avis/application/demande-avis-use-cases";
 
 /*
  * Dates reçues en string ISO (sélecteur front) → `Date`, avec rejet propre des dates
@@ -74,7 +75,7 @@ const updateSchema = z.object({
  * les dates, délègue aux use-cases (scoping tenant + anti-IDOR-FK via ctx.tenant), laisse
  * remonter les Domain errors (NotFound→404, Validation→400). Repo injecté (DI).
  */
-export function createInterventionsRouter(repo: IInterventionRepository, congeRepo: ICongeRepository, technicienRepo: ITechnicienRepository, badgeRepo: IBadgeRepository, db?: DbClient) {
+export function createInterventionsRouter(repo: IInterventionRepository, congeRepo: ICongeRepository, technicienRepo: ITechnicienRepository, badgeRepo: IBadgeRepository, db?: DbClient, demandeAvisDeps?: DemandeAvisDeps) {
   return router({
     list: voir.query(({ ctx }) => listInterventions(repo, ctx.tenant)),
 
@@ -114,10 +115,17 @@ export function createInterventionsRouter(repo: IInterventionRepository, congeRe
           if (rest.statut) {
             const level = rest.statut === "annulee" ? "warn" : "info";
             ctx.log[level]({ event: "intervention_statut_changed", interventionId: id, newStatut: rest.statut }, `Intervention statut → ${rest.statut}`);
-            if (rest.statut === "terminee" && result.technicienId != null) {
-              void verifierBadges(badgeRepo, ctx.tenant, result.technicienId).catch((e) =>
-                ctx.log.warn({ err: e }, "verifierBadges failed"),
-              );
+            if (rest.statut === "terminee") {
+              if (result.technicienId != null) {
+                void verifierBadges(badgeRepo, ctx.tenant, result.technicienId).catch((e) =>
+                  ctx.log.warn({ err: e }, "verifierBadges failed"),
+                );
+              }
+              if (demandeAvisDeps && !result.avisDemandeEnvoye) {
+                void envoyerDemandeAvis(demandeAvisDeps, ctx.tenant, id)
+                  .then(() => repo.marquerAvisEnvoye(ctx.tenant, id))
+                  .catch((e: unknown) => ctx.log.warn({ err: e }, "auto-avis failed"));
+              }
             }
           }
           if (tx) await outboxEvent(tx, ctx.tenant, { action: "intervention.modifiee", entityType: "intervention", entityId: id, payload: { interventionId: id } });

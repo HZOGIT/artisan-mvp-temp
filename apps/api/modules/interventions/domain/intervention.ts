@@ -23,6 +23,8 @@ export interface Intervention {
   readonly technicienId: number | null;
   readonly heureArrivee: Date | null;
   readonly heureDepart: Date | null;
+  readonly avisDemandeEnvoye: boolean;
+  readonly avisDemandeEnvoyeAt: Date | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }

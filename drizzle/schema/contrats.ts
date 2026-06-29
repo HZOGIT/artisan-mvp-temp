@@ -36,6 +36,8 @@ export const interventions = pgTable("interventions", {
   technicienId: integer("technicienId"),
   rappelClientEnvoye: boolean("rappelClientEnvoye").default(false).notNull(),
   dateRappelClient: timestamp("dateRappelClient"),
+  avisDemandeEnvoye: boolean("avisDemandeEnvoye").default(false).notNull(),
+  avisDemandeEnvoyeAt: timestamp("avisDemandeEnvoyeAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
 });

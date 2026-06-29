@@ -67,5 +67,7 @@ export interface IInterventionRepository {
   listCouleurs(ctx: TenantContext): Promise<Array<{ interventionId: number; couleur: string }>>;
   /** Upsert de la couleur d'une intervention (scopé `ctx.artisanId` par la PK) — idempotent. */
   setCouleur(ctx: TenantContext, interventionId: number, couleur: string): Promise<void>;
+  /** Pose le drapeau d'idempotence après envoi de la demande d'avis automatique. */
+  marquerAvisEnvoye(ctx: TenantContext, id: number): Promise<void>;
   withDb(db: DbClient): IInterventionRepository;
 }
