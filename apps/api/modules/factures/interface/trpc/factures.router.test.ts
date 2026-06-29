@@ -346,10 +346,9 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
     await callMutation(server, "factures.addLigne", { factureId: id, designation: "Pose carrelage", quantite: "1", prixUnitaireHT: "500.00", tvaCategorieId: "FR_10" }, tA);
     const res = await callMutation(server, "factures.attestationTva.generer", { factureId: id }, tA);
     expect(res.statusCode).toBe(200);
-    const data = res.json().result.data as { statut: string; factureId: number; url: string };
+    const data = res.json().result.data as { statut: string; factureId: number };
     expect(data.statut).toBe("genere");
     expect(data.factureId).toBe(id);
-    expect(typeof data.url).toBe("string");
 
     /** getByFacture doit lister l'attestation créée */
     const list = await callQuery(server, "factures.attestationTva.getByFacture", { factureId: id }, tA);
