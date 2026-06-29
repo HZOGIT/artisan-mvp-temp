@@ -27,12 +27,12 @@ import type {
 export type CreerDevisInput = Omit<CreateDevisInput, "numero">;
 
 /*
- * Un devis accepté est figé (toute écriture → Conflict). Les autres états restent éditables
- * (brouillon/envoye : travail en cours ; refuse/expire : ré-édition tolérée comme le legacy).
+ * Seul un devis `brouillon` est modifiable (lignes + entête). Dès qu'il est envoyé, il devient
+ * un engagement commercial immuable → ConflictError sur toute tentative d'écriture.
  */
 function assertModifiable(devis: Devis): void {
-  if (devis.statut === "accepte") {
-    throw new ConflictError("Un devis accepté ne peut plus être modifié");
+  if (devis.statut !== "brouillon") {
+    throw new ConflictError("Un devis envoyé ou finalisé ne peut plus être modifié");
   }
 }
 

@@ -68,6 +68,9 @@ export default function DevisLignePage() {
   if (!devis) {
     return <div className="text-center py-8"><p className="text-muted-foreground">{t("devisNonTrouve")}</p><Button variant="link" onClick={() => { window.location.href = "/devis"; }}>{t("retourDevis")}</Button></div>;
   }
+  if (devis.statut !== "brouillon") {
+    return <div className="text-center py-8"><p className="text-muted-foreground">{t("devisNonModifiable")}</p><Button variant="link" onClick={goBack}>{t("retourDevis")}</Button></div>;
+  }
 
   return (
     <div className="space-y-6">
