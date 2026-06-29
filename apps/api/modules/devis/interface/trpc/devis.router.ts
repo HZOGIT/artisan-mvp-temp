@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { and, eq } from "drizzle-orm";
 import { router, protectedProcedure, permissionProcedure } from "../../../../interface/trpc/trpc";
 import { TVA_CATEGORIES_MAP } from "../../../../shared/tva/taux-tva-fr";
 import type { DbClient } from "../../../../shared/db";
@@ -6,6 +7,7 @@ import type { PushPort } from "../../../../shared/push/web-push-adapter";
 import type { EventBusPort } from "../../../../shared/ports/event-bus";
 import { outboxEvent } from "../../../../shared/events/outbox-event";
 import { withOutbox } from "../../../../shared/events/with-outbox";
+import { signaturesDevis } from "../../../../../../drizzle/schema.pg";
 /** Permissions (parité legacy) : actions sur lignes/envoi/duplication = `devis.creer` ; conversion en facture = `factures.creer`. */
 const devisCreer = permissionProcedure("devis.creer");
 const facturesCreer = permissionProcedure("factures.creer");
@@ -226,7 +228,14 @@ export function createDevisRouter(
         return withOutbox(db, repo, async (r, tx) => {
           const result = await changerStatutDevis(r, ctx.tenant, input.id, "accepte");
           ctx.log.info({ event: "devis_accepte", devisId: input.id }, "Devis accepté");
-          if (tx) await outboxEvent(tx, ctx.tenant, { action: "devis.accepte", entityType: "devis", entityId: input.id, payload: { totalTTC: result.totalTTC, numero: result.numero } });
+          const closeSignatures = (client: DbClient) =>
+            client.update(signaturesDevis).set({ statut: "annulee" }).where(and(eq(signaturesDevis.devisId, input.id), eq(signaturesDevis.statut, "en_attente")));
+          if (tx) {
+            await closeSignatures(tx);
+            await outboxEvent(tx, ctx.tenant, { action: "devis.accepte", entityType: "devis", entityId: input.id, payload: { totalTTC: result.totalTTC, numero: result.numero } });
+          } else if (db) {
+            await closeSignatures(db);
+          }
           return result;
         });
       }),

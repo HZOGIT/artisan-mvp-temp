@@ -202,6 +202,19 @@ describe.skipIf(!URL)("devis.router e2e (HTTP → tRPC → use-case → repo →
     expect(after).toBe(before + 1);
   });
 
+  it("accepter → ferme les signatures_devis en_attente du devis (anti double-action portail)", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "devis.create", { clientId: clientA }, tA)).json().result.data.id as number;
+    await admin.query("update devis set statut='envoye' where id=$1", [id]);
+    const signToken = `test-close-sig-${id}-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`.slice(0, 64);
+    await admin.query("insert into signatures_devis (\"devisId\",token,\"expiresAt\",statut) values ($1,$2,now()+interval '30 days','en_attente')", [id, signToken]);
+    const res = await callMutation(server, "devis.accepter", { id }, tA);
+    expect(res.statusCode).toBe(200);
+    const { rows } = await admin.query("select statut from signatures_devis where token=$1", [signToken]);
+    expect(rows[0].statut).toBe("annulee");
+    await admin.query("delete from signatures_devis where token=$1", [signToken]);
+  });
+
   it("outbox atomicité — accepter → event_outbox action=devis.accepte avec userId tracé", async () => {
     const tA = await token(UA);
     const created = (await callMutation(server, "devis.create", { clientId: clientA }, tA)).json().result.data.id as number;

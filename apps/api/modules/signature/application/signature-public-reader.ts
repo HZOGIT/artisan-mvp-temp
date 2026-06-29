@@ -14,6 +14,7 @@ export interface SignatureTokenResolution {
   readonly artisanId: number;
   readonly dateVue: Date | null;
   readonly devisDateValidite: Date | null;
+  readonly devisStatut: string;
 }
 
 /*

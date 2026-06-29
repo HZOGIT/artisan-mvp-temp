@@ -12,7 +12,7 @@ import {
 import { tvaCategories, ligneTypeEnum } from "./factures";
 
 export const devisStatutEnum = pgEnum("devis_statut", ["brouillon", "envoye", "accepte", "refuse", "expire"]);
-export const signatureStatutEnum = pgEnum("signature_statut", ["en_attente", "accepte", "refuse"]);
+export const signatureStatutEnum = pgEnum("signature_statut", ["en_attente", "accepte", "refuse", "annulee"]);
 
 export const devis = pgTable("devis", {
   id: serial("id").primaryKey(),

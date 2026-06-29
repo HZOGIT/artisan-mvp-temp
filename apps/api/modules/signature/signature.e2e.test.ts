@@ -51,6 +51,30 @@ describe.skipIf(!URL)("signature e2e (routeur monté, surface publique par token
     expect(res.statusCode).toBe(404);
   });
 
+  it("signDevis sur portail — devis déjà accepté par l'artisan → 400 (anti double-action Type A)", async () => {
+    const token2 = "sige2e-token-typeA-xxxxxxxxxxxxxxxxxxxxxxxx";
+    const artisanId2 = (await admin.query('insert into artisans ("userId","nomEntreprise") values ($1,$2) returning id', [UID + 1, "E2E2"])).rows[0].id;
+    const clientId2 = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [artisanId2, "C2"])).rows[0].id;
+    const devisId2 = (await admin.query('insert into devis ("artisanId","clientId",numero,statut) values ($1,$2,$3,$4) returning id', [artisanId2, clientId2, `E2E-TypeA-${UID}`, "accepte"])).rows[0].id;
+    await admin.query('insert into signatures_devis ("devisId",token,"expiresAt",statut) values ($1,$2, now() + interval \'30 days\', \'en_attente\')', [devisId2, token2]);
+    try {
+      const body = { "0": { json: { token: token2, signatureData: "data:image/png;base64,AAA", signataireName: "Jean", signataireEmail: "jean@test.com" } } };
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/trpc/signature.signDevis?batch=1",
+        headers: { "content-type": "application/json" },
+        payload: JSON.stringify(body),
+      });
+      expect(res.statusCode).toBe(400);
+    } finally {
+      await admin.query("delete from signatures_devis where token=$1", [token2]);
+      await admin.query("delete from devis where id=$1", [devisId2]);
+      await admin.query('delete from clients where "artisanId"=$1', [artisanId2]);
+      await admin.query("delete from artisans where id=$1", [artisanId2]);
+      await admin.query('delete from users where id=$1', [UID + 1]).catch(() => {});
+    }
+  });
+
   it("signDevis → 200, devis passe à accepte (immutabilité : 2ᵉ signature → 400)", async () => {
     const body = { "0": { json: { token: TOKEN, signatureData: "data:image/png;base64,AAA", signataireName: "Jean", signataireEmail: "jean@test.com" } } };
     const res = await app.inject({

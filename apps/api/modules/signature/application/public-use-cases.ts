@@ -166,6 +166,9 @@ export async function signDevis(
   if (resolution.signature.statut !== "en_attente") {
     throw new ValidationError("Ce devis a déjà été traité");
   }
+  if (resolution.devisStatut === "accepte" || resolution.devisStatut === "refuse") {
+    throw new ValidationError("Ce devis a déjà été clôturé par votre artisan");
+  }
   const now = (deps.maintenant ?? (() => new Date()))();
   if (now > resolution.signature.expiresAt) throw new ValidationError("Ce lien de signature a expiré");
   if (resolution.devisDateValidite && now > resolution.devisDateValidite) {
