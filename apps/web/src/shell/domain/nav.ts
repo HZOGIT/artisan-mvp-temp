@@ -91,7 +91,7 @@ export const NAV_GROUPS: NavGroup[] = [
     { icon: Mail, label: "Modèles Transactionnels", path: "/modeles-email-transactionnels" },
     { icon: History, label: "Historique emails", path: "/historique-emails" },
     { icon: Activity, label: "Mes événements", path: "/events-admin", ownerOnly: true },
-    { icon: Users, label: "Utilisateurs", path: "/utilisateurs" },
+    { icon: Users, label: "Utilisateurs", path: "/utilisateurs", ownerOnly: true },
   ] },
 ];
 

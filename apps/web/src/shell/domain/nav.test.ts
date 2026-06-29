@@ -39,6 +39,16 @@ describe("shell/nav — domain pur (port fidèle DashboardLayout)", () => {
     expect(withoutArtisan.items.map((i) => i.label)).not.toContain("Mes événements");
   });
 
+  it("filterGroupByPermissions : Utilisateurs visible owner uniquement (OPE-719)", () => {
+    const params = group("parametres");
+    const owner = filterGroupByPermissions(params, ["utilisateurs.gerer"], "artisan");
+    expect(owner.items.map((i) => i.path)).toContain("/utilisateurs");
+    const collaborateur = filterGroupByPermissions(params, ["utilisateurs.gerer"], "secretaire");
+    expect(collaborateur.items.map((i) => i.path)).not.toContain("/utilisateurs");
+    const sansPerm = filterGroupByPermissions(params, [], "artisan");
+    expect(sansPerm.items.map((i) => i.path)).not.toContain("/utilisateurs");
+  });
+
   it("filterGroupByModules : null → show-all ; ALWAYS_VISIBLE toujours là ; item filtré si module inactif", () => {
     const commercial = group("commercial");
     expect(filterGroupByModules(commercial, null).items).toHaveLength(commercial.items.length);
