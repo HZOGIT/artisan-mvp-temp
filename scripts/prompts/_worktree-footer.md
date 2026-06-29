@@ -45,7 +45,7 @@ git -C /tmp/wt-__SESSION_NAME__ commit -m "fix(<module>): ... (OPE-XXX)"
 git -C /tmp/wt-__SESSION_NAME__ push origin feat/__SESSION_NAME__
 ```
 
-Jamais `git add -A`, jamais `git add .`, jamais `git commit -a`. Jamais `git reset --hard`, jamais `push --force`.
+Jamais `git add -A`, jamais `git add .`, jamais `git commit -a`. Jamais `git reset --hard`. `push --force` interdit **sauf** `--force-with-lease` sur ta propre branche `feat/<session>` (rebase préventif ci-dessous) — jamais sur une branche partagée.
 
 ### Préchauffer le cache TypeScript (background, dès le début)
 
@@ -90,6 +90,18 @@ cd /tmp/wt-__SESSION_NAME__ && pnpm check
 ```
 
 Si `pnpm check` échoue, corriger avant de continuer.
+
+### Rebase préventif avant la PR
+
+Avant d'ouvrir la PR (ou avant de pousser les corrections d'un round de review), rebase sur `origin/staging` pour éviter les faux-reverts et réduire les risques de conflit sémantique au merge :
+
+```bash
+git -C /tmp/wt-__SESSION_NAME__ fetch origin staging
+git -C /tmp/wt-__SESSION_NAME__ rebase origin/staging
+git -C /tmp/wt-__SESSION_NAME__ push --force-with-lease origin feat/__SESSION_NAME__
+```
+
+`--force-with-lease` est autorisé ici : tu es le seul à pousser sur ta propre branche `feat/<session>`. Interdit sur `staging` ou toute branche partagée.
 
 ### Créer la Pull Request
 

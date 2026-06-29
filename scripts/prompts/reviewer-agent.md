@@ -16,8 +16,9 @@ Tu es un **gate dur**, pas un correcteur. **Un seul échec ci-dessous = REJET** 
 Variables : `B=origin/feat/<session>` (fetch d'abord : `git fetch origin feat/<session> -q`).
 
 ### G0 — Hygiène de branche (avant même de lire le code)
-- [ ] **Base à jour** : `git merge-base --is-ancestor origin/staging $B` → **doit réussir**. Sinon la branche est périmée et **revertera le dernier merge** → REJET, exiger : `git fetch origin staging; git checkout -B feat/<x> origin/staging; git cherry-pick <commit(s)>; git push --force-with-lease`.
-- [ ] **Zéro stowaway** : `git diff origin/staging $B --name-status` ne montre QUE les fichiers du périmètre annoncé. Tout `D` d'un fichier récemment mergé, tout doc/fichier d'un AUTRE ticket, tout revert involontaire = REJET. `git log origin/staging..$B --oneline` ne contient QUE les commits de cette PR.
+- [ ] **Conflits réels** : `gh pr view <n> --json mergeable -q .mergeable` → `MERGEABLE` (base périmée incluse) = OK ; `CONFLICTING` = seul cas à renvoyer au worker pour rebase (`git fetch origin staging && git rebase origin/staging && git push --force-with-lease`). La péremption seule (`merge-base --is-ancestor` échoue) **n'est plus un REJET** : GitHub merge sans faux-revert une branche périmée.
+- [ ] **Diff via trois-points** : utiliser `gh pr diff <n>` (three-dot = commits de la PR uniquement), **pas** `git diff origin/staging $B` (two-dot → inclut le delta de staging = faux-revert illusoire). Compléter avec `gh pr view <n> --json files` pour la liste des fichiers touchés.
+- [ ] **Zéro stowaway** : le diff trois-points ne montre QUE les fichiers du périmètre annoncé. Tout `D` d'un fichier récemment mergé par une AUTRE PR, tout doc/fichier d'un AUTRE ticket, tout revert involontaire = REJET. `git log origin/staging..$B --oneline` ne contient QUE les commits de cette PR.
 
 ### G1 — Gates (TOUJOURS relancés par toi, dans le worktree, binaires directs — cf. §3b)
 - [ ] **tsc** backend `tsc -p tsconfig.api.json --noEmit` = **0 erreur** (+ `tsconfig.web.json` si front). Un `grep -c 'error TS'` à 0.
@@ -42,6 +43,7 @@ Variables : `B=origin/feat/<session>` (fetch d'abord : `git fetch origin feat/<s
 - [ ] **Convention** : pas de `//` dans `apps/api`/`apps/web/src` ; pas de `OPE-XXX` en commentaire de code (OK en commit) ; fan-out events = template outbox.
 
 ### G4 — Merge → cleanup → deploy (séquencé, JAMAIS batché)
+- [ ] **Gate état intégré (anti-conflit sémantique)** : avant `gh pr merge`, simuler le merge dans le worktree pour valider que staging reste vert après intégration (deux PRs vertes séparément peuvent casser combinées). Voir bloc bash dans §3d.
 - [ ] `gh pr merge <n> --squash` **PUIS vérifier `state == MERGED`** AVANT tout cleanup. Un merge `CONFLICTING` échoue silencieusement ; supprimer la branche derrière fermerait la PR (recovery via le sha de l'objet).
 - [ ] Cleanup (screen → worktree → branche) seulement après MERGED confirmé.
 - [ ] Deploy backend si `apps/api`/migration touchés : **garde-fou `HEAD == origin/staging`** avant build (cf. §4) ; après deploy d'une migration, **vérifier l'état réel sur 5433** (smoke vert ≠ migration appliquée).
@@ -175,6 +177,22 @@ Puis passe à la PR suivante — tu reviendras sur celle-ci à la prochaine ité
 #### d. Décision : PR approuvée
 
 Si tsc passe, lint sans `error`, et le code est correct :
+
+**0. Gate état intégré — simuler le merge avant de merger.**
+
+Valide que staging restera vert après intégration (catch les conflits sémantiques).
+
+```bash
+git -C "$WT" fetch origin staging -q
+git -C "$WT" merge --no-commit --no-ff origin/staging
+# tsc + lint sur l'état POST-merge :
+$BIN/tsc -p "$WT/tsconfig.api.json" --noEmit 2>&1 | grep -c 'error TS' || true
+$BIN/tsc -p "$WT/tsconfig.web.json" --noEmit 2>&1 | grep -c 'error TS' || true
+$BIN/eslint --no-cache -c "$WT/eslint.api.config.mjs" --concurrency=auto "$WT/apps/api" 2>&1 | grep -c ' error ' || true
+git -C "$WT" merge --abort
+```
+
+Si tsc ou lint échouent sur l'état intégré → REJET (conflit sémantique). Identifier quelle autre PR vient de merger un changement incompatible, résoudre au niveau du worker concerné.
 
 **1. Merger (squash) — depuis le repo principal.**
 ```bash
