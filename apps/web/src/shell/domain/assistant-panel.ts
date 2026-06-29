@@ -44,8 +44,8 @@ export function writePanelSize(size: AssistantPanelSize): void {
   try { window.localStorage.setItem(PANEL_SIZE_KEY, size); } catch { /* noop */ }
 }
 
-/** Auto-open du panneau au montage : ouvert d'office sur desktop large (≥1024px), fermé sur mobile/tablette. */
+/** Auto-open du panneau au montage : ouvert d'office sur très grand écran (≥1440px) pour préserver ≥856px de contenu. */
 export function initialAssistantOpen(): boolean {
   if (typeof window === "undefined") return false;
-  return window.matchMedia("(min-width: 1024px)").matches;
+  return window.matchMedia("(min-width: 1440px)").matches;
 }
