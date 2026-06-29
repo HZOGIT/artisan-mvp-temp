@@ -10,6 +10,17 @@ import type {
   UpdateDevisLigneInput,
 } from "../domain/devis";
 
+/** Ligne brute du JOIN devis × clients pour listAcceptesAvecClient. */
+export interface DevisAccepteRow {
+  readonly id: number;
+  readonly numero: string;
+  readonly objet: string | null;
+  readonly totalTTC: string | null;
+  readonly dateDevis: Date | null;
+  readonly clientNom: string | null;
+  readonly clientPrenom: string | null;
+}
+
 /*
  * Port du repository devis. Chaque méthode exige le TenantContext (scope tenant + RLS).
  * `devis` possède un `artisanId` → double cloisonnement RLS + filtre. Les `devis_lignes` (SANS
@@ -21,6 +32,8 @@ import type {
  */
 export interface IDevisRepository {
   list(ctx: TenantContext): Promise<Devis[]>;
+  /** Devis acceptés du tenant avec nom client, en une seule requête JOIN (anti N+1). */
+  listAcceptesAvecClient(ctx: TenantContext): Promise<DevisAccepteRow[]>;
   /*
    * Devis « non signés » (statut ∈ {brouillon, envoye}), du plus récent au plus ancien — base des
    * relances et de `getDevisNonSignes`. Scopé tenant.

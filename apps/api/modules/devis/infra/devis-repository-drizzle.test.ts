@@ -113,6 +113,35 @@ describe.skipIf(!URL)("DevisRepositoryDrizzle (PG, RLS + scope tenant + lignes)"
     expect(await repo.listLignes(ctx(A), d.id)).toEqual([]);
   });
 
+  it("listAcceptesAvecClient : une requête JOIN, filtre statut='accepte', scope tenant, clientNom", async () => {
+    const cliPrenom = (await admin.query('insert into clients ("artisanId",nom,prenom) values ($1,$2,$3) returning id', [A, "Lefebvre", "Paul"])).rows[0].id as number;
+    const cliSansPrenom = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [A, "Morin"])).rows[0].id as number;
+    const sfx = Date.now();
+    const dAcc = await repo.create(ctx(A), { clientId: cliPrenom, numero: `DEV-LACC-${sfx}` });
+    await repo.setStatut(ctx(A), dAcc.id, "accepte");
+    const dAcc2 = await repo.create(ctx(A), { clientId: cliSansPrenom, numero: `DEV-LACC2-${sfx}` });
+    await repo.setStatut(ctx(A), dAcc2.id, "accepte");
+    await repo.create(ctx(A), { clientId: cliPrenom, numero: `DEV-BR-${sfx}` }); // brouillon exclu
+
+    const rows = await repo.listAcceptesAvecClient(ctx(A));
+
+    const acc = rows.find((r) => r.numero === `DEV-LACC-${sfx}`);
+    expect(acc).toBeDefined();
+    expect(acc!.clientNom).toBe("Lefebvre");
+    expect(acc!.clientPrenom).toBe("Paul");
+
+    const acc2 = rows.find((r) => r.numero === `DEV-LACC2-${sfx}`);
+    expect(acc2).toBeDefined();
+    expect(acc2!.clientNom).toBe("Morin");
+    expect(acc2!.clientPrenom).toBeNull();
+
+    /* brouillon absent */
+    expect(rows.some((r) => r.numero === `DEV-BR-${sfx}`)).toBe(false);
+    /* isolation cross-tenant : B ne voit pas les devis de A */
+    const rowsB = await repo.listAcceptesAvecClient(ctx(B));
+    expect(rowsB.some((r) => r.numero === `DEV-LACC-${sfx}`)).toBe(false);
+  });
+
   it("addLigne avec remise 20% : montantHT = pu × q × 0.8", async () => {
     const d = await repo.create(ctx(A), { clientId: clientA, numero: "DEV-REMISE-01" });
     const l = await repo.addLigne(ctx(A), d.id, {

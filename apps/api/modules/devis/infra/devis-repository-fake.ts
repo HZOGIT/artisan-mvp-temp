@@ -1,5 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { IDevisRepository } from "../application/devis-repository";
+import type { IDevisRepository, DevisAccepteRow } from "../application/devis-repository";
 import type {
   Devis,
   DevisLigne,
@@ -24,10 +24,17 @@ export class FakeDevisRepository implements IDevisRepository {
   private compteur = new Map<number, number>();
   /** Clients appartenant à un tenant (injectable) : clé `${artisanId}:${clientId}`. */
   private ownedClients = new Set<string>();
+  /** Noms clients pour listAcceptesAvecClient : clé `${artisanId}:${clientId}`. */
+  private clientNames = new Map<string, { nom: string; prenom?: string }>();
 
   /** Aide de test : déclare qu'un client appartient au tenant (pour valider ownsClient/anti-IDOR). */
   registerClient(artisanId: number, clientId: number): void {
     this.ownedClients.add(`${artisanId}:${clientId}`);
+  }
+
+  /** Aide de test : enregistre le nom d'un client (pour listAcceptesAvecClient). */
+  registerClientNom(artisanId: number, clientId: number, nom: string, prenom?: string): void {
+    this.clientNames.set(`${artisanId}:${clientId}`, { nom, prenom });
   }
 
   /*
@@ -45,6 +52,16 @@ export class FakeDevisRepository implements IDevisRepository {
 
   async list(ctx: TenantContext): Promise<Devis[]> {
     return this.devisStore.filter((d) => d.artisanId === ctx.artisanId);
+  }
+
+  async listAcceptesAvecClient(ctx: TenantContext): Promise<DevisAccepteRow[]> {
+    return this.devisStore
+      .filter((d) => d.artisanId === ctx.artisanId && d.statut === "accepte")
+      .sort((a, b) => (b.dateDevis?.getTime() ?? 0) - (a.dateDevis?.getTime() ?? 0) || b.id - a.id)
+      .map((d) => {
+        const c = this.clientNames.get(`${ctx.artisanId}:${d.clientId}`);
+        return { id: d.id, numero: d.numero, objet: d.objet, totalTTC: d.totalTTC, dateDevis: d.dateDevis, clientNom: c?.nom ?? null, clientPrenom: c?.prenom ?? null };
+      });
   }
 
   async listNonSignes(ctx: TenantContext): Promise<Devis[]> {

@@ -626,7 +626,6 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     repository: commandeRepo,
     fournisseurRepository: fournisseurRepo,
     devisRepository: devisRepo,
-    clientRepository: clientRepo,
     /*
      * Envoi du bon de commande par email (PDF en PJ) : artisan reader + PdfPort/EmailPort legacy +
      * rate-limiter anti-abus (20 / 15 min). email/rate-limiter injectables en test.

@@ -3,7 +3,7 @@ import { devis, devisLignes, clients, parametresArtisan } from "../../../../../d
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
-import type { IDevisRepository } from "../application/devis-repository";
+import type { IDevisRepository, DevisAccepteRow } from "../application/devis-repository";
 import type {
   Devis,
   DevisLigne,
@@ -79,6 +79,25 @@ export class DevisRepositoryDrizzle implements IDevisRepository {
         .where(eq(devis.artisanId, ctx.artisanId))
         .orderBy(desc(devis.dateDevis), desc(devis.id));
       return rows.map(toDevis);
+    });
+  }
+
+  listAcceptesAvecClient(ctx: TenantContext): Promise<DevisAccepteRow[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      return tx
+        .select({
+          id: devis.id,
+          numero: devis.numero,
+          objet: devis.objet,
+          totalTTC: devis.totalTTC,
+          dateDevis: devis.dateDevis,
+          clientNom: clients.nom,
+          clientPrenom: clients.prenom,
+        })
+        .from(devis)
+        .leftJoin(clients, eq(clients.id, devis.clientId))
+        .where(and(eq(devis.artisanId, ctx.artisanId), eq(devis.statut, "accepte")))
+        .orderBy(desc(devis.dateDevis), desc(devis.id));
     });
   }
 

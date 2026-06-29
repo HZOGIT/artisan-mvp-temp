@@ -1,6 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { IDevisRepository } from "../../devis/application/devis-repository";
-import type { IClientRepository } from "../../clients/application/client-repository";
 
 /*
  * Devis acceptés du tenant, enrichis du nom client (parité legacy `listDevisAcceptes`). Sert de base
@@ -18,24 +17,15 @@ export interface DevisAccepte {
 
 export async function listerDevisAcceptes(
   devisRepo: IDevisRepository,
-  clientRepo: IClientRepository,
   ctx: TenantContext,
 ): Promise<DevisAccepte[]> {
-  const acceptes = (await devisRepo.list(ctx)).filter((d) => d.statut === "accepte");
-  return Promise.all(
-    acceptes.map(async (d) => {
-      /** Best-effort : "Client" si le client n'est pas (ou plus) accessible dans le tenant. */
-      let clientNom = "Client";
-      const c = await clientRepo.getById(ctx, d.clientId);
-      if (c) clientNom = c.nom + (c.prenom ? " " + c.prenom : "");
-      return {
-        id: d.id,
-        numero: d.numero,
-        objet: d.objet ?? "",
-        clientNom,
-        totalTTC: Number(d.totalTTC ?? "0") || 0,
-        dateDevis: d.dateDevis ? d.dateDevis.toISOString() : "",
-      };
-    }),
-  );
+  const rows = await devisRepo.listAcceptesAvecClient(ctx);
+  return rows.map((r) => ({
+    id: r.id,
+    numero: r.numero,
+    objet: r.objet ?? "",
+    clientNom: r.clientNom ? r.clientNom + (r.clientPrenom ? " " + r.clientPrenom : "") : "Client",
+    totalTTC: Number(r.totalTTC ?? "0") || 0,
+    dateDevis: r.dateDevis ? r.dateDevis.toISOString() : "",
+  }));
 }

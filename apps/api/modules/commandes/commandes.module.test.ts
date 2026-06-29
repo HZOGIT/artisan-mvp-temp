@@ -3,7 +3,6 @@ import { createCommandesModule } from "./commandes.module";
 import type { ICommandeRepository } from "./application/commande-repository";
 import type { IFournisseurRepository } from "../fournisseurs/application/fournisseur-repository";
 import type { IDevisRepository } from "../devis/application/devis-repository";
-import type { IClientRepository } from "../clients/application/client-repository";
 
 const stubRepo: ICommandeRepository = {
   list: async () => [],
@@ -18,11 +17,10 @@ const stubRepo: ICommandeRepository = {
   setStatutFacturation: async () => null,
 };
 
-// Stubs minimaux des repos composés par commandes (getPerformances + listDevisAcceptes).
+/* Stubs minimaux des repos composés par commandes (getPerformances + listDevisAcceptes). */
 const stubFournisseurRepo = { list: async () => [], getById: async () => null } as unknown as IFournisseurRepository;
-const stubDevisRepo = { list: async () => [] } as unknown as IDevisRepository;
-const stubClientRepo = { getById: async () => null } as unknown as IClientRepository;
-// Stub des dépendances d'envoi email (sendEmail) — non exercées par ces tests de câblage.
+const stubDevisRepo = { list: async () => [], listAcceptesAvecClient: async () => [] } as unknown as IDevisRepository;
+/* Stub des dépendances d'envoi email (sendEmail) — non exercées par ces tests de câblage. */
 const stubMailing = {
   repo: stubRepo,
   fournisseurRepo: stubFournisseurRepo,
@@ -31,7 +29,7 @@ const stubMailing = {
   email: { send: async () => {} },
   rateLimiter: { check: async () => true },
 };
-// Stub des dépendances IA (genererDepuisDevisIA) — non exercées par ces tests de câblage.
+/* Stub des dépendances IA (genererDepuisDevisIA) — non exercées par ces tests de câblage. */
 const stubIa = {
   devisRepo: stubDevisRepo,
   stockRepo: { list: async () => [] } as unknown as Parameters<typeof createCommandesModule>[0]["ia"]["stockRepo"],
@@ -42,7 +40,7 @@ const stubIa = {
 
 describe("commandes.module", () => {
   it("createCommandesModule câble le repository injecté", () => {
-    const module = createCommandesModule({ repository: stubRepo, fournisseurRepository: stubFournisseurRepo, devisRepository: stubDevisRepo, clientRepository: stubClientRepo, mailing: stubMailing, ia: stubIa });
+    const module = createCommandesModule({ repository: stubRepo, fournisseurRepository: stubFournisseurRepo, devisRepository: stubDevisRepo, mailing: stubMailing, ia: stubIa });
     expect(module.deps.repository).toBe(stubRepo);
   });
 
@@ -62,7 +60,7 @@ describe("commandes.module", () => {
   });
 
   it("expose un routeur tRPC assemblé (procédures parité)", () => {
-    const module = createCommandesModule({ repository: stubRepo, fournisseurRepository: stubFournisseurRepo, devisRepository: stubDevisRepo, clientRepository: stubClientRepo, mailing: stubMailing, ia: stubIa });
+    const module = createCommandesModule({ repository: stubRepo, fournisseurRepository: stubFournisseurRepo, devisRepository: stubDevisRepo, mailing: stubMailing, ia: stubIa });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
     expect(procedures).toEqual([
       "create",
