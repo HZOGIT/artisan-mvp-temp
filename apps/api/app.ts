@@ -329,6 +329,8 @@ export interface AppDeps extends ContextDeps {
   readonly emailPort?: EmailPort;
   readonly pushPort?: PushPort;
   readonly rateLimiter?: RateLimiterPort;
+  readonly signinRateLimiter?: RateLimiterPort;
+  readonly signupRateLimiter?: RateLimiterPort;
   readonly storage?: StoragePort;
   /** Port LLM (Gemini) + rate-limiter IA dédié — injectables en test (FakeLlmPort déterministe). */
   readonly llm?: LlmPort;
@@ -938,6 +940,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     hasher: new BcryptPasswordHasher(),
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     email: emailAdapter,
+    signinRateLimiter: deps.signinRateLimiter ?? new SlidingWindowRateLimiter(10, 15 * 60 * 1000),
+    signupRateLimiter: deps.signupRateLimiter ?? new SlidingWindowRateLimiter(5, 60 * 60 * 1000),
     resetRateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(5, 60 * 60 * 1000),
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
     optoutRepo: new EmailOptoutRepositoryDrizzle(getDbHandle().db),

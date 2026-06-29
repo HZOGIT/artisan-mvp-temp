@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { ConflictError, ForbiddenError, UnauthorizedError, ValidationError } from "../../../shared/errors";
+import { ConflictError, ForbiddenError, TooManyRequestsError, UnauthorizedError, ValidationError } from "../../../shared/errors";
 import type { EmailPort } from "../../../shared/ports/email";
 import type { PasswordHasher } from "../../../shared/ports/password-hasher";
 import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
@@ -20,6 +20,10 @@ export interface AuthDeps {
   /** défaut 7j (parité legacy) */
   readonly tokenTtl?: string | number;
   readonly email?: EmailPort;
+  /** Rate-limiter connexion (clé = `signin:<email>`) ; anti-brute-force. Optionnel. */
+  readonly signinRateLimiter?: RateLimiterPort;
+  /** Rate-limiter inscription (clé = `signup:<ip|email>`) ; anti-flooding. Optionnel. */
+  readonly signupRateLimiter?: RateLimiterPort;
   /** Rate-limiter de la demande de reset (clé = email) ; anti-flood. Optionnel. */
   readonly resetRateLimiter?: RateLimiterPort;
   /** Base URL de confiance pour le lien de reset (JAMAIS l'Origin) — parité legacy APP_URL. */
@@ -51,6 +55,9 @@ export async function me(repo: IAuthRepository, claims: TokenClaims | null, perm
  * signé (à poser en cookie par l'interface). Identifiants invalides / sans mot de passe → 401.
  */
 export async function signin(deps: AuthDeps, input: { email: string; password: string }): Promise<{ user: AuthUser; token: string }> {
+  if (deps.signinRateLimiter && !(await deps.signinRateLimiter.check(`signin:${input.email.toLowerCase()}`))) {
+    throw new TooManyRequestsError("Trop de tentatives de connexion. Réessayez dans 15 minutes.");
+  }
   const cred = await deps.repo.findCredentials(input.email);
   if (!cred || !cred.password) {
     throw new UnauthorizedError("Invalid email or password");
@@ -76,6 +83,10 @@ export async function signin(deps: AuthDeps, input: { email: string; password: s
  * permissions owner) → JWT + (cookie posé par l'interface). Email de bienvenue best-effort. Parité legacy.
  */
 export async function signup(deps: AuthDeps, input: { email: string; password: string; name?: string; registrationIp?: string | null }): Promise<{ user: AuthUser; token: string }> {
+  const signupKey = `signup:${input.registrationIp ?? input.email.toLowerCase()}`;
+  if (deps.signupRateLimiter && !(await deps.signupRateLimiter.check(signupKey))) {
+    throw new TooManyRequestsError("Trop d'inscriptions depuis cette adresse. Réessayez dans une heure.");
+  }
   if ((await deps.repo.findIdByEmail(input.email)) !== null) {
     throw new ConflictError("Email already in use");
   }
