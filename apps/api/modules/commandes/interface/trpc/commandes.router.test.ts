@@ -154,19 +154,22 @@ describe.skipIf(!URL)("commandesFournisseurs.router e2e (HTTP → tRPC → use-c
     expect(lignes[0].quantiteRecue).toBe("0.00");
   });
 
-  it("updateStatut : transition scopée ; cross-tenant → 404", async () => {
+  it("updateStatut : transition scopée ; cross-tenant → 404 ; transition invalide → 409", async () => {
     const tA = await token(UA);
     const tB = await token(UB);
     const id = (await callMutation(server, "commandesFournisseurs.create", { fournisseurId: fournA, lignes: [ligne] }, tA)).json().result.data.id as number;
-    expect((await callMutation(server, "commandesFournisseurs.updateStatut", { id, statut: "confirmee" }, tA)).json().result.data.statut).toBe("confirmee");
+    expect((await callMutation(server, "commandesFournisseurs.updateStatut", { id, statut: "envoyee" }, tA)).json().result.data.statut).toBe("envoyee");
     expect((await callMutation(server, "commandesFournisseurs.updateStatut", { id, statut: "annulee" }, tB)).statusCode).toBe(404);
     expect((await callMutation(server, "commandesFournisseurs.updateStatut", { id, statut: "x_invalide" as unknown as string }, tA)).statusCode).toBe(400);
+    await callMutation(server, "commandesFournisseurs.updateStatut", { id, statut: "annulee" }, tA);
+    expect((await callMutation(server, "commandesFournisseurs.updateStatut", { id, statut: "envoyee" }, tA)).statusCode).toBe(409);
   });
 
   it("recevoir : réception partielle → partiellement_livree, totale → livree ; qté > commandée → 400 ; cross-tenant → 404", async () => {
     const tA = await token(UA);
     const tB = await token(UB);
     const id = (await callMutation(server, "commandesFournisseurs.create", { fournisseurId: fournA, lignes: [{ designation: "Tube", quantite: 10, prixUnitaire: 5 }] }, tA)).json().result.data.id as number;
+    await callMutation(server, "commandesFournisseurs.updateStatut", { id, statut: "envoyee" }, tA);
     await callMutation(server, "commandesFournisseurs.updateStatut", { id, statut: "confirmee" }, tA);
     const ligneId = ((await callQuery(server, "commandesFournisseurs.getLignes", { commandeId: id }, tA)).json().result.data as Array<{ id: number }>)[0].id;
     // partielle
