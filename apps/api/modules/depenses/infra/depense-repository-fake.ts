@@ -139,6 +139,17 @@ export class FakeDepenseRepository implements IDepenseRepository {
     );
   }
 
+  async listRecurrentesDues(ctx: TenantContext, asOf: string): Promise<Depense[]> {
+    return this.store.filter(
+      (d) =>
+        d.artisanId === ctx.artisanId &&
+        d.recurrente &&
+        d.prochaineOccurrence !== null &&
+        d.frequenceRecurrence !== null &&
+        d.prochaineOccurrence <= asOf,
+    );
+  }
+
   /*
    * ⚠️ Version simplifiée (suffisante pour les tests de use-case : défaut du mois + délégation).
    * L'agrégation fidèle est validée par le test DB du repo Drizzle.
