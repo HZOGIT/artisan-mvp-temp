@@ -179,7 +179,7 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
   async updateSubscriptionPeriod(subscriptionId: number, status: string, periodStart: Date, periodEnd: Date): Promise<void> {
     await this.db
       .update(billingSubscriptions)
-      .set({ status, current_period_start: periodStart, current_period_end: periodEnd, updated_at: new Date() })
+      .set({ status, current_period_start: periodStart, current_period_end: periodEnd, trial_ends_at: null, updated_at: new Date() })
       .where(eq(billingSubscriptions.id, subscriptionId));
   }
 

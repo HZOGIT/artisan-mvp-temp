@@ -179,7 +179,7 @@ export class FakeBillingRepository implements IBillingRepository {
       throw err;
     }
     this.subs = this.subs.map(s =>
-      s.id === subscriptionId ? { ...s, status, current_period_start: periodStart, current_period_end: periodEnd, updated_at: this.now() } : s
+      s.id === subscriptionId ? { ...s, status, current_period_start: periodStart, current_period_end: periodEnd, trial_ends_at: null, updated_at: this.now() } : s
     );
   }
 

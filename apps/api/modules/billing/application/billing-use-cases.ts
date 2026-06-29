@@ -327,7 +327,7 @@ export async function previewPlanChange(
   const targetAmountCents = knownPlan.amountCentsByInterval[interval];
 
   const pendingCycle = await deps.repo.findPendingCycle(sub.id);
-  const nextBillingDate: Date | null = pendingCycle?.period_start ?? sub.trial_ends_at ?? sub.current_period_end ?? null;
+  const nextBillingDate: Date | null = pendingCycle?.period_start ?? (sub.status === "trialing" ? sub.trial_ends_at : sub.current_period_end) ?? null;
 
   const activeUserCount = await deps.repo.countActiveUsers(ctx);
 
