@@ -29,6 +29,18 @@ export class FakeRdvRepository implements IRdvRepository {
     return [...this.scoped(ctx)].sort((a, b) => b.dateProposee.getTime() - a.dateProposee.getTime() || b.id - a.id);
   }
 
+  async countByStatut(ctx: TenantContext): Promise<Partial<Record<RdvStatut, number>>> {
+    const result: Partial<Record<RdvStatut, number>> = {};
+    for (const rdv of this.scoped(ctx)) {
+      result[rdv.statut] = (result[rdv.statut] ?? 0) + 1;
+    }
+    return result;
+  }
+
+  async getPendingCount(ctx: TenantContext): Promise<number> {
+    return this.scoped(ctx).filter((r) => r.statut === "en_attente").length;
+  }
+
   async getById(ctx: TenantContext, id: number): Promise<Rdv | null> {
     return this.scoped(ctx).find((r) => r.id === id) ?? null;
   }

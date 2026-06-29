@@ -46,6 +46,31 @@ export class RdvRepositoryDrizzle implements IRdvRepository {
     });
   }
 
+  countByStatut(ctx: TenantContext): Promise<Partial<Record<RdvStatut, number>>> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select({ statut: rdvEnLigne.statut, n: sql<number>`count(*)::int` })
+        .from(rdvEnLigne)
+        .where(eq(rdvEnLigne.artisanId, ctx.artisanId))
+        .groupBy(rdvEnLigne.statut);
+      const result: Partial<Record<RdvStatut, number>> = {};
+      for (const row of rows) {
+        if (row.statut) result[row.statut as RdvStatut] = row.n;
+      }
+      return result;
+    });
+  }
+
+  getPendingCount(ctx: TenantContext): Promise<number> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .select({ n: sql<number>`count(*)::int` })
+        .from(rdvEnLigne)
+        .where(and(eq(rdvEnLigne.artisanId, ctx.artisanId), eq(rdvEnLigne.statut, "en_attente")));
+      return row?.n ?? 0;
+    });
+  }
+
   getById(ctx: TenantContext, id: number): Promise<Rdv | null> {
     return withTenant(this.db, ctx, async (tx) => {
       const [row] = await tx

@@ -81,4 +81,29 @@ describe.skipIf(!URL)("RdvRepositoryDrizzle (PG, RLS + état machine + anti-IDOR
     expect(await repo.delete(ctx(A), r.id)).toBe(true);
     expect(await repo.getById(ctx(A), r.id)).toBeNull();
   });
+
+  it("countByStatut — GROUP BY COUNT, pas de full-list, scopé tenant", async () => {
+    const r1 = await repo.create(ctx(A), base());
+    const r2 = await repo.create(ctx(A), base());
+    await repo.setStatut(ctx(A), r1.id, "confirme");
+    await repo.setStatut(ctx(A), r2.id, "refuse", { motifRefus: "Indisponible" });
+    const extra = await repo.create(ctx(A), base());
+    const counts = await repo.countByStatut(ctx(A));
+    expect(counts.en_attente).toBeGreaterThanOrEqual(1);
+    expect(counts.confirme).toBeGreaterThanOrEqual(1);
+    expect(counts.refuse).toBeGreaterThanOrEqual(1);
+    const countsB = await repo.countByStatut(ctx(B));
+    expect(countsB.en_attente ?? 0).toBe(0);
+    await repo.delete(ctx(A), extra.id);
+  });
+
+  it("getPendingCount — COUNT SQL WHERE en_attente, scopé tenant", async () => {
+    const r1 = await repo.create(ctx(A), base());
+    const before = await repo.getPendingCount(ctx(A));
+    expect(before).toBeGreaterThanOrEqual(1);
+    await repo.setStatut(ctx(A), r1.id, "confirme");
+    const after = await repo.getPendingCount(ctx(A));
+    expect(after).toBe(before - 1);
+    expect(await repo.getPendingCount(ctx(B))).toBe(0);
+  });
 });
