@@ -94,9 +94,16 @@ cd /tmp/wt-__SESSION_NAME__ && \
 Ainsi drizzle-kit lit **ton** schéma (tes edits) et écrit dans **ton** `drizzle/`. Lancé depuis
 `__MAIN_REPO__`, il lirait le schéma périmé du repo principal et y écrirait la migration → contenu faux + fichier orphelin dans le mauvais repo.
 
-**Vérifie après generate** :
+**🔴 Restaurer les snapshots préexistants (obligatoire, avant `git add`) :**
 ```bash
-git -C /tmp/wt-__SESSION_NAME__ status -- drizzle/        # tes .sql/snapshot/_journal sont ICI
+git -C /tmp/wt-__SESSION_NAME__ fetch origin staging -q
+git -C /tmp/wt-__SESSION_NAME__ checkout origin/staging -- drizzle/meta/
+```
+`drizzle-kit generate` réécrit **tous** les snapshots `drizzle/meta/` (prevId + ré-encodage unicode) des migrations déjà mergées → stowaway dans la PR → le reviewer rejette. Ce checkout restaure les snapshots préexistants depuis `origin/staging`. Le **nouveau** snapshot (absent d'`origin/staging`) est laissé intact par git.
+
+**Vérifie après generate + restauration** :
+```bash
+git -C /tmp/wt-__SESSION_NAME__ status -- drizzle/        # doit montrer UNIQUEMENT : nouveau .sql + nouveau snapshot + _journal.json
 git -C __MAIN_REPO__ status -- drizzle/                   # DOIT être vide (rien dans le repo principal)
 ```
 
@@ -112,6 +119,14 @@ les noms de fichiers sont **horodatés** (`YYYYMMDDHHMMSS_<nom>.sql`) → unique
 rebase ni de régénération nécessaire pour l'ordre**. Si `_journal.json` présente un conflit textuel au merge,
 résolution triviale : garder les deux entrées (un entrée par migration) → `_journal.json` est cosmétique au
 runtime, le runner applique les migrations **par nom de fichier**.
+
+**`git add` pour une migration — chemins explicites uniquement (jamais `git add drizzle/`) :**
+```bash
+git -C /tmp/wt-__SESSION_NAME__ add drizzle/<YYYYMMDDHHMMSS>_<nom>.sql
+git -C /tmp/wt-__SESSION_NAME__ add drizzle/meta/<YYYYMMDDHHMMSS>_<nom>_snapshot.json
+git -C /tmp/wt-__SESSION_NAME__ add drizzle/meta/_journal.json
+```
+`git add drizzle/` emporterait les snapshots réécrit par drizzle-kit sur les migrations existantes (stowaway) si la restauration ci-dessus a été oubliée.
 
 ### Vérifier avant la PR
 
