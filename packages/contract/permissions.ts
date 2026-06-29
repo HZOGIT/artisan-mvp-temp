@@ -83,15 +83,16 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     label: "Administration",
     permissions: [
       { code: "parametres.voir", label: "Accéder aux paramètres" },
-      { code: "utilisateurs.gerer", label: "Gérer les utilisateurs" },
       { code: "vitrine.gerer", label: "Gérer la vitrine" },
     ],
   },
 ];
 
-export const ALL_PERMISSIONS: PermissionCode[] = PERMISSION_GROUPS.flatMap(
-  (g) => g.permissions.map((p) => p.code)
-);
+/** Toutes les permissions owner : groupes délégables + owner-only non délégables. */
+export const ALL_PERMISSIONS: PermissionCode[] = [
+  ...PERMISSION_GROUPS.flatMap((g) => g.permissions.map((p) => p.code)),
+  "utilisateurs.gerer", /* ponytail: owner-only, absent de PERMISSION_GROUPS (non délégable) */
+];
 
 export const ROLE_TEMPLATES: Record<string, PermissionCode[]> = {
   admin: [...ALL_PERMISSIONS],
