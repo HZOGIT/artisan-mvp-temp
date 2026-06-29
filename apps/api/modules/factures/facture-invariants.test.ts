@@ -56,11 +56,14 @@ describe("factures — invariants métier (synthèse)", () => {
     const f2 = await creerFacture(repo, A, { clientId: 100 });
     expect(f1.numero).toBeNull();
     expect(f2.numero).toBeNull();
+    await ajouterLigneFacture(repo, A, f1.id, { designation: "Pose", prixUnitaireHT: "100.00" });
+    await ajouterLigneFacture(repo, A, f2.id, { designation: "Pose", prixUnitaireHT: "100.00" });
     const emise1 = await changerStatutFacture(repo, A, f1.id, "envoyee", undefined, fakeArtisanReader);
     const emise2 = await changerStatutFacture(repo, A, f2.id, "envoyee", undefined, fakeArtisanReader);
     expect(emise1.numero).toBe("FAC-00001");
     expect(emise2.numero).toBe("FAC-00002");
     const fB = await creerFacture(repo, B, { clientId: 200 });
+    await ajouterLigneFacture(repo, B, fB.id, { designation: "Pose", prixUnitaireHT: "100.00" });
     const fakeArtisanReaderB = { getArtisan: async () => ({ id: 2, nomEntreprise: null, email: null, siret: "73282932000074" }) };
     expect((await changerStatutFacture(repo, B, fB.id, "envoyee", undefined, fakeArtisanReaderB)).numero).toBe("FAC-00001");
     expect((await getFacture(repo, A, emise1.id)).numero).toBe("FAC-00001");
@@ -98,6 +101,7 @@ describe("factures — invariants métier (synthèse)", () => {
     const repo = repoWithClient();
     const f = await creerFacture(repo, A, { clientId: 100 });
     await expect(changerStatutFacture(repo, A, f.id, "payee")).rejects.toBeInstanceOf(ConflictError); // saute envoyee
+    await ajouterLigneFacture(repo, A, f.id, { designation: "Pose", prixUnitaireHT: "100.00" });
     await changerStatutFacture(repo, A, f.id, "envoyee", undefined, fakeArtisanReader);
     await changerStatutFacture(repo, A, f.id, "payee");
     await expect(changerStatutFacture(repo, A, f.id, "en_retard")).rejects.toBeInstanceOf(ConflictError); // payee terminal
