@@ -114,7 +114,7 @@ const createCategorieSchema = z.object({
   couleur: hexCouleur.optional(),
   icone: z.string().max(50).optional(),
   compteComptable: z.string().max(10).optional(),
-  plafondMensuel: z.number().optional(),
+  plafondMensuel: z.number().min(0).optional(),
 });
 const updateCategorieSchema = z.object({
   id: z.number(),
@@ -122,7 +122,7 @@ const updateCategorieSchema = z.object({
   couleur: hexCouleur.optional(),
   icone: z.string().max(50).optional(),
   compteComptable: z.string().max(10).optional(),
-  plafondMensuel: z.number().optional(),
+  plafondMensuel: z.number().min(0).optional(),
   actif: z.boolean().optional(),
 });
 
