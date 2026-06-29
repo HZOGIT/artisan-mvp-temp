@@ -54,6 +54,32 @@ export function pdfLignes(lignes: readonly Ligne[]): PdfLigne[] {
   }));
 }
 
+export interface LotSousTotal { readonly sectionLabel: string; readonly totalHT: string }
+
+/**
+ * Sous-totaux par section pour affichage UI. Renvoie Map(index → LotSousTotal)
+ * où l'entrée s'insère après lignes[index]. Lots avant la 1re section ignorés.
+ */
+export function sectionSousTotaux(
+  lignes: readonly { type?: string | null; designation?: string | null; montantHT?: string | null }[],
+): Map<number, LotSousTotal> {
+  const result = new Map<number, LotSousTotal>();
+  let section: string | null = null;
+  let ht = 0;
+  let hasArticles = false;
+  const flush = (idx: number) => { if (section !== null && hasArticles) result.set(idx, { sectionLabel: section, totalHT: ht.toFixed(2) }); };
+  for (let i = 0; i < lignes.length; i++) {
+    const type = lignes[i].type ?? "produit";
+    if (type === "section") {
+      flush(i - 1); section = lignes[i].designation ?? ""; ht = 0; hasArticles = false;
+    } else if (type !== "note") {
+      if (section !== null) { ht += parseFloat(lignes[i].montantHT ?? "0") || 0; hasArticles = true; }
+    }
+  }
+  flush(lignes.length - 1);
+  return result;
+}
+
 /** Mutation de transition de statut cible (ou null si non disponible). PUR. */
 export function statutTransition(target: string): "envoyer" | "accepter" | "refuser" | null {
   if (target === "envoye") return "envoyer";

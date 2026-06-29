@@ -76,6 +76,32 @@ export function pdfLignes(lignes: readonly Ligne[]): PdfLigne[] {
   return lignes.map((l) => ({ designation: l.designation, description: l.description, quantite: n(l.quantite) || 1, unite: l.unite, prixUnitaire: n(l.prixUnitaireHT), tauxTva: n(l.tauxTVA) || 20, type: l.type, tvaCategorieId: (l as { tvaCategorieId?: string | null }).tvaCategorieId ?? null, remise: n((l as { remise?: string | null }).remise ?? "0") }));
 }
 
+export interface LotSousTotal { readonly sectionLabel: string; readonly totalHT: string }
+
+/**
+ * Sous-totaux par section pour affichage UI. Renvoie Map(index → LotSousTotal)
+ * où l'entrée s'insère après lignes[index]. Lots avant la 1re section ignorés.
+ */
+export function sectionSousTotaux(
+  lignes: readonly { type?: string | null; designation?: string | null; montantHT?: string | null }[],
+): Map<number, LotSousTotal> {
+  const result = new Map<number, LotSousTotal>();
+  let section: string | null = null;
+  let ht = 0;
+  let hasArticles = false;
+  const flush = (idx: number) => { if (section !== null && hasArticles) result.set(idx, { sectionLabel: section, totalHT: ht.toFixed(2) }); };
+  for (let i = 0; i < lignes.length; i++) {
+    const type = lignes[i].type ?? "produit";
+    if (type === "section") {
+      flush(i - 1); section = lignes[i].designation ?? ""; ht = 0; hasArticles = false;
+    } else if (type !== "note") {
+      if (section !== null) { ht += parseFloat(lignes[i].montantHT ?? "0") || 0; hasArticles = true; }
+    }
+  }
+  flush(lignes.length - 1);
+  return result;
+}
+
 export function activitesForFacture(activites: readonly Activite[], factureId: number): Activite[] {
   return activites.filter((a) => a.entiteType === "facture" && a.entiteId === factureId).slice().sort((a, b) => new Date(a.echeance).getTime() - new Date(b.echeance).getTime());
 }

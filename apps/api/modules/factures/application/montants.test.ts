@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calculerMontantsLigne, calculerTotaux, calculerMontantsAvoirLigne, necessite_attestation_tva_reduite, appliquerRegimeTVA } from "./montants";
+import { calculerMontantsLigne, calculerTotaux, calculerMontantsAvoirLigne, necessite_attestation_tva_reduite, appliquerRegimeTVA, calculerSousTotauxParSection } from "./montants";
 
 describe("factures — calcul des montants de ligne (pur)", () => {
   it("ligne produit : HT = q×pu, TVA = HT×taux/100, TTC = HT+TVA", () => {
@@ -112,6 +112,44 @@ describe("necessite_attestation_tva_reduite (L1 — pur)", () => {
 
   it("renvoie false pour une liste vide", () => {
     expect(necessite_attestation_tva_reduite([])).toBe(false);
+  });
+});
+
+describe("factures — sous-totaux par section (pur)", () => {
+  const l = (type: "produit" | "section" | "note", ht = "0.00", tva = "0.00", ttc = "0.00", designation = "") =>
+    ({ type, designation, montantHT: ht, montantTVA: tva, montantTTC: ttc } as const);
+
+  it("aucune section → Map vide", () => {
+    expect(calculerSousTotauxParSection([l("produit", "100.00", "20.00", "120.00")])).toEqual(new Map());
+  });
+
+  it("section neutre (0 articles) → Map vide", () => {
+    expect(calculerSousTotauxParSection([l("section", "0.00", "0.00", "0.00", "Lot 1")])).toEqual(new Map());
+  });
+
+  it("regroupement correct : sous-total inséré après le dernier article du lot", () => {
+    const lignes = [
+      l("section", "0.00", "0.00", "0.00", "Lot A"),
+      l("produit", "200.00", "40.00", "240.00"),
+      l("section", "0.00", "0.00", "0.00", "Lot B"),
+      l("produit", "50.00", "10.00", "60.00"),
+      l("produit", "50.00", "10.00", "60.00"),
+    ] as const;
+    const result = calculerSousTotauxParSection(lignes);
+    expect(result.size).toBe(2);
+    expect(result.get(1)).toMatchObject({ sectionLabel: "Lot A", totalHT: "200.00" });
+    expect(result.get(4)).toMatchObject({ sectionLabel: "Lot B", totalHT: "100.00" });
+  });
+
+  it("articles avant la première section : ignorés", () => {
+    const lignes = [
+      l("produit", "999.00", "0.00", "999.00"),
+      l("section", "0.00", "0.00", "0.00", "Lot"),
+      l("produit", "10.00", "2.00", "12.00"),
+    ] as const;
+    const result = calculerSousTotauxParSection(lignes);
+    expect(result.size).toBe(1);
+    expect(result.get(2)).toMatchObject({ totalHT: "10.00" });
   });
 });
 

@@ -31,6 +31,52 @@ export function calculerMontantsLigne(
   return { montantHT: ht.toFixed(2), montantTVA: tva.toFixed(2), montantTTC: round2(ht + tva).toFixed(2) };
 }
 
+export interface LotSousTotal {
+  readonly sectionLabel: string;
+  readonly totalHT: string;
+  readonly totalTVA: string;
+  readonly totalTTC: string;
+}
+
+/**
+ * Sous-totaux par lot : pour chaque lot précédé d'une `section` et contenant ≥1 article,
+ * renvoie Map(index → LotSousTotal) où l'entrée s'insère APRÈS lignes[index].
+ * Les lots avant la première section et les lots vides sont ignorés.
+ */
+export function calculerSousTotauxParSection(
+  lignes: readonly { type: LigneType; designation?: string | null; montantHT: string; montantTVA: string; montantTTC: string }[],
+): Map<number, LotSousTotal> {
+  const result = new Map<number, LotSousTotal>();
+  let section: string | null = null;
+  let ht = 0, tva = 0, ttc = 0;
+  let hasArticles = false;
+
+  const flush = (idx: number) => {
+    if (section !== null && hasArticles) {
+      result.set(idx, { sectionLabel: section, totalHT: round2(ht).toFixed(2), totalTVA: round2(tva).toFixed(2), totalTTC: round2(ttc).toFixed(2) });
+    }
+  };
+
+  for (let i = 0; i < lignes.length; i++) {
+    const l = lignes[i];
+    if (l.type === "section") {
+      flush(i - 1);
+      section = l.designation ?? "";
+      ht = tva = ttc = 0;
+      hasArticles = false;
+    } else if (l.type !== "note") {
+      if (section !== null) {
+        ht += Number(l.montantHT) || 0;
+        tva += Number(l.montantTVA) || 0;
+        ttc += Number(l.montantTTC) || 0;
+        hasArticles = true;
+      }
+    }
+  }
+  flush(lignes.length - 1);
+  return result;
+}
+
 /*
  * Totaux d'un devis = somme des montants de ses lignes (les lignes d'affichage valent 0 →
  * neutres). Les totaux sont TOUJOURS dérivés des lignes côté serveur, jamais fournis par le

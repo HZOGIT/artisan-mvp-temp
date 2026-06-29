@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/shared/ui/badge";
 import { Textarea } from "@/shared/ui/textarea";
 import { useFactureDetail, useSearchArticles } from "../application/use-facture-detail";
-import { formatCurrency, isAvoirDoc, avoirSolde, avoirLignesMontantTTC, buildAvoirTotalLignes, pdfLignes, activitesForFacture, pendingCount, allowedNext, statutAction, STATUS_LABEL_KEY, STATUS_COLORS, RAPPEL_TYPE_KEY, type ArticleSearchResult, type AvoirLigneForm, type RappelType } from "../domain/facture-detail";
+import { formatCurrency, isAvoirDoc, avoirSolde, avoirLignesMontantTTC, buildAvoirTotalLignes, pdfLignes, activitesForFacture, pendingCount, allowedNext, statutAction, STATUS_LABEL_KEY, STATUS_COLORS, RAPPEL_TYPE_KEY, sectionSousTotaux, type ArticleSearchResult, type AvoirLigneForm, type RappelType } from "../domain/facture-detail";
 import { TVA_CATEGORIES } from "@/shared/tva/taux-tva-fr";
 import type { TvaCategorieId } from "@/shared/tva/taux-tva-fr";
 
@@ -331,16 +331,24 @@ export default function FactureDetailPage() {
               <table className="data-table">
                 <thead><tr><th>{t("colReference")}</th><th>{t("designation")}</th><th className="text-right">{t("qte")}</th><th className="text-right">{t("prixHT")}</th><th className="text-right">{t("colTVA")}</th><th className="text-right">{t("colTotalTTC")}</th></tr></thead>
                 <tbody>
-                  {facture.lignes.map((ligne) => {
+                  {(() => { const stMap = sectionSousTotaux(facture.lignes); return facture.lignes.map((ligne, i) => {
+                    const st = stMap.get(i);
                     if (ligne.type === "section" || ligne.type === "note") {
                       return (<tr key={ligne.id} className={ligne.type === "section" ? "bg-muted/50" : ""}><td colSpan={6} className={ligne.type === "section" ? "font-semibold" : "italic text-muted-foreground"}>{ligne.type === "section" ? "§ " : ""}{ligne.designation}</td></tr>);
                     }
                     return (
-                      <tr key={ligne.id}>
-                        <td>{ligne.reference || "-"}</td><td>{ligne.designation}</td><td className="text-right">{ligne.quantite} {ligne.unite}</td><td className="text-right">{formatCurrency(ligne.prixUnitaireHT)}</td><td className="text-right">{ligne.tauxTVA}%</td><td className="text-right font-medium">{formatCurrency(ligne.montantTTC)}</td>
-                      </tr>
+                      <>
+                        <tr key={ligne.id}>
+                          <td>{ligne.reference || "-"}</td><td>{ligne.designation}</td><td className="text-right">{ligne.quantite} {ligne.unite}</td><td className="text-right">{formatCurrency(ligne.prixUnitaireHT)}</td><td className="text-right">{ligne.tauxTVA}%</td><td className="text-right font-medium">{formatCurrency(ligne.montantTTC)}</td>
+                        </tr>
+                        {st && (
+                          <tr key={`st-${i}`} className="bg-slate-100/80 border-t border-slate-200">
+                            <td colSpan={6} className="text-right text-sm font-semibold text-slate-600 py-1 pr-4">{t("sousTotalLot", { label: st.sectionLabel, montant: formatCurrency(st.totalHT) })}</td>
+                          </tr>
+                        )}
+                      </>
                     );
-                  })}
+                  }); })()}
                 </tbody>
                 <tfoot>
                   <tr className="border-t-2"><td colSpan={5} className="text-right font-medium">{t("totalHT")}</td><td className="text-right font-medium">{formatCurrency(facture.totalHT)}</td></tr>

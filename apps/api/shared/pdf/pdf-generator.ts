@@ -474,6 +474,39 @@ const TABLE_THEME = {
 
 /*
  * ============================================================================
+ * Sous-totaux par section — helper PDF interne (même logique que les montants.ts de module)
+ * ============================================================================
+ */
+
+interface PdfLotSousTotal { sectionLabel: string; totalHT: number }
+
+function pdfSousTotauxMap(lignes: readonly { type?: string | null; designation?: string | null; montantHT?: number | string | null }[]): Map<number, PdfLotSousTotal> {
+  const result = new Map<number, PdfLotSousTotal>();
+  let section: string | null = null;
+  let ht = 0;
+  let hasArticles = false;
+
+  const flush = (idx: number) => {
+    if (section !== null && hasArticles) result.set(idx, { sectionLabel: section, totalHT: ht });
+  };
+
+  for (let i = 0; i < lignes.length; i++) {
+    const type = lignes[i].type ?? "produit";
+    if (type === "section") {
+      flush(i - 1);
+      section = lignes[i].designation ?? "";
+      ht = 0;
+      hasArticles = false;
+    } else if (type !== "note") {
+      if (section !== null) { ht += Number(lignes[i].montantHT) || 0; hasArticles = true; }
+    }
+  }
+  flush(lignes.length - 1);
+  return result;
+}
+
+/*
+ * ============================================================================
  * Public types
  * ============================================================================
  */
@@ -549,29 +582,36 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   /** Tableau des lignes */
   const hasRemiseD = devis.lignes.some((l) => Number(l.remise) > 0);
   const colSpanD = hasRemiseD ? 5 : 4;
-  const tableData = devis.lignes.map((ligne) => {
+  const sousTotauxD = pdfSousTotauxMap(devis.lignes);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tableData: any[] = [];
+  devis.lignes.forEach((ligne, i) => {
     /*
      * Section (en-tête de lot, gras) / note (texte libre, italique) en
      * pleine largeur, sans colonnes chiffrées ; exclues des totaux (montants 0).
      */
     const type = ligne.type ?? "produit";
     if (type === "section") {
-      return [{ content: ligne.designation ?? "", colSpan: colSpanD, styles: { fontStyle: "bold" as const, fillColor: [226, 232, 240] as [number, number, number], textColor: [30, 41, 59] as [number, number, number] } }];
+      tableData.push([{ content: ligne.designation ?? "", colSpan: colSpanD, styles: { fontStyle: "bold" as const, fillColor: [226, 232, 240] as [number, number, number], textColor: [30, 41, 59] as [number, number, number] } }]);
+    } else if (type === "note") {
+      tableData.push([{ content: ligne.designation ?? "", colSpan: colSpanD, styles: { fontStyle: "italic" as const, textColor: [100, 100, 100] as [number, number, number] } }]);
+    } else {
+      const quantite = Number(ligne.quantite) || 0;
+      const prixUnitaire = Number(ligne.prixUnitaireHT) || 0;
+      const montantHT = ligne.montantHT != null ? Number(ligne.montantHT) : prixUnitaire * quantite;
+      const row: (string | number)[] = [ligne.designation ?? "", quantite.toString(), `${prixUnitaire.toFixed(2)} €`];
+      if (hasRemiseD) row.push(Number(ligne.remise) > 0 ? `${Number(ligne.remise).toFixed(0)}%` : "");
+      row.push(`${montantHT.toFixed(2)} €`);
+      tableData.push(row);
     }
-    if (type === "note") {
-      return [{ content: ligne.designation ?? "", colSpan: colSpanD, styles: { fontStyle: "italic" as const, textColor: [100, 100, 100] as [number, number, number] } }];
+    const st = sousTotauxD.get(i);
+    if (st) {
+      const stFill = tint(primary, 0.90);
+      tableData.push([
+        { content: `Sous-total ${st.sectionLabel}`, colSpan: colSpanD - 1, styles: { fontStyle: "bold" as const, halign: "right" as const, fillColor: stFill, textColor: TEXT_DARK } },
+        { content: `${st.totalHT.toFixed(2)} €`, styles: { fontStyle: "bold" as const, halign: "right" as const, fillColor: stFill, textColor: TEXT_DARK } },
+      ]);
     }
-    const quantite = Number(ligne.quantite) || 0;
-    const prixUnitaire = Number(ligne.prixUnitaireHT) || 0;
-    const montantHT = ligne.montantHT != null ? Number(ligne.montantHT) : prixUnitaire * quantite;
-    const row: (string | number)[] = [
-      ligne.designation ?? "",
-      quantite.toString(),
-      `${prixUnitaire.toFixed(2)} €`,
-    ];
-    if (hasRemiseD) row.push(Number(ligne.remise) > 0 ? `${Number(ligne.remise).toFixed(0)}%` : "");
-    row.push(`${montantHT.toFixed(2)} €`);
-    return row;
   });
 
   const headD = hasRemiseD
@@ -748,29 +788,36 @@ export async function generateFacturePDF(data: PDFFactureData): Promise<Buffer> 
   /** Tableau des lignes */
   const hasRemiseF = facture.lignes.some((l) => Number(l.remise) > 0);
   const colSpanF = hasRemiseF ? 5 : 4;
-  const tableData = facture.lignes.map((ligne) => {
+  const sousTotauxF = pdfSousTotauxMap(facture.lignes);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tableData: any[] = [];
+  facture.lignes.forEach((ligne, i) => {
     /*
      * Section (en-tête de lot, gras) / note (texte libre, italique)
      * en pleine largeur, sans colonnes chiffrées ; exclues des totaux (montants 0).
      */
     const type = ligne.type ?? "produit";
     if (type === "section") {
-      return [{ content: ligne.designation ?? "", colSpan: colSpanF, styles: { fontStyle: "bold" as const, fillColor: [226, 232, 240] as [number, number, number], textColor: [30, 41, 59] as [number, number, number] } }];
+      tableData.push([{ content: ligne.designation ?? "", colSpan: colSpanF, styles: { fontStyle: "bold" as const, fillColor: [226, 232, 240] as [number, number, number], textColor: [30, 41, 59] as [number, number, number] } }]);
+    } else if (type === "note") {
+      tableData.push([{ content: ligne.designation ?? "", colSpan: colSpanF, styles: { fontStyle: "italic" as const, textColor: [100, 100, 100] as [number, number, number] } }]);
+    } else {
+      const quantite = Number(ligne.quantite) || 0;
+      const prixUnitaire = Number(ligne.prixUnitaireHT) || 0;
+      const montantHT = ligne.montantHT != null ? Number(ligne.montantHT) : prixUnitaire * quantite;
+      const row: (string | number)[] = [ligne.designation ?? "", quantite.toString(), `${prixUnitaire.toFixed(2)} €`];
+      if (hasRemiseF) row.push(Number(ligne.remise) > 0 ? `${Number(ligne.remise).toFixed(0)}%` : "");
+      row.push(`${montantHT.toFixed(2)} €`);
+      tableData.push(row);
     }
-    if (type === "note") {
-      return [{ content: ligne.designation ?? "", colSpan: colSpanF, styles: { fontStyle: "italic" as const, textColor: [100, 100, 100] as [number, number, number] } }];
+    const st = sousTotauxF.get(i);
+    if (st) {
+      const stFill = tint(primary, 0.90);
+      tableData.push([
+        { content: `Sous-total ${st.sectionLabel}`, colSpan: colSpanF - 1, styles: { fontStyle: "bold" as const, halign: "right" as const, fillColor: stFill, textColor: TEXT_DARK } },
+        { content: `${st.totalHT.toFixed(2)} €`, styles: { fontStyle: "bold" as const, halign: "right" as const, fillColor: stFill, textColor: TEXT_DARK } },
+      ]);
     }
-    const quantite = Number(ligne.quantite) || 0;
-    const prixUnitaire = Number(ligne.prixUnitaireHT) || 0;
-    const montantHT = ligne.montantHT != null ? Number(ligne.montantHT) : prixUnitaire * quantite;
-    const row: (string | number)[] = [
-      ligne.designation ?? "",
-      quantite.toString(),
-      `${prixUnitaire.toFixed(2)} €`,
-    ];
-    if (hasRemiseF) row.push(Number(ligne.remise) > 0 ? `${Number(ligne.remise).toFixed(0)}%` : "");
-    row.push(`${montantHT.toFixed(2)} €`);
-    return row;
   });
 
   const headF = hasRemiseF
