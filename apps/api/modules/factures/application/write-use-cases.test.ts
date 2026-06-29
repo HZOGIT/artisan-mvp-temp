@@ -15,6 +15,8 @@ import {
   creerAvoir,
   calculerMontantSituation,
   facturerSituation,
+  facturerAcompte,
+  facturerSolde,
 } from "./write-use-cases";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import { ConflictError, NotFoundError, ValidationError } from "../../../shared/errors";
@@ -570,5 +572,104 @@ describe("facturerSituation — use-case (L1 fakes)", () => {
     /** Le cumul devis est inchangé. */
     expect((await reader.getDevis(A, 42))?.montantDejaFacture).toBe("0.00");
     reader.updateMontantDejaFactureTx = origTx;
+  });
+});
+
+/** Devis accepté simple pour les tests acompte (HT=1000, TVA=20%, TTC=1200). */
+const devisAcompte = (over: Partial<DevisReadModel> = {}): DevisReadModel => ({
+  id: 99,
+  artisanId: A.artisanId,
+  clientId: 100,
+  numero: "DEV-00099",
+  statut: "accepte",
+  objet: "Travaux",
+  referenceClient: null,
+  conditionsPaiement: null,
+  notes: null,
+  totalHT: "1000.00",
+  totalTVA: "200.00",
+  totalTTC: "1200.00",
+  montantDejaFacture: "0.00",
+  ...over,
+});
+
+describe("facturerAcompte / facturerSolde", () => {
+  function setup() {
+    const reader = new FakeDevisReader();
+    const repo = new FakeFactureRepository();
+    const devis = devisAcompte();
+    reader.register(devis, [
+      {
+        ordre: 0, reference: null, designation: "Pose", description: null,
+        quantite: "1.00", unite: "unité", prixUnitaireHT: "1000.00",
+        tauxTVA: "20.00", remise: "0", tvaCategorieId: null,
+        montantHT: "1000.00", montantTVA: "200.00", montantTTC: "1200.00",
+        type: "produit",
+      },
+    ]);
+    repo.registerClient(A.artisanId, 100);
+    repo.registerDevis(A.artisanId, 99);
+    return { reader, repo, devis };
+  }
+
+  it("acompte 30 % → facture estAcompte=true, HT=300, TVA=60, TTC=360, devis montantDejaFacture=360", async () => {
+    const { reader, repo } = setup();
+    const a = await facturerAcompte(repo, reader, A, { devisId: 99, montant: "360" });
+    expect(a.estAcompte).toBe(true);
+    expect(a.totalHT).toBe("300.00");
+    expect(a.totalTVA).toBe("60.00");
+    expect(a.totalTTC).toBe("360.00");
+    expect((await reader.getDevis(A, 99))?.montantDejaFacture).toBe("360.00");
+  });
+
+  it("acompte 30 % puis solde → Σ(acompte+solde).TTC = totalTTC devis + lignes déduction présentes", async () => {
+    const { reader, repo } = setup();
+    const acompte = await facturerAcompte(repo, reader, A, { devisId: 99, montant: "360" });
+    const solde = await facturerSolde(repo, reader, A, { devisId: 99 });
+
+    expect(Number(acompte.totalTTC) + Number(solde.totalTTC)).toBeCloseTo(1200, 1);
+    const lignes = await repo.listLignes(A, solde.id);
+    const deductionLignes = lignes.filter((l) => l.montantTTC < 0);
+    expect(deductionLignes).toHaveLength(1);
+    expect(Math.abs(Number(deductionLignes[0]?.montantTTC))).toBeCloseTo(360, 1);
+  });
+
+  it("multi-acomptes (30 % + 40 %) puis solde → Σ = 1200, 2 lignes déduction", async () => {
+    const { reader, repo } = setup();
+    const a1 = await facturerAcompte(repo, reader, A, { devisId: 99, montant: "360" });
+    const a2 = await facturerAcompte(repo, reader, A, { devisId: 99, montant: "480" });
+    const solde = await facturerSolde(repo, reader, A, { devisId: 99 });
+
+    const total = Number(a1.totalTTC) + Number(a2.totalTTC) + Number(solde.totalTTC);
+    expect(total).toBeCloseTo(1200, 1);
+
+    const lignes = await repo.listLignes(A, solde.id);
+    const deductions = lignes.filter((l) => l.montantTTC < 0);
+    expect(deductions).toHaveLength(2);
+  });
+
+  it("acompte dépassant le restant → ValidationError", async () => {
+    const { reader, repo } = setup();
+    await facturerAcompte(repo, reader, A, { devisId: 99, montant: "900" });
+    await expect(facturerAcompte(repo, reader, A, { devisId: 99, montant: "400" })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("devis non-accepté → ConflictError", async () => {
+    const reader = new FakeDevisReader();
+    reader.register({ ...devisAcompte(), statut: "brouillon" });
+    const repo = new FakeFactureRepository();
+    repo.registerClient(A.artisanId, 100);
+    await expect(facturerAcompte(repo, reader, A, { devisId: 99, montant: "100" })).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("facturerSolde si solde déjà existant → ConflictError (existsForDevis)", async () => {
+    const { reader, repo } = setup();
+    await facturerSolde(repo, reader, A, { devisId: 99 });
+    await expect(facturerSolde(repo, reader, A, { devisId: 99 })).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("cross-tenant : facturerAcompte d'un devis d'un autre tenant → NotFoundError", async () => {
+    const { reader, repo } = setup();
+    await expect(facturerAcompte(repo, reader, B, { devisId: 99, montant: "100" })).rejects.toBeInstanceOf(NotFoundError);
   });
 });

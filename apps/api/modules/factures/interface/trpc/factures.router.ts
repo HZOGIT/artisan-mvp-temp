@@ -31,6 +31,8 @@ import {
   creerAvoir,
   convertirDevisEnFacture,
   facturerSituation,
+  facturerAcompte,
+  facturerSolde,
 } from "../../application/write-use-cases";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
@@ -254,6 +256,27 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
       .mutation(async ({ ctx, input }) => {
         const result = await convertirDevisEnFacture(repo, devisReader, ctx.tenant, input.devisId);
         ctx.log.info({ event: "facture_depuis_devis", factureId: result.id, devisId: input.devisId }, "Devis converti en facture");
+        return result;
+      }),
+
+    /** Créer une facture d'acompte (estAcompte=true) depuis un devis accepté (montant fixe TTC). */
+    facturerAcompte: protectedProcedure
+      .input(z.object({
+        devisId: z.number().int(),
+        montant: decimal,
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const result = await facturerAcompte(repo, devisReader, ctx.tenant, input);
+        ctx.log.info({ event: "acompte_facture", factureId: result.id, devisId: input.devisId, montant: input.montant }, "Facture d'acompte créée");
+        return result;
+      }),
+
+    /** Créer la facture de solde (lignes devis + déductions acomptes) depuis un devis accepté. */
+    facturerSolde: protectedProcedure
+      .input(z.object({ devisId: z.number().int() }))
+      .mutation(async ({ ctx, input }) => {
+        const result = await facturerSolde(repo, devisReader, ctx.tenant, input);
+        ctx.log.info({ event: "solde_facture", factureId: result.id, devisId: input.devisId }, "Facture de solde créée");
         return result;
       }),
 

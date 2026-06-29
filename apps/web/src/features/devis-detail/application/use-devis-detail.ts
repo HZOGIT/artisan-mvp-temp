@@ -41,6 +41,9 @@ export function useDevisDetail(id: number) {
     deleteRappel: trpc.activites.delete.useMutation(),
     /** situations de travaux (facturation partielle) */
     facturerSituation: trpc.factures.facturerSituation.useMutation(),
+    /** acomptes et solde */
+    facturerAcompte: trpc.factures.facturerAcompte.useMutation(),
+    facturerSolde: trpc.factures.facturerSolde.useMutation(),
     /** signature */
     requestSignature: trpc.signature.createSignatureLink.useMutation(),
     /** variantes */

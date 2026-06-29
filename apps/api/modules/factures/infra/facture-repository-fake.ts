@@ -101,6 +101,7 @@ export class FakeFactureRepository implements IFactureRepository {
       regimeTVA: input.regimeTVA ?? "normal",
       pdfFileId: null,
       pdfStorageKey: null,
+      estAcompte: input.estAcompte ?? false,
     };
     this.factureStore.push(f);
     return f;
@@ -167,6 +168,7 @@ export class FakeFactureRepository implements IFactureRepository {
       regimeTVA: header.regimeTVA ?? "normal",
       pdfFileId: null,
       pdfStorageKey: null,
+      estAcompte: header.estAcompte ?? false,
     };
     this.factureStore.push(facture);
     const lignesAdded: number[] = [];
@@ -355,6 +357,7 @@ export class FakeFactureRepository implements IFactureRepository {
       regimeTVA: "normal",
       pdfFileId: null,
       pdfStorageKey: null,
+      estAcompte: false,
     };
     this.factureStore.push(avoir);
     input.lignes.forEach((l, i) => {
@@ -383,7 +386,13 @@ export class FakeFactureRepository implements IFactureRepository {
 
   async existsForDevis(ctx: TenantContext, devisId: number): Promise<boolean> {
     return this.factureStore.some(
-      (f) => f.artisanId === ctx.artisanId && f.devisId === devisId && f.typeDocument === "facture",
+      (f) => f.artisanId === ctx.artisanId && f.devisId === devisId && f.typeDocument === "facture" && !f.estAcompte,
+    );
+  }
+
+  async listAcomptes(ctx: TenantContext, devisId: number): Promise<Facture[]> {
+    return this.factureStore.filter(
+      (f) => f.artisanId === ctx.artisanId && f.devisId === devisId && f.typeDocument === "facture" && f.estAcompte,
     );
   }
 
@@ -419,6 +428,7 @@ export class FakeFactureRepository implements IFactureRepository {
       regimeTVA: "normal",
       pdfFileId: null,
       pdfStorageKey: null,
+      estAcompte: false,
     };
     this.factureStore.push(facture);
     input.lignes.forEach((l) => {
