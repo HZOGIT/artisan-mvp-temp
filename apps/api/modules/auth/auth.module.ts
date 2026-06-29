@@ -16,6 +16,8 @@ export interface AuthModuleDeps {
   readonly jwtSecret: string;
   readonly tokenTtl?: string | number;
   readonly email?: EmailPort;
+  readonly signinRateLimiter?: RateLimiterPort;
+  readonly signupRateLimiter?: RateLimiterPort;
   readonly resetRateLimiter?: RateLimiterPort;
   readonly appUrl?: string;
   readonly genResetToken?: () => string;
@@ -35,6 +37,8 @@ export function createAuthModule(deps: AuthModuleDeps): AuthModule {
     jwtSecret: deps.jwtSecret,
     tokenTtl: deps.tokenTtl,
     email: deps.email,
+    signinRateLimiter: deps.signinRateLimiter,
+    signupRateLimiter: deps.signupRateLimiter,
     resetRateLimiter: deps.resetRateLimiter,
     appUrl: deps.appUrl,
     genResetToken: deps.genResetToken,

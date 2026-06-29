@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { ConflictError, ForbiddenError, UnauthorizedError, ValidationError } from "../../../shared/errors";
-import { FakeEmailPort } from "../../../shared/ports/fakes";
+import { ConflictError, ForbiddenError, TooManyRequestsError, UnauthorizedError, ValidationError } from "../../../shared/errors";
+import { FakeEmailPort, FakeRateLimiter } from "../../../shared/ports/fakes";
 import { FakePasswordHasher } from "../../../shared/ports/password-hasher-bcrypt";
 import { verifyAuthToken } from "../../../shared/tenant/jwt";
 import { FakeAuthRepository } from "../infra/auth-repository-fake";
@@ -196,5 +196,24 @@ describe("auth use-cases", () => {
     expect(await logoutEverywhere(makeDeps(repo), 1)).toEqual({ success: true });
     expect(await repo.getPasswordChangedAt(1)).toBeInstanceOf(Date);
     expect((await repo.findCredentialsById(1))?.password).toBe("hashed:x");
+  });
+
+  it("OPE-773 — signin : signinRateLimiter bloqué → TooManyRequestsError (429)", async () => {
+    const repo = new FakeAuthRepository();
+    repo.seed({ id: 7, email: "ok@t.fr", password: "hashed:secret", role: "artisan", artisanId: 99 });
+    const limiter = new FakeRateLimiter();
+    limiter.denyKey("signin:ok@t.fr");
+    const deps: AuthDeps = { ...makeDeps(repo), signinRateLimiter: limiter };
+    await expect(signin(deps, { email: "ok@t.fr", password: "secret" })).rejects.toBeInstanceOf(TooManyRequestsError);
+    expect(repo.touched).toEqual([]); /* aucun accès DB si rate-limité */
+  });
+
+  it("OPE-774 — signup : signupRateLimiter bloqué (par IP) → TooManyRequestsError (429)", async () => {
+    const repo = new FakeAuthRepository();
+    const limiter = new FakeRateLimiter();
+    limiter.denyKey("signup:1.2.3.4");
+    const deps: AuthDeps = { ...makeDeps(repo), signupRateLimiter: limiter };
+    await expect(signup(deps, { email: "new@t.fr", password: "secret6", registrationIp: "1.2.3.4" })).rejects.toBeInstanceOf(TooManyRequestsError);
+    expect(repo.bootstrapped).toEqual([]);
   });
 });
