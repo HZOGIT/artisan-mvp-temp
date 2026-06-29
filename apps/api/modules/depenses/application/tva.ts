@@ -17,8 +17,11 @@ export function tvaDeduite(montantTva: string, coeff: string): string {
 }
 
 export function calculerTva(montantHt: string, tauxTva: string): MontantsTva {
-  const ht = Number(montantHt) || 0;
-  const taux = Number(tauxTva) || 0;
+  const ht = Number(montantHt);
+  const taux = Number(tauxTva);
+  if (!Number.isFinite(ht) || !Number.isFinite(taux)) {
+    throw new Error(`calculerTva: valeurs invalides (ht='${montantHt}', taux='${tauxTva}')`);
+  }
   const tva = round2(ht * (taux / 100));
   const ttc = round2(ht + tva);
   return { montantTva: tva.toFixed(2), montantTtc: ttc.toFixed(2) };
