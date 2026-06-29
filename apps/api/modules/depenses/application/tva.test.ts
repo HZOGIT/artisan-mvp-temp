@@ -25,8 +25,9 @@ describe("depenses — calcul TVA (pur)", () => {
     expect(ecart).toBeLessThanOrEqual(0.01);
   });
 
-  it("entrées non numériques → 0 (robustesse)", () => {
-    expect(calculerTva("", "20")).toEqual({ montantTva: "0.00", montantTtc: "0.00" });
+  it("entrée non numérique → lève une erreur (pas de TVA=0 silencieuse)", () => {
+    expect(() => calculerTva("abc", "20")).toThrow("calculerTva: valeurs invalides");
+    expect(() => calculerTva("100", "NaN")).toThrow("calculerTva: valeurs invalides");
   });
 });
 
