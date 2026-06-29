@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { TenantContext } from "../../../shared/tenant";
 import { IntegrationsComptablesRepositoryFake } from "../infra/integrations-comptables-repository-fake";
-import { getConfig, saveConfig, saveSyncConfig, getSyncStatus, getExports, genererExport, type GenererExportDeps } from "./use-cases";
+import { getConfig, saveConfig, saveSyncConfig, getSyncStatus, getExports, genererExport, getLockDate, verrouillerCompta, type GenererExportDeps } from "./use-cases";
 import { ValidationError } from "../../../shared/errors";
 
 const ctx: TenantContext = { artisanId: 1, userId: 1 };
@@ -71,5 +71,17 @@ describe("getExports", () => {
     await repo.createExport(ctx, { logiciel: "sage", formatExport: "fec", periodeDebut: "2026-01-01", periodeFin: "2026-01-31" });
     await repo.createExport(ctx, { logiciel: "sage", formatExport: "fec", periodeDebut: "2026-02-01", periodeFin: "2026-02-28" });
     expect((await getExports(repo, ctx)).map((e) => e.id)).toEqual([2, 1]);
+  });
+});
+
+describe("verrouillerCompta", () => {
+  it("pose, efface, et rejette format invalide", async () => {
+    const repo = new IntegrationsComptablesRepositoryFake();
+    expect(await getLockDate(repo, ctx)).toBeNull();
+    await verrouillerCompta(repo, ctx, "2024-12-31");
+    expect(await getLockDate(repo, ctx)).toBe("2024-12-31");
+    await verrouillerCompta(repo, ctx, null);
+    expect(await getLockDate(repo, ctx)).toBeNull();
+    await expect(verrouillerCompta(repo, ctx, "31/12/2024")).rejects.toBeInstanceOf(ValidationError);
   });
 });

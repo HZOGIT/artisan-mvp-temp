@@ -51,4 +51,16 @@ describe.skipIf(!URL)("integrationsComptables.router e2e (protégé)", () => {
     expect((await injectTrpc(app, "POST", "integrationsComptables.saveConfig", { logiciel: "sage", formatExport: "fec", actif: true }, tok)).statusCode).toBe(200);
     expect((await injectTrpc(app, "POST", "integrationsComptables.genererExport", { logiciel: "excel", formatExport: "fec", dateDebut: "2026-01-01", dateFin: "2026-12-31" }, tok)).statusCode).toBe(400);
   });
+
+  it("getLockDate → null ; verrouillerCompta → 200 ; date reflétée ; format invalide → 400", async () => {
+    const tok = await jwt(UID);
+    const init = await injectTrpc(app, "GET", "integrationsComptables.getLockDate", undefined, tok);
+    expect(init.statusCode).toBe(200);
+    /** superjson : null → { json: null } ; string → { json: "..." } */
+    expect(JSON.parse(init.body).result.data?.json ?? null).toBeNull();
+    expect((await injectTrpc(app, "POST", "integrationsComptables.verrouillerCompta", { date: "2024-12-31" }, tok)).statusCode).toBe(200);
+    const after = await injectTrpc(app, "GET", "integrationsComptables.getLockDate", undefined, tok);
+    expect(JSON.parse(after.body).result.data?.json ?? JSON.parse(after.body).result.data).toBe("2024-12-31");
+    expect((await injectTrpc(app, "POST", "integrationsComptables.verrouillerCompta", { date: "31/12/2024" }, tok)).statusCode).toBe(400);
+  });
 });
