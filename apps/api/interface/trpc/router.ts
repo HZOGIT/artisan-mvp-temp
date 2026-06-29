@@ -136,18 +136,13 @@ export interface AppRouterDeps {
 }
 
 /*
- * Routeur racine du nouveau stack. Les routeurs de domaines (phases 1-5) y sont montés
- * au fur et à mesure, derrière le gateway/flag. `whoami` démontre `protectedProcedure`.
+ * Registre des routeurs de modules — APPEND-ONLY. Ajouter un module = ajouter UNE ligne
+ * `<cléTrpc>: deps.<module>.router` ici (conflit de merge trivial), sans toucher au corps
+ * structurel de `createAppRouter`. L'objet retourné est typé statiquement : son spread dans
+ * `router({...})` préserve l'inférence de `AppRouter` (le client tRPC du front en dépend).
  */
-export function createAppRouter(deps: AppRouterDeps) {
-  return router({
-    health: publicProcedure.query(() => ({ status: "ok" as const })),
-    whoami: protectedProcedure.query(({ ctx }) => ({
-      artisanId: ctx.tenant.artisanId,
-      userId: ctx.tenant.userId,
-      role: ctx.tenant.role ?? null,
-    })),
-    vehicules: createVehiculesRouter(deps.vehiculeRepo, deps.vehiculesDb),
+function moduleRouters(deps: AppRouterDeps) {
+  return {
     avis: deps.avis.router,
     badges: deps.badges.router,
     techniciens: deps.techniciens.router,
@@ -212,6 +207,25 @@ export function createAppRouter(deps: AppRouterDeps) {
     einvoicing: deps.einvoicing.router,
     feedback: deps.feedback.router,
     piecesJointes: deps.piecesJointes.router,
+  };
+}
+
+/*
+ * Routeur racine du nouveau stack. Le corps ne porte que les procédures racines (health/whoami)
+ * et le cas spécial `vehicules` (routeur construit inline, pas un module assemblé) ; tous les
+ * modules sont montés par `moduleRouters` (registre append-only ci-dessus). `whoami` démontre
+ * `protectedProcedure`.
+ */
+export function createAppRouter(deps: AppRouterDeps) {
+  return router({
+    health: publicProcedure.query(() => ({ status: "ok" as const })),
+    whoami: protectedProcedure.query(({ ctx }) => ({
+      artisanId: ctx.tenant.artisanId,
+      userId: ctx.tenant.userId,
+      role: ctx.tenant.role ?? null,
+    })),
+    vehicules: createVehiculesRouter(deps.vehiculeRepo, deps.vehiculesDb),
+    ...moduleRouters(deps),
   });
 }
 
