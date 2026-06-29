@@ -23,7 +23,7 @@ const ctx = (over: Partial<AppContext>): AppContext => ({ claims: null, tenant: 
 describe("auth.module (router via createCaller)", () => {
   function build() {
     const repo = new FakeAuthRepository();
-    repo.seed({ id: 7, email: "ok@t.fr", password: "hashed:secret", role: "artisan", name: "Jean" });
+    repo.seed({ id: 7, email: "ok@t.fr", password: "hashed:secret", role: "artisan", artisanId: 99, name: "Jean" });
     return createAuthModule({ repository: repo, hasher: new FakePasswordHasher(), jwtSecret: SECRET });
   }
 
