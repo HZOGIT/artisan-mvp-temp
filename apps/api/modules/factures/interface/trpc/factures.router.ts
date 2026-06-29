@@ -9,6 +9,7 @@ import type { PushPort } from "../../../../shared/push/web-push-adapter";
 import type { DbClient } from "../../../../shared/db";
 import type { IStockRepository } from "../../../stocks/application/stock-repository";
 import type { StoragePort } from "../../../../shared/ports/storage";
+import type { TenantContext } from "../../../../shared/tenant";
 import { outboxEvent } from "../../../../shared/events/outbox-event";
 import { withOutbox } from "../../../../shared/events/with-outbox";
 import { envoyerFactureParEmail } from "../../application/envoyer-facture-email";
@@ -129,7 +130,7 @@ const avoirInputSchema = z.object({
  * use-cases (scoping tenant + numérotation serveur + anti-IDOR-FK + immutabilité post-émission),
  * laisse remonter les Domain errors (NotFound→404, Validation→400, Conflict→409).
  */
-export function createFacturesRouter(repo: IFactureRepository, devisReader: IDevisReader, compta: ComptaPort, mailing: FactureMailingDeps, push?: PushPort, outboxInTx?: (artisanId: number, factureId: number, tx: DbClient) => Promise<void>, db?: DbClient, stockRepo?: IStockRepository, storage?: StoragePort, attestationRepo?: IAttestationTvaRepository) {
+export function createFacturesRouter(repo: IFactureRepository, devisReader: IDevisReader, compta: ComptaPort, mailing: FactureMailingDeps, push?: PushPort, outboxInTx?: (artisanId: number, factureId: number, tx: DbClient) => Promise<void>, db?: DbClient, stockRepo?: IStockRepository, storage?: StoragePort, attestationRepo?: IAttestationTvaRepository, lockDateReader?: { getLockDate(ctx: TenantContext): Promise<string | null> }) {
 
   return router({
     list: protectedProcedure.query(({ ctx }) => listFactures(repo, ctx.tenant)),
@@ -159,13 +160,14 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
     create: protectedProcedure
       .input(createSchema)
       .mutation(async ({ ctx, input }) => {
+        const lockDate = await lockDateReader?.getLockDate(ctx.tenant) ?? null;
         const { lignes: rawLignes, ...rest } = input;
         const lignes = rawLignes?.map(({ tvaCategorieId, remise: remiseNum, ...l }) => {
           const categorieId = tvaCategorieId ?? "FR_20";
           return { ...l, tauxTVA: TVA_CATEGORIES_MAP[categorieId].taux, tvaCategorieId: categorieId, remise: String(remiseNum ?? 0) };
         });
         return withOutbox(db, repo, async (r, tx) => {
-          const result = await creerFacture(r, ctx.tenant, { ...rest, dateEcheance: toDate(rest.dateEcheance), lignes });
+          const result = await creerFacture(r, ctx.tenant, { ...rest, dateEcheance: toDate(rest.dateEcheance), lignes }, undefined, lockDate);
           ctx.log.info({ event: "facture_created", factureId: result.id, clientId: rest.clientId }, "Facture créée");
           push?.sendToUser(ctx.tenant.artisanId, { title: "Operioz", body: `Nouvelle facture créée (brouillon)` }).catch(() => undefined);
           if (tx) await outboxEvent(tx, ctx.tenant, { action: "facture.creee", entityType: "facture", entityId: result.id, payload: { clientId: rest.clientId, numero: result.numero ?? null } });
@@ -175,9 +177,10 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const lockDate = await lockDateReader?.getLockDate(ctx.tenant) ?? null;
         const { id, dateEcheance, ...data } = input;
-        return modifierFacture(repo, ctx.tenant, id, { ...data, dateEcheance: toDate(dateEcheance) });
+        return modifierFacture(repo, ctx.tenant, id, { ...data, dateEcheance: toDate(dateEcheance) }, lockDate);
       }),
 
     delete: protectedProcedure

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { Download, Settings, CheckCircle2, Clock, AlertCircle, RefreshCw, Zap, Play, Pause, History, ArrowUpDown, FileText, CreditCard, AlertTriangle, RotateCcw } from "lucide-react";
+import { Download, Settings, CheckCircle2, Clock, AlertCircle, RefreshCw, Zap, Play, Pause, History, ArrowUpDown, FileText, CreditCard, AlertTriangle, RotateCcw, Lock, Unlock } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Input } from "@/shared/ui/input";
@@ -22,10 +22,11 @@ const STATUT_ICON: Record<string, typeof CheckCircle2> = { en_cours: RefreshCw, 
 
 export default function IntegrationsComptablesPage() {
   const { t } = useTranslation("integrationsComptables");
-  const { config, exports, syncLogs, syncStatus, pendingItems, exportsLoading, saveConfig, saveSyncConfig, genererExport, lancerSync, retrySync } = useIntegrationsComptables();
+  const { config, lockDate, exports, syncLogs, syncStatus, pendingItems, exportsLoading, saveConfig, saveSyncConfig, genererExport, lancerSync, retrySync, verrouillerCompta } = useIntegrationsComptables();
   const [exportForm, setExportForm] = useState(defaultExportForm);
   const [configForm, setConfigForm] = useState(DEFAULT_CONFIG_FORM);
   const [syncConfig, setSyncConfig] = useState(DEFAULT_SYNC_CONFIG);
+  const [lockDateInput, setLockDateInput] = useState("");
 
   useEffect(() => { if (config) setSyncConfig(syncConfigFromConfig(config)); }, [config]);
 
@@ -285,6 +286,37 @@ export default function IntegrationsComptablesPage() {
               <Button onClick={() => saveConfig.mutate(configForm, { onSuccess: () => toast.success(t("toastConfig")), onError: (e) => toast.error(e.message) })} disabled={saveConfig.isPending}>
                 {saveConfig.isPending ? t("sauvegarde") : t("sauvegarderConfig")}
               </Button>
+            </CardContent>
+          </Card>
+
+          {/* Verrouillage comptable */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Lock className="h-5 w-5" />{t("verrouillageTitre")}</CardTitle>
+              <CardDescription>{t("verrouillageDesc")}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {lockDate && (
+                <div className="flex items-center gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  <Lock className="h-4 w-4 shrink-0" />
+                  <span>{t("periodeVerrouilleeJusquau", { date: lockDate })}</span>
+                  <Button size="sm" variant="outline" className="ml-auto" disabled={verrouillerCompta.isPending}
+                    onClick={() => verrouillerCompta.mutate({ date: null }, { onSuccess: () => toast.success(t("toastDeverrouille")), onError: (e) => toast.error(e.message) })}>
+                    <Unlock className="h-4 w-4 mr-1" />{t("deverrouiller")}
+                  </Button>
+                </div>
+              )}
+              <div className="flex items-end gap-3">
+                <div className="space-y-2 flex-1">
+                  <Label htmlFor="lock-date-input">{t("verrouillerJusquau")}</Label>
+                  <Input id="lock-date-input" type="date" value={lockDateInput} onChange={(e) => setLockDateInput(e.target.value)} max={new Date().toISOString().slice(0, 10)} />
+                </div>
+                <Button disabled={!lockDateInput || verrouillerCompta.isPending}
+                  onClick={() => verrouillerCompta.mutate({ date: lockDateInput }, { onSuccess: () => { toast.success(t("toastVerrouille", { date: lockDateInput })); setLockDateInput(""); }, onError: (e) => toast.error(e.message) })}>
+                  <Lock className="h-4 w-4 mr-2" />{t("verrouiller")}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">{t("verrouillageExplication")}</p>
             </CardContent>
           </Card>
         </TabsContent>

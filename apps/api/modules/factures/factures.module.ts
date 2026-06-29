@@ -9,6 +9,7 @@ import type { IStockRepository } from "../stocks/application/stock-repository";
 import type { StoragePort } from "../../shared/ports/storage";
 import { createFacturesRouter } from "./interface/trpc/factures.router";
 import { AttestationTvaRepositoryDrizzle } from "./infra/attestation-tva-repository-drizzle";
+import type { TenantContext } from "../../shared/tenant";
 
 /*
  * Wiring DI du module factures : assemble le routeur tRPC à partir du repository, du lecteur de
@@ -31,6 +32,8 @@ export interface FacturesModuleDeps {
   readonly stockRepo?: IStockRepository;
   /** Stockage objet (S3) pour les PDFs d'attestation TVA. Optionnel : sans stockage si absent. */
   readonly storage?: StoragePort;
+  /** Lecteur de date de verrouillage comptable (garde anti-création/modif en période close). */
+  readonly lockDateReader?: { getLockDate(ctx: TenantContext): Promise<string | null> };
 }
 
 export interface FacturesModule {
@@ -40,5 +43,5 @@ export interface FacturesModule {
 
 export function createFacturesModule(deps: FacturesModuleDeps): FacturesModule {
   const attestationRepo = deps.db ? new AttestationTvaRepositoryDrizzle(deps.db) : undefined;
-  return { deps, router: createFacturesRouter(deps.repository, deps.devisReader, deps.compta ?? NOOP_COMPTA, deps.mailing, deps.push, deps.outboxInTx, deps.db, deps.stockRepo, deps.storage, attestationRepo) };
+  return { deps, router: createFacturesRouter(deps.repository, deps.devisReader, deps.compta ?? NOOP_COMPTA, deps.mailing, deps.push, deps.outboxInTx, deps.db, deps.stockRepo, deps.storage, attestationRepo, deps.lockDateReader) };
 }

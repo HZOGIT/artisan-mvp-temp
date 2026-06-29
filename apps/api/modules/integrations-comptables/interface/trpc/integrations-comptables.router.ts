@@ -2,7 +2,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IIntegrationsComptablesRepository } from "../../application/integrations-comptables-repository";
 import type { TenantContext } from "../../../../shared/tenant";
-import { getConfig, saveConfig, saveSyncConfig, getSyncStatus, getExports, genererExport, getSyncLogs, getPendingItems, lancerSync, retrySync } from "../../application/use-cases";
+import { getConfig, saveConfig, saveSyncConfig, getSyncStatus, getExports, genererExport, getSyncLogs, getPendingItems, lancerSync, retrySync, getLockDate, verrouillerCompta } from "../../application/use-cases";
 
 const logicielEnum = z.enum(["sage", "quickbooks", "ciel", "ebp", "autre"]);
 const formatEnum = z.enum(["fec", "iif", "qbo", "csv"]);
@@ -55,5 +55,14 @@ export function createIntegrationsComptablesRouter(repo: IIntegrationsComptables
       ctx.log.info({ event: "comptabilite_sync_retry", type: input.type, id: input.id }, "Retry sync comptable");
       return result;
     }),
+
+    getLockDate: protectedProcedure.query(({ ctx }) => getLockDate(repo, ctx.tenant)),
+
+    verrouillerCompta: protectedProcedure
+      .input(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable() }))
+      .mutation(async ({ ctx, input }) => {
+        await verrouillerCompta(repo, ctx.tenant, input.date);
+        ctx.log.warn({ event: "compta_verrouillage", date: input.date }, "Date de verrouillage comptable modifiée");
+      }),
   });
 }

@@ -20,17 +20,21 @@ export function useIntegrationsComptables() {
     utils.integrationsComptables.getPendingItems.invalidate();
   };
 
+  const invalidateLock = () => utils.integrationsComptables.getLockDate.invalidate();
+
   const saveConfig = trpc.integrationsComptables.saveConfig.useMutation({ onSuccess: invalidateConfig });
   const saveSyncConfig = trpc.integrationsComptables.saveSyncConfig.useMutation({ onSuccess: invalidateConfig });
   const genererExport = trpc.integrationsComptables.genererExport.useMutation({ onSuccess: () => utils.integrationsComptables.getExports.invalidate() });
   const lancerSync = trpc.integrationsComptables.lancerSync.useMutation({ onSuccess: invalidateSync });
   const retrySync = trpc.integrationsComptables.retrySync.useMutation({ onSuccess: () => { utils.integrationsComptables.getSyncLogs.invalidate(); utils.integrationsComptables.getPendingItems.invalidate(); } });
+  const verrouillerCompta = trpc.integrationsComptables.verrouillerCompta.useMutation({ onSuccess: () => { invalidateConfig(); invalidateLock(); } });
 
   const config: Config | undefined = configQ.data;
+  const lockDate: string | null | undefined = trpc.integrationsComptables.getLockDate.useQuery().data;
   const exportsData: SyncRow[] = exportsQ.data ?? [];
   const syncLogs: SyncRow[] = logsQ.data ?? [];
   const syncStatus: SyncStatus | undefined = statusQ.data;
   const pendingItems: PendingItems | undefined = pendingQ.data;
 
-  return { config, exports: exportsData, syncLogs, syncStatus, pendingItems, exportsLoading: exportsQ.isLoading, saveConfig, saveSyncConfig, genererExport, lancerSync, retrySync };
+  return { config, lockDate, exports: exportsData, syncLogs, syncStatus, pendingItems, exportsLoading: exportsQ.isLoading, saveConfig, saveSyncConfig, genererExport, lancerSync, retrySync, verrouillerCompta };
 }

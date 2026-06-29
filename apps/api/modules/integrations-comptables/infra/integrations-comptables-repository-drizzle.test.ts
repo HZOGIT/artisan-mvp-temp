@@ -95,6 +95,17 @@ describe.skipIf(!URL)("IntegrationsComptablesRepositoryDrizzle (RLS)", () => {
     expect(await repo.getConfig(ctx(artisanB))).toBeNull(); // isolation B inchangé
   });
 
+  it("getLockDate / setLockDate : persist + round-trip + isolation tenant (L2 RLS)", async () => {
+    expect(await repo.getLockDate(ctx(artisanA))).toBeNull();
+    await repo.setLockDate(ctx(artisanA), "2024-03-31");
+    expect(await repo.getLockDate(ctx(artisanA))).toBe("2024-03-31");
+    expect(await repo.getLockDate(ctx(artisanB))).toBeNull(); // isolation tenant
+    await repo.setLockDate(ctx(artisanA), "2024-06-30");
+    expect(await repo.getLockDate(ctx(artisanA))).toBe("2024-06-30"); // maj
+    await repo.setLockDate(ctx(artisanA), null);
+    expect(await repo.getLockDate(ctx(artisanA))).toBeNull(); // reset
+  });
+
   it("listPendingItems : facture émise non couverte par un export terminé chevauchant", async () => {
     const pendingBefore = await repo.listPendingItems(ctx(artisanA));
     expect(pendingBefore.some((p) => p.numero === "IIF-1")).toBe(true); // pas encore couverte

@@ -42,6 +42,10 @@ export interface IIntegrationsComptablesRepository {
   listPendingItems(ctx: TenantContext): Promise<PendingItem[]>;
   /** Met à jour `derniereSync` de la config (NOW). */
   touchDerniereSync(ctx: TenantContext, now: Date): Promise<void>;
+  /** Date de verrouillage comptable du tenant (YYYY-MM-DD) ou null si aucune. */
+  getLockDate(ctx: TenantContext): Promise<string | null>;
+  /** Pose ou efface la date de verrouillage comptable. */
+  setLockDate(ctx: TenantContext, date: string | null): Promise<void>;
 }
 
 /** Item en attente de synchro (facture non encore exportée). */

@@ -1,4 +1,5 @@
 import type { DbClient } from "../../shared/db";
+import type { TenantContext } from "../../shared/tenant";
 import type { IDepenseRepository } from "./application/depense-repository";
 import type { ICategorieDepenseRepository } from "../categories-depenses/application/categorie-depense-repository";
 import type { IBudgetCategorieRepository } from "../budgets-categories/application/budget-categorie-repository";
@@ -33,6 +34,8 @@ export interface DepensesModuleDeps {
    */
   readonly ocr?: { readonly vision: VisionPort; readonly rateLimiter: RateLimiterPort };
   readonly deplacementRepository?: IDeplacementRepository;
+  /** Lecteur de date de verrouillage comptable (garde anti-création/modif en période close). */
+  readonly lockDateReader?: { getLockDate(ctx: TenantContext): Promise<string | null> };
 }
 
 export interface DepensesModule {
@@ -55,6 +58,7 @@ export function createDepensesModule(deps: DepensesModuleDeps): DepensesModule {
       deps.db,
       deps.ocr,
       deps.deplacementRepository,
+      deps.lockDateReader,
     ),
   };
 }

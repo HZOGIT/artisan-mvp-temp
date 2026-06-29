@@ -2,6 +2,7 @@ import { ConflictError, NotFoundError, ValidationError } from "../../../shared/e
 import type { TenantContext } from "../../../shared/tenant";
 import { TVA_CATEGORIES_MAP } from "../../../shared/tva/taux-tva-fr";
 import { round2 } from "../../../shared/money";
+import { assertDateNonVerrouillee } from "../../../shared/compta-lock";
 import { factureCounter } from "../../../shared/observability/business-metrics";
 import type { IFactureRepository, AvoirLigneData, CopiedLigneData, Reglement } from "./facture-repository";
 import type { DbClient } from "../../../shared/db";
@@ -59,7 +60,8 @@ function assertLigneValide(designation: string | undefined, prixUnitaireHT?: str
   }
 }
 
-export async function creerFacture(repo: IFactureRepository, ctx: TenantContext, input: CreerFactureInput, inTx?: (tx: DbClient) => Promise<void>): Promise<Facture> {
+export async function creerFacture(repo: IFactureRepository, ctx: TenantContext, input: CreerFactureInput, inTx?: (tx: DbClient) => Promise<void>, lockDate?: string | null): Promise<Facture> {
+  assertDateNonVerrouillee(new Date(), lockDate ?? null);
   /** Anti-IDOR-FK : client (et devis lié) du tenant uniquement (ne révèle pas l'existence). */
   if (!(await repo.ownsClient(ctx, input.clientId))) throw new NotFoundError("Client introuvable");
   if (input.devisId != null && !(await repo.ownsDevis(ctx, input.devisId))) throw new NotFoundError("Devis introuvable");
@@ -76,9 +78,11 @@ export async function modifierFacture(
   ctx: TenantContext,
   id: number,
   input: UpdateFactureInput,
+  lockDate?: string | null,
 ): Promise<Facture> {
   const facture = await getFactureOwned(repo, ctx, id);
   assertModifiable(facture);
+  assertDateNonVerrouillee(facture.dateFacture, lockDate ?? null);
   const updated = await repo.update(ctx, id, input);
   if (!updated) throw new NotFoundError("Facture introuvable");
   return updated;

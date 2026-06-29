@@ -8,6 +8,15 @@ export function getConfig(repo: IIntegrationsComptablesRepository, ctx: TenantCo
   return repo.getConfig(ctx);
 }
 
+export function getLockDate(repo: IIntegrationsComptablesRepository, ctx: TenantContext): Promise<string | null> {
+  return repo.getLockDate(ctx);
+}
+
+export async function verrouillerCompta(repo: IIntegrationsComptablesRepository, ctx: TenantContext, date: string | null): Promise<void> {
+  if (date !== null && !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new ValidationError("Date de verrouillage invalide (format AAAA-MM-JJ attendu)");
+  await repo.setLockDate(ctx, date);
+}
+
 export function saveConfig(repo: IIntegrationsComptablesRepository, ctx: TenantContext, input: SaveConfigInput): Promise<ConfigComptable | null> {
   return repo.saveConfig(ctx, input);
 }

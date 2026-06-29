@@ -139,6 +139,20 @@ describe("depenses — use-cases d'écriture", () => {
     await expect(modifierDepense(repo, B, d.id, { description: "intrusion" })).rejects.toBeInstanceOf(NotFoundError);
   });
 
+  it("garde verrouillage — creerDepense refuse si dateDepense ≤ lockDate", async () => {
+    const repo = new FakeDepenseRepository();
+    await expect(creerDepense(repo, A, base({ dateDepense: "2024-01-15" }), "2024-03-31")).rejects.toBeInstanceOf(ValidationError);
+    await expect(creerDepense(repo, A, base({ dateDepense: "2024-03-31" }), "2024-03-31")).rejects.toBeInstanceOf(ValidationError);
+    await expect(creerDepense(repo, A, base({ dateDepense: "2024-04-01" }), "2024-03-31")).resolves.toBeDefined();
+  });
+
+  it("garde verrouillage — modifierDepense refuse si nouvelle dateDepense ≤ lockDate", async () => {
+    const repo = new FakeDepenseRepository();
+    const d = await creerDepense(repo, A, base({ dateDepense: "2024-04-15" }));
+    await expect(modifierDepense(repo, A, d.id, { dateDepense: "2024-02-01" }, "2024-03-31")).rejects.toBeInstanceOf(ValidationError);
+    await expect(modifierDepense(repo, A, d.id, { dateDepense: "2024-04-02" }, "2024-03-31")).resolves.toBeDefined();
+  });
+
   it("supprimerDepense — dépense du tenant → OK", async () => {
     const repo = new FakeDepenseRepository();
     const d = await creerDepense(repo, A, base());
