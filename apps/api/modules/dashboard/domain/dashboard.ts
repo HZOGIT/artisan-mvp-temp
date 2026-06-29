@@ -40,6 +40,23 @@ export interface DashIntervention {
   readonly createdAt: Date;
 }
 
+/** Agrégats SQL pré-calculés (remplace les 4 chargements complets listFactures/Devis/Clients/Interventions). */
+export interface DashboardSummaryStats {
+  readonly caMonth: number;
+  readonly caYear: number;
+  readonly facturesImpayeesCount: number;
+  readonly facturesImpayeesTotal: number;
+  readonly devisEnCours: number;
+  readonly devisAcceptes: number;
+  readonly devisThisMonth: number;
+  readonly totalClients: number;
+  readonly clientsThisMonth: number;
+  readonly totalDevis: number;
+  readonly totalFactures: number;
+  readonly totalInterventions: number;
+  readonly interventionsAVenir: number;
+}
+
 /** ── Sorties ────────────────────────────────────────────────────────────────────────────────────── */
 export interface DashboardStats {
   readonly caMonth: number;
