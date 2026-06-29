@@ -66,6 +66,7 @@ export interface Facture {
   readonly regimeTVA: RegimeTVA;
   readonly pdfFileId: number | null;
   readonly pdfStorageKey: string | null;
+  readonly estAcompte: boolean;
 }
 
 /*
@@ -85,6 +86,7 @@ export interface CreateFactureInput {
   readonly notes?: string | null;
   readonly dateEcheance?: Date | null;
   readonly regimeTVA?: RegimeTVA;
+  readonly estAcompte?: boolean;
 }
 
 /*

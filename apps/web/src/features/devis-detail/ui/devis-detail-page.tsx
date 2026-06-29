@@ -39,6 +39,8 @@ export default function DevisDetailPage() {
   const [newVarianteForm, setNewVarianteForm] = useState({ nom: "", description: "", recommandee: false });
   const [isSituationOpen, setIsSituationOpen] = useState(false);
   const [situationPct, setSituationPct] = useState("");
+  const [isAcompteOpen, setIsAcompteOpen] = useState(false);
+  const [acompteMontant, setAcompteMontant] = useState("");
   const [rappelTitre, setRappelTitre] = useState("");
   const [rappelEcheance, setRappelEcheance] = useState("");
   const [rappelType, setRappelType] = useState<RappelType>("relance");
@@ -90,6 +92,23 @@ export default function DevisDetailPage() {
   const handleDeleteLine = (lineId: number) => { if (confirm(t("confirmSupprimerLigne"))) D.deleteLigne.mutate({ id: lineId, devisId: id }, { onSuccess: () => toast.success(t("toastLigneSupprimee")) }); };
   const handleConvert = () => { if (confirm(t("confirmConvertirFacture"))) D.convertToFacture.mutate({ devisId: id }, { onSuccess: (data) => { toast.success(t("toastFactureCree")); window.location.href = `/factures/${data.id}`; }, onError: () => toast.error(t("errFacture")) }); };
   const handleDuplicate = () => { if (confirm(t("confirmDupliquer"))) D.duplicate.mutate({ devisId: id }, { onSuccess: (nd) => { toast.success(t("toastDuplique")); window.location.href = `/devis/${nd.id}`; }, onError: () => toast.error(t("errDuplication")) }); };
+
+  const handleFacturerAcompte = () => {
+    const montant = acompteMontant.replace(",", ".");
+    if (!montant || isNaN(parseFloat(montant)) || parseFloat(montant) <= 0) { toast.error(t("errMontantAcompteInvalide")); return; }
+    D.facturerAcompte.mutate({ devisId: id, montant }, {
+      onSuccess: (f) => { toast.success(t("toastAcompteCree")); setIsAcompteOpen(false); setAcompteMontant(""); window.location.href = `/factures/${f.id}`; },
+      onError: (e) => toast.error(e.message || t("errAcompte")),
+    });
+  };
+
+  const handleFacturerSolde = () => {
+    if (!confirm(t("confirmSolde"))) return;
+    D.facturerSolde.mutate({ devisId: id }, {
+      onSuccess: (f) => { toast.success(t("toastSoldeCree")); window.location.href = `/factures/${f.id}`; },
+      onError: (e) => toast.error(e.message || t("errSolde")),
+    });
+  };
 
   const handleFacturerSituation = () => {
     const pct = parseFloat(situationPct);
@@ -193,6 +212,35 @@ export default function DevisDetailPage() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+          )}
+          {statut === "accepte" && (
+            <Dialog open={isAcompteOpen} onOpenChange={setIsAcompteOpen}>
+              <DialogTrigger asChild><Button variant="outline"><Receipt className="h-4 w-4 mr-2" />{t("facturerAcompte")}</Button></DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{t("facturerAcompteTitre")}</DialogTitle>
+                  <DialogDescription>{t("facturerAcompteDesc", { total: formatCurrency(devis.totalTTC), dejaFacture: formatCurrency(devis.montantDejaFacture) })}</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="acompte-montant">{t("montantAcompteTTC")}</Label>
+                    <div className="flex items-center gap-2">
+                      <Input id="acompte-montant" type="number" min="0.01" step="0.01" placeholder="1000.00" value={acompteMontant} onChange={(e) => setAcompteMontant(e.target.value)} className="w-40" />
+                      <span className="text-muted-foreground">{t("unitEuroTTC")}</span>
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => { setIsAcompteOpen(false); setAcompteMontant(""); }}>{t("annuler")}</Button>
+                  <Button onClick={handleFacturerAcompte} disabled={D.facturerAcompte.isPending}>{D.facturerAcompte.isPending ? t("creation") : t("creerAcompte")}</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+          {statut === "accepte" && (
+            <Button variant="outline" onClick={handleFacturerSolde} disabled={D.facturerSolde.isPending}>
+              <FileText className="h-4 w-4 mr-2" />{t("facturerSolde")}
+            </Button>
           )}
         </div>
       </div>

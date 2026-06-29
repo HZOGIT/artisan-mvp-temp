@@ -488,6 +488,161 @@ export async function changerStatutFacture(
   return updated;
 }
 
+/** Entrée pour créer une facture d'acompte depuis un devis accepté. */
+export type FacturerAcompteInput = {
+  readonly devisId: number;
+  readonly montant: string;
+};
+
+/*
+ * Crée une facture d'acompte (estAcompte=true) sur un devis accepté. ⚠️ Invariants :
+ *  - devis du tenant, statut `accepte` ;
+ *  - montant > 0 et cumul ≤ totalTTC devis (anti-dépassement) ;
+ *  - aucune facture de solde déjà émise (existsForDevis=false) ;
+ *  - met à jour montantDejaFacture atomiquement (même tx que la création).
+ */
+export async function facturerAcompte(
+  factureRepo: IFactureRepository,
+  devisReader: IDevisReader,
+  ctx: TenantContext,
+  input: FacturerAcompteInput,
+): Promise<Facture> {
+  const devisData = await devisReader.getDevis(ctx, input.devisId);
+  if (!devisData) throw new NotFoundError("Devis introuvable");
+  if (devisData.statut !== "accepte") {
+    throw new ConflictError("Seul un devis accepté peut faire l'objet d'un acompte");
+  }
+  if (await factureRepo.existsForDevis(ctx, input.devisId)) {
+    throw new ConflictError("Une facture de solde a déjà été émise pour ce devis");
+  }
+
+  const montantTTC = round2(Number(input.montant) || 0);
+  if (!Number.isFinite(montantTTC) || montantTTC <= 0) {
+    throw new ValidationError("Le montant de l'acompte doit être strictement positif");
+  }
+
+  const totalDevis = Number(devisData.totalTTC) || 0;
+  const dejaFacture = Number(devisData.montantDejaFacture) || 0;
+  const restant = round2(totalDevis - dejaFacture);
+  if (montantTTC > restant + EPS) {
+    throw new ValidationError(`Le montant de l'acompte dépasse le restant à facturer (${restant.toFixed(2)} €)`);
+  }
+
+  const totalHT = Number(devisData.totalHT) || 0;
+  const proportion = totalDevis > 0 ? totalHT / totalDevis : 1 / 1.2;
+  const montantHT = round2(montantTTC * proportion);
+  const tauxTVA = totalHT > 0 && totalDevis > totalHT
+    ? round2((totalDevis - totalHT) / totalHT * 100).toFixed(2)
+    : "20.00";
+
+  const label = `Acompte sur devis n° ${devisData.numero}`;
+
+  const facture = await creerFacture(factureRepo, ctx, {
+    clientId: devisData.clientId,
+    devisId: devisData.id,
+    estAcompte: true,
+    objet: label,
+    notes: `Acompte ${montantTTC.toFixed(2)} € TTC — devis n° ${devisData.numero}`,
+    lignes: [{
+      designation: label,
+      prixUnitaireHT: montantHT.toFixed(2),
+      quantite: "1.00",
+      tauxTVA,
+      remise: "0",
+    }],
+  }, (tx) => devisReader.updateMontantDejaFactureTx(tx, ctx, input.devisId, montantTTC.toFixed(2)));
+
+  return facture;
+}
+
+/** Entrée pour créer la facture de solde depuis un devis avec acomptes. */
+export type FacturerSoldeInput = {
+  readonly devisId: number;
+};
+
+/*
+ * Crée la facture de solde : copie les lignes du devis puis insère une ligne de déduction
+ * négative par acompte. ⚠️ Invariants : devis `accepte`, pas de solde existant, TVA cohérente
+ * (la déduction inverse la TVA de l'acompte → totalTTC solde = totalTTC devis − Σ(acomptes)).
+ */
+export async function facturerSolde(
+  factureRepo: IFactureRepository,
+  devisReader: IDevisReader,
+  ctx: TenantContext,
+  input: FacturerSoldeInput,
+): Promise<Facture> {
+  const devisData = await devisReader.getDevis(ctx, input.devisId);
+  if (!devisData) throw new NotFoundError("Devis introuvable");
+  if (devisData.statut !== "accepte") {
+    throw new ConflictError("Seul un devis accepté peut être soldé");
+  }
+  if (await factureRepo.existsForDevis(ctx, input.devisId)) {
+    throw new ConflictError("Une facture de solde a déjà été émise pour ce devis");
+  }
+
+  const acomptes = (await factureRepo.listAcomptes(ctx, input.devisId)).filter(
+    (a) => a.statut !== "annulee",
+  );
+
+  const lignesDevis = await devisReader.getLignes(ctx, input.devisId);
+  const lignes: CopiedLigneData[] = lignesDevis.map((l) => ({
+    ordre: l.ordre,
+    reference: l.reference,
+    designation: l.designation,
+    description: l.description,
+    quantite: l.quantite,
+    unite: l.unite,
+    prixUnitaireHT: l.prixUnitaireHT,
+    tauxTVA: l.tauxTVA,
+    remise: l.remise ?? "0",
+    tvaCategorieId: l.tvaCategorieId ?? null,
+    montantHT: l.montantHT,
+    montantTVA: l.montantTVA,
+    montantTTC: l.montantTTC,
+    type: l.type,
+  }));
+
+  let ordreDeduction = lignes.length;
+  for (const acompte of acomptes) {
+    const htNum = Math.abs(Number(acompte.totalHT) || 0);
+    const ttcNum = Math.abs(Number(acompte.totalTTC) || 0);
+    const tauxTVA = htNum > 0 ? round2((ttcNum - htNum) / htNum * 100).toFixed(2) : "20.00";
+    const m = calculerMontantsAvoirLigne("1", String(htNum), tauxTVA);
+    lignes.push({
+      ordre: ordreDeduction++,
+      reference: acompte.numero,
+      designation: `Acompte déjà facturé (${acompte.numero ?? `Facture #${acompte.id}`})`,
+      description: null,
+      quantite: "1.00",
+      unite: "unité",
+      prixUnitaireHT: m.prixUnitaireHT,
+      tauxTVA,
+      remise: "0",
+      tvaCategorieId: null,
+      montantHT: m.montantHT,
+      montantTVA: m.montantTVA,
+      montantTTC: m.montantTTC,
+      type: "produit",
+    });
+  }
+
+  const facture = await factureRepo.createFromDevis(ctx, {
+    devisId: devisData.id,
+    clientId: devisData.clientId,
+    numero: null,
+    objet: devisData.objet ? `Solde — ${devisData.objet}` : "Facture de solde",
+    referenceClient: devisData.referenceClient,
+    conditionsPaiement: devisData.conditionsPaiement,
+    notes: acomptes.length > 0
+      ? `Solde — ${acomptes.length} acompte(s) déduit(s). Devis n° ${devisData.numero}`
+      : devisData.notes,
+    lignes,
+  });
+  if (!facture) throw new NotFoundError("Client du devis introuvable");
+  factureCounter.inc({ action: "created" });
+  return facture;
+}
+
 export async function supprimerLigneFacture(
   repo: IFactureRepository,
   ctx: TenantContext,

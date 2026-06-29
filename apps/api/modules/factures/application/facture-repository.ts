@@ -68,10 +68,13 @@ export interface IFactureRepository {
   /** true si le devis référencé appartient au tenant (anti-IDOR-FK sur le lien devis→facture). */
   ownsDevis(ctx: TenantContext, devisId: number): Promise<boolean>;
   /*
-   * true s'il existe déjà une facture (typeDocument='facture') liée à ce devis (anti-doublon
-   * de conversion), scopé tenant.
+   * true s'il existe déjà une facture de solde (typeDocument='facture', estAcompte=false) liée à ce
+   * devis (anti-doublon de conversion et de solde), scopé tenant. Les acomptes (estAcompte=true)
+   * ne sont pas comptés — plusieurs acomptes peuvent coexister avant le solde.
    */
   existsForDevis(ctx: TenantContext, devisId: number): Promise<boolean>;
+  /** Acomptes (estAcompte=true, typeDocument='facture') liés à un devis, scopés tenant. */
+  listAcomptes(ctx: TenantContext, devisId: number): Promise<Facture[]>;
   /*
    * Crée une facture à partir d'un devis (lignes copiées, totaux recalculés des lignes,
    * statut brouillon, devisId lié) — null si le devis n'appartient pas au tenant.

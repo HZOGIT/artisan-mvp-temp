@@ -71,6 +71,7 @@ export const factures = pgTable("factures", {
   regimeTVA: regimeTVAFactureEnum("regimeTVA").default("normal"),
   pdfFileId: integer("pdfFileId").references(() => files.id, { onDelete: "set null" }),
   pdfStorageKey: varchar("pdfStorageKey", { length: 500 }),
+  estAcompte: boolean("estAcompte").notNull().default(false),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 export type Facture = typeof factures.$inferSelect;

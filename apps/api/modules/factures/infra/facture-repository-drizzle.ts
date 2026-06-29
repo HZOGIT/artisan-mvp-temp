@@ -62,6 +62,7 @@ function toFacture(r: FactureRow): Facture {
     regimeTVA: (r.regimeTVA ?? "normal") as Facture["regimeTVA"],
     pdfFileId: r.pdfFileId ?? null,
     pdfStorageKey: r.pdfStorageKey ?? null,
+    estAcompte: r.estAcompte ?? false,
   };
 }
 
@@ -156,6 +157,7 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
           dateEcheance: input.dateEcheance ?? null,
           statut: "brouillon",
           regimeTVA: input.regimeTVA ?? "normal",
+          estAcompte: input.estAcompte ?? false,
           totalHT: "0.00",
           totalTVA: "0.00",
           totalTTC: "0.00",
@@ -185,6 +187,7 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
           dateEcheance: header.dateEcheance ?? null,
           statut: "brouillon",
           regimeTVA: header.regimeTVA ?? "normal",
+          estAcompte: header.estAcompte ?? false,
           totalHT: "0.00",
           totalTVA: "0.00",
           totalTTC: "0.00",
@@ -513,8 +516,19 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
       const [row] = await tx
         .select({ n: sql<number>`count(*)::int` })
         .from(factures)
-        .where(and(eq(factures.artisanId, ctx.artisanId), eq(factures.devisId, devisId), eq(factures.typeDocument, "facture")));
+        .where(and(eq(factures.artisanId, ctx.artisanId), eq(factures.devisId, devisId), eq(factures.typeDocument, "facture"), eq(factures.estAcompte, false)));
       return (row?.n ?? 0) > 0;
+    });
+  }
+
+  listAcomptes(ctx: TenantContext, devisId: number): Promise<Facture[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(factures)
+        .where(and(eq(factures.artisanId, ctx.artisanId), eq(factures.devisId, devisId), eq(factures.typeDocument, "facture"), eq(factures.estAcompte, true)))
+        .orderBy(asc(factures.id));
+      return rows.map(toFacture);
     });
   }
 
