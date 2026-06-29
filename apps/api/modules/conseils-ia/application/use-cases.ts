@@ -4,6 +4,8 @@ import type { LlmUsageTracker } from "../../../shared/ports/llm-usage-tracker";
 import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { ArtisanReader } from "../../../shared/readers/contact-readers";
 import type { AppLogger } from "../../../shared/ports/logger";
+import type { ISubscriptionReader } from "../../subscription/application/subscription-reader";
+import type { IModulesRepository } from "../../feature-modules/application/modules-repository";
 import { getContexteMetier } from "../../../shared/ia/contexte-metier";
 import { sanitizeIaError } from "../../../shared/ia/sanitize-ia-error";
 import type { ConseilsResult, ConseilsStats } from "../domain/conseils";
@@ -12,6 +14,8 @@ import type { ConseilsStatsReader } from "./conseils-stats-reader";
 
 /** Dépendances des conseils IA (lecture seule, non persistée). Parité legacy `conseilsIA`. */
 export interface ConseilsIaDeps {
+  readonly subscriptionReader: ISubscriptionReader;
+  readonly modulesRepo: IModulesRepository;
   readonly llm: LlmPort;
   readonly trackLlm?: LlmUsageTracker;
   readonly rateLimiter: RateLimiterPort;

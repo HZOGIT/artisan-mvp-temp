@@ -884,8 +884,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const activites = createActivitesModule({
     repository: deps.activiteRepo ?? new ActiviteRepositoryDrizzle(getDbHandle().db),
   });
+  const modulesRepo = deps.modulesRepo ?? new ModulesRepositoryDrizzle(getDbHandle().db);
   const modules = createFeatureModulesModule({
-    repository: deps.modulesRepo ?? new ModulesRepositoryDrizzle(getDbHandle().db),
+    repository: modulesRepo,
     subscriptionReader: deps.subscriptionRepo ?? new SubscriptionReaderDrizzle(getDbHandle().db),
   });
   const statistiques = createStatistiquesModule({
@@ -970,6 +971,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
    * Procédure RACINE `conseilsIA` (request/response, PAS de SSE). LlmPort Gemini (variable-path).
    */
   const conseilsIa = createConseilsIaModule({
+    subscriptionReader,
+    modulesRepo,
     llm: deps.llm ?? new GeminiLlmAdapter(app.log),
     trackLlm: makeLlmUsageTracker(getDbHandle().db),
     rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
@@ -1030,6 +1033,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     agentDeps,
     storage,
     db: getDbHandle().db,
+    subscriptionReader,
+    modulesRepo,
   });
   /*
    * Chat support artisan↔client (request/response). Notifier email best-effort (rate-limit anti-spam
@@ -1521,6 +1526,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
     statsReader: new AssistantStatsReaderDrizzle(getDbHandle().db),
     threadWriter: new AssistantThreadWriterDrizzle(getDbHandle().db),
+    subscriptionReader,
+    modulesRepo,
   });
 
   /** Outil unitaire de la session vocale Live `POST /api/voice/tool` — réutilise le registry agentique. */

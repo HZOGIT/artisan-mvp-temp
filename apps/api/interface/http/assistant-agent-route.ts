@@ -1,9 +1,15 @@
 import type { FastifyInstance } from "fastify";
-import { TooManyRequestsError, ValidationError } from "../../shared/errors";
+import { ForbiddenError, TooManyRequestsError, ValidationError } from "../../shared/errors";
 import { runAssistantAgent, type AssistantAgentDeps, type AssistantAgentEvent } from "../../modules/assistant/application/assistant-agent-use-cases";
 import { authArtisanFromCookie, type CookieAuthDeps } from "./cookie-auth";
+import type { ISubscriptionReader } from "../../modules/subscription/application/subscription-reader";
+import type { IModulesRepository } from "../../modules/feature-modules/application/modules-repository";
+import { assertPlanModule } from "../../modules/feature-modules/application/use-cases";
 
-export interface AssistantAgentRouteDeps extends CookieAuthDeps, AssistantAgentDeps {}
+export interface AssistantAgentRouteDeps extends CookieAuthDeps, AssistantAgentDeps {
+  readonly subscriptionReader: ISubscriptionReader;
+  readonly modulesRepo: IModulesRepository;
+}
 
 /*
  * Route HORS-tRPC `POST /api/assistant/stream` en mode AGENTIQUE (function-calling, outils du registry).
@@ -17,6 +23,15 @@ export function registerAssistantAgentRoute(app: FastifyInstance, deps: Assistan
     if (auth.status === "unauthenticated") return reply.code(401).send({ error: "Non autorisé" });
     if (auth.status === "no-artisan") return reply.code(404).send({ error: "Artisan non trouvé" });
 
+    const ctx = { artisanId: auth.artisanId, userId: auth.userId };
+
+    try {
+      await assertPlanModule(deps.subscriptionReader, deps.modulesRepo, ctx, "assistant_ia");
+    } catch (e) {
+      if (e instanceof ForbiddenError) return reply.code(403).send({ error: e.message });
+      throw e;
+    }
+
     const body = (req.body ?? {}) as { message?: unknown; history?: unknown; pageContext?: unknown; threadId?: unknown };
     const input = {
       message: typeof body.message === "string" ? body.message : "",
@@ -25,7 +40,7 @@ export function registerAssistantAgentRoute(app: FastifyInstance, deps: Assistan
       threadId: typeof body.threadId === "number" ? body.threadId : undefined,
     };
 
-    const gen = runAssistantAgent(deps, { artisanId: auth.artisanId, userId: auth.userId }, input);
+    const gen = runAssistantAgent(deps, ctx, input);
 
     /** 1er tick : validation/rate-limit levées AVANT tout stream → mappées en JSON (parité route text). */
     let first: IteratorResult<AssistantAgentEvent>;

@@ -19,6 +19,11 @@ import type { DbClient } from "../../../../shared/db";
 import { withTenant } from "../../../../shared/db";
 import { files } from "../../../../../../drizzle/schema/files";
 import { messageFiles } from "../../../../../../drizzle/schema/message-files";
+import type { ISubscriptionReader } from "../../../subscription/application/subscription-reader";
+import type { IModulesRepository } from "../../../feature-modules/application/modules-repository";
+import { assertPlanModule } from "../../../feature-modules/application/use-cases";
+
+const MODULE_SLUG = "assistant_ia";
 
 /**
  * Schéma Zod de l'union discriminée des événements émis par la subscription `stream`.
@@ -47,6 +52,8 @@ export function createAssistantRouter(
   agentDeps: AssistantAgentDeps,
   storage: StoragePort,
   db: DbClient,
+  subscriptionReader: ISubscriptionReader,
+  modulesRepo: IModulesRepository,
 ) {
   return router({
     getThreads: protectedProcedure.query(({ ctx }) => {
@@ -60,24 +67,28 @@ export function createAssistantRouter(
         return getMessages(threadsRepo, ctx.tenant, input.threadId);
       }),
 
-    suggestRelances: protectedProcedure.query(({ ctx }) => {
+    suggestRelances: protectedProcedure.query(async ({ ctx }) => {
       if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
+      await assertPlanModule(subscriptionReader, modulesRepo, ctx.tenant, MODULE_SLUG);
       return suggestRelances(generators, ctx.tenant);
     }),
     generateDevis: protectedProcedure
       .input(z.object({ description: z.string().min(1) }))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
+        await assertPlanModule(subscriptionReader, modulesRepo, ctx.tenant, MODULE_SLUG);
         return generateDevis(generators, ctx.tenant, input);
       }),
     analyseRentabilite: protectedProcedure
       .input(z.object({ devisId: z.number().int() }))
-      .query(({ ctx, input }) => {
+      .query(async ({ ctx, input }) => {
         if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
+        await assertPlanModule(subscriptionReader, modulesRepo, ctx.tenant, MODULE_SLUG);
         return analyseRentabilite(generators, ctx.tenant, input);
       }),
-    predictionTresorerie: protectedProcedure.query(({ ctx }) => {
+    predictionTresorerie: protectedProcedure.query(async ({ ctx }) => {
       if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
+      await assertPlanModule(subscriptionReader, modulesRepo, ctx.tenant, MODULE_SLUG);
       return predictionTresorerie(generators, ctx.tenant);
     }),
 
@@ -120,6 +131,7 @@ export function createAssistantRouter(
       )
       .subscription(async function* ({ ctx, input }) {
         if (!ctx.tenant) throw new TRPCError({ code: "UNAUTHORIZED" });
+        await assertPlanModule(subscriptionReader, modulesRepo, ctx.tenant, MODULE_SLUG);
         const tenant = ctx.tenant;
         const t0 = Date.now();
         let contentEvents = 0;
