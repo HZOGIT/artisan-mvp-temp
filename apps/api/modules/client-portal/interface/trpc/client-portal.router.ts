@@ -39,7 +39,9 @@ export interface ClientPortalRouterDeps {
   readonly devisOptionsWriter: IPortalDevisOptionsWriter;
 }
 
-const tokenInput = z.object({ token: z.string() });
+/** UUID v4 (36 chars) avec marge pour évolutions futures — jamais de valeur vide ou géante */
+const tokenSchema = z.string().min(1).max(128);
+const tokenInput = z.object({ token: tokenSchema });
 
 /*
  * Routeur tRPC `clientPortal` (espace client). ADMIN (cookie artisan) : génération/statut/désactivation
@@ -72,26 +74,26 @@ export function createClientPortalRouter(deps: ClientPortalRouterDeps) {
     /** ── PUBLIC (token) — RDV + chantiers ── */
     getCreneauxDisponibles: publicProcedure.input(tokenInput).query(({ input }) => getCreneauxDisponibles(deps, input.token)),
     demanderRdv: publicProcedure
-      .input(z.object({ token: z.string(), titre: z.string().min(1).max(200), description: z.string().max(5000).optional(), urgence: z.enum(["normale", "urgente", "tres_urgente"]).default("normale"), dateProposee: z.string().max(40) }))
+      .input(z.object({ token: tokenSchema, titre: z.string().min(1).max(200), description: z.string().max(5000).optional(), urgence: z.enum(["normale", "urgente", "tres_urgente"]).default("normale"), dateProposee: z.string().max(40) }))
       .mutation(({ input }) => demanderRdv(deps, input.token, { titre: input.titre, description: input.description, urgence: input.urgence, dateProposee: input.dateProposee })),
     getMesRdv: publicProcedure.input(tokenInput).query(({ input }) => getMesRdv(deps, input.token)),
     getSuiviChantiers: publicProcedure.input(tokenInput).query(({ input }) => getSuiviChantiers(deps, input.token)),
 
     /** ── PUBLIC (token) — chat + demandes ── */
     getConversations: publicProcedure.input(tokenInput).query(({ input }) => getConversations(deps, input.token)),
-    getConversationMessages: publicProcedure.input(z.object({ token: z.string(), conversationId: z.number().int().positive() })).query(({ input }) => getConversationMessages(deps, input.token, input.conversationId)),
-    sendClientMessage: publicProcedure.input(z.object({ token: z.string(), conversationId: z.number().int().positive(), contenu: z.string().min(1).max(5000) })).mutation(({ input }) => sendClientMessage(deps, input.token, input.conversationId, input.contenu)),
-    markClientMessagesAsRead: publicProcedure.input(z.object({ token: z.string(), conversationId: z.number().int().positive() })).mutation(({ input }) => markClientMessagesAsRead(deps, input.token, input.conversationId)),
-    demanderModification: publicProcedure.input(z.object({ token: z.string(), message: z.string().min(1).max(5000) })).mutation(({ input }) => demanderModification(deps, input.token, input.message)),
-    soumettreDemandeIA: publicProcedure.input(z.object({ token: z.string(), description: z.string().min(10).max(2000) })).mutation(({ ctx, input }) => soumettreDemandeIA(deps, input.token, input.description, ctx.log as unknown as AppLogger)),
+    getConversationMessages: publicProcedure.input(z.object({ token: tokenSchema, conversationId: z.number().int().positive() })).query(({ input }) => getConversationMessages(deps, input.token, input.conversationId)),
+    sendClientMessage: publicProcedure.input(z.object({ token: tokenSchema, conversationId: z.number().int().positive(), contenu: z.string().min(1).max(5000) })).mutation(({ input }) => sendClientMessage(deps, input.token, input.conversationId, input.contenu)),
+    markClientMessagesAsRead: publicProcedure.input(z.object({ token: tokenSchema, conversationId: z.number().int().positive() })).mutation(({ input }) => markClientMessagesAsRead(deps, input.token, input.conversationId)),
+    demanderModification: publicProcedure.input(z.object({ token: tokenSchema, message: z.string().min(1).max(5000) })).mutation(({ input }) => demanderModification(deps, input.token, input.message)),
+    soumettreDemandeIA: publicProcedure.input(z.object({ token: tokenSchema, description: z.string().min(10).max(2000) })).mutation(({ ctx, input }) => soumettreDemandeIA(deps, input.token, input.description, ctx.log as unknown as AppLogger)),
 
     /** ── PUBLIC (token) — options/variantes d'un devis ── */
     listerOptionsDevis: publicProcedure
-      .input(z.object({ token: z.string(), devisId: z.number().int().positive() }))
+      .input(z.object({ token: tokenSchema, devisId: z.number().int().positive() }))
       .query(({ input }) => listerOptionsDevis(deps, input.token, input.devisId)),
 
     selectionnerOption: publicProcedure
-      .input(z.object({ token: z.string(), optionId: z.number().int().positive() }))
+      .input(z.object({ token: tokenSchema, optionId: z.number().int().positive() }))
       .mutation(({ input }) =>
         selectionnerOption({ access: deps.access, docs: deps.docs, devisOptionsWriter: deps.devisOptionsWriter, rateLimiter: deps.rateLimiter }, input.token, input.optionId),
       ),
