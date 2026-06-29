@@ -2,7 +2,7 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IEcritureRepository } from "./ecriture-repository";
 import type { IFactureReader, FactureReadModel } from "./facture-reader";
 import type { EcritureComptable, CreateEcritureInput } from "../domain/ecriture";
-import { COMPTE_CLIENT, COMPTE_VENTES, COMPTE_BANQUE, compteTvaCollectee } from "./comptes";
+import { COMPTE_CLIENT, COMPTE_VENTES, COMPTE_BANQUE, COMPTE_ACHATS, COMPTE_TVA_DEDUCTIBLE, COMPTE_FOURNISSEURS, COMPTE_PERSONNEL, compteTvaCollectee } from "./comptes";
 
 /*
  * Génération des écritures comptables de VENTE d'une facture (parité legacy
@@ -125,6 +125,62 @@ export async function genererEcrituresEncaissement(
     { ...base, numeroCompte: COMPTE_BANQUE.compte, libelleCompte: COMPTE_BANQUE.lib, debit: montant },
     { ...base, numeroCompte: COMPTE_CLIENT.compte, libelleCompte: COMPTE_CLIENT.lib, credit: montant },
   ];
+  return ecritureRepo.createMany(ctx, lignes);
+}
+
+/** Champs minimaux d'une dépense pour générer les écritures AC. */
+export interface DepenseAchatInput {
+  readonly numero: string;
+  readonly dateDepense: string;
+  readonly fournisseur?: string | null;
+  readonly montantHt: string;
+  readonly montantTva?: string | null;
+  readonly montantTtc: string;
+  readonly tvaDeductible?: boolean;
+  /** Coefficient de déductibilité TVA en % (0–100). Défaut 100. */
+  readonly coeffDeductibilite?: string;
+  readonly remboursable?: boolean;
+}
+
+const r2 = (v: number) => Math.round(v * 100) / 100;
+
+/*
+ * Génère les écritures AC (journal achats) pour une dépense dans `ecritures_comptables`.
+ * Invariant Σdébit=Σcrédit : chargeHt + tvaDed = HT + TVA = TTC.
+ * Idempotent : purge les AC existantes (pieceRef=depense.numero) avant insert.
+ * 3 lignes : 607 Achats (débit HT+TVAnondéd) / 445660 TVA déductible (débit) / 401 Fournisseurs (crédit TTC).
+ */
+export async function genererEcrituresAchat(
+  ecritureRepo: IEcritureRepository,
+  ctx: TenantContext,
+  depense: DepenseAchatInput,
+): Promise<EcritureComptable[]> {
+  const ttc = Number(depense.montantTtc) || 0;
+  if (ttc <= 0) return [];
+
+  const tvaDeductible = depense.tvaDeductible !== false;
+  const montantTva = Number(depense.montantTva ?? "0");
+  const coeff = Number(depense.coeffDeductibilite ?? "100");
+  const tvaDed = tvaDeductible ? r2(montantTva * coeff / 100) : 0;
+  const chargeHt = r2(Number(depense.montantHt) + montantTva - tvaDed);
+
+  const dateEcriture = new Date(depense.dateDepense);
+  const pieceRef = depense.numero;
+  const libelle = `Achat ${pieceRef}${depense.fournisseur ? ` ${depense.fournisseur}` : ""}`.trim();
+  const base = { dateEcriture, journal: "AC" as const, pieceRef, libelle };
+  const fmt = (n: number) => n.toFixed(2);
+
+  const lignes: CreateEcritureInput[] = [];
+  if (chargeHt > 0) {
+    lignes.push({ ...base, numeroCompte: COMPTE_ACHATS.compte, libelleCompte: COMPTE_ACHATS.lib, debit: fmt(chargeHt) });
+  }
+  if (tvaDed > 0) {
+    lignes.push({ ...base, numeroCompte: COMPTE_TVA_DEDUCTIBLE.compte, libelleCompte: COMPTE_TVA_DEDUCTIBLE.lib, debit: fmt(tvaDed) });
+  }
+  const contrepartie = depense.remboursable ? COMPTE_PERSONNEL : COMPTE_FOURNISSEURS;
+  lignes.push({ ...base, numeroCompte: contrepartie.compte, libelleCompte: contrepartie.lib, credit: fmt(ttc) });
+
+  await ecritureRepo.deleteByJournalPieceRef(ctx, "AC", pieceRef);
   return ecritureRepo.createMany(ctx, lignes);
 }
 

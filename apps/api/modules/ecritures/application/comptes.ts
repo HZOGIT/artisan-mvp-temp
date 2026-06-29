@@ -11,6 +11,10 @@ export interface Compte {
 export const COMPTE_CLIENT: Compte = { compte: "411000", lib: "Clients" };
 export const COMPTE_VENTES: Compte = { compte: "706000", lib: "Prestations de services" };
 export const COMPTE_BANQUE: Compte = { compte: "512000", lib: "Banque" };
+export const COMPTE_ACHATS: Compte = { compte: "607000", lib: "Achats" };
+export const COMPTE_TVA_DEDUCTIBLE: Compte = { compte: "445660", lib: "TVA déductible" };
+export const COMPTE_FOURNISSEURS: Compte = { compte: "401000", lib: "Fournisseurs" };
+export const COMPTE_PERSONNEL: Compte = { compte: "425000", lib: "Personnel" };
 
 /*
  * TVA collectée selon le taux (parité legacy : seuils décroissants). 20→445711, 10→445712,

@@ -64,18 +64,23 @@ describe("ecritures — use-cases de lecture", () => {
     expect(await grandLivreComptable(repo, B, "411000")).toEqual([]); // pas d'écriture de B
   });
 
-  it("genererExportFEC : filtre par période + scopé tenant (header + lignes dans la fenêtre)", async () => {
+  it("genererExportFEC : filtre par période + scopé tenant (header + lignes dans la fenêtre) ; conformite.equilibre", async () => {
     const repo = new FakeEcritureRepository();
     await repo.createMany(A, [
       { dateEcriture: new Date("2026-06-15T00:00:00Z"), journal: "VE", numeroCompte: "411000", libelle: "Dans", debit: "120.00", factureId: 501 },
+      { dateEcriture: new Date("2026-06-15T00:00:00Z"), journal: "VE", numeroCompte: "706000", libelle: "Dans", credit: "100.00", factureId: 501 },
+      { dateEcriture: new Date("2026-06-15T00:00:00Z"), journal: "VE", numeroCompte: "445711", libelle: "Dans", credit: "20.00", factureId: 501 },
       { dateEcriture: new Date("2026-01-01T00:00:00Z"), journal: "VE", numeroCompte: "411000", libelle: "Avant", debit: "50.00", factureId: 502 },
     ]);
-    const fec = await genererExportFEC(repo, A, new Date("2026-06-01T00:00:00Z"), new Date("2026-06-30T23:59:59Z"));
-    const lines = fec.split("\n");
-    expect(lines.length).toBe(2); // header + 1 ligne (celle de juin)
+    const result = await genererExportFEC(repo, A, new Date("2026-06-01T00:00:00Z"), new Date("2026-06-30T23:59:59Z"));
+    const lines = result.fec.split("\n");
+    expect(lines.length).toBe(4); // header + 3 lignes (celles de juin)
     expect(lines[1]).toContain("Dans");
     expect(lines[1]).not.toContain("Avant");
-    // tenant B : aucune écriture → header seul
-    expect((await genererExportFEC(repo, B, new Date("2026-01-01"), new Date("2026-12-31"))).split("\n").length).toBe(1);
+    expect(result.conformite.equilibre).toBe(true); // Σdébit=Σcrédit
+    // tenant B : aucune écriture → header seul, équilibré
+    const resB = await genererExportFEC(repo, B, new Date("2026-01-01"), new Date("2026-12-31"));
+    expect(resB.fec.split("\n").length).toBe(1);
+    expect(resB.conformite.equilibre).toBe(true);
   });
 });

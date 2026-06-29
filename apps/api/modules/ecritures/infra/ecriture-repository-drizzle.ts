@@ -107,6 +107,22 @@ export class EcritureRepositoryDrizzle implements IEcritureRepository {
     });
   }
 
+  deleteByJournalPieceRef(ctx: TenantContext, journal: JournalComptable, pieceRef: string): Promise<number> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const deleted = await tx
+        .delete(ecrituresComptables)
+        .where(
+          and(
+            eq(ecrituresComptables.artisanId, ctx.artisanId),
+            eq(ecrituresComptables.journal, journal),
+            eq(ecrituresComptables.pieceRef, pieceRef),
+          ),
+        )
+        .returning({ id: ecrituresComptables.id });
+      return deleted.length;
+    });
+  }
+
   hasValidatedEcritures(ctx: TenantContext, factureId: number): Promise<boolean> {
     return withTenant(this.db, ctx, async (tx) => {
       const result = await tx

@@ -91,7 +91,9 @@ describe("ecritures — invariants métier (synthèse)", () => {
     expect(lines[0].split("\t").length).toBe(18);
     for (const l of lines.slice(1)) expect(l.split("\t")[3]).toMatch(/^\d{8}$/); // EcritureDate
     // export via use-case (période) cohérent
-    expect((await genererExportFEC(repo, A, new Date("2026-06-01"), new Date("2026-06-30"))).split("\n").length).toBe(lines.length);
+    const fecResult = await genererExportFEC(repo, A, new Date("2026-06-01"), new Date("2026-06-30"));
+    expect(fecResult.fec.split("\n").length).toBe(lines.length);
+    expect(fecResult.conformite.equilibre).toBe(true);
   });
 
   it("INV-7 : encaissement conditionné (statut≠payee ou avoir [TTC≤0] → rien)", async () => {

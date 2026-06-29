@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { FakeEcritureRepository } from "../infra/ecriture-repository-fake";
 import { FakeFactureReader } from "../infra/facture-reader-fake";
-import { genererEcrituresVente, genererEcrituresEncaissement, validerEcritures } from "./generation-use-cases";
+import { genererEcrituresVente, genererEcrituresEncaissement, validerEcritures, genererEcrituresAchat } from "./generation-use-cases";
 import type { EcritureComptable } from "../domain/ecriture";
 import type { TenantContext } from "../../../shared/tenant";
 import { ConflictError } from "../../../shared/errors";
@@ -222,6 +222,71 @@ describe("ecritures — inaltérabilité (statut validée) — OPE-118", () => {
     const final = await repo.listByFacture(A, 501);
     expect(final.filter((e) => e.journal === "VE" && e.statut === "validee").length).toBe(3);
     expect(final.filter((e) => e.journal === "BQ" && e.statut === "brouillon").length).toBe(2);
+  });
+});
+
+describe("ecritures — génération écritures d'ACHAT (FEC journal AC)", () => {
+  it("dépense standard : 607 débit HT / 445660 débit TVA déduite / 401 crédit TTC ; Σdébit=Σcrédit", async () => {
+    const repo = new FakeEcritureRepository();
+    const ecr = await genererEcrituresAchat(repo, A, {
+      numero: "DEP-00001", dateDepense: "2026-06-15", fournisseur: "Leroy Merlin",
+      montantHt: "100.00", montantTva: "20.00", montantTtc: "120.00", tvaDeductible: true, coeffDeductibilite: "100",
+    });
+    expect(ecr.length).toBe(3);
+    expect(ecr.find((e) => e.numeroCompte === "607000")!.debit).toBe("100.00");
+    expect(ecr.find((e) => e.numeroCompte === "445660")!.debit).toBe("20.00");
+    expect(ecr.find((e) => e.numeroCompte === "401000")!.credit).toBe("120.00");
+    assertEquilibre(ecr);
+    expect(ecr.every((e) => e.journal === "AC")).toBe(true);
+    expect(ecr.every((e) => e.pieceRef === "DEP-00001")).toBe(true);
+  });
+
+  it("TVA non déductible : tout part en 607, 445 absent ; Σdébit=Σcrédit", async () => {
+    const repo = new FakeEcritureRepository();
+    const ecr = await genererEcrituresAchat(repo, A, {
+      numero: "DEP-00002", dateDepense: "2026-06-15",
+      montantHt: "100.00", montantTva: "20.00", montantTtc: "120.00", tvaDeductible: false,
+    });
+    expect(ecr.find((e) => e.numeroCompte === "607000")!.debit).toBe("120.00"); // HT + TVA
+    expect(ecr.some((e) => e.numeroCompte === "445660")).toBe(false);
+    assertEquilibre(ecr);
+  });
+
+  it("TVA partiellement déductible (coeff 50%) : 607 débit HT+TVA/2 + 445 débit TVA/2 ; Σdébit=Σcrédit", async () => {
+    const repo = new FakeEcritureRepository();
+    const ecr = await genererEcrituresAchat(repo, A, {
+      numero: "DEP-00003", dateDepense: "2026-06-15",
+      montantHt: "100.00", montantTva: "20.00", montantTtc: "120.00", tvaDeductible: true, coeffDeductibilite: "50",
+    });
+    expect(ecr.find((e) => e.numeroCompte === "607000")!.debit).toBe("110.00"); // 100 + 10
+    expect(ecr.find((e) => e.numeroCompte === "445660")!.debit).toBe("10.00");
+    assertEquilibre(ecr);
+  });
+
+  it("remboursable → 425 Personnel (pas 401 Fournisseurs)", async () => {
+    const repo = new FakeEcritureRepository();
+    const ecr = await genererEcrituresAchat(repo, A, {
+      numero: "DEP-00004", dateDepense: "2026-06-15",
+      montantHt: "50.00", montantTva: "0.00", montantTtc: "50.00", remboursable: true,
+    });
+    expect(ecr.find((e) => e.numeroCompte === "425000")).toBeDefined();
+    expect(ecr.find((e) => e.numeroCompte === "401000")).toBeUndefined();
+    assertEquilibre(ecr);
+  });
+
+  it("idempotence : 2 appels → une seule pièce AC (purge avant insert)", async () => {
+    const repo = new FakeEcritureRepository();
+    const input = { numero: "DEP-00005", dateDepense: "2026-06-15", montantHt: "100.00", montantTva: "20.00", montantTtc: "120.00" };
+    await genererEcrituresAchat(repo, A, input);
+    await genererEcrituresAchat(repo, A, input);
+    const all = await repo.list(A);
+    expect(all.filter((e) => e.pieceRef === "DEP-00005").length).toBe(3); // pas 6
+  });
+
+  it("TTC ≤ 0 → aucune écriture", async () => {
+    const repo = new FakeEcritureRepository();
+    const ecr = await genererEcrituresAchat(repo, A, { numero: "DEP-99", dateDepense: "2026-06-15", montantHt: "0.00", montantTtc: "0.00" });
+    expect(ecr).toEqual([]);
   });
 });
 

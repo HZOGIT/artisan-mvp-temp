@@ -40,6 +40,7 @@ import type { FecReader } from "../../application/fec-reader";
 import { exportFecAchats } from "../../application/fec";
 import type { VisionPort, RateLimiterPort } from "../../../../shared/ports";
 import { analyserJustificatif } from "../../application/analyser-justificatif";
+import type { IDepenseComptaPort } from "../../application/depense-compta-port";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
@@ -144,6 +145,7 @@ export function createDepensesRouter(
   ocr?: { vision: VisionPort; rateLimiter: RateLimiterPort },
   deplacementRepo?: IDeplacementRepository,
   lockDateReader?: { getLockDate(ctx: TenantContext): Promise<string | null> },
+  comptaAchat?: IDepenseComptaPort,
 ) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listDepenses(repo, ctx.tenant)),
@@ -156,15 +158,19 @@ export function createDepensesRouter(
       .input(createSchema)
       .mutation(async ({ ctx, input }) => {
         const lockDate = await lockDateReader?.getLockDate(ctx.tenant) ?? null;
-        return withOutbox(db, repo, async (r, tx) => {
-          const result = await creerDepense(r, ctx.tenant, input, lockDate);
+        const result = await withOutbox(db, repo, async (r, tx) => {
+          const d = await creerDepense(r, ctx.tenant, input, lockDate);
           ctx.log.info(
-            { event: "depense_creee", depenseId: result.id, montantHt: Number(input.montantHt), categorie: input.categorie, chantierId: input.chantierId ?? null, recurrente: input.recurrente ?? false },
+            { event: "depense_creee", depenseId: d.id, montantHt: Number(input.montantHt), categorie: input.categorie, chantierId: input.chantierId ?? null, recurrente: input.recurrente ?? false },
             "Dépense enregistrée",
           );
-          if (tx) await outboxEvent(tx, ctx.tenant, { action: "depense.creee", entityType: "depense", entityId: result.id, payload: { depenseId: result.id, montant: result.montantTtc, categorieId: result.categorie } });
-          return result;
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "depense.creee", entityType: "depense", entityId: d.id, payload: { depenseId: d.id, montant: d.montantTtc, categorieId: d.categorie } });
+          return d;
         });
+        if (comptaAchat) await comptaAchat.genererEcrituresAchat(ctx.tenant, result).catch((err: unknown) => {
+          ctx.log.error({ err, depenseId: result.id }, "AC generation failed after depense create");
+        });
+        return result;
       }),
 
     update: protectedProcedure
@@ -172,23 +178,35 @@ export function createDepensesRouter(
       .mutation(async ({ ctx, input }) => {
         const lockDate = await lockDateReader?.getLockDate(ctx.tenant) ?? null;
         const { id, ...data } = input;
-        return withOutbox(db, repo, async (r, tx) => {
-          const result = await modifierDepense(r, ctx.tenant, id, data, lockDate);
+        const result = await withOutbox(db, repo, async (r, tx) => {
+          const d = await modifierDepense(r, ctx.tenant, id, data, lockDate);
           if (tx) await outboxEvent(tx, ctx.tenant, { action: "depense.modifiee", entityType: "depense", entityId: id, payload: { depenseId: id } });
-          return result;
+          return d;
         });
+        if (comptaAchat) await comptaAchat.genererEcrituresAchat(ctx.tenant, result).catch((err: unknown) => {
+          ctx.log.error({ err, depenseId: result.id }, "AC generation failed after depense update");
+        });
+        return result;
       }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        return withOutbox(db, repo, async (r, tx) => {
+        let depenseNumero: string | undefined;
+        const result = await withOutbox(db, repo, async (r, tx) => {
           const before = await r.getById(ctx.tenant, input.id);
+          depenseNumero = before?.numero;
           await supprimerDepense(r, ctx.tenant, input.id);
           ctx.log.warn({ event: "depense_supprimee", depenseId: input.id }, "Dépense supprimée");
           if (tx) await outboxEvent(tx, ctx.tenant, { action: "depense.supprimee", entityType: "depense", entityId: input.id, payload: { snapshot: { depenseId: input.id, montant: before?.montantTtc ?? null } } });
           return { success: true };
         });
+        if (comptaAchat && depenseNumero) {
+          await comptaAchat.supprimerEcrituresAchat(ctx.tenant, depenseNumero).catch((err: unknown) => {
+            ctx.log.error({ err, depenseNumero }, "AC suppression failed after depense delete");
+          });
+        }
+        return result;
       }),
 
     /*

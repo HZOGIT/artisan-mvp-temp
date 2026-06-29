@@ -10,6 +10,7 @@ import type { IFactureLettrerPort } from "./application/facture-lettreur-port";
 import type { FecReader } from "./application/fec-reader";
 import type { VisionPort, RateLimiterPort } from "../../shared/ports";
 import type { IDeplacementRepository } from "./application/deplacement-repository";
+import type { IDepenseComptaPort } from "./application/depense-compta-port";
 import { createDepensesRouter } from "./interface/trpc/depenses.router";
 
 /*
@@ -36,6 +37,8 @@ export interface DepensesModuleDeps {
   readonly deplacementRepository?: IDeplacementRepository;
   /** Lecteur de date de verrouillage comptable (garde anti-création/modif en période close). */
   readonly lockDateReader?: { getLockDate(ctx: TenantContext): Promise<string | null> };
+  /** Seam comptable : génère/supprime les écritures AC dans ecritures_comptables (optionnel). */
+  readonly comptaAchat?: IDepenseComptaPort;
 }
 
 export interface DepensesModule {
@@ -59,6 +62,7 @@ export function createDepensesModule(deps: DepensesModuleDeps): DepensesModule {
       deps.ocr,
       deps.deplacementRepository,
       deps.lockDateReader,
+      deps.comptaAchat,
     ),
   };
 }
