@@ -78,4 +78,20 @@ describe.skipIf(!URL)("EcritureRepositoryDrizzle (PG, RLS + scope tenant)", () =
     const recree = await repo.createMany(ctx(A), pieceVente(504));
     expect(recree.length).toBe(3);
   });
+
+  it("validateByFacture + hasValidatedEcritures : inaltérabilité OPE-118 (écritures → validée)", async () => {
+    await repo.createMany(ctx(A), pieceVente(510));
+    expect(await repo.hasValidatedEcritures(ctx(A), 510)).toBe(false);
+    const count = await repo.validateByFacture(ctx(A), 510);
+    expect(count).toBe(3);
+    expect(await repo.hasValidatedEcritures(ctx(A), 510)).toBe(true);
+    const rows = await repo.listByFacture(ctx(A), 510);
+    expect(rows.every((e) => e.statut === "validee")).toBe(true);
+  });
+
+  it("hasValidatedEcritures isolation tenant : B ne voit pas les validées de A", async () => {
+    await repo.createMany(ctx(A), pieceVente(511));
+    await repo.validateByFacture(ctx(A), 511);
+    expect(await repo.hasValidatedEcritures(ctx(B), 511)).toBe(false);
+  });
 });

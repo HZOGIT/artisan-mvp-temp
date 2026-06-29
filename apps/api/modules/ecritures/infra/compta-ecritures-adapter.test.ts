@@ -45,4 +45,15 @@ describe("ecritures — ComptaEcrituresAdapter (seam ComptaPort)", () => {
     expect(all.filter((e) => e.journal === "VE").length).toBe(3);
     expect(all.filter((e) => e.journal === "BQ").length).toBe(2);
   });
+
+  it("validerEcritures → toutes les écritures passent en statut validée (OPE-753)", async () => {
+    const { repo, adapter } = setup();
+    await adapter.genererEcrituresVente(A, 501);
+    await adapter.genererEcrituresEncaissement(A, 501);
+    expect(await repo.hasValidatedEcritures(A, 501)).toBe(false);
+    await adapter.validerEcritures(A, 501);
+    expect(await repo.hasValidatedEcritures(A, 501)).toBe(true);
+    const all = await repo.listByFacture(A, 501);
+    expect(all.every((e) => e.statut === "validee")).toBe(true);
+  });
 });
