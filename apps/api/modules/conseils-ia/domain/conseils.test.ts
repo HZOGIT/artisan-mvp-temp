@@ -11,7 +11,7 @@ describe("conseils domain", () => {
     });
     expect(p).toContain("Plomberie X");
     expect(p).toContain("3 devis en attente");
-    expect(p).toContain("2 factures impayees (1500 EUR)"); // toFixed(0)
+    expect(p).toContain("2 factures en attente de reglement (1500 EUR)"); /* toFixed(0) */
     expect(p).toContain("1 articles en stock bas");
     expect(p).toContain("juin");
     expect(p).toContain('"conseils"');
