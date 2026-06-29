@@ -70,6 +70,26 @@ describe.skipIf(!URL)("clientPortal.router e2e (admin cookie + public token)", (
     expect(res.statusCode).toBe(401);
   });
 
+  it("verifyAccess : token vide → 400 (BAD_REQUEST Zod)", async () => {
+    const res = await injectTrpc(app, "GET", "clientPortal.verifyAccess", { token: "" });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("verifyAccess : token > 128 chars → 400 (BAD_REQUEST Zod)", async () => {
+    const res = await injectTrpc(app, "GET", "clientPortal.verifyAccess", { token: "a".repeat(129) });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("getDevis (public) : token vide → 400 (BAD_REQUEST Zod)", async () => {
+    const res = await injectTrpc(app, "GET", "clientPortal.getDevis", { token: "" });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("getDevis (public) : token > 128 chars → 400 (BAD_REQUEST Zod)", async () => {
+    const res = await injectTrpc(app, "GET", "clientPortal.getDevis", { token: "b".repeat(200) });
+    expect(res.statusCode).toBe(400);
+  });
+
   // ── ADMIN (cookie artisan) ──
   it("generateAccess sans cookie → 401 (procédure protégée)", async () => {
     const res = await injectTrpc(app, "POST", "clientPortal.generateAccess", { clientId });
