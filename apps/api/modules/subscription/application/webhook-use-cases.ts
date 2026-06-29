@@ -188,4 +188,5 @@ async function handleSubscriptionDeleted(deps: StripeWebhookDeps, sub: Record<st
   const artisanId = metadata.artisanId ? Number(metadata.artisanId) : null;
   if (!artisanId) return;
   await deps.onSubscriptionWebhookEvent(artisanId, null, "canceled");
+  void deps.eventBus?.publish({ type: "abonnement.expire", aggregateType: "abonnement", aggregateId: artisanId, artisanId, userId: null, occurredAt: new Date() });
 }
