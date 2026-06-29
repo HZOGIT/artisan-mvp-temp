@@ -169,6 +169,13 @@
       "when": 1782741996762,
       "tag": "20260629140636_facture-acompte",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1751230893000,
+      "tag": "20260629201453_signature-statut-annulee",
+      "breakpoints": true
     }
   ]
 }

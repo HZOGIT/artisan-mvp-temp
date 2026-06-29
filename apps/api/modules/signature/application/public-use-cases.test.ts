@@ -52,6 +52,7 @@ const resolution = (overrides: Partial<SignatureTokenResolution> = {}): Signatur
   artisanId: 1,
   dateVue: null,
   devisDateValidite: null,
+  devisStatut: "envoye",
   ...overrides,
 });
 
@@ -210,6 +211,16 @@ describe("signDevis (public)", () => {
 
   it("statut ≠ en_attente → ValidationError (immutabilité)", async () => {
     const { deps } = build({ res: resolution({ signature: signature({ statut: "accepte" }) }), view });
+    await expect(signDevis(deps, signPayload)).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("devis déjà accepté par l'artisan (portail encore en_attente) → ValidationError (anti double-action)", async () => {
+    const { deps } = build({ res: resolution({ devisStatut: "accepte" }), view });
+    await expect(signDevis(deps, signPayload)).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("devis refusé par l'artisan (portail encore en_attente) → ValidationError (cohérence)", async () => {
+    const { deps } = build({ res: resolution({ devisStatut: "refuse" }), view });
     await expect(signDevis(deps, signPayload)).rejects.toBeInstanceOf(ValidationError);
   });
 

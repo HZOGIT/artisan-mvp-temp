@@ -6,7 +6,7 @@
  */
 import { randomUUID } from "crypto";
 
-export type SignatureStatut = "en_attente" | "accepte" | "refuse";
+export type SignatureStatut = "en_attente" | "accepte" | "refuse" | "annulee";
 
 /*
  * Reflet (lecture) d'une ligne `signatures_devis`. `signatureData` (image base64) lourde → exposée
