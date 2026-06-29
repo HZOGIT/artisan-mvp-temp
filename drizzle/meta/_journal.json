@@ -211,6 +211,13 @@
       "when": 20260629215256,
       "tag": "20260629215256_indexes-secondary",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1782770212805,
+      "tag": "20260629215652_rdv-index-artisan-statut",
+      "breakpoints": true
     }
   ]
 }

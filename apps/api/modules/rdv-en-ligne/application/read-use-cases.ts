@@ -49,16 +49,15 @@ export interface RdvStats {
 }
 
 export async function getRdvStats(repo: IRdvRepository, ctx: TenantContext): Promise<RdvStats> {
-  const rdvs = await repo.list(ctx);
+  const counts = await repo.countByStatut(ctx);
   return {
-    enAttente: rdvs.filter((r) => r.statut === "en_attente").length,
-    confirmes: rdvs.filter((r) => r.statut === "confirme").length,
-    refuses: rdvs.filter((r) => r.statut === "refuse").length,
+    enAttente: counts.en_attente ?? 0,
+    confirmes: counts.confirme ?? 0,
+    refuses: counts.refuse ?? 0,
   };
 }
 
 /** Nombre de RDV en attente, scopé tenant (parité legacy `rdv.getPendingCount`). */
-export async function getRdvPendingCount(repo: IRdvRepository, ctx: TenantContext): Promise<number> {
-  const rdvs = await repo.list(ctx);
-  return rdvs.filter((r) => r.statut === "en_attente").length;
+export function getRdvPendingCount(repo: IRdvRepository, ctx: TenantContext): Promise<number> {
+  return repo.getPendingCount(ctx);
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { FakeRdvRepository } from "../infra/rdv-repository-fake";
 import { FakeClientRepository } from "../../clients/infra/client-repository-fake";
-import { listRdvs, getRdv, listRdvsAvecClient } from "./read-use-cases";
+import { listRdvs, getRdv, listRdvsAvecClient, getRdvStats, getRdvPendingCount } from "./read-use-cases";
 import { NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 
@@ -52,6 +52,49 @@ describe("rdv-en-ligne — read use-cases", () => {
       const rdvRepo = new FakeRdvRepository();
       const clientRepo = new FakeClientRepository();
       expect(await listRdvsAvecClient(rdvRepo, clientRepo, A)).toEqual([]);
+    });
+  });
+
+  describe("getRdvStats — COUNT par statut (pas de full-list)", () => {
+    it("compte correctement par statut sans full-list", async () => {
+      const repo = new FakeRdvRepository();
+      const r1 = await repo.create(A, base());
+      await repo.create(A, base());
+      await repo.setStatut(A, r1.id, "confirme");
+      const stats = await getRdvStats(repo, A);
+      expect(stats.enAttente).toBe(1);
+      expect(stats.confirmes).toBe(1);
+      expect(stats.refuses).toBe(0);
+    });
+
+    it("retourne 0 pour les statuts absents (tenant vide)", async () => {
+      const repo = new FakeRdvRepository();
+      const stats = await getRdvStats(repo, A);
+      expect(stats).toEqual({ enAttente: 0, confirmes: 0, refuses: 0 });
+    });
+
+    it("scopé tenant — B ne compte pas les RDV de A", async () => {
+      const repo = new FakeRdvRepository();
+      await repo.create(A, base());
+      await repo.create(A, base());
+      const stats = await getRdvStats(repo, B);
+      expect(stats.enAttente).toBe(0);
+    });
+  });
+
+  describe("getRdvPendingCount — COUNT en_attente (pas de full-list)", () => {
+    it("compte uniquement les en_attente", async () => {
+      const repo = new FakeRdvRepository();
+      const r1 = await repo.create(A, base());
+      await repo.create(A, base());
+      await repo.setStatut(A, r1.id, "confirme");
+      expect(await getRdvPendingCount(repo, A)).toBe(1);
+    });
+
+    it("scopé tenant — B = 0 même si A en a", async () => {
+      const repo = new FakeRdvRepository();
+      await repo.create(A, base());
+      expect(await getRdvPendingCount(repo, B)).toBe(0);
     });
   });
 });

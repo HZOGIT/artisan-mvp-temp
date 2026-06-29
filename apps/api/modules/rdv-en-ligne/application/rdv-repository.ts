@@ -19,6 +19,10 @@ export interface SetStatutOptions {
  */
 export interface IRdvRepository {
   list(ctx: TenantContext): Promise<Rdv[]>;
+  /** Comptes par statut via GROUP BY — seuls les statuts présents apparaissent. */
+  countByStatut(ctx: TenantContext): Promise<Partial<Record<RdvStatut, number>>>;
+  /** COUNT SQL WHERE statut = 'en_attente' (badge dashboard). */
+  getPendingCount(ctx: TenantContext): Promise<number>;
   /** null si le RDV n'appartient pas au tenant. */
   getById(ctx: TenantContext, id: number): Promise<Rdv | null>;
   create(ctx: TenantContext, input: CreateRdvInput): Promise<Rdv>;
