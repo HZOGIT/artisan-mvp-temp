@@ -29,7 +29,7 @@ export function ExpiredBlocker({ onExportData }: { onExportData?: () => void }) 
             {!isPastDue && <><br /><span className="text-sm">{t("donneesConservees")}</span></>}
           </p>
           <div className="space-y-2">
-            <Button className="w-full" onClick={() => setLocation("/parametres?tab=abonnement")}>
+            <Button className="w-full" onClick={() => setLocation("/abonnement")}>
               <RefreshCw className="h-4 w-4 mr-2" />{isPastDue ? t("mettreAjourPaiement") : t("renouvelerAbo")}
             </Button>
             {onExportData && !isPastDue && (

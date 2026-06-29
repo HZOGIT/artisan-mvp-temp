@@ -31,6 +31,6 @@ export function accountBlockState(sub: Subscription | null | undefined, location
     trialEnded
   );
   const p = location;
-  const blockerAllowed = p.startsWith("/parametres") || p.startsWith("/profil");
+  const blockerAllowed = p.startsWith("/parametres") || p.startsWith("/profil") || p.startsWith("/abonnement");
   return { isBlocked, blockerAllowed };
 }
