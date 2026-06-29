@@ -1,6 +1,6 @@
 {
   "id": "c1c36efb-de88-4d85-9ced-fdc96992aace",
-  "prevId": "0d9a7d72-5f55-4863-914b-ad10972eebb8",
+  "prevId": "812782a6-6188-4cea-934c-57bc7bed48d3",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2072,7 +2072,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unité'"
+          "default": "'unit\u00e9'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -2713,7 +2713,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unité'"
+          "default": "'unit\u00e9'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -2938,7 +2938,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unité'"
+          "default": "'unit\u00e9'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -3146,7 +3146,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unité'"
+          "default": "'unit\u00e9'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -5650,12 +5650,6 @@
           "notNull": false,
           "default": false
         },
-        "dateVerrouillageCompta": {
-          "name": "dateVerrouillageCompta",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
         "derniereSync": {
           "name": "derniereSync",
           "type": "timestamp",
@@ -5681,6 +5675,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "dateVerrouillageCompta": {
+          "name": "dateVerrouillageCompta",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -7871,6 +7871,25 @@
           "primaryKey": false,
           "notNull": true
         },
+        "periodeDebut": {
+          "name": "periodeDebut",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "periodeFin": {
+          "name": "periodeFin",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "joursReportes": {
+          "name": "joursReportes",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0.00'"
+        },
         "soldeInitial": {
           "name": "soldeInitial",
           "type": "numeric(5, 2)",
@@ -7914,7 +7933,41 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_soldes_conges_periode": {
+          "name": "idx_soldes_conges_periode",
+          "columns": [
+            {
+              "expression": "artisanId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "technicienId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "periodeDebut",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -8476,7 +8529,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unité'"
+          "default": "'unit\u00e9'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -10213,7 +10266,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": true,
-          "default": "'unité'"
+          "default": "'unit\u00e9'"
         },
         "quantiteTheorique": {
           "name": "quantiteTheorique",
@@ -10300,7 +10353,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unité'"
+          "default": "'unit\u00e9'"
         },
         "prixUnitaire": {
           "name": "prixUnitaire",
@@ -11253,7 +11306,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unité'"
+          "default": "'unit\u00e9'"
         },
         "prixAchat": {
           "name": "prixAchat",
@@ -11342,7 +11395,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unité'"
+          "default": "'unit\u00e9'"
         },
         "prixEstime": {
           "name": "prixEstime",
@@ -12126,6 +12179,64 @@
           "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.scheduler_job_runs": {
+      "name": "scheduler_job_runs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "job_name": {
+          "name": "job_name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "period_key": {
+          "name": "period_key",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "job_run_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'running'"
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error_message": {
+          "name": "error_message",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -12934,6 +13045,15 @@
         "a_faire",
         "en_cours",
         "termine"
+      ]
+    },
+    "public.job_run_status": {
+      "name": "job_run_status",
+      "schema": "public",
+      "values": [
+        "running",
+        "done",
+        "failed"
       ]
     }
   },

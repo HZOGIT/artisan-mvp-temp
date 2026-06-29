@@ -1,6 +1,6 @@
 {
   "id": "0d9a7d72-5f55-4863-914b-ad10972eebb8",
-  "prevId": "8c232461-21df-4119-9f6f-ded802aa8249",
+  "prevId": "45279961-bd28-4204-9f62-1ca21dea752a",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2072,7 +2072,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -2713,7 +2713,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -2938,7 +2938,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -3146,7 +3146,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -8470,7 +8470,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -10160,7 +10160,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixUnitaire": {
           "name": "prixUnitaire",
@@ -11113,7 +11113,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixAchat": {
           "name": "prixAchat",
@@ -11202,7 +11202,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixEstime": {
           "name": "prixEstime",

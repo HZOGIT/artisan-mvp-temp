@@ -131,22 +131,15 @@
     {
       "idx": 18,
       "version": "7",
-      "when": 1782730775482,
-      "tag": "20260629105935_inventaires-physiques",
-      "breakpoints": true
-    },
-    {
-      "idx": 19,
-      "version": "7",
       "when": 1782731916190,
       "tag": "20260629111836_avis-demande-auto",
       "breakpoints": true
     },
     {
-      "idx": 20,
+      "idx": 19,
       "version": "7",
-      "when": 1782737987142,
-      "tag": "20260629125947_date-verrouillage-compta",
+      "when": 1782730775482,
+      "tag": "20260629105935_inventaires-physiques",
       "breakpoints": true
     },
     {
@@ -161,6 +154,13 @@
       "version": "7",
       "when": 1782738122823,
       "tag": "20260629130202_scheduler-job-runs",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1751201987,
+      "tag": "20260629125947_date-verrouillage-compta",
       "breakpoints": true
     }
   ]
