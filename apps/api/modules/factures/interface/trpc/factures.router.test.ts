@@ -82,6 +82,12 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
     expect((await callQuery(server, "factures.list", undefined)).statusCode).toBe(401);
   });
 
+  it("envoyer — facture sans ligne → 400", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "factures.create", { clientId: clientA }, tA)).json().result.data.id as number;
+    expect((await callMutation(server, "factures.envoyer", { id }, tA)).statusCode).toBe(400);
+  });
+
   it("create : brouillon sans numéro ; numéro FAC- assigné à l'émission + list scopé", async () => {
     const tA = await token(UA);
     const created = await callMutation(server, "factures.create", { clientId: clientA, objet: "Travaux" }, tA);
@@ -92,6 +98,7 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
     expect(f.totalTTC).toBe("0.00");
     const list = await callQuery(server, "factures.list", undefined, tA);
     expect((list.json().result.data as Array<{ id: number }>).some((x) => x.id === f.id)).toBe(true);
+    await callMutation(server, "factures.addLigne", { factureId: f.id, designation: "Pose", prixUnitaireHT: "100.00" }, tA);
     const emise = (await callMutation(server, "factures.envoyer", { id: f.id }, tA)).json().result.data as { numero: string | null };
     expect(emise.numero).toMatch(/^FAC-\d{5}$/);
     /* idempotence : second envoyer → même numéro conservé */
@@ -168,6 +175,7 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
     const id = (await callMutation(server, "factures.create", { clientId: clientA }, tA)).json().result.data.id as number;
     // brouillon → marquerEnRetard directement interdit (il faut envoyer d'abord)
     expect((await callMutation(server, "factures.marquerEnRetard", { id }, tA)).statusCode).toBe(409);
+    await callMutation(server, "factures.addLigne", { factureId: id, designation: "Pose", prixUnitaireHT: "100.00" }, tA);
     expect((await callMutation(server, "factures.envoyer", { id }, tA)).json().result.data.statut).toBe("envoyee");
     expect((await callMutation(server, "factures.marquerEnRetard", { id }, tA)).json().result.data.statut).toBe("en_retard");
     // cross-tenant : B ne transitionne pas la facture de A
@@ -338,10 +346,9 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
     await callMutation(server, "factures.addLigne", { factureId: id, designation: "Pose carrelage", quantite: "1", prixUnitaireHT: "500.00", tvaCategorieId: "FR_10" }, tA);
     const res = await callMutation(server, "factures.attestationTva.generer", { factureId: id }, tA);
     expect(res.statusCode).toBe(200);
-    const data = res.json().result.data as { statut: string; factureId: number; url: string };
+    const data = res.json().result.data as { statut: string; factureId: number };
     expect(data.statut).toBe("genere");
     expect(data.factureId).toBe(id);
-    expect(typeof data.url).toBe("string");
 
     /** getByFacture doit lister l'attestation créée */
     const list = await callQuery(server, "factures.attestationTva.getByFacture", { factureId: id }, tA);

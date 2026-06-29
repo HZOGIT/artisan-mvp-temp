@@ -67,6 +67,7 @@ describe("factures — use-cases d'écriture", () => {
     expect(f1.numero).toBeNull();
     expect(f2.numero).toBeNull();
     expect(f1.statut).toBe("brouillon");
+    await ajouterLigneFacture(repo, A, f1.id, { designation: "Pose", prixUnitaireHT: "100.00" });
     const emise = await changerStatutFacture(repo, A, f1.id, "envoyee", undefined, fakeArtisanReader);
     expect(emise.numero).toBe("FAC-00001");
     expect(emise.statut).toBe("envoyee");
@@ -163,9 +164,16 @@ describe("factures — use-cases d'écriture", () => {
     expect((await repo.getById(A, f.id))?.totalTTC).toBe("0.00");
   });
 
+  it("changerStatutFacture — brouillon → envoyee sans ligne → ValidationError", async () => {
+    const repo = repoWithClient(A, 100);
+    const f = await creerFacture(repo, A, { clientId: 100 });
+    await expect(changerStatutFacture(repo, A, f.id, "envoyee", undefined, fakeArtisanReader)).rejects.toBeInstanceOf(ValidationError);
+  });
+
   it("changerStatutFacture — machine à états : brouillon→envoyee→en_retard→payee ; idempotence", async () => {
     const repo = repoWithClient(A, 100);
     const f = await creerFacture(repo, A, { clientId: 100 });
+    await ajouterLigneFacture(repo, A, f.id, { designation: "Pose", prixUnitaireHT: "100.00" });
     expect((await changerStatutFacture(repo, A, f.id, "envoyee", undefined, fakeArtisanReader)).statut).toBe("envoyee");
     expect((await changerStatutFacture(repo, A, f.id, "envoyee")).statut).toBe("envoyee"); // idempotent
     expect((await changerStatutFacture(repo, A, f.id, "en_retard")).statut).toBe("en_retard");
@@ -175,7 +183,8 @@ describe("factures — use-cases d'écriture", () => {
   it("changerStatutFacture — transitions invalides → Conflict ; terminaux figés", async () => {
     const repo = repoWithClient(A, 100);
     const f = await creerFacture(repo, A, { clientId: 100 });
-    // brouillon → payee (saute envoyee) interdit
+    await ajouterLigneFacture(repo, A, f.id, { designation: "Pose", prixUnitaireHT: "100.00" });
+    /** brouillon → payee (saute envoyee) interdit */
     await expect(changerStatutFacture(repo, A, f.id, "payee")).rejects.toBeInstanceOf(ConflictError);
     await changerStatutFacture(repo, A, f.id, "envoyee", undefined, fakeArtisanReader);
     await changerStatutFacture(repo, A, f.id, "payee");

@@ -461,6 +461,8 @@ export async function changerStatutFacture(
     throw new ConflictError(`Transition de statut invalide : ${facture.statut} → ${cible}`);
   }
   if (cible === "envoyee") {
+    const lignes = await repo.listLignes(ctx, id);
+    if (lignes.length === 0) throw new ValidationError("Une facture doit comporter au moins une ligne pour être émise");
     if (!artisanReader) throw new ValidationError("Le SIRET de l'artisan est requis pour émettre une facture");
     const artisan = await artisanReader.getArtisan(ctx);
     if (!artisan?.siret) throw new ValidationError("Le SIRET de l'artisan est requis pour émettre une facture");
