@@ -6,7 +6,7 @@ let seq = 0;
 const ec = (over: Partial<EcritureComptable>): EcritureComptable => ({
   id: ++seq, artisanId: 1, dateEcriture: new Date("2026-06-14T00:00:00Z"), journal: "VE",
   numeroCompte: "411000", libelleCompte: "Clients", libelle: "Facture FAC-00001", pieceRef: "FAC-00001",
-  debit: "0.00", credit: "0.00", factureId: 501, lettrage: null, pointage: false, createdAt: new Date(), ...over,
+  debit: "0.00", credit: "0.00", factureId: 501, lettrage: null, pointage: false, ecritureNum: null, createdAt: new Date(), ...over,
 });
 
 // Pièce de vente (3 lignes, factureId 501) + encaissement (2 lignes, factureId 501, journal BQ).
@@ -64,5 +64,33 @@ describe("ecritures — export FEC (format légal DGFiP)", () => {
 
   it("aucune écriture → header seul", () => {
     expect(exporterFEC([]).split("\n").length).toBe(1);
+  });
+
+  it("ecritureNum persisté : stable après insertion d'une nouvelle écriture (anti-régression A47 A-1)", () => {
+    /** Pièce 1 : facture 100 (VE), ecritureNum=7 persisté */
+    const piece1 = [
+      ec({ factureId: 100, journal: "VE", ecritureNum: 7, debit: "120.00" }),
+      ec({ factureId: 100, journal: "VE", ecritureNum: 7, numeroCompte: "706000", credit: "100.00" }),
+    ];
+    /** Pièce 2 : facture 101 (VE), insérée chronologiquement avant piece1 mais ecritureNum=8 */
+    const piece2 = [
+      ec({ factureId: 101, journal: "VE", ecritureNum: 8, dateEcriture: new Date("2026-01-01T00:00:00Z"), pieceRef: "FAC-00002", debit: "60.00" }),
+    ];
+
+    const avant = exporterFEC([...piece1]);
+    const numAvant = avant.split("\n").slice(1).map((l) => l.split("\t")[2]);
+
+    /* Même jeu après insertion de piece2 (chronologiquement antérieure) */
+    const apres = exporterFEC([...piece1, ...piece2]);
+    const numApres = apres.split("\n").slice(1)
+      .filter((l) => l.split("\t")[8] === "FAC-00001") /* filtrer piece1 par PieceRef */
+      .map((l) => l.split("\t")[2]);
+
+    /* Les ecritureNum de la pièce existante ne changent pas */
+    expect(numAvant).toEqual(["7", "7"]);
+    expect(numApres).toEqual(["7", "7"]);
+    /* La nouvelle pièce a bien son propre ecritureNum */
+    const numPiece2 = apres.split("\n").slice(1).find((l) => l.split("\t")[3] === "20260101")?.split("\t")[2];
+    expect(numPiece2).toBe("8");
   });
 });

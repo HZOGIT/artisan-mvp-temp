@@ -49,7 +49,7 @@ describe.skipIf(!URL)("EcritureRepositoryDrizzle (PG, RLS + scope tenant)", () =
     const now = new Date();
     const res = await admin.query<{ id: number }>(`
       INSERT INTO factures ("artisanId", "clientId", "dateFacture", "createdAt", "updatedAt")
-      SELECT $1, 1, $2, $2, $2 FROM generate_series(1, 8)
+      SELECT $1, 1, $2, $2, $2 FROM generate_series(1, 9)
       RETURNING id
     `, [A, now]);
     fIds = res.rows.map((r) => r.id);
@@ -134,5 +134,22 @@ describe.skipIf(!URL)("EcritureRepositoryDrizzle (PG, RLS + scope tenant)", () =
         [A, fakeId],
       ),
     ).rejects.toThrow(/foreign key/i);
+  });
+
+  it("ecritureNum : 2 validations du même artisan → nums distincts (anti-doublons FEC, unicité index)", async () => {
+    await repo.createMany(ctx(A), pieceVente(fIds[7]));
+    await repo.createMany(ctx(A), pieceVente(fIds[8]));
+    await repo.validateByFacture(ctx(A), fIds[7]);
+    await repo.validateByFacture(ctx(A), fIds[8]);
+    const e7 = await repo.listByFacture(ctx(A), fIds[7]);
+    const e8 = await repo.listByFacture(ctx(A), fIds[8]);
+    const num7 = e7[0].ecritureNum;
+    const num8 = e8[0].ecritureNum;
+    expect(num7).not.toBeNull();
+    expect(num8).not.toBeNull();
+    expect(num7).not.toBe(num8);
+    /* toutes les lignes de chaque pièce partagent le même ecritureNum */
+    expect(e7.every((e) => e.ecritureNum === num7)).toBe(true);
+    expect(e8.every((e) => e.ecritureNum === num8)).toBe(true);
   });
 });
