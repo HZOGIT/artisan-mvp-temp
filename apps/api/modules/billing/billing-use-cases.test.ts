@@ -15,6 +15,7 @@ import {
   cancelAtPeriodEnd,
   reactivateSubscription,
   activateOnboardingSubscription,
+  previewPlanChange,
   NotFoundError,
   InvalidPlanError,
 } from "./application/billing-use-cases";
@@ -1633,5 +1634,42 @@ describe("activateOnboardingSubscription", () => {
   it("NotFoundError si le paymentMethodId est inconnu", async () => {
     const { deps } = await makeSetup();
     await expect(activateOnboardingSubscription(deps, A, { planId: "pro", paymentMethodId: 9999 })).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe("FIX-OPE713 — previewPlanChange : nextBillingDate priorité current_period_end vs trial_ends_at", () => {
+  it("sub active avec trial_ends_at résiduel → nextBillingDate = current_period_end (pas trial_ends_at)", async () => {
+    const deps = makeDeps();
+    const periodEnd = new Date("2026-08-01T00:00:00Z");
+    const staleTrialEnd = new Date("2026-07-01T00:00:00Z");
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "active",
+      currentPeriodStart: new Date("2026-07-01T00:00:00Z"),
+      currentPeriodEnd: periodEnd,
+      trialEndsAt: staleTrialEnd,
+      paymentMethodId: null,
+    });
+
+    const preview = await previewPlanChange(deps, A, "pro");
+
+    expect(preview.nextBillingDate?.getTime()).toBe(periodEnd.getTime());
+  });
+
+  it("sub trialing → nextBillingDate = trial_ends_at", async () => {
+    const deps = makeDeps();
+    const trialEnd = new Date("2026-07-15T00:00:00Z");
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "trialing",
+      currentPeriodStart: null,
+      currentPeriodEnd: null,
+      trialEndsAt: trialEnd,
+      paymentMethodId: null,
+    });
+
+    const preview = await previewPlanChange(deps, A, "pro");
+
+    expect(preview.nextBillingDate?.getTime()).toBe(trialEnd.getTime());
   });
 });

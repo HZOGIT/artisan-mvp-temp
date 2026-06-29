@@ -1327,6 +1327,22 @@ describe("FIX-N — activateExpiredTrials : transition trialing→active au tick
     expect(ev).toBeDefined();
   });
 
+  it("FIX-OPE713 — activation efface trial_ends_at (résiduel nettoyé)", async () => {
+    const { repo, billing } = makeDeps();
+    const trialEnd = new Date(Date.now() - 3600_000);
+    const sub = await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: trialEnd, paymentMethodId: null,
+    });
+
+    await runSchedulerTick({ repo, billing });
+
+    const updated = repo.subs.find(s => s.id === sub.id)!;
+    expect(updated.status).toBe("active");
+    expect(updated.trial_ends_at).toBeNull();
+  });
+
   it("sub trialing avec trial_ends_at dans le futur → inchangée", async () => {
     const { repo, billing } = makeDeps();
     const futureEnd = new Date(Date.now() + 86_400_000);
