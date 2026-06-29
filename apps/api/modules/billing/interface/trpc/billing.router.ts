@@ -8,6 +8,7 @@ import {
   setDefaultPaymentMethod,
   getBillingInfo,
   changePlan,
+  previewPlanChange,
   cancelAtPeriodEnd,
   reactivateSubscription,
   activateOnboardingSubscription,
@@ -59,6 +60,13 @@ export function createBillingRouter(deps: BillingDeps) {
       .input(z.object({ paymentMethodId: z.number().int().positive() }))
       .mutation(({ ctx, input }) =>
         setDefaultPaymentMethod(deps, ctx.tenant, input.paymentMethodId).catch(mapError),
+      ),
+
+    /** Aperçu des effets d'un changement de plan (sans modification). */
+    previewPlanChange: protectedProcedure
+      .input(z.object({ planId: z.enum(["starter", "pro", "enterprise"]) }))
+      .query(({ ctx, input }) =>
+        previewPlanChange(deps, ctx.tenant, input.planId).catch(mapError),
       ),
 
     /** Change de plan (upgrade ou downgrade). */

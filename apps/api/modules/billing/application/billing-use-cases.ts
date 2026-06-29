@@ -4,6 +4,7 @@ import type { BillingPort } from "../../../shared/ports/billing";
 import type { StripePort } from "../../../shared/ports/stripe";
 import type { BillingPaymentMethod, BillingSubscription, BillingInvoice } from "../../../../../drizzle/schema.pg";
 import { planById } from "../domain/plan";
+import type { BillingInterval } from "../domain/plan";
 
 export interface BillingDeps {
   readonly repo: IBillingRepository;
@@ -298,6 +299,47 @@ export async function activateOnboardingSubscription(
   });
 
   return { subscriptionId: sub.id };
+}
+
+
+export interface PlanChangePreview {
+  readonly currentPlanId: string;
+  readonly targetPlanId: string;
+  readonly targetAmountCents: number;
+  readonly nextBillingDate: Date | null;
+  readonly immediateAmountCents: 0;
+  readonly activeUserCount: number;
+  readonly targetMaxUsers: number;
+}
+
+export async function previewPlanChange(
+  deps: Pick<BillingDeps, "repo">,
+  ctx: TenantContext,
+  newPlanId: string,
+): Promise<PlanChangePreview> {
+  const knownPlan = planById(newPlanId);
+  if (!knownPlan) throw new InvalidPlanError(`Plan inconnu : ${newPlanId}`);
+
+  const sub = await deps.repo.findSubscription(ctx);
+  if (!sub) throw new NotFoundError("Aucun abonnement actif");
+
+  const interval: BillingInterval = sub.billing_interval === "yearly" ? "yearly" : "monthly";
+  const targetAmountCents = knownPlan.amountCentsByInterval[interval];
+
+  const pendingCycle = await deps.repo.findPendingCycle(sub.id);
+  const nextBillingDate: Date | null = pendingCycle?.period_start ?? sub.trial_ends_at ?? sub.current_period_end ?? null;
+
+  const activeUserCount = await deps.repo.countActiveUsers(ctx);
+
+  return {
+    currentPlanId: sub.plan_id,
+    targetPlanId: newPlanId,
+    targetAmountCents,
+    nextBillingDate,
+    immediateAmountCents: 0,
+    activeUserCount,
+    targetMaxUsers: knownPlan.maxUsers,
+  };
 }
 
 
