@@ -98,7 +98,14 @@ function journalWhenByTag(): Map<string, number> {
  * max du ledger Drizzle. On ne peut PAS se fier au checksum : une migration appliquée puis éditée
  * (cas réel sur 5432/5433) garde un `when` inchangé mais un checksum divergent — Drizzle l'a
  * pourtant bien appliquée. Les fichiers au `when` strictement supérieur sont réellement en attente
- * → laissés à la boucle d'application normale. Inerte après la 1ʳᵉ passe (tout est dans `__migrations`).
+ * → laissés à la boucle d'application normale.
+ *
+ * ⚠️ Le critère `when ≤ max` ne vaut QUE pour la bascule one-shot (ledger `__migrations` encore
+ * vide) : à ce moment-là, tout fichier au `when` bas a réellement été appliqué par Drizzle. Une
+ * fois la bascule faite, une NOUVELLE migration mergée hors-ordre (timestamp de nom antérieur au
+ * max) aurait un `when` bas SANS avoir été appliquée → l'enregistrer-sans-appliquer crée une
+ * colonne fantôme. C'est pourquoi {@link runMigrations} ne déclenche cette bascule qu'au tout
+ * premier boot du runner (ledger vide) ; ensuite, l'apply se décide purement par nom.
  */
 async function backfillFromDrizzle(
   ownerPool: Pool,
@@ -232,7 +239,13 @@ export async function runMigrations(ownerPool: Pool): Promise<void> {
    * boot sur un état récupérable). Une BDD pur-runner (sans schéma `drizzle`) reste en mode strict.
    */
   const transition = await hasDrizzleLedger(ownerPool);
-  if (transition) await backfillFromDrizzle(ownerPool, files, ledger);
+  /**
+   * Bascule one-shot UNIQUEMENT : ledger `__migrations` encore vide = tout premier boot du runner
+   * sur une BDD ex-Drizzle. Une fois la bascule faite (ledger peuplé), on ne ré-enregistre plus
+   * jamais sans appliquer — toute `.sql` absente du ledger passe par la boucle d'apply, décidée
+   * purement par nom de fichier, indépendamment de l'ordre des timestamps des autres entrées.
+   */
+  if (transition && ledger.size === 0) await backfillFromDrizzle(ownerPool, files, ledger);
 
   for (const file of files) {
     const content = fs.readFileSync(path.join(migrationsDir(), file), "utf8");

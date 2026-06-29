@@ -148,6 +148,65 @@ describe.skipIf(!URL)("runMigrations (Option D — runner SQL horodaté + ledger
     }
   });
 
+  it("post-bascule : migration mergée hors-ordre (timestamp de nom antérieur au max) absente du ledger → EST appliquée (OPE-707)", async () => {
+    if (!available) return;
+    /**
+     * Reproduit l'incident hors-ordre : la bascule est déjà faite (`__migrations` peuplé), le schéma
+     * drizzle existe toujours, et une NOUVELLE migration au timestamp de nom ANTÉRIEUR au max du
+     * ledger Drizzle est mergée. Son `when` bas la ferait passer pour « déjà couverte » par la
+     * bascule → enregistrée-sans-appliquer → colonne fantôme. Elle DOIT au contraire être appliquée.
+     */
+    const dir = writeFixtures({
+      "20000101000001_a.sql": "create table mig_a (id int);",
+      "20000101000002_b.sql": "create table mig_b (id int);",
+    });
+    fs.mkdirSync(path.join(dir, "meta"), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "meta", "_journal.json"),
+      JSON.stringify({
+        entries: [
+          { idx: 0, tag: "20000101000001_a", when: 1000 },
+          { idx: 1, tag: "20000101000002_b", when: 2000 },
+        ],
+      }),
+    );
+    const temp = await createTempDb();
+    const pool = new Pool({ connectionString: temp.url, max: 2 });
+    try {
+      await pool.query("create schema drizzle");
+      await pool.query(
+        "create table drizzle.__drizzle_migrations (id serial primary key, hash text not null, created_at bigint)",
+      );
+      await pool.query("insert into drizzle.__drizzle_migrations (hash, created_at) values ('x', 2000)");
+      await pool.query(
+        "create table __migrations (id serial primary key, filename text not null unique, checksum text not null, applied_at timestamptz not null default now())",
+      );
+      const bChecksum = crypto
+        .createHash("sha256")
+        .update("create table mig_b (id int);")
+        .digest("hex");
+      await pool.query("insert into __migrations (filename, checksum) values ($1, $2)", [
+        "20000101000002_b.sql",
+        bChecksum,
+      ]);
+      await pool.query("create table mig_b (id int)");
+
+      await withMigrationsDir(dir, () => runMigrations(pool));
+
+      const a = await pool.query("select to_regclass('public.mig_a') as t");
+      expect(a.rows[0].t).toBe("mig_a");
+      const led = await pool.query("select filename from __migrations order by filename");
+      expect(led.rows.map((r) => r.filename)).toEqual([
+        "20000101000001_a.sql",
+        "20000101000002_b.sql",
+      ]);
+    } finally {
+      await pool.end();
+      await temp.drop();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("transition (schéma drizzle présent) : migration pendante dont le DDL existe déjà → tolérée, sans throw", async () => {
     if (!available) return;
     /**
