@@ -298,6 +298,19 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
         })
         .where(and(eq(factures.id, id), eq(factures.artisanId, ctx.artisanId)))
         .returning();
+      if (row && patch.reglement) {
+        const isoDate = patch.reglement.date.toISOString().split("T")[0];
+        await tx.insert(reglements).values({
+          factureId: id,
+          artisanId: ctx.artisanId,
+          montant: patch.reglement.montant,
+          date: isoDate,
+          mode: patch.reglement.mode,
+          reference: null,
+          note: null,
+          createdAt: new Date(),
+        });
+      }
       return row ? toFacture(row) : null;
     });
   }

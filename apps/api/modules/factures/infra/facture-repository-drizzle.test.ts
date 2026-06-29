@@ -185,6 +185,48 @@ describe.skipIf(!URL)("FactureRepositoryDrizzle (PG, RLS + scope tenant + lignes
     expect(montantNum).toBeLessThanOrEqual(144.005);
   });
 
+  it("enregistrerPaiement : crée atomiquement un reglement ; invariant Σ(reglements) = montantPaye", async () => {
+    const f = await repo.createWithLignes(ctx(A), { clientId: clientA, numero: "FAC-INVT" }, [
+      { designation: "L", prixUnitaireHT: "100.00", tauxTVA: "20" },
+    ]);
+    await repo.setStatut(ctx(A), f.id, "envoyee");
+    expect((await repo.getById(ctx(A), f.id))?.totalTTC).toBe("120.00");
+
+    await repo.enregistrerPaiement(ctx(A), f.id, {
+      montantPaye: "50.00",
+      datePaiement: new Date("2026-06-01"),
+      modePaiement: "virement",
+      statut: "envoyee",
+      reglement: { montant: "50.00", date: new Date("2026-06-01"), mode: "virement" },
+    });
+
+    const { rows: r1 } = await admin.query<{ montant: string; mode: string }>(
+      'select montant, mode from reglements where "factureId" = $1',
+      [f.id],
+    );
+    expect(r1).toHaveLength(1);
+    expect(r1[0].montant).toBe("50.00");
+    expect(r1[0].mode).toBe("virement");
+    expect((await repo.getById(ctx(A), f.id))?.montantPaye).toBe("50.00");
+
+    await repo.enregistrerPaiement(ctx(A), f.id, {
+      montantPaye: "120.00",
+      datePaiement: new Date("2026-06-15"),
+      modePaiement: "cheque",
+      statut: "payee",
+      reglement: { montant: "70.00", date: new Date("2026-06-15"), mode: "cheque" },
+    });
+
+    const { rows: r2 } = await admin.query<{ montant: string }>(
+      'select montant from reglements where "factureId" = $1',
+      [f.id],
+    );
+    expect(r2).toHaveLength(2);
+    const somme = r2.reduce((s, r) => s + Number(r.montant), 0);
+    expect(somme).toBeCloseTo(120, 2);
+    expect((await repo.getById(ctx(A), f.id))?.montantPaye).toBe("120.00");
+  });
+
   it("setPdfFile : pose pdfFileId + pdfStorageKey ; lecture cohérente ; cross-tenant ignoré (OPE-687)", async () => {
     await admin.query("insert into files (id,storage_key,mime_type,size_bytes,sha256,purpose,bucket) values ($1,$2,'application/pdf',1000,'abc','facture-pdf','test')", [99_000_001, "factures/test/99000001.pdf"]);
     try {

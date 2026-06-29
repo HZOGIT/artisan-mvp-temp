@@ -229,6 +229,19 @@ export class FakeFactureRepository implements IFactureRepository {
   async enregistrerPaiement(ctx: TenantContext, id: number, patch: PaiementPatch): Promise<Facture | null> {
     const f = await this.getById(ctx, id);
     if (!f) return null;
+    if (patch.reglement) {
+      this.reglementStore.push({
+        id: ++this.reglementSeq,
+        factureId: id,
+        artisanId: ctx.artisanId,
+        montant: patch.reglement.montant,
+        date: patch.reglement.date,
+        mode: patch.reglement.mode,
+        reference: null,
+        note: null,
+        createdAt: new Date(),
+      });
+    }
     const updated: Facture = {
       ...f,
       montantPaye: patch.montantPaye,
@@ -239,6 +252,11 @@ export class FakeFactureRepository implements IFactureRepository {
     };
     this.factureStore = this.factureStore.map((x) => (x.id === id ? updated : x));
     return updated;
+  }
+
+  /** Aide de test : expose les règlements enregistrés pour une facture. */
+  getReglementsForTest(factureId: number): Reglement[] {
+    return this.reglementStore.filter((r) => r.factureId === factureId);
   }
 
   async ajouterReglement(ctx: TenantContext, input: CreateReglementInput): Promise<Reglement | null> {
