@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import {
   artisans,
   clients,
@@ -96,42 +96,48 @@ export class SignaturePublicReaderDrizzle implements SignaturePublicReader {
         .where(eq(devisOptions.devisId, devisId))
         .orderBy(asc(devisOptions.ordre));
 
-      const options = await Promise.all(
-        optionsRows.map(async (o) => {
-          const optLignes = await tx
-            .select()
-            .from(devisOptionsLignes)
-            .where(eq(devisOptionsLignes.optionId, o.id))
-            .orderBy(asc(devisOptionsLignes.ordre));
-          return {
-            id: o.id,
-            nom: o.nom,
-            description: o.description ?? null,
-            ordre: o.ordre ?? 0,
-            totalHT: o.totalHT ?? "0.00",
-            totalTVA: o.totalTVA ?? "0.00",
-            totalTTC: o.totalTTC ?? "0.00",
-            recommandee: o.recommandee ?? false,
-            selectionnee: o.selectionnee ?? false,
-            lignes: optLignes.map(
-              (l): SignatureLigneRow => ({
-                id: l.id,
-                designation: l.designation,
-                description: l.description ?? null,
-                quantite: l.quantite ?? "1.00",
-                unite: l.unite ?? null,
-                prixUnitaireHT: l.prixUnitaireHT ?? "0.00",
-                tauxTVA: l.tauxTVA ?? "20.00",
-                montantHT: l.montantHT ?? "0.00",
-                montantTVA: l.montantTVA ?? "0.00",
-                montantTTC: l.montantTTC ?? "0.00",
-                ordre: l.ordre ?? 0,
-                tvaCategorieId: l.tvaCategorieId ?? null,
-              }),
-            ),
-          };
-        }),
-      );
+      const optionIds = optionsRows.map((o) => o.id);
+      const toutesLignes = !optionIds.length ? [] : await tx
+        .select()
+        .from(devisOptionsLignes)
+        .where(inArray(devisOptionsLignes.optionId, optionIds))
+        .orderBy(asc(devisOptionsLignes.ordre));
+      const lignesParOption = new Map<number, typeof toutesLignes>();
+      for (const l of toutesLignes) {
+        const arr = lignesParOption.get(l.optionId);
+        if (arr) arr.push(l);
+        else lignesParOption.set(l.optionId, [l]);
+      }
+      const options = optionsRows.map((o) => {
+        const optLignes = lignesParOption.get(o.id) ?? [];
+        return {
+          id: o.id,
+          nom: o.nom,
+          description: o.description ?? null,
+          ordre: o.ordre ?? 0,
+          totalHT: o.totalHT ?? "0.00",
+          totalTVA: o.totalTVA ?? "0.00",
+          totalTTC: o.totalTTC ?? "0.00",
+          recommandee: o.recommandee ?? false,
+          selectionnee: o.selectionnee ?? false,
+          lignes: optLignes.map(
+            (l): SignatureLigneRow => ({
+              id: l.id,
+              designation: l.designation,
+              description: l.description ?? null,
+              quantite: l.quantite ?? "1.00",
+              unite: l.unite ?? null,
+              prixUnitaireHT: l.prixUnitaireHT ?? "0.00",
+              tauxTVA: l.tauxTVA ?? "20.00",
+              montantHT: l.montantHT ?? "0.00",
+              montantTVA: l.montantTVA ?? "0.00",
+              montantTTC: l.montantTTC ?? "0.00",
+              ordre: l.ordre ?? 0,
+              tvaCategorieId: l.tvaCategorieId ?? null,
+            }),
+          ),
+        };
+      });
 
       return {
         devis: {
