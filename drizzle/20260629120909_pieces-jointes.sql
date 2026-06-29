@@ -14,6 +14,7 @@ CREATE INDEX "pieces_jointes_artisan_devis_idx"   ON "pieces_jointes" ("artisan_
 CREATE INDEX "pieces_jointes_artisan_facture_idx" ON "pieces_jointes" ("artisan_id", "facture_id") WHERE "facture_id" IS NOT NULL;
 
 ALTER TABLE "pieces_jointes" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "pieces_jointes" FORCE ROW LEVEL SECURITY;
 
 CREATE POLICY "pieces_jointes_tenant_isolation" ON "pieces_jointes"
   USING ("artisan_id" = nullif(current_setting('app.tenant', true), '')::int)

@@ -4,7 +4,10 @@ import { withTenant } from "../../../shared/db/with-tenant";
 import type { TenantContext } from "../../../shared/tenant";
 import { piecesJointes } from "../../../../../drizzle/schema/pieces-jointes";
 import { files } from "../../../../../drizzle/schema/files";
+import { devis } from "../../../../../drizzle/schema/devis";
+import { factures } from "../../../../../drizzle/schema/factures";
 import type { IPiecesJointesRepository, PieceJointeRecord, AttachPieceInput } from "../application/pieces-jointes-repository";
+import { NotFoundError } from "../../../shared/errors";
 
 function rowToRecord(row: typeof piecesJointes.$inferSelect & { filename: string | null; mimeType: string; sizeBytes: number; storageKey: string }): PieceJointeRecord {
   return {
@@ -100,5 +103,19 @@ export class PiecesJointesRepositoryDrizzle implements IPiecesJointesRepository 
         .where(and(eq(piecesJointes.artisanId, ctx.artisanId), eq(piecesJointes.factureId, factureId)));
       return Number(row?.n ?? 0);
     });
+  }
+
+  async assertDevisOwnership(ctx: TenantContext, devisId: number): Promise<void> {
+    const rows = await withTenant(this.db, ctx, (tx) =>
+      tx.select({ id: devis.id }).from(devis).where(and(eq(devis.id, devisId), eq(devis.artisanId, ctx.artisanId))).limit(1)
+    );
+    if (!rows[0]) throw new NotFoundError("Devis introuvable");
+  }
+
+  async assertFactureOwnership(ctx: TenantContext, factureId: number): Promise<void> {
+    const rows = await withTenant(this.db, ctx, (tx) =>
+      tx.select({ id: factures.id }).from(factures).where(and(eq(factures.id, factureId), eq(factures.artisanId, ctx.artisanId))).limit(1)
+    );
+    if (!rows[0]) throw new NotFoundError("Facture introuvable");
   }
 }

@@ -92,4 +92,8 @@ describe.skipIf(!URL)("PiecesJointesRepositoryDrizzle (PG, RLS + scope tenant)",
     await repo.delete(ctx(B), piece.id);
     expect(await repo.getById(ctx(A), piece.id)).not.toBeNull();
   });
+
+  it("assertDevisOwnership cross-tenant lève NotFoundError", async () => {
+    await expect(repo.assertDevisOwnership(ctx(B), devisIdA)).rejects.toThrow("Devis introuvable");
+  });
 });

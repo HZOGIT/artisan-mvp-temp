@@ -27,4 +27,8 @@ export interface IPiecesJointesRepository {
   delete(ctx: TenantContext, id: number): Promise<void>;
   countByDevis(ctx: TenantContext, devisId: number): Promise<number>;
   countByFacture(ctx: TenantContext, factureId: number): Promise<number>;
+  /** Lève NotFoundError si le devis n'appartient pas au tenant. */
+  assertDevisOwnership(ctx: TenantContext, devisId: number): Promise<void>;
+  /** Lève NotFoundError si la facture n'appartient pas au tenant. */
+  assertFactureOwnership(ctx: TenantContext, factureId: number): Promise<void>;
 }

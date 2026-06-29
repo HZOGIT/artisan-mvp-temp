@@ -50,4 +50,8 @@ export class PiecesJointesRepositoryFake implements IPiecesJointesRepository {
   async countByFacture(ctx: TenantContext, factureId: number): Promise<number> {
     return this.store.filter((r) => r.artisanId === ctx.artisanId && r.factureId === factureId).length;
   }
+
+  async assertDevisOwnership(_ctx: TenantContext, _devisId: number): Promise<void> {}
+
+  async assertFactureOwnership(_ctx: TenantContext, _factureId: number): Promise<void> {}
 }

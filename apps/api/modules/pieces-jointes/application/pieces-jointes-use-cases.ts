@@ -46,6 +46,7 @@ export async function attacherPieceDevis(
   devisId: number,
   fileId: number,
 ): Promise<PieceJointeRecord> {
+  await repo.assertDevisOwnership(ctx, devisId);
   const count = await repo.countByDevis(ctx, devisId);
   if (count >= MAX_PIECES_PAR_DOC) {
     throw new ValidationError(`Maximum ${MAX_PIECES_PAR_DOC} pièces jointes par devis`);
@@ -59,6 +60,7 @@ export async function attacherPieceFacture(
   factureId: number,
   fileId: number,
 ): Promise<PieceJointeRecord> {
+  await repo.assertFactureOwnership(ctx, factureId);
   const count = await repo.countByFacture(ctx, factureId);
   if (count >= MAX_PIECES_PAR_DOC) {
     throw new ValidationError(`Maximum ${MAX_PIECES_PAR_DOC} pièces jointes par facture`);
