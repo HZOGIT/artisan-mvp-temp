@@ -105,6 +105,17 @@ describe.skipIf(!URL)("depenses.router e2e (HTTP → tRPC → use-case → repo 
     expect((await callQuery(server, "depenses.getCategories", undefined, tA)).json().result.data).toEqual([]);
   });
 
+  it("plafondMensuel : négatif → 400, zéro et positif → OK (OPE-778)", async () => {
+    const tA = await token(UA);
+    expect((await callMutation(server, "depenses.createCategorie", { nom: "Test", plafondMensuel: -1 }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "depenses.updateCategorie", { id: 999, plafondMensuel: -0.01 }, tA)).statusCode).toBe(400);
+    const created = await callMutation(server, "depenses.createCategorie", { nom: "TestZero", plafondMensuel: 0 }, tA);
+    expect(created.statusCode).toBe(200);
+    const id = created.json().result.data.id as number;
+    expect((await callMutation(server, "depenses.updateCategorie", { id, plafondMensuel: 500 }, tA)).json().result.data).toEqual({ success: true });
+    await callMutation(server, "depenses.deleteCategorie", { id }, tA);
+  });
+
   it("setBudget (parité client) : upsert (categorie, mois) — create puis update, scopé tenant", async () => {
     const tA = await token(UA);
     expect((await callMutation(server, "depenses.setBudget", { categorie: "Carburant", mois: "2026-07", budget: 500 }, tA)).json().result.data).toEqual({ success: true });
