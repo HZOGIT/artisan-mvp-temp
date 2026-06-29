@@ -445,21 +445,23 @@ export default function DevisDetailPage() {
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5" />{t("rappels", { n: pendingCount(rappels) })}</CardTitle></CardHeader>
         <CardContent>
-          <form className="flex flex-col sm:flex-row gap-2 mb-4" onSubmit={(e) => { e.preventDefault(); if (!rappelTitre.trim()) { toast.error(t("errTitreRequis")); return; } if (!rappelEcheance) { toast.error(t("errEcheanceRequise")); return; } D.createRappel.mutate({ titre: rappelTitre.trim(), echeance: rappelEcheance, type: rappelType, entiteType: "devis", entiteId: id }, { onSuccess: () => { toast.success(t("toastRappelAjoute")); setRappelTitre(""); setRappelEcheance(""); setRappelType("relance"); refetchActivites(); }, onError: (e) => toast.error(e.message) }); }}>
-            <Input placeholder={t("relancerPlaceholder", { numero: devis.numero })} value={rappelTitre} onChange={(e) => setRappelTitre(e.target.value)} className="flex-1" />
-            <Input type="date" value={rappelEcheance} onChange={(e) => setRappelEcheance(e.target.value)} className="sm:w-40" />
-            <Select value={rappelType} onValueChange={(v) => setRappelType(v as RappelType)}>
-              <SelectTrigger className="sm:w-32"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="relance">{t("rappelRelance")}</SelectItem>
-                <SelectItem value="appel">{t("rappelAppel")}</SelectItem>
-                <SelectItem value="email">{t("rappelEmail")}</SelectItem>
-                <SelectItem value="rdv">{t("rappelRdv")}</SelectItem>
-                <SelectItem value="autre">{t("rappelAutre")}</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button type="submit" disabled={D.createRappel.isPending}><Plus className="h-4 w-4 mr-1" /> {t("ajouter")}</Button>
-          </form>
+          {devis.statut !== "accepte" && devis.statut !== "refuse" && (
+            <form className="flex flex-col sm:flex-row gap-2 mb-4" onSubmit={(e) => { e.preventDefault(); if (!rappelTitre.trim()) { toast.error(t("errTitreRequis")); return; } if (!rappelEcheance) { toast.error(t("errEcheanceRequise")); return; } D.createRappel.mutate({ titre: rappelTitre.trim(), echeance: rappelEcheance, type: rappelType, entiteType: "devis", entiteId: id }, { onSuccess: () => { toast.success(t("toastRappelAjoute")); setRappelTitre(""); setRappelEcheance(""); setRappelType("relance"); refetchActivites(); }, onError: (e) => toast.error(e.message) }); }}>
+              <Input placeholder={t("relancerPlaceholder", { numero: devis.numero })} value={rappelTitre} onChange={(e) => setRappelTitre(e.target.value)} className="flex-1" />
+              <Input type="date" value={rappelEcheance} onChange={(e) => setRappelEcheance(e.target.value)} className="sm:w-40" />
+              <Select value={rappelType} onValueChange={(v) => setRappelType(v as RappelType)}>
+                <SelectTrigger className="sm:w-32"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="relance">{t("rappelRelance")}</SelectItem>
+                  <SelectItem value="appel">{t("rappelAppel")}</SelectItem>
+                  <SelectItem value="email">{t("rappelEmail")}</SelectItem>
+                  <SelectItem value="rdv">{t("rappelRdv")}</SelectItem>
+                  <SelectItem value="autre">{t("rappelAutre")}</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button type="submit" disabled={D.createRappel.isPending}><Plus className="h-4 w-4 mr-1" /> {t("ajouter")}</Button>
+            </form>
+          )}
           {rappels.length > 0 ? (
             <div className="space-y-2">
               {rappels.map((a) => (
