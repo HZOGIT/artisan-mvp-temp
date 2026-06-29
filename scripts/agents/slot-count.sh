@@ -28,13 +28,28 @@ while IFS= read -r branch; do
 done < <(gh pr list --base staging --state open --json headRefName \
     --jq '.[].headRefName' 2>/dev/null || true)
 
-# Branch 2: feat/* worktrees with a live screen session
-while IFS= read -r wt_line; do
-  branch="$(echo "$wt_line" | grep -o '\[feat/[^]]*\]' | tr -d '[]' || true)"
-  [[ -z "$branch" ]] && continue
-  session="${branch#feat/}"
+# Branch 2: worktrees by PATH (robust to detached HEAD during rebase)
+# Any worktree with path /tmp/wt-* is an active worker slot
+WORKTREE_BASE="${WORKTREE_BASE:-/tmp/wt-}"
+while IFS= read -r wt_path wt_detached_or_branch; do
+  # Extract path from worktree list line
+  [[ -z "$wt_path" ]] && continue
+
+  # Only count worktrees in /tmp/wt-* (skip main repo and others)
+  [[ "$wt_path" != ${WORKTREE_BASE}* ]] && continue
+  [[ "$wt_path" == "$REPO_DIR" ]] && continue
+
+  # Derive session name from directory name (wt-<session> -> <session>)
+  session="${wt_path##*/}"  # basename
+  session="${session#wt-}"   # remove 'wt-' prefix
+
+  # Use the derived session to construct branch key for seen[]
+  # This works whether the worktree is on feat/session or detached HEAD
+  branch="feat/${session}"
+
+  # Check if screen session is live
   screen -ls 2>/dev/null | grep -qE "[0-9]+\\.${session}[[:space:]]" \
     && seen["$branch"]=1 || true
-done < <(git -C "$REPO_DIR" worktree list 2>/dev/null || true)
+done < <(git -C "$REPO_DIR" worktree list 2>/dev/null | awk '{print $1}' || true)
 
 echo "${#seen[@]}"
