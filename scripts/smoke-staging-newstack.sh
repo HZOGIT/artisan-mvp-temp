@@ -39,6 +39,10 @@ for perm in clients.voir contrats.voir interventions.voir rdv.gerer; do
   $PG "insert into permissions_utilisateur (\"userId\", permission, autorise) select $UA, '$perm', true where not exists (select 1 from permissions_utilisateur where \"userId\"=$UA and permission='$perm');" >/dev/null
 done
 
+# Abonnement PRO actif pour A (idempotent) — nécessaire pour les endpoints gatés planMinimum=pro
+# (conseilsIA, assistant.getThreads). Sans ça → 403, fausse alarme smoke (OPE-770).
+$PG "insert into billing_subscriptions (artisan_id, plan_id, billing_interval, billing_mode, status) values ($AA, 'pro', 'monthly', 'maison', 'active') on conflict (artisan_id) do update set plan_id='pro', status='active';" >/dev/null
+
 # 2) Smoke authentifié des domaines servis par le nouveau stack (200 attendu = endpoint OK end-to-end).
 PROCS="vehicules.list notifications.list fournisseurs.list parametres.get modelesEmail.list relances.list conges.list badges.list stocks.list techniciens.list rdv.list clients.list factures.list contrats.list commandesFournisseurs.list devis.list avis.list interventions.list chantiers.list articles.getArtisanArticles previsions.getHistorique depenses.list artisan.getProfile activites.list modules.list statistiques.getDevisStats calendrier.getIcalFeed emails.list geolocalisation.getPositions dashboard.getStats dashboard.getAlerts rapports.list auth.me subscription.getCurrent conseilsIA assistant.getThreads chat.getConversations"
 fail=0
