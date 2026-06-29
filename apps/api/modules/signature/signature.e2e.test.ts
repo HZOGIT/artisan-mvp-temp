@@ -75,6 +75,18 @@ describe.skipIf(!URL)("signature e2e (routeur monté, surface publique par token
     }
   });
 
+  it("signDevis : signatureData format invalide → 400 (garde regex)", async () => {
+    const body = { "0": { json: { token: TOKEN, signatureData: "garbage string sans format data URL", signataireName: "Jean", signataireEmail: "jean@test.com" } } };
+    const res = await app.inject({ method: "POST", url: "/api/trpc/signature.signDevis?batch=1", headers: { "content-type": "application/json" }, payload: JSON.stringify(body) });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("signDevis : signatureData trop grande → 400 (garde max)", async () => {
+    const body = { "0": { json: { token: TOKEN, signatureData: "data:image/png;base64," + "A".repeat(500000), signataireName: "Jean", signataireEmail: "jean@test.com" } } };
+    const res = await app.inject({ method: "POST", url: "/api/trpc/signature.signDevis?batch=1", headers: { "content-type": "application/json" }, payload: JSON.stringify(body) });
+    expect(res.statusCode).toBe(400);
+  });
+
   it("signDevis → 200, devis passe à accepte (immutabilité : 2ᵉ signature → 400)", async () => {
     const body = { "0": { json: { token: TOKEN, signatureData: "data:image/png;base64,AAA", signataireName: "Jean", signataireEmail: "jean@test.com" } } };
     const res = await app.inject({
