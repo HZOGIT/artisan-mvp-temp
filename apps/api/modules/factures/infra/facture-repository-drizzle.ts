@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, sql, sum } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, inArray, sql, sum } from "drizzle-orm";
 import { factures, facturesLignes, clients, devis, parametresArtisan, eventLog, reglements } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
@@ -644,6 +644,19 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
         .from(facturesLignes)
         .where(eq(facturesLignes.factureId, factureId))
         .orderBy(asc(facturesLignes.ordre), asc(facturesLignes.id));
+      return rows.map(toLigne);
+    });
+  }
+
+  listLignesByFactureIds(ctx: TenantContext, ids: number[]): Promise<FactureLigne[]> {
+    if (ids.length === 0) return Promise.resolve([]);
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select(getTableColumns(facturesLignes))
+        .from(facturesLignes)
+        .innerJoin(factures, and(eq(factures.id, facturesLignes.factureId), eq(factures.artisanId, ctx.artisanId)))
+        .where(inArray(facturesLignes.factureId, ids))
+        .orderBy(asc(facturesLignes.factureId), asc(facturesLignes.ordre), asc(facturesLignes.id));
       return rows.map(toLigne);
     });
   }

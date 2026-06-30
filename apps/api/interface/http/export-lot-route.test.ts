@@ -18,8 +18,14 @@ const FACTURES = [
 function deps(over: Partial<ExportLotRouteDeps> = {}): Omit<ExportLotRouteDeps, "jwtSecret" | "resolver"> {
   return {
     factureLister: { list: async () => FACTURES },
-    factureReader: { listLignes: async () => [{ designation: "L", quantite: "1", prixUnitaireHT: "100", tauxTVA: "20", montantHT: "100.00", montantTVA: "20.00", montantTTC: "120.00" }] },
-    clientReader: { getById: async (_c, id) => ({ id, nom: "Dupont" }) },
+    factureReader: {
+      listLignes: async () => [{ designation: "L", quantite: "1", prixUnitaireHT: "100", tauxTVA: "20", montantHT: "100.00", montantTVA: "20.00", montantTTC: "120.00" }],
+      listLignesByFactureIds: async (_c, ids) => ids.map((id) => ({ factureId: id, designation: "L", quantite: "1", prixUnitaireHT: "100", tauxTVA: "20", montantHT: "100.00", montantTVA: "20.00", montantTTC: "120.00" })),
+    },
+    clientReader: {
+      getById: async (_c, id) => ({ id, nom: "Dupont" }),
+      listByIds: async (_c, ids) => ids.map((id) => ({ id, nom: "Dupont" })),
+    },
     artisanReader: { getProfile: async () => ({ id: 1, nomEntreprise: "ACME", siret: "12345678900011", tauxTVA: "20" }) },
     pdf: new FakePdfPort(),
     ...over,

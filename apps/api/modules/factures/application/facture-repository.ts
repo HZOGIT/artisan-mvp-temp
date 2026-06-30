@@ -94,6 +94,8 @@ export interface IFactureRepository {
 
   /** Lignes d'une facture — [] si la facture n'appartient pas au tenant. */
   listLignes(ctx: TenantContext, factureId: number): Promise<FactureLigne[]>;
+  /** Lignes de plusieurs factures en bulk (1 requête + filtre cross-tenant). [] si ids vide. */
+  listLignesByFactureIds(ctx: TenantContext, ids: number[]): Promise<FactureLigne[]>;
   /** Ajoute une ligne (montants recalculés) — null si la facture n'appartient pas au tenant. */
   addLigne(ctx: TenantContext, factureId: number, input: CreateFactureLigneInput): Promise<FactureLigne | null>;
   /** Modifie une ligne (montants recalculés) — null si la ligne ne relève pas d'une facture du tenant. */
