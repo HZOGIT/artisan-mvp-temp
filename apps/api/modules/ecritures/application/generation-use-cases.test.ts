@@ -200,6 +200,19 @@ describe("ecritures — inaltérabilité (statut validée) — OPE-118", () => {
     expect(all.filter((e) => e.journal === "BQ" && e.statut === "brouillon").length).toBe(2);
   });
 
+  it("encaissement BQ → validerEcritures → BQ en statut validée (anti-régression OPE-944)", async () => {
+    const repo = new FakeEcritureRepository();
+    const reader = new FakeFactureReader();
+    reader.register(facture({ statut: "payee" }), [{ tauxTVA: "20.00", montantTVA: "20.00" }]);
+    await genererEcrituresVente(repo, reader, A, 501);
+    await validerEcritures(repo, A, 501);
+    await genererEcrituresEncaissement(repo, reader, A, 501);
+    await validerEcritures(repo, A, 501);
+    const bq = (await repo.listByFacture(A, 501)).filter((e) => e.journal === "BQ");
+    expect(bq.length).toBe(2);
+    expect(bq.every((e) => e.statut === "validee")).toBe(true);
+  });
+
   it("intégration : facture émise → genererEcrituresVente + validerEcritures → paiement génère ENCAISSEMENT (OPE-666)", async () => {
     const repo = new FakeEcritureRepository();
     const reader = new FakeFactureReader();

@@ -1337,6 +1337,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     genererEcrituresFacture: async (artisanId: number, factureId: number) => {
       await compta.genererEcrituresVente({ artisanId, userId: 0 }, factureId);
       await compta.genererEcrituresEncaissement({ artisanId, userId: 0 }, factureId);
+      await compta.validerEcritures({ artisanId, userId: 0 }, factureId);
     },
   });
 
@@ -1349,6 +1350,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     genererEcrituresFacture: async (artisanId: number, factureId: number) => {
       await compta.genererEcrituresVente({ artisanId, userId: 0 }, factureId);
       await compta.genererEcrituresEncaissement({ artisanId, userId: 0 }, factureId);
+      await compta.validerEcritures({ artisanId, userId: 0 }, factureId);
     },
   });
 
@@ -1410,6 +1412,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     genererEcritures: async (artisanId: number, factureId: number) => {
       await compta.genererEcrituresVente({ artisanId, userId: 0 }, factureId);
       await compta.genererEcrituresEncaissement({ artisanId, userId: 0 }, factureId);
+      await compta.validerEcritures({ artisanId, userId: 0 }, factureId);
     },
   });
   app.register(eventOutboxDrainerPlugin, { db: getDbHandle().db });
