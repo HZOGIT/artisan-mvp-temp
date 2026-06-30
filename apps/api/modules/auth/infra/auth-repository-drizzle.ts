@@ -167,7 +167,7 @@ export class AuthRepositoryDrizzle implements IAuthRepository {
     /** 3. Abonnement d'essai (billing maison, si absent) — best-effort. */
     try {
       await this.db.transaction(async (tx) => {
-        /** billing_subscriptions a forcerowsecurity=on → poser le tenant avant SELECT/INSERT. */
+        /* billing_subscriptions : RLS désactivée — isolation via artisan_id explicite (cf. billing-repository-drizzle.ts). */
         await tx.execute(sql`SELECT set_config('app.tenant', ${String(artisanId)}, true)`);
         const [existing] = await tx.select({ id: billingSubscriptions.id }).from(billingSubscriptions).where(eq(billingSubscriptions.artisan_id, artisanId)).limit(1);
         if (!existing) {
