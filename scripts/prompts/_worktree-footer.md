@@ -128,6 +128,10 @@ git -C /tmp/wt-__SESSION_NAME__ add drizzle/meta/_journal.json
 ```
 `git add drizzle/` emporterait les snapshots réécrit par drizzle-kit sur les migrations existantes (stowaway) si la restauration ci-dessus a été oubliée.
 
+### Convention events de domaine
+
+Tout event de domaine/outbox est **atomique** avec la mutation métier — `withOutbox` dans la même transaction, jamais hors-tx ni en `.catch` avalé. Best-effort toléré uniquement pour les side-effects non-métier optionnels (email, stats, anti-flood). Template et règle complète : `CLAUDE.md §Events de domaine` + `docs/architecture/events-domaine-atomique.md`.
+
 ### Vérifier avant la PR
 
 ```bash
