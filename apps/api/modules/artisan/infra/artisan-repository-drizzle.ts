@@ -3,7 +3,7 @@ import { artisans } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IArtisanRepository } from "../application/artisan-repository";
-import type { ArtisanProfile, UpdateArtisanProfileInput } from "../domain/artisan";
+import type { ArtisanProfile, ConnectStateUpdate, UpdateArtisanProfileInput } from "../domain/artisan";
 
 type Row = typeof artisans.$inferSelect;
 
@@ -83,5 +83,18 @@ export class ArtisanRepositoryDrizzle implements IArtisanRepository {
       .where(and(eq(artisans.slug, slug), ne(artisans.id, ctx.artisanId)))
       .limit(1);
     return !row;
+  }
+
+  async updateConnectState(ctx: TenantContext, data: ConnectStateUpdate): Promise<void> {
+    const set: Partial<typeof artisans.$inferInsert> = { updatedAt: new Date() };
+    const fields: (keyof ConnectStateUpdate)[] = [
+      "stripeConnectAccountId", "stripeConnectChargesEnabled", "stripeConnectPayoutsEnabled",
+      "stripeConnectDetailsSubmitted", "stripeConnectRequirements", "stripeConnectStatus",
+      "stripeConnectConnectedAt", "stripeConnectUpdatedAt",
+    ];
+    for (const f of fields) {
+      if (data[f] !== undefined) (set as Record<string, unknown>)[f] = data[f];
+    }
+    await this.db.update(artisans).set(set).where(eq(artisans.id, ctx.artisanId));
   }
 }

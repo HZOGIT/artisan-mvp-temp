@@ -225,6 +225,8 @@ import { registerUploadPieceJointeRoute } from "./interface/http/upload-piece-jo
 import { registerPortailPieceJointeRoute } from "./interface/http/portail-piece-jointe-route";
 import { registerAttestationTvaDownloadRoute } from "./interface/http/attestation-tva-download-route";
 import { createPiecesJointesModule } from "./modules/pieces-jointes/pieces-jointes.module";
+import { createConnectModule } from "./modules/connect/connect.module";
+import { registerConnectRefreshRoute } from "./modules/connect/interface/http/connect-refresh-route";
 import { PiecesJointesRepositoryDrizzle } from "./modules/pieces-jointes/infra/pieces-jointes-repository-drizzle";
 import { registerFacturxRoutes } from "./interface/http/facturx-route";
 import { registerExportLotRoutes } from "./interface/http/export-lot-route";
@@ -1204,6 +1206,13 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const piecesJointesRepo = new PiecesJointesRepositoryDrizzle(getDbHandle().db);
   const piecesJointes = createPiecesJointesModule({ repository: piecesJointesRepo, storage: facturesStorage });
 
+  const connect = createConnectModule({
+    artisanRepo: deps.artisanRepo ?? new ArtisanRepositoryDrizzle(getDbHandle().db),
+    stripe: deps.stripePort ?? new StripeAdapter(),
+    db: getDbHandle().db,
+    appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+  });
+
   /*
    * Assemblage du routeur racine — APPEND-ONLY (une propriété par module, conflit de merge trivial).
    * Ajouter un module : instancier son `const` ci-dessus puis ajouter UNE ligne ici. Pas de ligne
@@ -1275,6 +1284,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     einvoicing,
     feedback,
     piecesJointes,
+    connect,
   });
 
   app.register(fastifyTRPCPlugin, {
@@ -1615,6 +1625,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     rateLimiter: new SlidingWindowRateLimiter(20, 60 * 1000),
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
   });
+
+  /** Refresh URL Stripe Connect — recrée un Account Link expiré et redirige l'artisan. */
+  registerConnectRefreshRoute(app, connect.routeDeps);
 
   /** Recherche publique du catalogue de référence `/api/articles/search` (sans auth). */
   registerArticlesSearchRoute(app, {

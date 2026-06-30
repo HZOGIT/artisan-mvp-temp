@@ -1,4 +1,4 @@
-import type { CheckoutSessionStatus, CreateCustomerParams, CreateInvoiceCheckoutParams, StripePort, StripeWebhookEvent } from "./stripe";
+import type { CheckoutSessionStatus, CreateAccountLinkParams, CreateConnectAccountParams, CreateCustomerParams, CreateInvoiceCheckoutParams, StripePort, StripeWebhookEvent } from "./stripe";
 import { getSecret } from "../config/secrets";
 
 const STRIPE_MODULE = "stripe";
@@ -12,6 +12,8 @@ type StripeSDK = {
     };
   };
   webhooks: { constructEvent(payload: Buffer, signature: string, secret: string): StripeWebhookEvent & { account?: string } };
+  accounts: { create(p: unknown): Promise<{ id: string }> };
+  accountLinks: { create(p: unknown): Promise<{ url: string }> };
 };
 
 export class StripeAdapter implements StripePort {
@@ -82,6 +84,31 @@ export class StripeAdapter implements StripePort {
     });
     return { url: session.url, sessionId: session.id };
   }
+
+  async createConnectAccount(p: CreateConnectAccountParams): Promise<{ id: string }> {
+    const s = await this.sdk();
+    return s.accounts.create({
+      controller: {
+        stripe_dashboard: { type: "full" },
+        fees: { payer: "account" },
+        losses: { payments: "stripe" },
+        requirement_collection: "stripe",
+      },
+      country: p.country,
+      email: p.email || undefined,
+    });
+  }
+
+  async createAccountLink(p: CreateAccountLinkParams): Promise<{ url: string }> {
+    const s = await this.sdk();
+    return s.accountLinks.create({
+      account: p.accountId,
+      refresh_url: p.refreshUrl,
+      return_url: p.returnUrl,
+      type: "account_onboarding",
+      collection_options: { fields: "eventually_due" },
+    });
+  }
 }
 
 export class FakeStripePort implements StripePort {
@@ -109,5 +136,17 @@ export class FakeStripePort implements StripePort {
   public sessionStatuses: Map<string, CheckoutSessionStatus> = new Map();
   async retrieveCheckoutSession(sessionId: string): Promise<CheckoutSessionStatus | null> {
     return this.sessionStatuses.get(sessionId) ?? { paymentStatus: "unpaid", paymentIntentId: null };
+  }
+
+  public connectAccounts: CreateConnectAccountParams[] = [];
+  async createConnectAccount(p: CreateConnectAccountParams): Promise<{ id: string }> {
+    this.connectAccounts.push(p);
+    return { id: `acct_fake_${++this.seq}` };
+  }
+
+  public accountLinks: CreateAccountLinkParams[] = [];
+  async createAccountLink(p: CreateAccountLinkParams): Promise<{ url: string }> {
+    this.accountLinks.push(p);
+    return { url: `https://connect.stripe.test/onboarding/${p.accountId}_${++this.seq}` };
   }
 }

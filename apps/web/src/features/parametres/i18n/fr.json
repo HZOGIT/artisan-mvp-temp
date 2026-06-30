@@ -1,8 +1,6 @@
 {
   "title": "Paramètres",
   "subtitle": "Configurez les paramètres de votre application",
-  "tabGeneral": "Général",
-  "tabAbonnement": "Abonnement",
   "perso": "Personnalisation",
   "persoDesc": "Logo, couleurs et identité visuelle",
   "logo": "Logo de l'entreprise",

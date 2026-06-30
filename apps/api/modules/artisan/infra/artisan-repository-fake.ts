@@ -1,6 +1,6 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { IArtisanRepository } from "../application/artisan-repository";
-import type { ArtisanProfile, UpdateArtisanProfileInput } from "../domain/artisan";
+import type { ArtisanProfile, ConnectStateUpdate, UpdateArtisanProfileInput } from "../domain/artisan";
 
 /*
  * Double in-memory du repository « profil artisan » (tests sans DB). Le profil est scopé par
@@ -45,5 +45,11 @@ export class FakeArtisanRepository implements IArtisanRepository {
 
   async isSlugAvailable(ctx: TenantContext, slug: string): Promise<boolean> {
     return !this.profiles.some((p) => p.slug === slug && p.id !== ctx.artisanId);
+  }
+
+  async updateConnectState(ctx: TenantContext, data: ConnectStateUpdate): Promise<void> {
+    const idx = this.profiles.findIndex((p) => p.id === ctx.artisanId);
+    if (idx === -1) return;
+    this.profiles[idx] = { ...this.profiles[idx], ...data, updatedAt: new Date() } as ArtisanProfile;
   }
 }

@@ -24,7 +24,6 @@ export default function ParametresPage() {
     parametres, artisan, icalFeed, demandes, vitrineSettings, isLoading, refetchArtisan,
     updateParametres, updateProfile, updateVitrine, regenerateIcal, updateDemandeStatut, convertirDemande,
   } = useParametres();
-
   const [formData, setFormData] = useState<ParametresForm>(FORM_DEFAULTS);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -116,8 +115,7 @@ export default function ParametresPage() {
         <p className="text-muted-foreground mt-1">{t("subtitle")}</p>
       </div>
 
-      <div>
-          <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5" />{t("perso")}</CardTitle>
@@ -389,7 +387,6 @@ export default function ParametresPage() {
               )}
             </CardContent>
           </Card>
-      </div>
     </div>
   );
 }

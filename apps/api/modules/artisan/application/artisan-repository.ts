@@ -1,5 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { ArtisanProfile, UpdateArtisanProfileInput } from "../domain/artisan";
+import type { ArtisanProfile, ConnectStateUpdate, UpdateArtisanProfileInput } from "../domain/artisan";
 
 /*
  * Port du repository « profil artisan ». Toujours scopé au tenant courant (`ctx.artisanId`) : le
@@ -12,4 +12,6 @@ export interface IArtisanRepository {
   update(ctx: TenantContext, input: UpdateArtisanProfileInput): Promise<ArtisanProfile | null>;
   /** true si le slug est libre (ou déjà le sien). Garde d'unicité du slug public (vitrine/portail). */
   isSlugAvailable(ctx: TenantContext, slug: string): Promise<boolean>;
+  /** Upsert de l'état Stripe Connect du tenant courant (colonnes connect seulement). */
+  updateConnectState(ctx: TenantContext, data: ConnectStateUpdate): Promise<void>;
 }

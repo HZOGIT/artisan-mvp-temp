@@ -72,3 +72,15 @@ export interface UpdateArtisanProfileInput {
   readonly assuranceDecennalePolice?: string | null;
   readonly assuranceDecennaleGarantie?: string | null;
 }
+
+/** Mise à jour partielle des colonnes Stripe Connect (onboarding + synchro webhook). */
+export interface ConnectStateUpdate {
+  readonly stripeConnectAccountId?: string;
+  readonly stripeConnectChargesEnabled?: boolean;
+  readonly stripeConnectPayoutsEnabled?: boolean;
+  readonly stripeConnectDetailsSubmitted?: boolean;
+  readonly stripeConnectRequirements?: unknown;
+  readonly stripeConnectStatus?: string;
+  readonly stripeConnectConnectedAt?: Date | null;
+  readonly stripeConnectUpdatedAt?: Date;
+}

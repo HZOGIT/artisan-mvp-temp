@@ -87,6 +87,7 @@ import shellFr from "@/shell/i18n/fr.json";
 import vitrinePublicFr from "@/features/vitrine-public/i18n/fr.json";
 import eventsAdminFr from "@/features/events-admin/i18n/fr.json";
 import einvoicingFr from "@/features/einvoicing/i18n/fr.json";
+import paiementsFr from "@/features/paiements/i18n/fr.json";
 
 /*
  * i18n du FRONT NEUF (react-i18next). Choix de la refonte : tout libellé utilisateur passe par `t()`.
@@ -185,6 +186,7 @@ const resources = {
     vitrinePublic: vitrinePublicFr,
     "events-admin": eventsAdminFr,
     einvoicing: einvoicingFr,
+    paiements: paiementsFr,
   },
 } as const;
 

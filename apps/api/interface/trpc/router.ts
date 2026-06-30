@@ -65,6 +65,7 @@ import type { BillingModule } from "../../modules/billing/billing.module";
 import type { EinvoicingModule } from "../../modules/einvoicing/einvoicing.module";
 import type { FeedbackModule } from "../../modules/feedback/feedback.module";
 import type { PiecesJointesModule } from "../../modules/pieces-jointes/pieces-jointes.module";
+import type { ConnectModule } from "../../modules/connect/connect.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
@@ -133,6 +134,7 @@ export interface AppRouterDeps {
   readonly einvoicing: EinvoicingModule;
   readonly feedback: FeedbackModule;
   readonly piecesJointes: PiecesJointesModule;
+  readonly connect: ConnectModule;
 }
 
 /*
@@ -207,6 +209,7 @@ function moduleRouters(deps: AppRouterDeps) {
     einvoicing: deps.einvoicing.router,
     feedback: deps.feedback.router,
     piecesJointes: deps.piecesJointes.router,
+    connect: deps.connect.router,
   };
 }
 

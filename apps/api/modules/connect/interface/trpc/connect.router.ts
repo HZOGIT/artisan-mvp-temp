@@ -1,4 +1,10 @@
-/**
- * Router tRPC Connect — à implémenter dans le Lot 1 (onboarding :
- * connect.startOnboarding, connect.status, GET /api/paiement/connect/refresh).
- */
+import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import type { ConnectDeps } from "../../application/use-cases";
+import { startOnboarding, getConnectStatus } from "../../application/use-cases";
+
+export function createConnectRouter(deps: ConnectDeps) {
+  return router({
+    startOnboarding: protectedProcedure.mutation(({ ctx }) => startOnboarding(deps, ctx.tenant)),
+    status: protectedProcedure.query(({ ctx }) => getConnectStatus(deps, ctx.tenant)),
+  });
+}
