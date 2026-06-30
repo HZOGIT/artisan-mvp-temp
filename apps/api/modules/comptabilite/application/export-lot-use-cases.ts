@@ -25,8 +25,14 @@ interface FactureLotItem {
 
 export interface ExportLotReaderDeps {
   readonly factureLister: { list(ctx: TenantContext): Promise<readonly FactureLotItem[]> };
-  readonly factureReader: { listLignes(ctx: TenantContext, id: number): Promise<unknown[]> };
-  readonly clientReader: { getById(ctx: TenantContext, id: number): Promise<{ nom?: string | null } | null> };
+  readonly factureReader: {
+    listLignes(ctx: TenantContext, id: number): Promise<unknown[]>;
+    listLignesByFactureIds(ctx: TenantContext, ids: number[]): Promise<readonly { factureId: number }[]>;
+  };
+  readonly clientReader: {
+    getById(ctx: TenantContext, id: number): Promise<{ nom?: string | null } | null>;
+    listByIds(ctx: TenantContext, ids: number[]): Promise<readonly { id: number; nom?: string | null }[]>;
+  };
   readonly artisanReader: { getProfile(ctx: TenantContext): Promise<unknown | null> };
 }
 export interface ExportLotPdfDeps extends ExportLotReaderDeps {
@@ -80,14 +86,32 @@ async function loadArtisan(deps: ExportLotReaderDeps, ctx: TenantContext): Promi
   return artisan;
 }
 
+async function bulkLoad(deps: ExportLotReaderDeps, ctx: TenantContext, factures: readonly FactureLotItem[]) {
+  const ids = factures.map((f) => f.id);
+  const clientIds = Array.from(new Set(factures.map((f) => f.clientId)));
+  const [allLignes, allClients] = await Promise.all([
+    deps.factureReader.listLignesByFactureIds(ctx, ids),
+    deps.clientReader.listByIds(ctx, clientIds),
+  ]);
+  const lignesMap = new Map<number, (typeof allLignes)[number][]>();
+  for (const l of allLignes) {
+    const list = lignesMap.get(l.factureId) ?? [];
+    list.push(l);
+    lignesMap.set(l.factureId, list);
+  }
+  const clientsMap = new Map(allClients.map((c) => [c.id, c]));
+  return { lignesMap, clientsMap };
+}
+
 export async function collectFacturxLot(deps: ExportLotReaderDeps, ctx: TenantContext, period: PeriodInput, now: Date = new Date()): Promise<LotResult> {
   const { factures, debut, fin } = await selectFactures(deps, ctx, period, now);
-  const artisan = await loadArtisan(deps, ctx);
+  const [artisan, { lignesMap, clientsMap }] = await Promise.all([loadArtisan(deps, ctx), bulkLoad(deps, ctx, factures)]);
   const entries: LotEntry[] = [];
   for (const facture of factures) {
-    const [lignes, client] = await Promise.all([deps.factureReader.listLignes(ctx, facture.id), deps.clientReader.getById(ctx, facture.clientId)]);
-    /** client supprimé : on saute (parité legacy) */
+    const client = clientsMap.get(facture.clientId) ?? null;
+    /* client supprimé : on saute (parité legacy) */
     if (!client) continue;
+    const lignes = lignesMap.get(facture.id) ?? [];
     const xml = generateFacturXML({ ...facture, lignes } as never, artisan as never, client as never);
     entries.push({ name: `${facture.numero ?? ""}_${sanitizeName(client.nom)}.xml`, content: xml });
   }
@@ -96,11 +120,12 @@ export async function collectFacturxLot(deps: ExportLotReaderDeps, ctx: TenantCo
 
 export async function collectFacturePdfLot(deps: ExportLotPdfDeps, ctx: TenantContext, period: PeriodInput, now: Date = new Date()): Promise<LotResult> {
   const { factures, debut, fin } = await selectFactures(deps, ctx, period, now);
-  const artisan = await loadArtisan(deps, ctx);
+  const [artisan, { lignesMap, clientsMap }] = await Promise.all([loadArtisan(deps, ctx), bulkLoad(deps, ctx, factures)]);
   const entries: LotEntry[] = [];
   for (const facture of factures) {
-    const [lignes, client] = await Promise.all([deps.factureReader.listLignes(ctx, facture.id), deps.clientReader.getById(ctx, facture.clientId)]);
+    const client = clientsMap.get(facture.clientId) ?? null;
     if (!client) continue;
+    const lignes = lignesMap.get(facture.id) ?? [];
     let buffer: Buffer | null = null;
     if (facture.pdfStorageKey && deps.storage) {
       buffer = await deps.storage.get(facture.pdfStorageKey);

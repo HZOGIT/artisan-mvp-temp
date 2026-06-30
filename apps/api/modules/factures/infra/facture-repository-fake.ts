@@ -501,6 +501,13 @@ export class FakeFactureRepository implements IFactureRepository {
       .sort((a, b) => a.ordre - b.ordre || a.id - b.id);
   }
 
+  async listLignesByFactureIds(ctx: TenantContext, ids: number[]): Promise<FactureLigne[]> {
+    const idSet = new Set(ids);
+    return this.lignesStore
+      .filter((l) => idSet.has(l.factureId) && this.factureStore.some((f) => f.id === l.factureId && f.artisanId === ctx.artisanId))
+      .sort((a, b) => a.factureId - b.factureId || a.ordre - b.ordre || a.id - b.id);
+  }
+
   async addLigne(ctx: TenantContext, factureId: number, input: CreateFactureLigneInput): Promise<FactureLigne | null> {
     if (!(await this.getById(ctx, factureId))) return null;
     const type = input.type ?? "produit";

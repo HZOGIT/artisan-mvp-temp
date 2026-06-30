@@ -16,8 +16,14 @@ const FACTURES = [
 function build(over: Partial<ExportLotPdfDeps> = {}): ExportLotPdfDeps {
   return {
     factureLister: { list: async () => FACTURES },
-    factureReader: { listLignes: async () => [{ designation: "L", quantite: "1", prixUnitaireHT: "100", tauxTVA: "20", montantHT: "100.00", montantTVA: "20.00", montantTTC: "120.00" }] },
-    clientReader: { getById: async (_c, id) => ({ id, nom: id === 6 ? "Durand & Fils" : "Dupont" }) },
+    factureReader: {
+      listLignes: async () => [{ designation: "L", quantite: "1", prixUnitaireHT: "100", tauxTVA: "20", montantHT: "100.00", montantTVA: "20.00", montantTTC: "120.00" }],
+      listLignesByFactureIds: async (_c, ids) => ids.map((id) => ({ factureId: id, designation: "L", quantite: "1", prixUnitaireHT: "100", tauxTVA: "20", montantHT: "100.00", montantTVA: "20.00", montantTTC: "120.00" })),
+    },
+    clientReader: {
+      getById: async (_c, id) => ({ id, nom: id === 6 ? "Durand & Fils" : "Dupont" }),
+      listByIds: async (_c, ids) => ids.map((id) => ({ id, nom: id === 6 ? "Durand & Fils" : "Dupont" })),
+    },
     artisanReader: { getProfile: async () => ({ id: 1, nomEntreprise: "ACME", siret: "12345678900011", tauxTVA: "20" }) },
     pdf: new FakePdfPort(),
     ...over,
@@ -47,7 +53,7 @@ describe("collectFacturxLot", () => {
   });
 
   it("client supprimé → facture sautée (parité legacy)", async () => {
-    const res = await collectFacturxLot(build({ clientReader: { getById: async () => null } }), ctx, PERIOD);
+    const res = await collectFacturxLot(build({ clientReader: { getById: async () => null, listByIds: async () => [] } }), ctx, PERIOD);
     expect(res.entries).toHaveLength(0);
   });
 });
