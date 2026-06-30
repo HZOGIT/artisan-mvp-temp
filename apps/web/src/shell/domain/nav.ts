@@ -145,6 +145,7 @@ export const MODULE_TO_LABELS: Record<string, string[]> = {
 
 export const ALWAYS_VISIBLE_LABELS = new Set([
   "Tableau de bord", "Statistiques", "Mon profil", "Paramètres", "Guide d'utilisation", "Mes modules", "Abonnement",
+  "Portail client",
 ]);
 
 /** Filtre les items d'un groupe selon les modules actifs. null (loading/déconnecté) → show-all. PUR. */

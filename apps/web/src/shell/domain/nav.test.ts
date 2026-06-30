@@ -64,6 +64,14 @@ describe("shell/nav — domain pur (port fidèle DashboardLayout)", () => {
     expect(filterGroupByModules(group("parametres"), ["zzz"]).items.map((i) => i.label)).toContain("Support");
   });
 
+  it("filterGroupByModules : Portail client CORE — visible même sans modules actifs (OPE-850)", () => {
+    const clients = group("clients");
+    const aucunModule = filterGroupByModules(clients, []);
+    expect(aucunModule.items.map((i) => i.label)).toContain("Portail client");
+    const autreModule = filterGroupByModules(clients, ["devis"]);
+    expect(autreModule.items.map((i) => i.label)).toContain("Portail client");
+  });
+
   it("getAssistantContextForPath : exact, parent, fallback", () => {
     expect(getAssistantContextForPath("/devis").context).toContain("liste de devis");
     expect(getAssistantContextForPath("/devis/nouveau").context).toContain("crée un nouveau devis");

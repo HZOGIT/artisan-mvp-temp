@@ -207,6 +207,10 @@ export class FakeBillingRepository implements IBillingRepository {
     this.deactivateLockedModulesCalls.push({ artisanId, planId });
   }
 
+  async reactivateDefaultModulesForPlan(_artisanId: number, _planId: string): Promise<void> {
+    /* ponytail: stub — tests assertent deactivateLockedModulesCalls, pas la réactivation */
+  }
+
   async findPendingCycle(subscriptionId: number): Promise<Cycle | null> {
     return this.cycles
       .filter(c => c.subscription_id === subscriptionId && c.status === "pending")

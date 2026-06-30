@@ -266,11 +266,45 @@ async function casBillingCancelReactivate() {
   }
 }
 
+// ── CAS anti-régression OPE-850 — modules restent actifs après round-trip changePlan ─────────────────
+// Régression : changePlan(downgrade→starter) appelait deactivateLockedModules mais l'upgrade suivant
+// ne réactivait pas les modules → portail_client + assistant_ia disparaissaient de la sidebar.
+// Ce test vérifie que les modules actifs AVANT le round-trip sont toujours actifs APRÈS.
+async function casModulesApresChangePlan() {
+  casesRun++;
+  const tag = 'billing.modules-persist-after-plan-roundtrip';
+  const trpcPost = async (proc, input) => ctx.request.post(`${BACKEND}/api/trpc/${proc}?batch=1`, {
+    headers: { 'content-type': 'application/json' },
+    data: { '0': { json: input } },
+  });
+  try {
+    const info = await trpcGet('billing.getBillingInfo', null);
+    if (!info?.subscription) { issues.push({ tag, skipped: 'aucune subscription active' }); return; }
+    const originalPlan = info.subscription.plan_id;
+    if (originalPlan === 'starter') { issues.push({ tag, skipped: 'plan déjà starter — test vise upgrade/downgrade' }); return; }
+
+    const modulesBefore = await trpcGet('modules.getMine', null) ?? [];
+    const downgrade = 'starter';
+
+    await trpcPost('billing.changePlan', { planId: downgrade });
+    await trpcPost('billing.changePlan', { planId: originalPlan });
+
+    const modulesAfter = await trpcGet('modules.getMine', null) ?? [];
+    const missing = modulesBefore.filter(m => !modulesAfter.includes(m));
+    if (missing.length > 0) {
+      issues.push({ tag, error: `modules manquants après round-trip changePlan: ${missing.join(', ')}` });
+    }
+  } catch (e) {
+    issues.push({ tag, error: String(e).slice(0, 200) });
+  }
+}
+
 await casBillingGetInfo();
 await casBillingRender();
 await casBillingMutations();
 await casBillingChangePlan();
 await casBillingCancelReactivate();
+await casModulesApresChangePlan();
 
 // ── CAS 7 — Anti-régression OPE-606 : routing /dashboard stable + /signin accessible ────────────────
 // Bug corrigé : gate onboarding utilisait navigate() custom (pushState + popstate synthétique) → conflit
