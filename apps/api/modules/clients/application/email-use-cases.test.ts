@@ -62,6 +62,23 @@ describe("envoyerMessageClients (L1 fakes)", () => {
     expect(email.sent.map((m) => m.to)).toEqual(["durand@a.fr", "leblanc@a.fr"]);
   });
 
+  it("OPE-930 — unsubscribeUrl pointe vers le backend (appUrl /api/emails/unsubscribe)", async () => {
+    const repo = new FakeClientRepository();
+    const optout = new EmailOptoutRepositoryFake();
+    const email = new FakeEmailPort();
+    const c1 = await creerClient(repo, A, { nom: "Test", email: "test@a.fr" });
+
+    await envoyerMessageClients(repo, optout, email, fakeDb(), A, {
+      clientIds: [c1.id],
+      sujet: "Test URL",
+      corps: "<p>OK</p>",
+      appUrl: "https://api.backend.test",
+      unsubscribeSecret: "s",
+    });
+
+    expect(email.sent[0].unsubscribeUrl).toContain("https://api.backend.test/api/emails/unsubscribe");
+  });
+
   it("skippe les clients en opt-out", async () => {
     const repo = new FakeClientRepository();
     const optout = new EmailOptoutRepositoryFake();

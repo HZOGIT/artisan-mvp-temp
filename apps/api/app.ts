@@ -354,6 +354,8 @@ export interface AppDeps extends ContextDeps {
   readonly iaRateLimiter?: RateLimiterPort;
   readonly ocrVision?: VisionPort;
   readonly lienBaseUrl?: string;
+  /** URL publique du backend (ex. https://staging-backend.operioz.com). Distinct de APP_URL (front). Utilisé pour les endpoints /api/… dans les webhooks Stripe et les liens de désinscription. */
+  readonly backendPublicUrl?: string;
   readonly badgeRepo?: IBadgeRepository;
   /** Pool DB pour les transactions outbox du module badges (défaut : getDbHandle().db). */
   readonly badgesDb?: DbClient;
@@ -566,6 +568,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   });
 
+  const backendPublicUrl = deps.backendPublicUrl ?? process.env.BACKEND_PUBLIC_URL ?? deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com";
+
   app.setErrorHandler<FastifyError>((error, req, reply) => {
     const status = error.statusCode ?? 500;
     if (status >= 500) {
@@ -700,6 +704,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     optoutRepo: new EmailOptoutRepositoryDrizzle(getDbHandle().db),
     db: deps.clientsDb ?? getDbHandle().db,
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+    backendPublicUrl: backendPublicUrl,
     unsubscribeSecret: deps.emailUnsubscribeSecret ?? process.env.EMAIL_UNSUBSCRIBE_SECRET ?? process.env.JWT_SECRET ?? "dev-unsubscribe-secret",
   });
   /*
@@ -977,6 +982,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     signupRateLimiter: deps.signupRateLimiter ?? new SlidingWindowRateLimiter(5, 60 * 60 * 1000),
     resetRateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(5, 60 * 60 * 1000),
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+    backendPublicUrl: backendPublicUrl,
     optoutRepo: new EmailOptoutRepositoryDrizzle(getDbHandle().db),
     unsubscribeSecret: deps.emailUnsubscribeSecret ?? process.env.EMAIL_UNSUBSCRIBE_SECRET ?? process.env.JWT_SECRET ?? "dev-unsubscribe-secret",
   });
@@ -1829,10 +1835,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   /** Auto-setup webhook Stripe au démarrage (idempotent — skip si endpoint déjà présent). Fail-closed si clé présente mais Stripe refuse. */
   app.addHook("onReady", async () => {
-    const appUrl = deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com";
     const stripeKey = process.env.STRIPE_SECRET_KEY ?? "";
 
-    const webhookUrl = `${appUrl}/api/stripe/webhook`;
+    const webhookUrl = `${backendPublicUrl}/api/stripe/webhook`;
     const newSecret = await ensureStripeWebhookEndpoint(stripeKey, webhookUrl, app.log as unknown as AppLogger);
     if (newSecret) {
       const envSecret = deps.stripeWebhookSecret ?? process.env.STRIPE_WEBHOOK_SECRET ?? "";
@@ -1841,7 +1846,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       }
     }
 
-    const connectWebhookUrl = `${appUrl}/api/stripe/connect-webhook`;
+    const connectWebhookUrl = `${backendPublicUrl}/api/stripe/connect-webhook`;
     const newConnectSecret = await ensureStripeConnectWebhookEndpoint(stripeKey, connectWebhookUrl, app.log as unknown as AppLogger);
     if (newConnectSecret) {
       const envConnectSecret = getStripeConnectWebhookSecret() ?? "";

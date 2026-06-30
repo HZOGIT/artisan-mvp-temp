@@ -204,7 +204,7 @@ export function createClientsRouter(deps: ClientsModuleDeps) {
         }
         const result = await envoyerMessageClients(repo, deps.optoutRepo, deps.email, deps.db, ctx.tenant, {
           ...input,
-          appUrl: deps.appUrl ?? "https://www.operioz.com",
+          appUrl: deps.backendPublicUrl ?? deps.appUrl ?? "https://www.operioz.com",
           unsubscribeSecret: deps.unsubscribeSecret ?? "dev-unsubscribe-secret",
         });
         ctx.log.info(
