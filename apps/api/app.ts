@@ -160,6 +160,8 @@ import { ChatClientNotifierDrizzle } from "./modules/chat/infra/chat-client-noti
 import { registerIcalRoute } from "./interface/http/ical-route";
 import { IcalPublicReaderDrizzle } from "./modules/calendrier/infra/ical-public-reader-drizzle";
 import { registerStripeWebhookRoute } from "./interface/http/stripe-webhook-route";
+import { registerStripeConnectWebhookRoute } from "./interface/http/stripe-connect-webhook-route";
+import { ConnectArtisanWriterDrizzle } from "./modules/connect/infra/connect-artisan-writer-drizzle";
 import { registerResendWebhookRoute } from "./interface/http/resend-webhook-route";
 import { registerPaWebhookRoute } from "./interface/http/pa-webhook-route";
 import { registerSuperpdpOauthRoutes } from "./interface/http/superpdp-oauth-route";
@@ -194,7 +196,8 @@ import { createComptaReconcilerJob } from "./modules/ecritures/application/compt
 import { contratsVisitesCronPlugin } from "./shared/infra/contrats-visites-cron";
 import { rappelRdvClientCronPlugin } from "./shared/infra/rappel-rdv-client-cron";
 import { analysePhotosCronPlugin } from "./shared/infra/analyse-photos-cron";
-import { ensureStripeWebhookEndpoint } from "./shared/infra/stripe-webhook-setup";
+import { ensureStripeWebhookEndpoint, ensureStripeConnectWebhookEndpoint } from "./shared/infra/stripe-webhook-setup";
+import { getStripeConnectWebhookSecret } from "./shared/config/secrets";
 import { WebhookPaymentWriterDrizzle } from "./modules/subscription/infra/webhook-payment-writer-drizzle";
 import { SubscriptionEventNotifierDrizzle } from "./modules/subscription/infra/subscription-event-notifier-drizzle";
 import { registerUploadLogoRoute } from "./interface/http/upload-logo-route";
@@ -1328,6 +1331,13 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     eventBus,
   });
 
+  /** Webhook Stripe Connect `/api/stripe/connect-webhook` — account.updated / deauthorized via owner pool. */
+  registerStripeConnectWebhookRoute(app, {
+    stripe: deps.stripePort ?? new StripeAdapter(),
+    writer: new ConnectArtisanWriterDrizzle(getOwnerDbHandle().db),
+    webhookSecret: getStripeConnectWebhookSecret() ?? "",
+  });
+
   const resendSecret = deps.resendWebhookSecret ?? process.env.RESEND_WEBHOOK_SECRET;
   if (resendSecret) {
     registerResendWebhookRoute(app, {
@@ -1795,12 +1805,23 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   /** Auto-setup webhook Stripe au démarrage (idempotent — skip si endpoint déjà présent). Fail-closed si clé présente mais Stripe refuse. */
   app.addHook("onReady", async () => {
     const appUrl = deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com";
+    const stripeKey = process.env.STRIPE_SECRET_KEY ?? "";
+
     const webhookUrl = `${appUrl}/api/stripe/webhook`;
-    const newSecret = await ensureStripeWebhookEndpoint(process.env.STRIPE_SECRET_KEY ?? "", webhookUrl, app.log as unknown as AppLogger);
+    const newSecret = await ensureStripeWebhookEndpoint(stripeKey, webhookUrl, app.log as unknown as AppLogger);
     if (newSecret) {
       const envSecret = deps.stripeWebhookSecret ?? process.env.STRIPE_WEBHOOK_SECRET ?? "";
       if (newSecret !== envSecret) {
         throw new Error(`Webhook Stripe créé avec un nouveau secret. Mettez à jour STRIPE_WEBHOOK_SECRET puis relancez le déploiement. Secret : ${newSecret}`);
+      }
+    }
+
+    const connectWebhookUrl = `${appUrl}/api/stripe/connect-webhook`;
+    const newConnectSecret = await ensureStripeConnectWebhookEndpoint(stripeKey, connectWebhookUrl, app.log as unknown as AppLogger);
+    if (newConnectSecret) {
+      const envConnectSecret = getStripeConnectWebhookSecret() ?? "";
+      if (newConnectSecret !== envConnectSecret) {
+        throw new Error(`Webhook Connect créé avec un nouveau secret. Mettez à jour STRIPE_CONNECT_WEBHOOK_SECRET puis relancez le déploiement. Secret : ${newConnectSecret}`);
       }
     }
   });

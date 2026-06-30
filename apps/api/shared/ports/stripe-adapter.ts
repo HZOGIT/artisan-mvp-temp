@@ -11,7 +11,7 @@ type StripeSDK = {
       retrieve(id: string): Promise<{ payment_status: string; payment_intent: string | { id: string } | null }>;
     };
   };
-  webhooks: { constructEvent(payload: Buffer, signature: string, secret: string): StripeWebhookEvent };
+  webhooks: { constructEvent(payload: Buffer, signature: string, secret: string): StripeWebhookEvent & { account?: string } };
 };
 
 export class StripeAdapter implements StripePort {
@@ -28,7 +28,7 @@ export class StripeAdapter implements StripePort {
   async constructEvent(rawBody: Buffer, signature: string, secret: string): Promise<StripeWebhookEvent> {
     const s = await this.sdk();
     const ev = s.webhooks.constructEvent(rawBody, signature, secret);
-    return { id: ev.id, type: ev.type, data: { object: ev.data.object } };
+    return { id: ev.id, type: ev.type, ...(ev.account ? { account: ev.account } : {}), data: { object: ev.data.object } };
   }
 
   async createCustomer(p: CreateCustomerParams): Promise<{ id: string }> {

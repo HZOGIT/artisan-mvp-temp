@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { ensureStripeWebhookEndpoint } from "./stripe-webhook-setup";
+import { ensureStripeWebhookEndpoint, ensureStripeConnectWebhookEndpoint } from "./stripe-webhook-setup";
 import type { StripeWebhookSDK } from "./stripe-webhook-setup";
 
 const EVENTS = [
@@ -87,5 +87,49 @@ describe("ensureStripeWebhookEndpoint", () => {
     expect((caught[0] as Error).message).toBe("network error");
     expect(sdk.webhookEndpoints.list).toHaveBeenCalledTimes(3);
     vi.useRealTimers();
+  });
+});
+
+const CONNECT_EVENTS = ["account.updated", "account.application.deauthorized"];
+const CONNECT_URL = "https://example.com/api/stripe/connect-webhook";
+
+const makeConnectSDK = (endpoints: Array<{ id: string; url: string; status: string; enabled_events: string[]; secret?: string }> = []): StripeWebhookSDK => ({
+  webhookEndpoints: {
+    list: vi.fn().mockResolvedValue({ data: endpoints }),
+    create: vi.fn().mockResolvedValue({ id: "we_connect_new", url: CONNECT_URL, secret: "whsec_connectSecret" }),
+    update: vi.fn().mockResolvedValue({ id: "we_connect_existing" }),
+  },
+});
+
+describe("ensureStripeConnectWebhookEndpoint", () => {
+  it("retourne null si STRIPE_SECRET_KEY absent (no-op)", async () => {
+    const result = await ensureStripeConnectWebhookEndpoint("", CONNECT_URL);
+    expect(result).toBeNull();
+  });
+
+  it("crée l'endpoint Connect avec connect=true et retourne le secret", async () => {
+    const sdk = makeConnectSDK([]);
+    const result = await ensureStripeConnectWebhookEndpoint("sk_test_key", CONNECT_URL, undefined, () => sdk);
+    expect(sdk.webhookEndpoints.create).toHaveBeenCalledWith({
+      url: CONNECT_URL,
+      enabled_events: CONNECT_EVENTS,
+      description: "Operioz Connect — auto-setup",
+      connect: true,
+    });
+    expect(result).toBe("whsec_connectSecret");
+  });
+
+  it("retourne null si endpoint Connect existant avec tous les events (idempotent)", async () => {
+    const sdk = makeConnectSDK([{ id: "we_connect_existing", url: CONNECT_URL, status: "enabled", enabled_events: CONNECT_EVENTS }]);
+    const result = await ensureStripeConnectWebhookEndpoint("sk_test_key", CONNECT_URL, undefined, () => sdk);
+    expect(sdk.webhookEndpoints.create).not.toHaveBeenCalled();
+    expect(result).toBeNull();
+  });
+
+  it("met à jour les events manquants sur l'endpoint Connect existant", async () => {
+    const sdk = makeConnectSDK([{ id: "we_connect_existing", url: CONNECT_URL, status: "enabled", enabled_events: ["account.updated"] }]);
+    const result = await ensureStripeConnectWebhookEndpoint("sk_test_key", CONNECT_URL, undefined, () => sdk);
+    expect(sdk.webhookEndpoints.update).toHaveBeenCalledWith("we_connect_existing", { enabled_events: CONNECT_EVENTS });
+    expect(result).toBeNull();
   });
 });

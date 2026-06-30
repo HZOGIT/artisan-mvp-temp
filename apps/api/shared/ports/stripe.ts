@@ -1,6 +1,8 @@
 export interface StripeWebhookEvent {
   readonly id: string;
   readonly type: string;
+  /** Présent sur les events Connect : ID du compte connecté (`acct_…`). */
+  readonly account?: string;
   readonly data: { readonly object: Record<string, unknown> };
 }
 
