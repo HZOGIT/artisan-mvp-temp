@@ -161,8 +161,9 @@ describe.skipIf(!URL)("devis.router e2e (HTTP → tRPC → use-case → repo →
     const tA = await token(UA);
     const tB = await token(UB);
     const id = (await callMutation(server, "devis.create", { clientId: clientA }, tA)).json().result.data.id as number;
-    /** brouillon → accepter directement interdit (409) */
+    /** brouillon → accepter directement interdit (409, transition check avant garde lignes) */
     expect((await callMutation(server, "devis.accepter", { id }, tA)).statusCode).toBe(409);
+    await callMutation(server, "devis.addLigne", { devisId: id, designation: "Pose", quantite: "1", prixUnitaireHT: "100.00" }, tA);
     expect((await callMutation(server, "devis.envoyer", { id }, tA)).json().result.data.statut).toBe("envoye");
     expect((await callMutation(server, "devis.accepter", { id }, tA)).json().result.data.statut).toBe("accepte");
     /** accepté = terminal : refuser → 409 */
@@ -205,6 +206,7 @@ describe.skipIf(!URL)("devis.router e2e (HTTP → tRPC → use-case → repo →
   it("accepter → ferme les signatures_devis en_attente du devis (anti double-action portail)", async () => {
     const tA = await token(UA);
     const id = (await callMutation(server, "devis.create", { clientId: clientA }, tA)).json().result.data.id as number;
+    await callMutation(server, "devis.addLigne", { devisId: id, designation: "Pose", quantite: "1", prixUnitaireHT: "100.00" }, tA);
     await admin.query("update devis set statut='envoye' where id=$1", [id]);
     const signToken = `test-close-sig-${id}-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`.slice(0, 64);
     await admin.query("insert into signatures_devis (\"devisId\",token,\"expiresAt\",statut) values ($1,$2,now()+interval '30 days','en_attente')", [id, signToken]);
@@ -218,6 +220,7 @@ describe.skipIf(!URL)("devis.router e2e (HTTP → tRPC → use-case → repo →
   it("outbox atomicité — accepter → event_outbox action=devis.accepte avec userId tracé", async () => {
     const tA = await token(UA);
     const created = (await callMutation(server, "devis.create", { clientId: clientA }, tA)).json().result.data.id as number;
+    await callMutation(server, "devis.addLigne", { devisId: created, designation: "Pose", quantite: "1", prixUnitaireHT: "100.00" }, tA);
     await callMutation(server, "devis.envoyer", { id: created }, tA);
     const res = await callMutation(server, "devis.accepter", { id: created }, tA);
     expect(res.statusCode).toBe(200);

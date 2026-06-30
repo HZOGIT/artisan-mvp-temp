@@ -123,6 +123,7 @@ describe("devis — use-cases d'écriture", () => {
   it("changerStatutDevis — machine à états : brouillon→envoye→accepte ; idempotence", async () => {
     const repo = repoWithClient(A, 100);
     const d = await creerDevis(repo, A, { clientId: 100 });
+    await ajouterLigneDevis(repo, A, d.id, { designation: "Pose", quantite: "1", prixUnitaireHT: "100.00" });
     expect((await changerStatutDevis(repo, A, d.id, "envoye", fakeArtisanReader)).statut).toBe("envoye");
     expect((await changerStatutDevis(repo, A, d.id, "envoye")).statut).toBe("envoye"); // idempotent
     expect((await changerStatutDevis(repo, A, d.id, "accepte")).statut).toBe("accepte");
@@ -132,8 +133,9 @@ describe("devis — use-cases d'écriture", () => {
   it("changerStatutDevis — transitions invalides → Conflict ; états terminaux figés", async () => {
     const repo = repoWithClient(A, 100);
     const d = await creerDevis(repo, A, { clientId: 100 });
-    // brouillon → accepte (saute envoye) interdit
+    // brouillon → accepte (saute envoye) interdit (transition check avant garde lignes)
     await expect(changerStatutDevis(repo, A, d.id, "accepte")).rejects.toBeInstanceOf(ConflictError);
+    await ajouterLigneDevis(repo, A, d.id, { designation: "Pose", quantite: "1", prixUnitaireHT: "100.00" });
     await changerStatutDevis(repo, A, d.id, "envoye", fakeArtisanReader);
     await changerStatutDevis(repo, A, d.id, "refuse");
     // refuse est terminal → toute autre transition → Conflict
@@ -146,6 +148,27 @@ describe("devis — use-cases d'écriture", () => {
     const d = await creerDevis(repo, A, { clientId: 100 });
     await expectCrossTenantDenied(() => changerStatutDevis(repo, B, d.id, "envoye"));
     await expect(changerStatutDevis(repo, B, d.id, "envoye")).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("GARDE LIGNES : envoyer un devis sans ligne → ValidationError", async () => {
+    const repo = repoWithClient(A, 100);
+    const d = await creerDevis(repo, A, { clientId: 100 });
+    await expect(changerStatutDevis(repo, A, d.id, "envoye", fakeArtisanReader)).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("GARDE LIGNES : envoyer un devis avec lignes et montant > 0 → OK", async () => {
+    const repo = repoWithClient(A, 100);
+    const d = await creerDevis(repo, A, { clientId: 100 });
+    await ajouterLigneDevis(repo, A, d.id, { designation: "Pose", quantite: "1", prixUnitaireHT: "100.00" });
+    const result = await changerStatutDevis(repo, A, d.id, "envoye", fakeArtisanReader);
+    expect(result.statut).toBe("envoye");
+  });
+
+  it("GARDE LIGNES : accepter un devis avec totalHT = 0 → ValidationError", async () => {
+    const repo = repoWithClient(A, 100);
+    const d = await creerDevis(repo, A, { clientId: 100 });
+    repo.setStatutForTest(d.id, "envoye");
+    await expect(changerStatutDevis(repo, A, d.id, "accepte")).rejects.toBeInstanceOf(ValidationError);
   });
 
   it("dupliquerDevis : nouveau brouillon, numéro serveur, objet (copie), validité +30j, lignes copiées", async () => {
