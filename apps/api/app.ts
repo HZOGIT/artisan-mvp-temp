@@ -114,6 +114,7 @@ import { createSubscriptionModule } from "./modules/subscription/subscription.mo
 import { createBillingModule } from "./modules/billing/billing.module";
 import { buildEinvoicingModule } from "./modules/einvoicing/einvoicing.module";
 import { BillingRepositoryDrizzle } from "./modules/billing/infra/billing-repository-drizzle";
+import type { IBillingRepository } from "./modules/billing/application/billing-repository";
 import { BillingAdapter } from "./shared/ports/billing-adapter";
 import { mapPlan, normalizeStatus } from "./modules/billing/application/billing-migration";
 import { createPlatformAdminModule } from "./modules/platform-admin/platform-admin.module";
@@ -179,6 +180,7 @@ import { paInboundPollerPlugin } from "./shared/infra/pa-inbound-poller";
 import { paReconciliationPollerPlugin } from "./shared/infra/pa-reconciliation-poller";
 import { portalPaymentReconciliationPollerPlugin } from "./shared/infra/portal-payment-reconciliation-poller";
 import { eventOutboxDrainerPlugin } from "./shared/events/outbox-drainer";
+import { withOutbox } from "./shared/events/with-outbox";
 import { geoPurgeCronPlugin } from "./shared/infra/geo-purge-cron";
 import { rgpdCronPlugin } from "./shared/infra/rgpd-cron";
 import { retentionPurgeCronPlugin } from "./shared/infra/retention-purge-cron";
@@ -1337,15 +1339,19 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       if (!existing || existing.billing_mode !== "stripe") return;
       const planId = mapPlan(priceId, null);
       const status = normalizeStatus(stripeStatus);
-      await billingRepo.updateSubscriptionPlan(ctx, planId);
-      await billingRepo.updateSubscriptionStatus(ctx, status);
+      await withOutbox(getDbHandle().db, billingRepo as IBillingRepository, async (r) => {
+        await r.updateSubscriptionPlan(ctx, planId);
+        await r.updateSubscriptionStatus(ctx, status);
+        if (stripeStatus === "canceled") {
+          await r.emitOutboxEvent({ artisanId, action: "abonnement.expire", entityType: "abonnement", entityId: artisanId, payload: {} });
+        }
+      });
     },
     markWebhookProcessed: (eventId, eventType) => billingRepo.markWebhookProcessed(eventId, eventType, {}),
     genererEcrituresFacture: async (artisanId: number, factureId: number) => {
       await compta.genererEcrituresVente({ artisanId, userId: 0 }, factureId);
       await compta.genererEcrituresEncaissement({ artisanId, userId: 0 }, factureId);
     },
-    eventBus,
   });
 
   /** Webhook Stripe Connect `/api/stripe/connect-webhook` — account.updated / deauthorized + checkout.session.completed / payment_intent.payment_failed (direct charges factures). */

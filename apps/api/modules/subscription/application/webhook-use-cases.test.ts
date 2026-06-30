@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import { FakeStripePort } from "../../../shared/ports/stripe-adapter";
 import { FakeWebhookPaymentWriter } from "../infra/webhook-payment-writer-fake";
 import { FakeSubscriptionEventNotifier } from "../infra/subscription-event-notifier-fake";
-import { FakeEventBus } from "../../../shared/ports/fakes";
 import { processStripeWebhook } from "./webhook-use-cases";
 
 const SIG = "valid-sig";
@@ -275,15 +274,12 @@ describe("processStripeWebhook (fail-closed)", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("OPE-579 — checkout.session.completed : FACTURE_PAYEE publié sur eventBus", async () => {
+  it("OPE-935 — checkout.session.completed : completeCheckout appelé (facture.payee atomique via outbox, plus via eventBus)", async () => {
     const { deps, paymentWriter } = build();
-    const bus = new FakeEventBus();
     paymentWriter.seed("tok_bus", { paiementId: 7, factureId: 42, artisanId: 3 });
     const event = { id: "evt_bus1", type: "checkout.session.completed", data: { object: { payment_intent: "pi_bus", metadata: { token_paiement: "tok_bus", facture_id: "42" } } } };
-    await processStripeWebhook({ ...deps, eventBus: bus }, { rawBody: raw(event), signature: SIG });
-    const published = bus.getPublished("facture.payee");
-    expect(published).toHaveLength(1);
-    expect(published[0]?.artisanId).toBe(3);
-    expect(published[0]?.payload).toEqual({ factureId: 42 });
+    const r = await processStripeWebhook(deps, { rawBody: raw(event), signature: SIG });
+    expect(r.http).toBe(200);
+    expect(paymentWriter.completed).toEqual([{ artisanId: 3, paiementId: 7, factureId: 42, stripePaymentIntentId: "pi_bus" }]);
   });
 });
