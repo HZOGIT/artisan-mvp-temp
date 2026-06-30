@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import { router, protectedProcedure, ownerProcedure } from "../../../../interface/trpc/trpc";
 import type { IArtisanRepository } from "../../application/artisan-repository";
 import { getProfile, updateProfile } from "../../application/use-cases";
 import { UnauthorizedError, ValidationError } from "../../../../shared/errors";
@@ -58,7 +58,7 @@ export function createArtisanRouter(repo: IArtisanRepository, security: ArtisanS
   return router({
     getProfile: protectedProcedure.query(({ ctx }) => getProfile(repo, ctx.tenant)),
 
-    updateProfile: protectedProcedure
+    updateProfile: ownerProcedure
       .input(updateSchema)
       .mutation(async ({ ctx, input }) => {
         const { currentPassword, ...profileInput } = input;
