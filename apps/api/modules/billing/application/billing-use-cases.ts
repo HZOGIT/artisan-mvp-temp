@@ -185,7 +185,12 @@ export class InvalidPlanError extends Error {
   }
 }
 
-export async function changePlan(deps: Pick<BillingDeps, "repo">, ctx: TenantContext, newPlanId: string): Promise<void> {
+export async function changePlan(
+  deps: Pick<BillingDeps, "repo">,
+  ctx: TenantContext,
+  newPlanId: string,
+  now: Date = new Date(),
+): Promise<void> {
   const knownPlan = planById(newPlanId);
   if (!knownPlan) throw new InvalidPlanError(`Plan inconnu : ${newPlanId}`);
 
@@ -195,13 +200,40 @@ export async function changePlan(deps: Pick<BillingDeps, "repo">, ctx: TenantCon
 
   if (sub.plan_id === newPlanId) return;
 
+  const oldPlan = planById(sub.plan_id);
   await deps.repo.updateSubscriptionPlan(ctx, newPlanId);
 
   const pendingCycle = await deps.repo.findPendingCycle(sub.id);
   if (pendingCycle) {
     const interval = sub.billing_interval === "yearly" ? "yearly" : "monthly";
     const newAmountCents = knownPlan.amountCentsByInterval[interval];
-    await deps.repo.updateCycleAmount(pendingCycle.id, newAmountCents);
+    const oldAmountCents = oldPlan ? oldPlan.amountCentsByInterval[interval] : newAmountCents;
+    const diff = newAmountCents - oldAmountCents;
+
+    let pendingCycleAmount = newAmountCents;
+
+    if (diff !== 0) {
+      const periodLengthMs = pendingCycle.period_end.getTime() - pendingCycle.period_start.getTime();
+      const remainingMs = pendingCycle.period_start.getTime() - now.getTime();
+      if (remainingMs > 0 && periodLengthMs > 0) {
+        const prorationCents = Math.round((remainingMs / periodLengthMs) * Math.abs(diff));
+        if (diff > 0 && prorationCents > 0) {
+          /* upgrade mi-cycle : charge immédiate pour les jours restants × différentiel */
+          await deps.repo.createCycle({
+            subscriptionId: sub.id,
+            periodStart: now,
+            periodEnd: pendingCycle.period_start,
+            amountCents: prorationCents,
+            currency: pendingCycle.currency,
+          });
+        } else if (diff < 0 && prorationCents > 0) {
+          /* downgrade mi-cycle : crédit proraté déduit du prochain cycle */
+          pendingCycleAmount = Math.max(0, newAmountCents - prorationCents);
+        }
+      }
+    }
+
+    await deps.repo.updateCycleAmount(pendingCycle.id, pendingCycleAmount);
   }
 
   await deps.repo.appendEvent({
@@ -307,7 +339,7 @@ export interface PlanChangePreview {
   readonly targetPlanId: string;
   readonly targetAmountCents: number;
   readonly nextBillingDate: Date | null;
-  readonly immediateAmountCents: 0;
+  readonly immediateAmountCents: number;
   readonly activeUserCount: number;
   readonly targetMaxUsers: number;
 }
@@ -316,6 +348,7 @@ export async function previewPlanChange(
   deps: Pick<BillingDeps, "repo">,
   ctx: TenantContext,
   newPlanId: string,
+  now: Date = new Date(),
 ): Promise<PlanChangePreview> {
   const knownPlan = planById(newPlanId);
   if (!knownPlan) throw new InvalidPlanError(`Plan inconnu : ${newPlanId}`);
@@ -329,6 +362,20 @@ export async function previewPlanChange(
   const pendingCycle = await deps.repo.findPendingCycle(sub.id);
   const nextBillingDate: Date | null = pendingCycle?.period_start ?? (sub.status === "trialing" ? sub.trial_ends_at : sub.current_period_end) ?? null;
 
+  let immediateAmountCents = 0;
+  if (pendingCycle) {
+    const oldPlan = planById(sub.plan_id);
+    const oldAmountCents = oldPlan ? oldPlan.amountCentsByInterval[interval] : 0;
+    const diff = targetAmountCents - oldAmountCents;
+    if (diff > 0) {
+      const periodLengthMs = pendingCycle.period_end.getTime() - pendingCycle.period_start.getTime();
+      const remainingMs = pendingCycle.period_start.getTime() - now.getTime();
+      if (remainingMs > 0 && periodLengthMs > 0) {
+        immediateAmountCents = Math.round((remainingMs / periodLengthMs) * diff);
+      }
+    }
+  }
+
   const activeUserCount = await deps.repo.countActiveUsers(ctx);
 
   return {
@@ -336,7 +383,7 @@ export async function previewPlanChange(
     targetPlanId: newPlanId,
     targetAmountCents,
     nextBillingDate,
-    immediateAmountCents: 0,
+    immediateAmountCents,
     activeUserCount,
     targetMaxUsers: knownPlan.maxUsers,
   };

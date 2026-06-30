@@ -6,7 +6,7 @@ export interface PlanChangePreviewData {
   readonly targetPlanId: string;
   readonly targetAmountCents: number;
   readonly nextBillingDate: Date | null;
-  readonly immediateAmountCents: 0;
+  readonly immediateAmountCents: number;
   readonly activeUserCount: number;
   readonly targetMaxUsers: number;
 }

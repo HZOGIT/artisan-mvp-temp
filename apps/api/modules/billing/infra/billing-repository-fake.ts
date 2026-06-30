@@ -202,7 +202,9 @@ export class FakeBillingRepository implements IBillingRepository {
   }
 
   async findPendingCycle(subscriptionId: number): Promise<Cycle | null> {
-    return this.cycles.find(c => c.subscription_id === subscriptionId && c.status === "pending") ?? null;
+    return this.cycles
+      .filter(c => c.subscription_id === subscriptionId && c.status === "pending")
+      .sort((a, b) => b.period_start.getTime() - a.period_start.getTime())[0] ?? null;
   }
 
   async findNonTerminalCycle(subscriptionId: number): Promise<Cycle | null> {

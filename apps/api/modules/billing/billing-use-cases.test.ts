@@ -1674,3 +1674,124 @@ describe("FIX-OPE713 — previewPlanChange : nextBillingDate priorité current_p
     expect(preview.nextBillingDate?.getTime()).toBe(trialEnd.getTime());
   });
 });
+
+describe("FIX-OPE829 — changePlan proration mi-cycle", () => {
+  const now = new Date("2026-07-15T12:00:00Z");
+  const periodStart = new Date("2026-08-01T00:00:00Z");
+  const periodEnd = new Date("2026-09-01T00:00:00Z");
+
+  function expectedProration(diff: number): number {
+    const remainingMs = periodStart.getTime() - now.getTime();
+    const periodLengthMs = periodEnd.getTime() - periodStart.getTime();
+    return Math.round((remainingMs / periodLengthMs) * Math.abs(diff));
+  }
+
+  it("upgrade starter→pro mi-cycle : crée un cycle de proration immédiat au tarif différentiel", async () => {
+    const deps = makeDeps();
+    const sub = await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    await deps.repo.createCycle({
+      subscriptionId: sub.id, periodStart, periodEnd, amountCents: 2900, currency: "eur",
+    });
+
+    await changePlan(deps, A, "pro", now);
+
+    const cycles = deps.repo.cycles;
+    expect(cycles).toHaveLength(2);
+
+    const prorationCycle = cycles.find(c => c.period_start.getTime() === now.getTime());
+    expect(prorationCycle).toBeDefined();
+    expect(prorationCycle!.period_end).toEqual(periodStart);
+    expect(prorationCycle!.amount_cents).toBe(expectedProration(4900 - 2900));
+
+    const mainCycle = cycles.find(c => c.period_start.getTime() === periodStart.getTime());
+    expect(mainCycle!.amount_cents).toBe(4900);
+  });
+
+  it("upgrade starter→pro : previewPlanChange reflète immediateAmountCents > 0", async () => {
+    const deps = makeDeps();
+    const sub = await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    await deps.repo.createCycle({
+      subscriptionId: sub.id, periodStart, periodEnd, amountCents: 2900, currency: "eur",
+    });
+
+    const preview = await previewPlanChange(deps, A, "pro", now);
+
+    expect(preview.immediateAmountCents).toBe(expectedProration(4900 - 2900));
+    expect(preview.immediateAmountCents).toBeGreaterThan(0);
+  });
+
+  it("downgrade pro→starter mi-cycle : crédit proraté déduit du cycle futur, aucun cycle immédiat créé", async () => {
+    const deps = makeDeps();
+    const sub = await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "pro", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    await deps.repo.createCycle({
+      subscriptionId: sub.id, periodStart, periodEnd, amountCents: 4900, currency: "eur",
+    });
+
+    await changePlan(deps, A, "starter", now);
+
+    expect(deps.repo.cycles).toHaveLength(1);
+    const credit = expectedProration(4900 - 2900);
+    expect(deps.repo.cycles[0]!.amount_cents).toBe(Math.max(0, 2900 - credit));
+  });
+
+  it("downgrade pro→starter : previewPlanChange — immediateAmountCents = 0 (le crédit est sur le prochain cycle)", async () => {
+    const deps = makeDeps();
+    const sub = await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "pro", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    await deps.repo.createCycle({
+      subscriptionId: sub.id, periodStart, periodEnd, amountCents: 4900, currency: "eur",
+    });
+
+    const preview = await previewPlanChange(deps, A, "starter", now);
+
+    expect(preview.immediateAmountCents).toBe(0);
+  });
+
+  it("upgrade sans cycle pending (ex: sub trialing) → aucun cycle de proration créé", async () => {
+    const deps = makeDeps();
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: new Date("2026-08-01T00:00:00Z"), paymentMethodId: null,
+    });
+
+    await changePlan(deps, A, "pro", now);
+
+    expect(deps.repo.cycles).toHaveLength(0);
+  });
+
+  it("upgrade en fin de période (period_start ≤ now) → pas de proration (remainingMs ≤ 0)", async () => {
+    const deps = makeDeps();
+    const sub = await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const pastPeriodStart = new Date("2026-07-01T00:00:00Z");
+    const pastPeriodEnd = new Date("2026-08-01T00:00:00Z");
+    await deps.repo.createCycle({
+      subscriptionId: sub.id, periodStart: pastPeriodStart, periodEnd: pastPeriodEnd,
+      amountCents: 2900, currency: "eur",
+    });
+
+    await changePlan(deps, A, "pro", now);
+
+    expect(deps.repo.cycles).toHaveLength(1);
+    expect(deps.repo.cycles[0]!.amount_cents).toBe(4900);
+  });
+});
