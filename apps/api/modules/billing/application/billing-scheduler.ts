@@ -248,6 +248,13 @@ async function handleDunning(deps: SchedulerDeps, p: DunningParams): Promise<voi
       payload: { artisanId, reason: "max_dunning_attempts" },
       actor: "scheduler",
     });
+    await deps.repo.emitOutboxEvent({
+      artisanId,
+      action: "abonnement.suspendu",
+      entityType: "abonnement",
+      entityId: subscriptionId,
+      payload: { raison: "max_dunning_attempts" },
+    });
     if (deps.notifier) {
       const appUrl = deps.appUrl ?? "https://www.operioz.com";
       /*
@@ -552,6 +559,13 @@ async function activateExpiredTrials(deps: SchedulerDeps, now: Date): Promise<nu
         payload: { artisanId: sub.artisan_id, planId: sub.plan_id, interval },
         actor: "scheduler",
       });
+      await deps.repo.emitOutboxEvent({
+        artisanId: sub.artisan_id,
+        action: "abonnement.active",
+        entityType: "abonnement",
+        entityId: sub.id,
+        payload: { planId: sub.plan_id, dateDebut: trialEnd.toISOString() },
+      });
 
       activated++;
     } catch (err) {
@@ -598,6 +612,13 @@ async function processDueCancellations(deps: SchedulerDeps, now: Date): Promise<
         payload: { artisanId: sub.artisan_id, cancelAt: (sub.cancel_at ?? now).toISOString(), via: "scheduler" },
         actor: "scheduler",
       });
+      await deps.repo.emitOutboxEvent({
+        artisanId: sub.artisan_id,
+        action: "abonnement.annule",
+        entityType: "abonnement",
+        entityId: sub.id,
+        payload: { cancelAt: (sub.cancel_at ?? now).toISOString(), via: "scheduler" },
+      });
       count++;
     } catch (err) {
       /* appendEvent peut échouer si la DB est down — protéger pour ne pas avorter la boucle */
@@ -639,6 +660,13 @@ export async function runSchedulerTick(deps: SchedulerDeps): Promise<{ charged: 
           eventType: "subscription.canceled",
           payload: { artisanId: subscription.artisan_id, cancelAt: subscription.cancel_at.toISOString(), via: "scheduler" },
           actor: "scheduler",
+        });
+        await deps.repo.emitOutboxEvent({
+          artisanId: subscription.artisan_id,
+          action: "abonnement.annule",
+          entityType: "abonnement",
+          entityId: subscription.id,
+          payload: { cancelAt: subscription.cancel_at.toISOString(), via: "scheduler" },
         });
         cancelled++;
         continue;
