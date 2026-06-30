@@ -9,9 +9,16 @@ IMG=mcr.microsoft.com/playwright:v1.48.0-jammy
 PW_VERSION=1.48.0           # doit suivre le tag de l'image ci-dessus
 PW_VOLUME=${PW_VOLUME:-operioz-pw-${PW_VERSION}}  # cache node_modules persistant (versionné)
 SCRIPT="${1:?usage: pw-run.sh <script.mjs>}"; shift || true
-ENVARGS=(-e "E2E_PASS=${E2E_PASS:-Azerqsdf1234!}" -e PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1)
-for kv in "$@"; do ENVARGS+=(-e "$kv"); done
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# ponytail: source Stripe test key from env files (gitignored) so STRIPE_SECRET_KEY reaches Docker
+for _envf in "$ROOT/.env.staging" "$ROOT/.env.local"; do
+  if [[ -z "${STRIPE_SECRET_KEY:-}" && -f "$_envf" ]]; then
+    STRIPE_SECRET_KEY="$(grep '^STRIPE_SECRET_KEY=' "$_envf" | cut -d= -f2-)"
+  fi
+done; unset _envf
+ENVARGS=(-e "E2E_PASS=${E2E_PASS:-Azerqsdf1234!}" -e PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1)
+[[ -n "${STRIPE_SECRET_KEY:-}" ]] && ENVARGS+=(-e "STRIPE_SECRET_KEY=$STRIPE_SECRET_KEY")
+for kv in "$@"; do ENVARGS+=(-e "$kv"); done
 # Le volume nommé survit entre les runs → l'install npm n'a lieu qu'au premier appel (cache froid).
 docker run --rm "${ENVARGS[@]}" -v "$ROOT":/work:ro -v "$PW_VOLUME":/pw "$IMG" sh -c '
   if [ ! -d /pw/node_modules/playwright ]; then
