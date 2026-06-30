@@ -98,6 +98,17 @@ describe("importFactures", () => {
     expect(repo.createdFactures[0].numero).toBe("2024-042");
   });
 
+  it("normalise un tauxTVA illégal (16.10) vers le taux canonique (FR_10 = '10') — anti-régression OPE-1003", async () => {
+    const repo = new ImportErpRepositoryFake(clients);
+    await importFactures(repo, ctx, {
+      mapping: { ...mapFacture, TVA: "tauxTVA" },
+      rows: [{ Client: "Martin", Objet: "Test", TTC: "120", Date: "2026-02-01", TVA: "16.10" }],
+    });
+    const f = repo.createdFactures[0];
+    expect(f.lignes?.[0].tauxTVA).toBe("10");
+    expect(f.lignes?.[0].tvaCategorieId).toBe("FR_10");
+  });
+
   it("REFUSE un numéro en doublon (existant ou intra-lot) → erreur, pas de ré-attribution", async () => {
     const repo = new ImportErpRepositoryFake(clients);
     repo.existingNumeros = ["FAC-00010"]; // déjà présent en base

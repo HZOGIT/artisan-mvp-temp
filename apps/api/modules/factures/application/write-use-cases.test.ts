@@ -60,6 +60,16 @@ describe("factures — use-cases d'écriture", () => {
     expect(await repo.listLignes(A, f.id)).toHaveLength(2);
   });
 
+  it("creerFacture avec lignes — tauxTVA illégal (ex: 16.10) → ValidationError (OPE-1003)", async () => {
+    const repo = repoWithClient(A, 100);
+    await expect(
+      creerFacture(repo, A, {
+        clientId: 100,
+        lignes: [{ designation: "Situation de travaux", prixUnitaireHT: "2050.00", tauxTVA: "16.10" }],
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
   it("creerFacture — brouillon sans numéro ; numéro assigné à l'émission (changerStatut envoyee)", async () => {
     const repo = repoWithClient(A, 100);
     const f1 = await creerFacture(repo, A, { clientId: 100, objet: "Travaux" });
