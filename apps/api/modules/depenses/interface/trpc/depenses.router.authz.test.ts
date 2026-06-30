@@ -91,6 +91,25 @@ describe.skipIf(!URL)("depenses.router authz — permission gates (OPE-787 / OPE
     expect(res.statusCode).not.toBe(403);
   });
 
+  it("payerNoteFrais — membre sans notes_frais.approuver → 403", async () => {
+    const tok = await jwt(MEMBER);
+    expect((await mut(server, "depenses.payerNoteFrais", { id: 1 }, tok)).statusCode).toBe(403);
+  });
+
+  it("payerNoteFrais — owner bypasse la garde → non-403 (404 note absente)", async () => {
+    const tok = await jwt(OWNER);
+    const res = await mut(server, "depenses.payerNoteFrais", { id: 999999 }, tok);
+    expect(res.statusCode).not.toBe(403);
+  });
+
+  it("payerNoteFrais — membre AVEC notes_frais.approuver → non-403", async () => {
+    await admin.query('insert into permissions_utilisateur ("userId",permission,autorise) values ($1,$2,true)', [MEMBER, "notes_frais.approuver"]);
+    const tok = await jwt(MEMBER);
+    const res = await mut(server, "depenses.payerNoteFrais", { id: 999999 }, tok);
+    expect(res.statusCode).not.toBe(403);
+    await admin.query('delete from permissions_utilisateur where "userId"=$1 and permission=$2', [MEMBER, "notes_frais.approuver"]);
+  });
+
   it("importReleve — membre sans comptabilite.voir → 403", async () => {
     const tok = await jwt(MEMBER);
     expect(
