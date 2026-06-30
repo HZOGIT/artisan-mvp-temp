@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -83,13 +84,13 @@ if (!isMain) {
   ];
   const merged = canonicalize([...A, ...B]);
   const idxs = merged.entries.map((e) => e.idx);
-  console.assert(merged.entries.length === 3, "union doit avoir 3 entrées");
-  console.assert(new Set(idxs).size === idxs.length, "idx uniques");
-  console.assert(merged.entries[0].tag === "20260101000000_a", "ordre alphabétique");
-  console.assert(merged.entries[1].tag === "20260102000000_b", "entrée droppée restaurée");
-  console.assert(merged.entries[2].tag === "20260103000000_c", "entrée distante présente");
+  assert.equal(merged.entries.length, 3, "union doit avoir 3 entrées");
+  assert.equal(new Set(idxs).size, idxs.length, "idx uniques");
+  assert.equal(merged.entries[0].tag, "20260101000000_a", "ordre alphabétique");
+  assert.equal(merged.entries[1].tag, "20260102000000_b", "entrée droppée restaurée");
+  assert.equal(merged.entries[2].tag, "20260103000000_c", "entrée distante présente");
   const again = canonicalize(merged.entries);
-  console.assert(JSON.stringify(again) === JSON.stringify(merged), "idempotent");
+  assert.deepEqual(again, merged, "idempotent");
   console.log("selfcheck OK — collisions idx impossibles, entrées droppées restaurées, idempotent");
 } else {
   console.error(
