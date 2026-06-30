@@ -1,0 +1,22 @@
+# squawk : linter de surete des migrations Postgres
+# Seules regles actives (crash-loop certain sur donnees existantes) :
+#   adding-required-field     — ADD COLUMN NOT NULL sans DEFAULT
+#   constraint-missing-not-valid — ADD CONSTRAINT sans NOT VALID
+excluded_rules = [
+  # Incompatible avec notre runner transactionnel (CONCURRENTLY interdit en tx)
+  "require-concurrent-index-creation",
+  # Patterns legitimes dans notre base (ADD VALUE enum, ALTER TYPE widening)
+  "require-enum-value-ordering",
+  "changing-column-type",
+  # FK adds : risque mais legitime et courant dans nos migrations
+  "adding-foreign-key-constraint",
+  "disallowed-unique-constraint",
+  # Choix de types deliberes — drizzle-kit genere integer/timestamp/serial/varchar
+  "prefer-text-field",
+  "prefer-bigint-over-int",
+  "prefer-timestamp-tz",
+  "prefer-identity",
+  # Bruit sans valeur de securite pour nous
+  "require-timeout-settings",
+  "prefer-robust-stmts",
+]
