@@ -303,6 +303,7 @@ Pour trouver l'`id` de l'issue depuis son identifiant OPE-XXX : utiliser `get_is
 ## Règles
 
 - Ne merge **jamais** une PR si `pnpm check` échoue ou si lint retourne des `error`.
+- Ne merge **jamais** une PR implémentant un changement risqué (migration BDD, contrat/API, registre central, sécurité/authz/RLS, billing/argent, RGPD/légal/archivage, archi, suppression data, effet externe irréversible) sans trace de validation humaine — l'issue Linear doit être passée par le statut `Awaiting Human Validation` avant dispatch. En cas de doute → `notify.sh human BLOCKED` avec l'issue concernée.
 - Si la même PR a déjà reçu 3 rounds de corrections sans avancer → notifie l'humain avec `BLOCKED`.
 - **Jamais** `push --force`, `rebase` ou `commit --amend` sur la **branche `staging` distante** (réécriture d'historique partagé). En revanche, **réaligner le working tree LOCAL** sur `origin/staging` via `git reset --hard origin/staging` est **autorisé et requis avant chaque deploy** (étape 4) : ça ne touche pas l'historique distant, ça pointe vers le merge de tout le monde, et ça préserve les fichiers non suivis.
 - Commit chirurgical si tu dois toucher un fichier en direct (rare).
