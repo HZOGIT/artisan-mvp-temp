@@ -20,7 +20,7 @@ export interface SchedulerDeps {
   readonly db?: DbClient;
   readonly pdf?: PdfPort;
   readonly emailLogWriter?: IEmailLogWriter;
-  readonly logger?: { error(obj: Record<string, unknown>, msg: string): void };
+  readonly logger?: { error(obj: Record<string, unknown>, msg: string): void; warn(obj: Record<string, unknown>, msg: string): void };
 }
 
 const TICK_BATCH_SIZE = 200;
@@ -28,7 +28,7 @@ const NO_PM_RETRY_DELAY_MS = 24 * 3600_000;
 
 /** Envoie la facture d'abonnement par email (best-effort — ne doit jamais bloquer la facturation). */
 async function sendInvoiceEmail(
-  deps: Pick<SchedulerDeps, "notifier" | "pdf" | "emailLogWriter" | "appUrl">,
+  deps: Pick<SchedulerDeps, "notifier" | "pdf" | "emailLogWriter" | "appUrl" | "logger">,
   invoice: BillingInvoice,
   cyclePeriod: { period_start: Date; period_end: Date },
   artisanInfo: { name: string | null; address: string | null; siret: string | null } | null,
@@ -73,7 +73,9 @@ async function sendInvoiceEmail(
       type: "facture_abonnement",
       entiteType: "billing_invoice",
       entiteId: invoice.id,
-    }).catch(() => {});
+    }).catch((err: unknown) =>
+      deps.logger?.warn({ event: "email_log_write_failed", err, invoiceId: invoice.id }, "journalisation emails_log facture abonnement échouée"),
+    );
   }
 }
 
