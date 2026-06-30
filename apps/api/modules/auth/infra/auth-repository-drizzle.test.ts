@@ -246,4 +246,29 @@ describe.skipIf(!URL)("AuthRepositoryDrizzle (PG : users HORS RLS, accès par id
       await admin.query("delete from users where email=$1", [testEmail]);
     }
   });
+
+  it("OPE-992 — createAndBootstrapUser : permissions atomiques dans la tx principale (anti-régression fenêtre RLS)", async () => {
+    /**
+     * Anti-régression OPE-992 : l'INSERT permissions_utilisateur était best-effort HORS-tx
+     * → échouait silencieusement quand FORCE RLS était actif sur la table.
+     * Fix : permissions insérées dans la MÊME tx que user+artisan.
+     * Ce test tourne sous app_tenant (APP_DATABASE_URL), pas owner — comme en prod.
+     */
+    const testEmail = "ope-992-permissions-atomic@t.fr";
+    try {
+      await admin.query("delete from users where email=$1", [testEmail]);
+      const created = await repo.createAndBootstrapUser({ email: testEmail, passwordHash: "hash-ope992", name: "OPE992" });
+      const { rows } = await admin.query<{ permission: string }>(
+        "select permission from permissions_utilisateur where \"userId\"=$1 and autorise=true",
+        [created.id],
+      );
+      const granted = rows.map((r) => r.permission);
+      for (const p of ALL_PERMISSIONS) {
+        expect(granted, `permission manquante après inscription : ${p}`).toContain(p);
+      }
+      expect(granted.length, "exactement ALL_PERMISSIONS sans doublon").toBe(ALL_PERMISSIONS.length);
+    } finally {
+      await admin.query("delete from users where email=$1", [testEmail]);
+    }
+  });
 });
