@@ -99,6 +99,7 @@ export async function creerFacture(repo: IFactureRepository, ctx: TenantContext,
   if (!(await repo.ownsClient(ctx, input.clientId))) throw new NotFoundError("Client introuvable");
   if (input.devisId != null && !(await repo.ownsDevis(ctx, input.devisId))) throw new NotFoundError("Devis introuvable");
   const { lignes, ...header } = input;
+  lignes?.forEach((l) => assertTauxTVALegal(l.tauxTVA));
   const facture = lignes && lignes.length > 0
     ? await repo.createWithLignes(ctx, { ...header, numero: null }, lignes, inTx)
     : await repo.create(ctx, { ...header, numero: null });

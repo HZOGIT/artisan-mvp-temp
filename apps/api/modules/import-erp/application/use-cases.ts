@@ -1,5 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
-import { tauxStringToCategorie } from "../../../shared/tva/taux-tva-fr";
+import { tauxStringToCategorie, TVA_CATEGORIES_MAP } from "../../../shared/tva/taux-tva-fr";
 import { round2 } from "../../../shared/money";
 import type { IImportErpRepository } from "./import-erp-repository";
 import { pickField, findClientByName, emptyResult, type ImportRow, type ImportMapping, type ImportResult } from "../domain/import";
@@ -158,7 +158,7 @@ export async function importFactures(repo: IImportErpRepository, ctx: TenantCont
           designation: "Reprise historique",
           quantite: "1",
           prixUnitaireHT: totalHT.toFixed(2),
-          tauxTVA: tauxTVA.toFixed(2),
+          tauxTVA: TVA_CATEGORIES_MAP[tvaCategorieId].taux,
           tvaCategorieId,
           montantHT: totalHT.toFixed(2),
           montantTVA: montantTVA.toFixed(2),
