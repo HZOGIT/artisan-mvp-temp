@@ -107,9 +107,12 @@ export class AuthRepositoryDrizzle implements IAuthRepository {
         .returning({ id: users.id, email: users.email });
       const [artisan] = await tx.insert(artisans).values({ userId: user.id }).returning({ id: artisans.id });
       await tx.update(users).set({ artisanId: artisan.id }).where(eq(users.id, user.id));
+      await tx.insert(permissionsUtilisateur)
+        .values(ALL_PERMISSIONS.map((p) => ({ userId: user.id, permission: p, autorise: true })))
+        .onConflictDoNothing({ target: [permissionsUtilisateur.userId, permissionsUtilisateur.permission] });
       return { userId: user.id, userEmail: user.email ?? null, artisanId: artisan.id };
     });
-    /** Best-effort : billing d'essai + permissions owner (non bloquants). */
+    /** Best-effort : billing d'essai (non bloquant). */
     try {
       await this.db.transaction(async (tx) => {
         await tx.execute(sql`SELECT set_config('app.tenant', ${String(artisanId)}, true)`);
@@ -132,13 +135,6 @@ export class AuthRepositoryDrizzle implements IAuthRepository {
           }
         }
       });
-    } catch {
-      /* best-effort */
-    }
-    try {
-      await this.db.insert(permissionsUtilisateur)
-        .values(ALL_PERMISSIONS.map((p) => ({ userId, permission: p, autorise: true })))
-        .onConflictDoNothing({ target: [permissionsUtilisateur.userId, permissionsUtilisateur.permission] });
     } catch {
       /* best-effort */
     }
