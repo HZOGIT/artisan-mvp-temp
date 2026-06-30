@@ -60,7 +60,7 @@ export function createCongesRouter(repo: ICongeRepository, db?: DbClient) {
       .input(z.object({ id: z.number().int() }))
       .query(({ ctx, input }) => getConge(repo, ctx.tenant, input.id)),
 
-    create: protectedProcedure
+    create: gerer
       .input(createSchema)
       .mutation(async ({ ctx, input }) => {
         return withOutbox(db, repo, async (r, tx) => {
@@ -71,7 +71,7 @@ export function createCongesRouter(repo: ICongeRepository, db?: DbClient) {
         });
       }),
 
-    update: protectedProcedure
+    update: gerer
       .input(z.object({ id: z.number().int() }).and(updateSchema))
       .mutation(async ({ ctx, input }) => {
         const { id, ...data } = input;
@@ -82,7 +82,7 @@ export function createCongesRouter(repo: ICongeRepository, db?: DbClient) {
         });
       }),
 
-    delete: protectedProcedure
+    delete: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         return withOutbox(db, repo, async (r, tx) => {
