@@ -32,7 +32,7 @@ export class WebhookPaymentWriterDrizzle implements WebhookPaymentWriter {
       const now = new Date();
       await tx
         .update(paiementsStripe)
-        .set({ statut: "complete", stripePaymentIntentId: input.stripePaymentIntentId, paidAt: now })
+        .set({ statut: "payee", stripePaymentIntentId: input.stripePaymentIntentId, paidAt: now })
         .where(and(eq(paiementsStripe.id, input.paiementId), eq(paiementsStripe.artisanId, input.artisanId)));
 
       const [facture] = await tx
@@ -75,7 +75,7 @@ export class WebhookPaymentWriterDrizzle implements WebhookPaymentWriter {
     return withTenant(this.db, ctx, async (tx) => {
       await tx
         .update(paiementsStripe)
-        .set({ statut: "echoue" })
+        .set({ statut: "echouee" })
         .where(and(eq(paiementsStripe.id, input.paiementId), eq(paiementsStripe.artisanId, input.artisanId)));
     });
   }
