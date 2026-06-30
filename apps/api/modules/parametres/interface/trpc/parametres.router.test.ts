@@ -16,6 +16,7 @@ const SECRET = "test-secret-at-least-32-characters-long-xxxx";
 // Plage d'ids UNIQUE à ce fichier (anti-collision run parallèle — cf. hygiène des tests PG).
 const UA = 9944201;
 const UB = 9944202;
+const UC = 9944203; /** collaborateur non-owner de A — gate permission `parametres.modifier` */
 
 async function token(userId: number): Promise<string> {
   return new SignJWT({ userId, email: `u${userId}@t.fr` })
@@ -37,6 +38,7 @@ describe.skipIf(!URL)("parametres.router e2e (HTTP → tRPC → use-case → rep
   let server: ReturnType<typeof buildApp>;
 
   const purge = async (uid: number) => {
+    await admin.query("delete from permissions_utilisateur where \"userId\"=$1", [uid]);
     await admin.query('delete from parametres_artisan where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from artisans where "userId"=$1', [uid]);
     await admin.query("delete from users where id=$1", [uid]);
@@ -47,13 +49,18 @@ describe.skipIf(!URL)("parametres.router e2e (HTTP → tRPC → use-case → rep
       await purge(uid);
       await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [uid, `u${uid}@t.fr`]);
     }
+    await admin.query("delete from permissions_utilisateur where \"userId\"=$1", [UC]);
+    await admin.query("delete from users where id=$1", [UC]);
     artisanA = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UA])).rows[0].id;
     await admin.query('insert into artisans ("userId") values ($1) returning id', [UB]);
+    await admin.query('insert into users (id, email, password, role, "artisanId") values ($1,$2,\'x\',\'artisan\',$3)', [UC, `u${UC}@t.fr`, artisanA]);
     server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(app.db), parametresRepo: new ParametresRepositoryDrizzle(app.db) });
   });
 
   afterAll(async () => {
     await server.close();
+    await admin.query("delete from permissions_utilisateur where \"userId\"=$1", [UC]);
+    await admin.query("delete from users where id=$1", [UC]);
     for (const uid of [UA, UB]) await purge(uid);
     await app.close();
     await admin.end();
@@ -121,5 +128,26 @@ describe.skipIf(!URL)("parametres.router e2e (HTTP → tRPC → use-case → rep
     const pB = (await q(server, "parametres.get", tB)).json().result.data as { prefixeFacture: string };
     expect(pB.prefixeFacture).not.toBe("AAA");
     expect(pB.prefixeFacture).toBe("FAC"); // B voit ses défauts
+  });
+
+  it("gate permission : collaborateur non-owner sans `parametres.modifier` → update 403", async () => {
+    await admin.query("delete from permissions_utilisateur where \"userId\"=$1", [UC]);
+    const tC = await token(UC);
+    expect((await mut(server, "parametres.update", { prefixeDevis: "X" }, tC)).statusCode).toBe(403);
+  });
+
+  it("gate permission : collaborateur non-owner AVEC `parametres.modifier` → update 200", async () => {
+    await admin.query(
+      'insert into permissions_utilisateur ("userId", permission, autorise) values ($1,$2,true) on conflict ("userId", permission) do update set autorise = true',
+      [UC, "parametres.modifier"],
+    );
+    const tC = await token(UC);
+    expect((await mut(server, "parametres.update", { prefixeDevis: "P" }, tC)).statusCode).toBe(200);
+  });
+
+  it("gate permission : owner (UA) sans permission DB → update autorisé (bypass propriétaire)", async () => {
+    await admin.query("delete from permissions_utilisateur where \"userId\"=$1", [UA]);
+    const tA = await token(UA);
+    expect((await mut(server, "parametres.update", { prefixeDevis: "DEV" }, tA)).statusCode).toBe(200);
   });
 });

@@ -17,7 +17,7 @@ export type PermissionCode =
   | "articles.voir"
   | "comptabilite.voir"
   | "exports.voir"
-  | "parametres.voir"
+  | "parametres.voir" | "parametres.modifier"
   | "utilisateurs.gerer"
   | "vitrine.gerer";
 
@@ -83,6 +83,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     label: "Administration",
     permissions: [
       { code: "parametres.voir", label: "Accéder aux paramètres" },
+      { code: "parametres.modifier", label: "Modifier les paramètres" },
       { code: "vitrine.gerer", label: "Gérer la vitrine" },
     ],
   },
