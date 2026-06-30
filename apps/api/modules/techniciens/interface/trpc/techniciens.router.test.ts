@@ -17,6 +17,8 @@ const UA = 9935001;
 const UB = 9935002;
 const COLLAB_A = 9935011;
 const COLLAB_B = 9935012;
+/** Collaborateur de artisanA sans aucune permission — prouve les gates techniciens.gerer et ownerProcedure. */
+const UC = 9935021;
 
 async function token(userId: number): Promise<string> {
   return new SignJWT({ userId, email: `u${userId}@t.fr` })
@@ -54,6 +56,10 @@ describe.skipIf(!URL)("techniciens.router e2e (HTTP → tRPC → use-case → re
     await admin.query("delete from users where id in ($1,$2)", [COLLAB_A, COLLAB_B]);
     await admin.query('insert into users (id, email, password, role, name, "artisanId") values ($1,$2,\'x\',\'technicien\',$3,$4)', [COLLAB_A, `c${COLLAB_A}@t.fr`, "Collab A", artisanA]);
     await admin.query('insert into users (id, email, password, role, name, "artisanId") values ($1,$2,\'x\',\'secretaire\',$3,$4)', [COLLAB_B, `c${COLLAB_B}@t.fr`, "Collab B", artisanB]);
+    // UC : collaborateur de artisanA, non-owner, aucune permission (prouve les gates).
+    await admin.query('delete from permissions_utilisateur where "userId"=$1', [UC]);
+    await admin.query("delete from users where id=$1", [UC]);
+    await admin.query('insert into users (id, email, password, role, "artisanId") values ($1,$2,\'x\',\'artisan\',$3)', [UC, `u${UC}@t.fr`, artisanA]);
     server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(app.db), technicienRepo: new TechnicienRepositoryDrizzle(app.db) });
   });
 
@@ -68,6 +74,8 @@ describe.skipIf(!URL)("techniciens.router e2e (HTTP → tRPC → use-case → re
       await admin.query('delete from techniciens where "artisanId"=$1', [aId]);
     }
     await admin.query("delete from users where id in ($1,$2)", [COLLAB_A, COLLAB_B]);
+    await admin.query('delete from permissions_utilisateur where "userId"=$1', [UC]);
+    await admin.query("delete from users where id=$1", [UC]);
     for (const uid of [UA, UB]) {
       await admin.query('delete from artisans where "userId"=$1', [uid]);
       await admin.query("delete from users where id=$1", [uid]);
@@ -233,6 +241,31 @@ describe.skipIf(!URL)("techniciens.router e2e (HTTP → tRPC → use-case → re
     // A supprime → success ; re-supprimer → 404 (introuvable)
     expect((await callMutation(server, "techniciens.deleteHabilitation", { technicienId: techA, id: hab.id }, tA)).statusCode).toBe(200);
     expect((await callMutation(server, "techniciens.deleteHabilitation", { technicienId: techA, id: hab.id }, tA)).statusCode).toBe(404);
+  });
+
+  it("PERMISSION GATE techniciens.gerer : collaborateur UC sans droit → create/update/delete 403 ; propriétaire UA → OK", async () => {
+    const tC = await token(UC);
+    const tA = await token(UA);
+    // UC sans techniciens.gerer → toutes les mutations CRUD refusées.
+    expect((await callMutation(server, "techniciens.create", { nom: "Interdit" }, tC)).statusCode).toBe(403);
+    expect((await callMutation(server, "techniciens.update", { id: 1, nom: "Interdit" }, tC)).statusCode).toBe(403);
+    expect((await callMutation(server, "techniciens.delete", { id: 1 }, tC)).statusCode).toBe(403);
+    // UA (propriétaire) peut créer — le gate owner-bypass s'applique.
+    const created = await callMutation(server, "techniciens.create", { nom: "AutoriseProprio" }, tA);
+    expect(created.statusCode).toBe(200);
+    const id = created.json().result.data.id as number;
+    expect((await callMutation(server, "techniciens.update", { id, statut: "inactif" }, tA)).statusCode).toBe(200);
+    expect((await callMutation(server, "techniciens.delete", { id }, tA)).statusCode).toBe(200);
+  });
+
+  it("setSuiviActif owner-only (CNIL) : collaborateur UC → 403 ; propriétaire UA → 200", async () => {
+    const tC = await token(UC);
+    const tA = await token(UA);
+    const techId = (await callMutation(server, "techniciens.create", { nom: "GPS" }, tA)).json().result.data.id as number;
+    // UC non-owner → rejeté par ownerProcedure.
+    expect((await callMutation(server, "techniciens.setSuiviActif", { technicienId: techId, actif: true }, tC)).statusCode).toBe(403);
+    // UA propriétaire → autorisé.
+    expect((await callMutation(server, "techniciens.setSuiviActif", { technicienId: techId, actif: true }, tA)).statusCode).toBe(200);
   });
 
   it("getStats (parité client) : comptes d'interventions par statut, scopé technicien owné ; anti-IDOR → 404 ; 401", async () => {

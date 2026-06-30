@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import { router, protectedProcedure, permissionProcedure, ownerProcedure } from "../../../../interface/trpc/trpc";
 import type { DbClient } from "../../../../shared/db";
 import { outboxEvent } from "../../../../shared/events/outbox-event";
 import { withOutbox } from "../../../../shared/events/with-outbox";
@@ -11,6 +11,8 @@ const couleur = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB
 const coutHoraire = z.string().regex(/^\d+(\.\d{1,2})?$/, "Coût horaire invalide").max(12);
 const statut = z.enum(["actif", "inactif", "conge"]);
 const typeContrat = z.enum(["cdi", "cdd", "interimaire", "sous_traitant"]);
+
+const gerer = permissionProcedure("techniciens.gerer");
 
 /** Bornes alignées sur la table `techniciens` (defense-in-depth). */
 const createSchema = z.object({
@@ -56,7 +58,7 @@ export function createTechniciensRouter(repo: ITechnicienRepository, db?: DbClie
       .input(z.object({ id: z.number().int() }))
       .query(({ ctx, input }) => getTechnicien(repo, ctx.tenant, input.id)),
 
-    create: protectedProcedure
+    create: gerer
       .input(createSchema)
       .mutation(async ({ ctx, input }) => {
         return withOutbox(db, repo, async (r, tx) => {
@@ -67,7 +69,7 @@ export function createTechniciensRouter(repo: ITechnicienRepository, db?: DbClie
         });
       }),
 
-    update: protectedProcedure
+    update: gerer
       .input(z.object({ id: z.number().int() }).and(updateSchema))
       .mutation(async ({ ctx, input }) => {
         const { id, ...data } = input;
@@ -82,7 +84,7 @@ export function createTechniciensRouter(repo: ITechnicienRepository, db?: DbClie
         });
       }),
 
-    delete: protectedProcedure
+    delete: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         return withOutbox(db, repo, async (r, tx) => {
@@ -147,7 +149,7 @@ export function createTechniciensRouter(repo: ITechnicienRepository, db?: DbClie
       }),
 
     /** CNIL — active/désactive le suivi GPS d'un technicien (interrupteur salarié). */
-    setSuiviActif: protectedProcedure
+    setSuiviActif: ownerProcedure
       .input(z.object({ technicienId: z.number().int(), actif: z.boolean() }))
       .mutation(async ({ ctx, input }) => {
         return withOutbox(db, repo, async (r, tx) => {
