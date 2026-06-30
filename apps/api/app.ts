@@ -171,6 +171,7 @@ import { schedulerPlugin } from "./platform/scheduler";
 import { createRelancesDevisJob } from "./modules/devis/application/relances-devis-job";
 import { createAlertesPrevisionsJob } from "./modules/alertes-previsions/application/alertes-previsions-job";
 import { createFacturesRecurrentesJob } from "./modules/contrats-maintenance/application/factures-recurrentes-job";
+import { createRevisionIndexationJob } from "./modules/contrats-maintenance/application/revision-indexation-job";
 import { paOutboxDrainerPlugin } from "./shared/infra/pa-outbox-drainer";
 import { paInboundPollerPlugin } from "./shared/infra/pa-inbound-poller";
 import { paReconciliationPollerPlugin } from "./shared/infra/pa-reconciliation-poller";
@@ -1496,6 +1497,15 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
           },
           contratRepo,
           factureGen: new FacturesContratFactureGenerator(factureRepo),
+        }),
+      );
+      registry.register(
+        createRevisionIndexationJob({
+          listArtisanIds: async () => {
+            const rows = await getDbHandle().db.select({ id: artisansTable.id }).from(artisansTable);
+            return rows.map((r) => r.id);
+          },
+          contratRepo,
         }),
       );
     },
