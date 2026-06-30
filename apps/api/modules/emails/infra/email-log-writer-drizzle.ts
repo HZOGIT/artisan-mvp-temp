@@ -1,7 +1,7 @@
 import { and, eq, ne } from "drizzle-orm";
 import { emailsLog } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
-import type { IEmailLogWriter } from "../application/email-log-writer";
+import type { IEmailLogWriter, CreateEmailLogEntry } from "../application/email-log-writer";
 
 /*
  * Writer cross-tenant du journal d'emails. Réservé aux opérations système (webhook Resend) :
@@ -20,5 +20,17 @@ export class EmailLogWriterDrizzle implements IEmailLogWriter {
       .where(and(eq(emailsLog.resendId, resendId), ne(emailsLog.statut, statut)))
       .returning({ artisanId: emailsLog.artisanId, destinataire: emailsLog.destinataire });
     return rows[0] ?? null;
+  }
+
+  async create(entry: CreateEmailLogEntry): Promise<void> {
+    await this.db.insert(emailsLog).values({
+      artisanId: entry.artisanId,
+      destinataire: entry.destinataire,
+      sujet: entry.sujet,
+      type: entry.type,
+      statut: entry.statut ?? "sent",
+      entiteType: entry.entiteType ?? null,
+      entiteId: entry.entiteId ?? null,
+    });
   }
 }

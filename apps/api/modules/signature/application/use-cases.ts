@@ -12,6 +12,7 @@ import type {
   SignatureDevisContextReader,
   SignatureNotificationWriter,
 } from "./signature-repository";
+import type { IEmailLogWriter } from "../../emails/application/email-log-writer";
 
 /** Dépendances injectées de la surface ARTISAN (protégée) du domaine signature. */
 export interface SignatureDeps {
@@ -21,6 +22,7 @@ export interface SignatureDeps {
   readonly notifications: SignatureNotificationWriter;
   readonly appUrl: string;
   readonly maintenant?: () => Date;
+  readonly emailLogWriter?: IEmailLogWriter;
 }
 
 /*
@@ -82,6 +84,9 @@ export async function createSignatureLink(
     });
     try {
       await deps.email.send({ to: client.email, subject, body, fromName: artisan?.nomEntreprise ?? undefined, replyTo: artisan?.email ?? undefined });
+      if (deps.emailLogWriter) {
+        await deps.emailLogWriter.create({ artisanId: ctx.artisanId, destinataire: client.email, sujet: subject, type: "lien_signature", entiteType: "devis", entiteId: devisId }).catch(() => {});
+      }
     } catch {
       /* best-effort : le lien est créé même si l'email échoue */
     }

@@ -80,4 +80,18 @@ describe.skipIf(!URL)("EmailLogWriterDrizzle (PG, update par resendId + isolatio
     expect(rowsA.every((r) => r.artisanId === A)).toBe(true);
     expect(rowsA.some((r) => r.artisanId === B)).toBe(false);
   });
+
+  it("create() — insère une ligne emails_log lisible sous le bon tenant", async () => {
+    await writer.create({ artisanId: A, destinataire: "new@t.fr", sujet: "Facture TEST", type: "envoi_facture", entiteType: "facture", entiteId: 9001 });
+    const rows = await reader.list({ artisanId: A, userId: 0 }, { entiteType: "facture" });
+    const row = rows.find((r) => r.destinataire === "new@t.fr" && r.type === "envoi_facture");
+    expect(row).toBeDefined();
+    expect(row?.artisanId).toBe(A);
+    expect(row?.statut).toBe("sent");
+  });
+
+  it("create() — isolation RLS : ligne créée pour A invisible depuis B", async () => {
+    const rowsB = await reader.list({ artisanId: B, userId: 0 }, {});
+    expect(rowsB.some((r) => r.destinataire === "new@t.fr")).toBe(false);
+  });
 });

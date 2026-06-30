@@ -11,6 +11,7 @@ import type { ArtisanReader, ClientReader } from "./contact-readers";
 import type { IModeleEmailRepository } from "../../modeles-email/application/modele-email-repository";
 import { buildModeleEmail } from "../../modeles-email/domain/render";
 import type { IPiecesJointesRepository } from "../../pieces-jointes/application/pieces-jointes-repository";
+import type { IEmailLogWriter } from "../../emails/application/email-log-writer";
 
 /*
  * Dépendances de l'envoi d'une facture par email (composition cross-domaine : artisan + client +
@@ -29,6 +30,7 @@ export interface FactureMailingDeps {
   readonly db?: DbClient;
   /** Optionnel : pièces jointes (plans, photos…) attachables à l'email. */
   readonly piecesJointesRepo?: IPiecesJointesRepository;
+  readonly emailLogWriter?: IEmailLogWriter;
 }
 
 export interface EnvoyerFactureEmailInput {
@@ -212,6 +214,10 @@ export async function envoyerFactureParEmail(
   }
 
   await deps.email.send({ to: client.email, subject, body, ...(attachments.length ? { attachments } : {}), fromName: artisan.nomEntreprise ?? undefined, replyTo: artisan.email ?? undefined });
+
+  if (deps.emailLogWriter) {
+    await deps.emailLogWriter.create({ artisanId: ctx.artisanId, destinataire: client.email, sujet: subject, type: "envoi_facture", entiteType: "facture", entiteId: facture.id }).catch(() => {});
+  }
 
   /** Envoi réussi (pas d'exception) : passage `envoyee` depuis brouillon/validee uniquement. */
   if (facture.statut === "brouillon" || facture.statut === "validee") {

@@ -3,6 +3,8 @@ import { router, protectedProcedure, publicProcedure } from "../../../../interfa
 import type { SignatureDeps } from "../../application/use-cases";
 import { getSignatureByDevis, createSignatureLink } from "../../application/use-cases";
 import type { SignaturePublicDeps } from "../../application/public-use-cases";
+import type { DbClient } from "../../../../shared/db";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
 import {
   getDevisForSignature,
   selectDevisOption,
@@ -28,7 +30,7 @@ const refuseInput = z.object({ token: z.string().min(1).max(64), motifRefus: z.s
  * valide l'input, délègue aux use-cases, laisse remonter les Domain errors (NotFound→404,
  * Validation→400). Les mutations publiques (selectDevisOption/signDevis/refuseDevis) suivent.
  */
-export function createSignatureRouter(deps: SignatureDeps, publicDeps: SignaturePublicDeps) {
+export function createSignatureRouter(deps: SignatureDeps, publicDeps: SignaturePublicDeps, db?: DbClient) {
   return router({
     /*
      * ── Surface ARTISAN (protégée) ───────────────────────────────────────────────────────────────
@@ -44,6 +46,8 @@ export function createSignatureRouter(deps: SignatureDeps, publicDeps: Signature
       .mutation(async ({ ctx, input }) => {
         const result = await createSignatureLink(deps, ctx.tenant, input.devisId);
         ctx.log.info({ event: "signature_link_created", devisId: input.devisId }, "Lien de signature généré");
+        const tx = db;
+        if (tx) await outboxEvent(tx, ctx.tenant, { action: "devis.signature_envoyee", entityType: "devis", entityId: input.devisId, payload: {} }).catch(() => {});
         return result;
       }),
 

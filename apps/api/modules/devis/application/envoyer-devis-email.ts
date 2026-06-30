@@ -10,6 +10,7 @@ import type { DevisSignatureReader } from "./devis-signature-reader";
 import type { IModeleEmailRepository } from "../../modeles-email/application/modele-email-repository";
 import { buildModeleEmail } from "../../modeles-email/domain/render";
 import type { IPiecesJointesRepository } from "../../pieces-jointes/application/pieces-jointes-repository";
+import type { IEmailLogWriter } from "../../emails/application/email-log-writer";
 
 /*
  * Dépendances de l'envoi d'un devis par email (composition : artisan + client + PDF + email +
@@ -28,6 +29,7 @@ export interface DevisMailingDeps {
   /** Optionnel : pièces jointes (plans, photos…) attachables à l'email. */
   readonly piecesJointesRepo?: IPiecesJointesRepository;
   readonly storage?: StoragePort;
+  readonly emailLogWriter?: IEmailLogWriter;
 }
 
 export interface EnvoyerDevisEmailInput {
@@ -196,6 +198,10 @@ export async function envoyerDevisParEmail(
   }
 
   await deps.email.send({ to: destinataireEmail, subject, body, ...(attachments.length ? { attachments } : {}), fromName: artisan.nomEntreprise ?? undefined, replyTo: artisan.email ?? undefined });
+
+  if (deps.emailLogWriter) {
+    await deps.emailLogWriter.create({ artisanId: ctx.artisanId, destinataire: destinataireEmail, sujet: subject, type: "envoi_devis", entiteType: "devis", entiteId: devis.id }).catch(() => {});
+  }
 
   /** Envoi réussi : passage `envoye` depuis brouillon uniquement (ne régresse pas un devis émis/signé). */
   if (devis.statut === "brouillon") {

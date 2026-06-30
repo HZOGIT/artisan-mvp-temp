@@ -8,6 +8,7 @@ import type { IFactureRepository } from "./facture-repository";
 import type { IModeleEmailRepository } from "../../modeles-email/application/modele-email-repository";
 import { buildModeleEmail } from "../../modeles-email/domain/render";
 import type { IEmailOptoutRepository } from "../../emails/application/email-optout-repository";
+import type { IEmailLogWriter } from "../../emails/application/email-log-writer";
 
 /*
  * Relance d'une facture impayée par email (parité fonctionnelle du legacy `execEnvoyerRelance`) :
@@ -24,6 +25,7 @@ export interface RelanceMailingDeps {
   readonly modeleEmailRepo?: IModeleEmailRepository;
   /** Optionnel : si présent, vérifie l'opt-out RGPD avant envoi. */
   readonly optoutRepo?: IEmailOptoutRepository;
+  readonly emailLogWriter?: IEmailLogWriter;
 }
 
 export interface EnvoyerRelanceInput {
@@ -183,6 +185,10 @@ export async function envoyerRelanceFacture(
   }
 
   await deps.email.send({ to: client.email, subject, body, fromName: artisan.nomEntreprise ?? undefined, replyTo: artisan.email ?? undefined });
+
+  if (deps.emailLogWriter) {
+    await deps.emailLogWriter.create({ artisanId: ctx.artisanId, destinataire: client.email, sujet: subject, type: "relance_facture", entiteType: "facture", entiteId: input.factureId }).catch(() => {});
+  }
 
   /** Incrémenter le compteur de relances après envoi réussi. */
   await repo.update(ctx, input.factureId, { nombreRelances: niveau });
