@@ -153,7 +153,7 @@ export function createStocksRouter(
      * Génère une notification « Stock bas » par stock sous le seuil (parité client + legacy).
      * Cross-domaine : compose le repo notifications. Renvoie { alertsCreated }.
      */
-    generateAlerts: protectedProcedure.mutation(({ ctx }) => genererAlertesStock(repo, notificationRepo, ctx.tenant)),
+    generateAlerts: protectedProcedure.mutation(({ ctx }) => genererAlertesStock(repo, notificationRepo, ctx.tenant, db)),
 
     /*
      * Rapport de réapprovisionnement groupé par fournisseur (parité client trpc.stocks.getRapportCommande).

@@ -1,6 +1,8 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { IStockRepository } from "./stock-repository";
 import type { INotificationRepository } from "../../notifications/application/notification-repository";
+import type { DbClient } from "../../../shared/db";
+import { outboxEvent } from "../../../shared/events/outbox-event";
 
 /*
  * Génération des alertes de stock bas (cross-domaine stocks → notifications, scopé tenant).
@@ -18,6 +20,7 @@ export async function genererAlertesStock(
   stockRepo: IStockRepository,
   notificationRepo: INotificationRepository,
   ctx: TenantContext,
+  tx?: DbClient,
 ): Promise<GenererAlertesResult> {
   const allStocks = await stockRepo.list(ctx);
   let alertsCreated = 0;
@@ -36,6 +39,14 @@ export async function genererAlertesStock(
       message: `L'article "${s.designation}" (${s.reference}) est en stock bas: ${s.quantiteEnStock} ${s.unite} (seuil: ${s.seuilAlerte})`,
       lien,
     });
+    if (tx) {
+      await outboxEvent(tx, ctx, {
+        action: "stock.seuil_bas_atteint",
+        entityType: "stock",
+        entityId: s.id,
+        payload: { stockId: s.id, reference: s.reference, designation: s.designation, quantiteEnStock: s.quantiteEnStock, seuilAlerte: s.seuilAlerte },
+      });
+    }
     alertsCreated++;
   }
   return { alertsCreated };
