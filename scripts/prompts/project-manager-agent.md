@@ -60,10 +60,8 @@ echo "Slots actifs : $active"
 
 ### 2. Prioriser les issues
 
-Lister d'abord le projet prod-blockers (Urgent → High) — via MCP ou linearis CLI :
-```
-mcp__plugin_linear_linear__list_issues project="Points bloquants déploiement en production" state=Backlog
-# ou équivalent :
+Lister d'abord le projet prod-blockers (Urgent → High) via la CLI `linearis` :
+```bash
 linearis issues list --project "Points bloquants déploiement en production" --priority 2
 ```
 
@@ -131,7 +129,7 @@ Tick prod-first — N slots libres → M lancées, K already-done
 
 ## Linear CLI — linearis
 
-Disponible sur ce serveur en plus des outils MCP. Utile pour les scripts et les sessions worktree :
+Outil officiel pour toutes les opérations Linear — jamais des outils MCP :
 
 ```bash
 linearis issues read OPE-XXX                    # lire une issue

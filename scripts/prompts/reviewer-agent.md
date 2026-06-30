@@ -285,17 +285,13 @@ PR_URL=$(gh pr view <numero> --json url -q .url)
 ```
 
 Pour chaque OPE-XXX trouvé :
-- Passer le statut de l'issue à **Done** via l'outil MCP Linear `save_issue` (champ `status: "Done"`)
-- Poster un commentaire sur l'issue via `save_comment` :
-  > "Corrigé dans [PR #<numero>](<PR_URL>) — mergée dans `staging`."
+- Passer le statut de l'issue à **Done** via la CLI `linearis`
+- Poster un commentaire sur l'issue via `linearis`
 
-Exemple d'appel (répéter pour chaque issue) :
+```bash
+linearis issues update OPE-XXX --status "Done"
+linearis issues discuss OPE-XXX --body "Corrigé dans [PR #<numero>](<PR_URL>) — mergée dans \`staging\`."
 ```
-mcp__plugin_linear_linear__save_issue({ id: "<id-issue>", status: "Done" })
-mcp__plugin_linear_linear__save_comment({ issueId: "<id-issue>", body: "Corrigé dans [PR #<numero>](<PR_URL>) — mergée dans `staging`." })
-```
-
-Pour trouver l'`id` de l'issue depuis son identifiant OPE-XXX : utiliser `get_issue` avec l'identifiant textuel ou `list_issues` avec filtre sur le projet.
 
 **6. Notifier l'humain :**
 ```bash

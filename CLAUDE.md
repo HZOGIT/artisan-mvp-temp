@@ -100,8 +100,7 @@ Après 3 rounds de corrections sans avancée → `notify.sh human BLOCKED`.
 
 ## Linear CLI — linearis
 
-`linearis` est disponible sur ce serveur (v2026.4.9) et peut être utilisé par **tous les agents**
-en complément ou à la place des outils MCP Linear.
+`linearis` est disponible sur ce serveur (v2026.4.9) — **outil officiel pour toutes les opérations Linear** (tous les agents, toutes les sessions).
 
 ```bash
 # Lire une issue
@@ -121,9 +120,7 @@ linearis issues update OPE-XXX --status "In Progress" --priority 2
 linearis issues discuss OPE-XXX --body "markdown ici"
 ```
 
-**Quand l'utiliser :** dans les sessions worktree où les outils MCP ne sont pas disponibles, ou
-pour scripter des opérations Linear en cascade (plusieurs updates / commentaires d'un coup).
-Les agents MCP peuvent continuer à utiliser les outils Linear MCP — les deux coexistent.
+Toutes les opérations Linear (lire, créer, commenter, mettre à jour un statut) passent par `linearis` — jamais par des outils MCP.
 
 ---
 
