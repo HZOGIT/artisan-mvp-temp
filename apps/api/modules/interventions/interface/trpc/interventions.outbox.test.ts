@@ -84,6 +84,40 @@ describe.skipIf(!URL)("interventions.outbox atomicité (L2 — Drizzle + PG loca
     expect(after).toBe(before + 1);
   });
 
+  it("update statut=en_cours → event_outbox action='intervention.demarree' co-écrit", async () => {
+    const tA = await token(UA);
+    const created = await callMutation(server, "interventions.create", { clientId, titre: "Demarree test", dateDebut: "2099-10-02T08:00:00Z" }, tA);
+    expect(created.statusCode).toBe(200);
+    const interventionId = (created.json() as { result: { data: { id: number } } }).result.data.id;
+    const res = await callMutation(server, "interventions.update", { id: interventionId, statut: "en_cours" }, tA);
+    expect(res.statusCode).toBe(200);
+    const row = (await admin.query("select action from event_outbox where \"entityId\"=$1 and action='intervention.demarree'", [interventionId])).rows[0];
+    expect(row).toBeDefined();
+  });
+
+  it("update statut=terminee → event_outbox action='intervention.terminee' co-écrit", async () => {
+    const tA = await token(UA);
+    const created = await callMutation(server, "interventions.create", { clientId, titre: "Terminee test", dateDebut: "2099-10-03T08:00:00Z" }, tA);
+    expect(created.statusCode).toBe(200);
+    const interventionId = (created.json() as { result: { data: { id: number } } }).result.data.id;
+    await callMutation(server, "interventions.update", { id: interventionId, statut: "en_cours" }, tA);
+    const res = await callMutation(server, "interventions.update", { id: interventionId, statut: "terminee" }, tA);
+    expect(res.statusCode).toBe(200);
+    const row = (await admin.query("select action from event_outbox where \"entityId\"=$1 and action='intervention.terminee'", [interventionId])).rows[0];
+    expect(row).toBeDefined();
+  });
+
+  it("update statut=annulee → event_outbox action='intervention.annulee' co-écrit", async () => {
+    const tA = await token(UA);
+    const created = await callMutation(server, "interventions.create", { clientId, titre: "Annulee test", dateDebut: "2099-10-04T08:00:00Z" }, tA);
+    expect(created.statusCode).toBe(200);
+    const interventionId = (created.json() as { result: { data: { id: number } } }).result.data.id;
+    const res = await callMutation(server, "interventions.update", { id: interventionId, statut: "annulee" }, tA);
+    expect(res.statusCode).toBe(200);
+    const row = (await admin.query("select action from event_outbox where \"entityId\"=$1 and action='intervention.annulee'", [interventionId])).rows[0];
+    expect(row).toBeDefined();
+  });
+
   it("outbox atomicité — rollback: throw après write intervention → 0 intervention ET 0 event_outbox persistés", async () => {
     const ctx = { artisanId: artisanA, userId: UA, role: "artisan" as const, isOwner: true, franchiseTVA: false };
     const repo = new InterventionRepositoryDrizzle(app.db);
