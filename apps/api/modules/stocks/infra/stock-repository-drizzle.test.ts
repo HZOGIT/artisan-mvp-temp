@@ -92,4 +92,21 @@ describe.skipIf(!URL)("StockRepositoryDrizzle (PG, RLS + scope tenant)", () => {
     const n = await admin.query('select count(*)::int as n from mouvements_stock where "stockId"=$1', [s.id]);
     expect(n.rows[0].n).toBe(0);
   });
+
+  it("OPE-836 : CHECK quantiteEnStock >= 0 — insertion négative rejetée en DB", async () => {
+    await expect(
+      admin.query(
+        `insert into stocks ("artisanId", reference, designation, "quantiteEnStock") values ($1,'NEG-1','Négatif','-1.00')`,
+        [A],
+      ),
+    ).rejects.toThrow(/stocks_quantite_non_negative/);
+  });
+
+  it("OPE-837 : FK mouvements_stock.stockId — mouvement orphelin rejeté en DB", async () => {
+    await expect(
+      admin.query(
+        `insert into mouvements_stock ("stockId", type, quantite, "quantiteAvant", "quantiteApres") values (999999999,'entree','1.00','0.00','1.00')`,
+      ),
+    ).rejects.toThrow(/mouvements_stock_stockid_fk/);
+  });
 });
