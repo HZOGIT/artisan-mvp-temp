@@ -46,8 +46,11 @@ Le serveur appelle `runMigrations(ownerPool)` (dans `apps/api/shared/db/run-migr
 
 **Collision entre worktrees résolue** : deux worktrees parallèles produisent
 `20260628HHMMSSa_<nom>.sql` et `20260628HHMMSSb_<autre>.sql` — noms uniques → aucun conflit
-git ni runtime. Si conflit textuel sur `_journal.json` au merge → résolution triviale (garder
-les deux entrées) : `_journal.json` est cosmétique runtime, le runner n'en dépend pas.
+git ni runtime. Les conflits sur `_journal.json` sont résolus **automatiquement** par le merge
+driver `drizzle-journal` (union + réindex idx, enregistré via `prepare`/`pnpm install`) —
+**ne jamais résoudre `_journal.json` à la main**. Vérif avant PR : `pnpm db:verify-journal`.
+En cas de désync : `node scripts/drizzle/canonicalize-journal.mjs rebuild drizzle`.
+Si driver absent : `git config merge.drizzle-journal.driver "node scripts/drizzle/canonicalize-journal.mjs merge %O %A %B"`.
 
 ## 2. Faire évoluer le schéma — `generate` = BROUILLON, revue manuelle OBLIGATOIRE
 
@@ -78,8 +81,9 @@ les deux entrées) : `_journal.json` est cosmétique runtime, le runner n'en dé
 
 **Règles dures**
 - **Jamais** de `.sql` à la main ni d'édition manuelle de `_journal.json`/snapshot pour le cas auto —
-  drizzle-kit gère idx/timestamp/journal/snapshot atomiquement. Migration sans snapshot ou sans entrée
-  journal = cassé (la prochaine `generate` diverge ; le boot peut crash-looper).
+  drizzle-kit gère idx/timestamp/journal/snapshot atomiquement. Conflit de merge sur `_journal.json` →
+  le merge driver `drizzle-journal` le résout automatiquement (ne pas `git add _journal.json` manuellement).
+  Migration sans snapshot ou sans entrée journal = cassé (la prochaine `generate` diverge ; le boot peut crash-looper).
 - **Jamais** éditer une migration déjà appliquée → un changement = une **nouvelle** migration (append).
 - `ADD COLUMN` nullable ou `DEFAULT … NOT NULL` (PG 11+) = sûr. `ADD CHECK/UNIQUE/NOT NULL` sec sur des
   données existantes peut **rejeter l'existant au boot** (fail-closed) → préférer `NOT VALID`/backfill.
