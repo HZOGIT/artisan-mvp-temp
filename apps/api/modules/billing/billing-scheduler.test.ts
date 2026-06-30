@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { FakeBillingRepository } from "./infra/billing-repository-fake";
 import { FakeBillingPort } from "../../shared/ports/billing-adapter";
+import { FakeSubscriptionEventNotifier } from "../subscription/infra/subscription-event-notifier-fake";
+import type { PdfPort } from "../../shared/ports/pdf";
 import {
   chargeOffSessionForCycle,
   recoverZombies,
@@ -8,6 +10,8 @@ import {
   MaxAttemptsReachedError,
 } from "./application/billing-scheduler";
 import type { SchedulerDeps } from "./application/billing-scheduler";
+
+const fakePdf: PdfPort = { render: (_t, _d) => Promise.resolve(Buffer.from("pdf")) };
 
 const ARTISAN_ID = 1;
 const CTX = { artisanId: ARTISAN_ID, userId: 0 };
@@ -2498,5 +2502,102 @@ describe("FIX-CDH — protection catch blocks : appendEvent en échec ne doit pa
       expect(sub1.status).toBe("active");
       expect(sub2.status).toBe("canceled");
     });
+  });
+});
+
+describe("email facture abonnement (OPE-872)", () => {
+  it("paiement réussi → email envoyé avec PDF en pièce jointe", async () => {
+    const repo = new FakeBillingRepository();
+    const billing = new FakeBillingPort();
+    const notifier = new FakeSubscriptionEventNotifier();
+    billing.nextChargeResult = { paymentIntentId: "pi_ok", status: "succeeded" };
+
+    const sub = await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const pm = await repo.savePaymentMethod({
+      artisanId: ARTISAN_ID, stripeCustomerId: "cus_test", stripePaymentMethodId: "pm_test",
+      brand: "visa", last4: "4242", expMonth: 12, expYear: 2028, consentedAt: new Date(),
+    });
+    await repo.setDefaultPaymentMethod({ artisanId: ARTISAN_ID, userId: 0 }, pm.id);
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"),
+      amountCents: 2900, currency: "eur",
+    });
+
+    await chargeOffSessionForCycle({ repo, billing, notifier, pdf: fakePdf }, cycle.id, sub.id, ARTISAN_ID);
+
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(notifier.emails).toHaveLength(1);
+    const mail = notifier.emails[0]!;
+    expect(mail.artisanId).toBe(ARTISAN_ID);
+    expect(mail.subject).toContain("facture Operioz");
+    expect(mail.attachments).toHaveLength(1);
+    expect(mail.attachments[0]!.filename).toMatch(/Facture_Operioz_.*\.pdf/);
+    expect(mail.attachments[0]!.contentType).toBe("application/pdf");
+    expect(mail.attachments[0]!.content).toEqual(Buffer.from("pdf"));
+  });
+
+  it("idempotence : cycle déjà paid → pas de second email (guard webhook)", async () => {
+    const repo = new FakeBillingRepository();
+    const billing = new FakeBillingPort();
+    const notifier = new FakeSubscriptionEventNotifier();
+
+    const sub = await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const pm = await repo.savePaymentMethod({
+      artisanId: ARTISAN_ID, stripeCustomerId: "cus_test", stripePaymentMethodId: "pm_test",
+      brand: "visa", last4: "4242", expMonth: 12, expYear: 2028, consentedAt: new Date(),
+    });
+    await repo.setDefaultPaymentMethod({ artisanId: ARTISAN_ID, userId: 0 }, pm.id);
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"),
+      amountCents: 2900, currency: "eur",
+    });
+
+    billing.nextChargeResult = { paymentIntentId: "pi_ok", status: "succeeded" };
+    await chargeOffSessionForCycle({ repo, billing, notifier, pdf: fakePdf }, cycle.id, sub.id, ARTISAN_ID);
+    await new Promise(r => setTimeout(r, 0));
+
+    const firstEmailCount = notifier.emails.length;
+    expect(firstEmailCount).toBe(1);
+
+    billing.nextChargeResult = { paymentIntentId: "pi_ok2", status: "succeeded" };
+    await chargeOffSessionForCycle({ repo, billing, notifier, pdf: fakePdf }, cycle.id, sub.id, ARTISAN_ID);
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(notifier.emails).toHaveLength(firstEmailCount);
+  });
+
+  it("pas de notifier → pas d'erreur (pdf ignoré)", async () => {
+    const repo = new FakeBillingRepository();
+    const billing = new FakeBillingPort();
+    billing.nextChargeResult = { paymentIntentId: "pi_ok", status: "succeeded" };
+
+    const sub = await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const pm = await repo.savePaymentMethod({
+      artisanId: ARTISAN_ID, stripeCustomerId: "cus_test", stripePaymentMethodId: "pm_test",
+      brand: "visa", last4: "4242", expMonth: 12, expYear: 2028, consentedAt: new Date(),
+    });
+    await repo.setDefaultPaymentMethod({ artisanId: ARTISAN_ID, userId: 0 }, pm.id);
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"),
+      amountCents: 2900, currency: "eur",
+    });
+
+    await expect(
+      chargeOffSessionForCycle({ repo, billing }, cycle.id, sub.id, ARTISAN_ID),
+    ).resolves.toBeUndefined();
+    expect(repo.invoices).toHaveLength(1);
   });
 });

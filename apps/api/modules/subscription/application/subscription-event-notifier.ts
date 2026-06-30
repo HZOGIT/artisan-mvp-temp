@@ -1,4 +1,5 @@
 import type { SignatureNotificationType } from "../../signature/application/signature-repository";
+import type { EmailAttachment } from "../../../shared/ports/email";
 
 /*
  * Notifications/emails best-effort des évènements abonnement (parité legacy : notif in-app + email à
@@ -9,5 +10,5 @@ export interface SubscriptionEventNotifier {
   /** Notification in-app pour l'artisan (table notifications, scopée artisanId). */
   notifyArtisan(artisanId: number, notif: { type: SignatureNotificationType; titre: string; message: string; lien: string }): Promise<void>;
   /** Email à l'utilisateur propriétaire de l'artisan (résout users.email ; no-op si absent). */
-  emailArtisanOwner(artisanId: number, subject: string, html: string): Promise<void>;
+  emailArtisanOwner(artisanId: number, subject: string, html: string, attachments?: readonly EmailAttachment[]): Promise<void>;
 }
