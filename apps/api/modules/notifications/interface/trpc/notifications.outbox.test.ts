@@ -72,19 +72,21 @@ describe.skipIf(!URL)("notifications.outbox atomicité (L2 — Drizzle + PG loca
     expect(after).toBe(before + 1);
   });
 
-  it("outbox atomicité — markAllAsRead → notification.toutes_lues ET event_outbox co-écrits", async () => {
-    const notifB1 = (await admin.query('insert into notifications ("artisanId", titre, type) values ($1,$2,$3) returning id', [artisanA, "Bulk 1", "info"])).rows[0].id;
-    const notifB2 = (await admin.query('insert into notifications ("artisanId", titre, type) values ($1,$2,$3) returning id', [artisanA, "Bulk 2", "info"])).rows[0].id;
+  it("outbox atomicité — markAllAsRead → notification.lue PAR notif ET event_outbox co-écrits", async () => {
+    const notifB1 = (await admin.query('insert into notifications ("artisanId", titre, type) values ($1,$2,$3) returning id', [artisanA, "Bulk 1", "info"])).rows[0].id as number;
+    const notifB2 = (await admin.query('insert into notifications ("artisanId", titre, type) values ($1,$2,$3) returning id', [artisanA, "Bulk 2", "info"])).rows[0].id as number;
     const tA = await token(UA);
     const outboxBefore = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
     const res = await callMutation(server, "notifications.markAllAsRead", {}, tA);
     expect(res.statusCode).toBe(200);
     const outboxAfter = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
-    expect(outboxAfter).toBe(outboxBefore + 1);
-    const row = (await admin.query("select * from event_outbox where \"artisanId\"=$1 and action='notification.toutes_lues' order by id desc limit 1", [artisanA])).rows[0];
-    expect(row).toBeDefined();
-    expect(row.artisanId).toBe(artisanA);
-    expect((row.payload as { count?: number }).count).toBeGreaterThan(0);
+    expect(outboxAfter).toBeGreaterThan(outboxBefore);
+    const rows = (await admin.query("select * from event_outbox where \"artisanId\"=$1 and action='notification.lue' and \"entityId\" = any($2::int[])", [artisanA, [notifB1, notifB2]])).rows;
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      expect(row.artisanId).toBe(artisanA);
+      expect(row.entityType).toBe("notification");
+    }
     await admin.query("delete from notifications where id = any($1::int[])", [[notifB1, notifB2]]);
   });
 

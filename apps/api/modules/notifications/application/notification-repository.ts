@@ -14,8 +14,8 @@ export interface INotificationRepository {
   countUnread(ctx: TenantContext): Promise<number>;
   /** Marque une notification comme lue — false si elle n'appartient pas au tenant. */
   markAsRead(ctx: TenantContext, id: number): Promise<boolean>;
-  /** Marque toutes les notifications du tenant comme lues — renvoie le nombre affecté. */
-  markAllAsRead(ctx: TenantContext): Promise<number>;
+  /** Marque toutes les notifications du tenant comme lues — renvoie les IDs affectés. */
+  markAllAsRead(ctx: TenantContext): Promise<number[]>;
   /** Archive une notification — false si elle n'appartient pas au tenant. */
   archive(ctx: TenantContext, id: number): Promise<boolean>;
   /** Archive toutes les notifications actives portant ce lien (ex. `/factures/42`). */

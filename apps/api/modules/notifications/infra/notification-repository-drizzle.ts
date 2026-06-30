@@ -77,14 +77,14 @@ export class NotificationRepositoryDrizzle implements INotificationRepository {
     });
   }
 
-  markAllAsRead(ctx: TenantContext): Promise<number> {
+  markAllAsRead(ctx: TenantContext): Promise<number[]> {
     return withTenant(this.db, ctx, async (tx) => {
       const updated = await tx
         .update(notifications)
         .set({ lu: true })
         .where(and(eq(notifications.artisanId, ctx.artisanId), eq(notifications.lu, false)))
         .returning({ id: notifications.id });
-      return updated.length;
+      return updated.map((u) => u.id);
     });
   }
 

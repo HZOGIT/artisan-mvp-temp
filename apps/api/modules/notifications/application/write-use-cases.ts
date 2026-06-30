@@ -12,8 +12,8 @@ export async function marquerLue(repo: INotificationRepository, ctx: TenantConte
   if (!ok) throw new NotFoundError("Notification introuvable");
 }
 
-/** Marque toutes les notifications du tenant comme lues ; renvoie le nombre affecté. */
-export function marquerToutesLues(repo: INotificationRepository, ctx: TenantContext): Promise<number> {
+/** Marque toutes les notifications du tenant comme lues ; renvoie les IDs affectés. */
+export function marquerToutesLues(repo: INotificationRepository, ctx: TenantContext): Promise<number[]> {
   return repo.markAllAsRead(ctx);
 }
 

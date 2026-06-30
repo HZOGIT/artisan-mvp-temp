@@ -27,8 +27,9 @@ describe("notifications — use-cases écriture (repo mocké)", () => {
     await expectCrossTenantDenied(() => marquerLue(repo, B, notifA));
   });
 
-  it("marquerToutesLues : compte le tenant + ne touche pas l'autre", async () => {
-    expect(await marquerToutesLues(repo, A)).toBe(2);
+  it("marquerToutesLues : IDs du tenant + ne touche pas l'autre", async () => {
+    const ids = await marquerToutesLues(repo, A);
+    expect(ids).toHaveLength(2);
     expect(await compterNonLues(repo, A)).toBe(0);
     expect(await compterNonLues(repo, B)).toBe(1); // B intact
   });

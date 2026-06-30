@@ -73,16 +73,16 @@ export class FakeNotificationRepository implements INotificationRepository {
     return true;
   }
 
-  async markAllAsRead(ctx: TenantContext): Promise<number> {
-    let count = 0;
+  async markAllAsRead(ctx: TenantContext): Promise<number[]> {
+    const ids: number[] = [];
     this.store = this.store.map((x) => {
       if (x.artisanId === ctx.artisanId && !x.lu) {
-        count++;
+        ids.push(x.id);
         return { ...x, lu: true };
       }
       return x;
     });
-    return count;
+    return ids;
   }
 
   async archive(ctx: TenantContext, id: number): Promise<boolean> {
