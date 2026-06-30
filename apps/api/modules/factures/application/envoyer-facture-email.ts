@@ -144,8 +144,7 @@ export async function envoyerFactureParEmail(
 
   let factureNumero = facture.numero;
   if (facture.statut === "brouillon" && !factureNumero) {
-    factureNumero = await repo.nextNumero(ctx);
-    await repo.assignNumero(ctx, facture.id, factureNumero);
+    factureNumero = await repo.nextNumeroAndAssign(ctx, facture.id);
   }
   const effectiveNumero = factureNumero ?? "";
 

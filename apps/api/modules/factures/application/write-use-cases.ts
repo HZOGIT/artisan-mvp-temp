@@ -383,11 +383,9 @@ export async function creerAvoir(
     throw new ValidationError(`Le montant de l'avoir dépasse le solde disponible (${soldeRestant.toFixed(2)})`);
   }
 
-  const numero = await repo.nextNumeroAvoir(ctx);
   const avoir = await repo.createAvoir(ctx, {
     factureOrigineId,
     clientId: origine.clientId,
-    numero,
     objet: input.objet ?? `Avoir sur facture ${origine.numero ?? ""}`,
     notes: input.notes ?? null,
     conditionsPaiement: origine.conditionsPaiement,
@@ -481,8 +479,7 @@ export async function changerStatutFacture(
     if (!artisan?.siret) throw new ValidationError("Le SIRET de l'artisan est requis pour émettre une facture");
   }
   if (cible === "envoyee" && facture.statut === "brouillon" && !facture.numero) {
-    const numero = await repo.nextNumero(ctx);
-    await repo.assignNumero(ctx, id, numero);
+    await repo.nextNumeroAndAssign(ctx, id);
   }
   /** Insert pa_outbox dans la même tx que setStatut → atomicité réglementaire. */
   const inTx = cible === "envoyee" && outboxInTx

@@ -58,6 +58,11 @@ export interface IDevisRepository {
    * intégrité de la numérotation commerciale (parité legacy `getNextDevisNumber`).
    */
   nextNumero(ctx: TenantContext): Promise<string>;
+  /**
+   * Crée un devis en allouant le numéro atomiquement dans la même transaction (advisory lock +
+   * incrément + INSERT atomiques) — élimine le trou de numérotation entre nextNumero et create.
+   */
+  createWithNumero(ctx: TenantContext, input: Omit<CreateDevisInput, 'numero'>): Promise<Devis>;
   /** true si le client référencé appartient au tenant (anti-IDOR-FK avant rattachement). */
   ownsClient(ctx: TenantContext, clientId: number): Promise<boolean>;
 

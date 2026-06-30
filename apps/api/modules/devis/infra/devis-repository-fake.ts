@@ -146,6 +146,11 @@ export class FakeDevisRepository implements IDevisRepository {
     return `DEV-${String(compteur).padStart(5, "0")}`;
   }
 
+  async createWithNumero(ctx: TenantContext, input: Omit<CreateDevisInput, 'numero'>): Promise<Devis> {
+    const numero = await this.nextNumero(ctx);
+    return this.create(ctx, { ...input, numero });
+  }
+
   async ownsClient(ctx: TenantContext, clientId: number): Promise<boolean> {
     return this.ownedClients.has(`${ctx.artisanId}:${clientId}`);
   }

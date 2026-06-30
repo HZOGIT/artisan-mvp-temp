@@ -189,36 +189,56 @@ export class DevisRepositoryDrizzle implements IDevisRepository {
   }
 
   nextNumero(ctx: TenantContext): Promise<string> {
+    return withTenant(this.db, ctx, (tx) => this.allocateNumeroDevisInTx(tx, ctx));
+  }
+
+  createWithNumero(ctx: TenantContext, input: Omit<CreateDevisInput, 'numero'>): Promise<Devis> {
     return withTenant(this.db, ctx, async (tx) => {
-      /*
-       * Verrou advisory par tenant (namespace 1 = allocation numéro) : sérialise les appels
-       * concurrents pour le même artisan. Libéré automatiquement en fin de transaction.
-       */
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(1, ${ctx.artisanId})`);
-      const [params] = await tx
-        .select({ prefixe: parametresArtisan.prefixeDevis, compteur: parametresArtisan.compteurDevis })
-        .from(parametresArtisan)
-        .where(eq(parametresArtisan.artisanId, ctx.artisanId))
-        .limit(1);
-      const prefixe = params?.prefixe || "DEV";
-      const compteurParam = (params?.compteur ?? 0) + 1;
-
-      const [maxRow] = await tx
-        .select({ maxNum: sql<string | null>`max(${devis.numero})` })
-        .from(devis)
-        .where(eq(devis.artisanId, ctx.artisanId));
-      let maxFromDb = 0;
-      const m = maxRow?.maxNum?.match(/-(\d+)$/);
-      if (m) maxFromDb = parseInt(m[1], 10) + 1;
-
-      const compteur = Math.max(compteurParam, maxFromDb);
-      if (params) {
-        await tx.update(parametresArtisan).set({ compteurDevis: compteur }).where(eq(parametresArtisan.artisanId, ctx.artisanId));
-      } else {
-        await tx.insert(parametresArtisan).values({ artisanId: ctx.artisanId, compteurDevis: compteur });
-      }
-      return `${prefixe}-${String(compteur).padStart(5, "0")}`;
+      const numero = await this.allocateNumeroDevisInTx(tx, ctx);
+      const [row] = await tx
+        .insert(devis)
+        .values({
+          artisanId: ctx.artisanId,
+          clientId: input.clientId,
+          numero,
+          objet: input.objet ?? null,
+          referenceClient: input.referenceClient ?? null,
+          conditionsPaiement: input.conditionsPaiement ?? null,
+          notes: input.notes ?? null,
+          dateValidite: input.dateValidite ?? null,
+          statut: "brouillon",
+          totalHT: "0.00",
+          totalTVA: "0.00",
+          totalTTC: "0.00",
+        })
+        .returning();
+      return toDevis(row);
     });
+  }
+
+  private async allocateNumeroDevisInTx(tx: DbClient, ctx: TenantContext): Promise<string> {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(1, ${ctx.artisanId})`);
+    const [params] = await tx
+      .select({ prefixe: parametresArtisan.prefixeDevis, compteur: parametresArtisan.compteurDevis })
+      .from(parametresArtisan)
+      .where(eq(parametresArtisan.artisanId, ctx.artisanId))
+      .limit(1);
+    const prefixe = params?.prefixe || "DEV";
+    const compteurParam = (params?.compteur ?? 0) + 1;
+    const [maxRow] = await tx
+      .select({ maxNum: sql<string | null>`max(${devis.numero})` })
+      .from(devis)
+      .where(eq(devis.artisanId, ctx.artisanId));
+    let maxFromDb = 0;
+    const m = maxRow?.maxNum?.match(/-(\d+)$/);
+    if (m) maxFromDb = parseInt(m[1], 10) + 1;
+    const compteur = Math.max(compteurParam, maxFromDb);
+    if (params) {
+      await tx.update(parametresArtisan).set({ compteurDevis: compteur }).where(eq(parametresArtisan.artisanId, ctx.artisanId));
+    } else {
+      await tx.insert(parametresArtisan).values({ artisanId: ctx.artisanId, compteurDevis: compteur });
+    }
+    return `${prefixe}-${String(compteur).padStart(5, "0")}`;
   }
 
   ownsClient(ctx: TenantContext, clientId: number): Promise<boolean> {

@@ -55,8 +55,7 @@ function assertLigneValide(designation: string | undefined, prixUnitaireHT?: str
 export async function creerDevis(repo: IDevisRepository, ctx: TenantContext, input: CreerDevisInput): Promise<Devis> {
   /** Anti-IDOR-FK : le client doit appartenir au tenant (ne révèle pas l'existence cross-tenant). */
   if (!(await repo.ownsClient(ctx, input.clientId))) throw new NotFoundError("Client introuvable");
-  const numero = await repo.nextNumero(ctx);
-  const devis = await repo.create(ctx, { ...input, numero });
+  const devis = await repo.createWithNumero(ctx, input);
   devisCounter.inc({ action: "created" });
   return devis;
 }
@@ -180,12 +179,10 @@ export async function dupliquerDevis(
   maintenant: () => Date = () => new Date(),
 ): Promise<Devis> {
   const origine = await getDevisOwned(repo, ctx, devisId);
-  const numero = await repo.nextNumero(ctx);
   const dateValidite = new Date(maintenant());
   dateValidite.setDate(dateValidite.getDate() + 30);
-  const copie = await repo.create(ctx, {
+  const copie = await repo.createWithNumero(ctx, {
     clientId: origine.clientId,
-    numero,
     objet: origine.objet ? `${origine.objet} (copie)` : "(copie)",
     referenceClient: origine.referenceClient,
     conditionsPaiement: origine.conditionsPaiement,

@@ -318,6 +318,12 @@ export class FakeFactureRepository implements IFactureRepository {
     );
   }
 
+  async nextNumeroAndAssign(ctx: TenantContext, factureId: number): Promise<string> {
+    const numero = await this.nextNumero(ctx);
+    await this.assignNumero(ctx, factureId, numero);
+    return numero;
+  }
+
   async nextNumeroAvoir(ctx: TenantContext): Promise<string> {
     const compteurParam = (this.avoirCompteur.get(ctx.artisanId) ?? 0) + 1;
     let maxFromDb = 0;
@@ -345,6 +351,7 @@ export class FakeFactureRepository implements IFactureRepository {
 
   async createAvoir(ctx: TenantContext, input: CreateAvoirInput): Promise<Facture | null> {
     if (!(await this.getById(ctx, input.factureOrigineId))) return null;
+    const numero = input.numero ?? (await this.nextNumeroAvoir(ctx));
     const totaux = calculerTotaux(input.lignes);
     const now = new Date();
     const avoir: Facture = {
@@ -352,7 +359,7 @@ export class FakeFactureRepository implements IFactureRepository {
       artisanId: ctx.artisanId,
       clientId: input.clientId,
       devisId: null,
-      numero: input.numero,
+      numero,
       dateFacture: now,
       dateEcheance: null,
       statut: "brouillon",

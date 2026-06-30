@@ -49,6 +49,12 @@ export interface IFactureRepository {
   nextNumero(ctx: TenantContext): Promise<string>;
   /** Assigne le numéro définitif à une facture (à l'émission brouillon→envoyee). */
   assignNumero(ctx: TenantContext, id: number, numero: string): Promise<void>;
+  /**
+   * Alloue le prochain numéro de facture ET l'assigne dans une seule transaction (advisory lock
+   * + incrément + UPDATE atomiques) — élimine le trou de numérotation FEC entre nextNumero et
+   * assignNumero.
+   */
+  nextNumeroAndAssign(ctx: TenantContext, factureId: number): Promise<string>;
   /** Prochain numéro d'AVOIR (préfixe + compteur dédiés, parité `getNextAvoirNumber`). */
   nextNumeroAvoir(ctx: TenantContext): Promise<string>;
   /** Avoirs émis sur une facture d'origine (typeDocument='avoir'), scopés tenant. */
@@ -191,7 +197,8 @@ export interface CreateFromDevisInput {
 export interface CreateAvoirInput {
   readonly factureOrigineId: number;
   readonly clientId: number;
-  readonly numero: string;
+  /** Omis → numéro alloué atomiquement par `createAvoir` (advisory lock + incrément dans la même TX). */
+  readonly numero?: string;
   readonly objet: string | null;
   readonly notes: string | null;
   readonly conditionsPaiement: string | null;

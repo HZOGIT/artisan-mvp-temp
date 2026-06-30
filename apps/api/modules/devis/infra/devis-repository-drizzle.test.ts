@@ -142,6 +142,16 @@ describe.skipIf(!URL)("DevisRepositoryDrizzle (PG, RLS + scope tenant + lignes)"
     expect(rowsB.some((r) => r.numero === `DEV-LACC-${sfx}`)).toBe(false);
   });
 
+  it("createWithNumero : atomique — 2 devis concurrents obtiennent des numéros distincts et consécutifs (anti-trou)", async () => {
+    const [d1, d2] = await Promise.all([
+      repo.createWithNumero(ctx(A), { clientId: clientA }),
+      repo.createWithNumero(ctx(A), { clientId: clientA }),
+    ]);
+    expect(d1.numero).not.toBe(d2.numero);
+    const nums = [d1, d2].map((d) => parseInt(d.numero.match(/-(\d+)$/)![1], 10)).sort((a, b) => a - b);
+    expect(nums[1] - nums[0]).toBe(1);
+  });
+
   it("addLigne avec remise 20% : montantHT = pu × q × 0.8", async () => {
     const d = await repo.create(ctx(A), { clientId: clientA, numero: "DEV-REMISE-01" });
     const l = await repo.addLigne(ctx(A), d.id, {

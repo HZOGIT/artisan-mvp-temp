@@ -417,32 +417,39 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
   }
 
   nextNumeroAvoir(ctx: TenantContext): Promise<string> {
+    return withTenant(this.db, ctx, (tx) => this.allocateNumeroAvoirInTx(tx, ctx));
+  }
+
+  nextNumeroAndAssign(ctx: TenantContext, factureId: number): Promise<string> {
     return withTenant(this.db, ctx, async (tx) => {
-      /** Verrou advisory tenant (namespace 1) — sérialise l'allocation du numéro avoir. */
+      /** Verrou advisory tenant (namespace 1) — sérialise l'allocation numéro + assignation dans la même TX. */
       await tx.execute(sql`SELECT pg_advisory_xact_lock(1, ${ctx.artisanId})`);
       const [params] = await tx
-        .select({ prefixe: parametresArtisan.prefixeAvoir, compteur: parametresArtisan.compteurAvoir })
+        .select({ prefixe: parametresArtisan.prefixeFacture, compteur: parametresArtisan.compteurFacture })
         .from(parametresArtisan)
         .where(eq(parametresArtisan.artisanId, ctx.artisanId))
         .limit(1);
-      const prefixe = params?.prefixe || "AV";
+      const prefixe = params?.prefixe || "FAC";
       const compteurParam = (params?.compteur ?? 0) + 1;
-
       const [maxRow] = await tx
         .select({ maxNum: sql<string | null>`max(${factures.numero})` })
         .from(factures)
-        .where(and(eq(factures.artisanId, ctx.artisanId), eq(factures.typeDocument, "avoir")));
+        .where(eq(factures.artisanId, ctx.artisanId));
       let maxFromDb = 0;
       const m = maxRow?.maxNum?.match(/-(\d+)$/);
       if (m) maxFromDb = parseInt(m[1], 10) + 1;
-
       const compteur = Math.max(compteurParam, maxFromDb);
       if (params) {
-        await tx.update(parametresArtisan).set({ compteurAvoir: compteur }).where(eq(parametresArtisan.artisanId, ctx.artisanId));
+        await tx.update(parametresArtisan).set({ compteurFacture: compteur }).where(eq(parametresArtisan.artisanId, ctx.artisanId));
       } else {
-        await tx.insert(parametresArtisan).values({ artisanId: ctx.artisanId, compteurAvoir: compteur });
+        await tx.insert(parametresArtisan).values({ artisanId: ctx.artisanId, compteurFacture: compteur });
       }
-      return `${prefixe}-${String(compteur).padStart(5, "0")}`;
+      const numero = `${prefixe}-${String(compteur).padStart(5, "0")}`;
+      await tx
+        .update(factures)
+        .set({ numero, updatedAt: new Date() })
+        .where(and(eq(factures.id, factureId), eq(factures.artisanId, ctx.artisanId)));
+      return numero;
     });
   }
 
@@ -483,13 +490,14 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
     return withTenant(this.db, ctx, async (tx) => {
       /** La facture d'origine doit appartenir au tenant (anti-IDOR-FK). */
       if (!(await this.ownsFacture(tx, ctx, input.factureOrigineId))) return null;
+      const numero = input.numero ?? (await this.allocateNumeroAvoirInTx(tx, ctx));
       const totaux = calculerTotaux(input.lignes);
       const [avoir] = await tx
         .insert(factures)
         .values({
           artisanId: ctx.artisanId,
           clientId: input.clientId,
-          numero: input.numero,
+          numero,
           typeDocument: "avoir",
           factureOrigineId: input.factureOrigineId,
           statut: "brouillon",
@@ -745,6 +753,32 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
 
   withDb(db: DbClient): FactureRepositoryDrizzle {
     return new FactureRepositoryDrizzle(db);
+  }
+
+  /** Alloue le prochain numéro d'avoir dans la transaction courante (advisory lock + incrément). */
+  private async allocateNumeroAvoirInTx(tx: DbClient, ctx: TenantContext): Promise<string> {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(1, ${ctx.artisanId})`);
+    const [params] = await tx
+      .select({ prefixe: parametresArtisan.prefixeAvoir, compteur: parametresArtisan.compteurAvoir })
+      .from(parametresArtisan)
+      .where(eq(parametresArtisan.artisanId, ctx.artisanId))
+      .limit(1);
+    const prefixe = params?.prefixe || "AV";
+    const compteurParam = (params?.compteur ?? 0) + 1;
+    const [maxRow] = await tx
+      .select({ maxNum: sql<string | null>`max(${factures.numero})` })
+      .from(factures)
+      .where(and(eq(factures.artisanId, ctx.artisanId), eq(factures.typeDocument, "avoir")));
+    let maxFromDb = 0;
+    const m = maxRow?.maxNum?.match(/-(\d+)$/);
+    if (m) maxFromDb = parseInt(m[1], 10) + 1;
+    const compteur = Math.max(compteurParam, maxFromDb);
+    if (params) {
+      await tx.update(parametresArtisan).set({ compteurAvoir: compteur }).where(eq(parametresArtisan.artisanId, ctx.artisanId));
+    } else {
+      await tx.insert(parametresArtisan).values({ artisanId: ctx.artisanId, compteurAvoir: compteur });
+    }
+    return `${prefixe}-${String(compteur).padStart(5, "0")}`;
   }
 
   /** La facture appartient-elle au tenant ? (RLS + filtre artisanId) */
