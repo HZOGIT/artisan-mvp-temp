@@ -288,6 +288,11 @@ export async function marquerFacturePayee(
     /** préservé */
     modePaiement: facture.modePaiement,
     statut: "payee",
+    reglement: {
+      montant: input.montantPaye,
+      date: datePaiement,
+      mode: toReglementMode(facture.modePaiement),
+    },
   });
   if (!updated) throw new NotFoundError("Facture introuvable");
   factureCounter.inc({ action: "paid" });
