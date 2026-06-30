@@ -267,6 +267,13 @@
       "when": 1751292000000,
       "tag": "20260630120000_normaliser-statut-paiement",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1751295600000,
+      "tag": "20260630130000_stock-check-non-negatif-fk-mouvements",
+      "breakpoints": true
     }
   ]
 }
