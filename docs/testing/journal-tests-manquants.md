@@ -1,4 +1,4 @@
-# Journal — boucle autonome « tests manquants » (new-stack `src/`)
+# Journal — boucle autonome « tests manquants » (new-stack `apps/api/`)
 
 > **État persistant de la boucle.** La context window est longue : ce fichier est la **mémoire de
 > travail** relue à chaque itération (cron 10 min). Issu du spike OPE-316.
@@ -42,20 +42,20 @@ git fetch origin && git rebase origin/staging      # se resynchroniser (coordina
    **niveau de colonne manquant le plus prioritaire** (L2 RLS / L3 router / L1 / L4). Vérifier qu'aucun
    autre agent ne l'a prise (git log récent, bus). Ne PAS recréer un niveau déjà couvert.
 2. **Écrire le test du niveau visé**, patterns canon :
-   - L1 use-case → `*.test.ts` + **fakes**. Réf : `src/modules/devis/application/write-use-cases.test.ts`.
-   - L2 repo Drizzle → `*-drizzle.test.ts` + RLS + `expectCrossTenantDenied`. Réf : `src/modules/devis/infra/devis-repository-drizzle.test.ts`.
-   - L3 router tRPC → `*.router.test.ts` via `injectTrpc`. Réf : `src/modules/devis/interface/trpc/devis.router.test.ts`. (Route HTTP → `app.inject`, réf : `src/interface/http/paiement-route.test.ts`.)
+   - L1 use-case → `*.test.ts` + **fakes**. Réf : `apps/api/modules/devis/application/write-use-cases.test.ts`.
+   - L2 repo Drizzle → `*-drizzle.test.ts` + RLS + `expectCrossTenantDenied`. Réf : `apps/api/modules/devis/infra/devis-repository-drizzle.test.ts`.
+   - L3 router tRPC → `*.router.test.ts` via `injectTrpc`. Réf : `apps/api/modules/devis/interface/trpc/devis.router.test.ts`. (Route HTTP → `app.inject`, réf : `apps/api/interface/http/paiement-route.test.ts`.)
    - L4 navigateur → `scripts/e2e/*.journey.mjs` (chemins critiques). Réf : `scripts/e2e/devis-to-paiement.journey.mjs`.
-3. **Exécuter** : `pnpm exec tsc -p tsconfig.src.json` (rapide, optionnel) + `pnpm exec vitest run <fichier>`.
+3. **Exécuter** : `tsc -p tsconfig.api.json --noEmit` (rapide, optionnel) + `pnpm exec vitest run <fichier>`.
    - Rouge à cause du test → corriger le test.
-   - Rouge à cause d'un **vrai bug** dans `src/` → fix **minimal**, le signaler (tag `fix`), et **déployer**.
+   - Rouge à cause d'un **vrai bug** dans `apps/api/` → fix **minimal**, le signaler (tag `fix`), et **déployer**.
 4. **Mettre à jour ce journal** : cocher la cible, fixer la suivante.
 5. **Diffuser** : `./scripts/testing-loop/broadcast.sh <tag> "<titre>" "<message>"` (ajoute aussi la ligne
    de log au journal — d'où l'ordre : broadcast AVANT le commit, pour éviter un arbre sale au prochain rebase).
 6. **Commit UNIQUE** (scope strict : `git add <mes test(s)> docs/testing/journal-tests-manquants.md`,
    **jamais** `-A`) sur `staging`, puis push + RE-VÉRIFIER `origin/staging`.
    Message : `test(<module>): <quoi>` + `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
-7. **Déployer** sur staging **uniquement si un fix `src/` a été livré** : `./scripts/deploy-staging-newstack.sh`.
+7. **Déployer** sur staging **uniquement si un fix `apps/api/` a été livré** : `./scripts/deploy-backend.sh`.
    (Un ajout de test pur ne change pas le runtime → pas de déploiement.)
 8. **Créer l'issue Linear** enfant de OPE-318 (« test(<module>): … », Done).
 

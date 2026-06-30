@@ -1,7 +1,9 @@
 # OPE-295 — Investigation : Archivage 10 ans probant
 
+> **⚠️ TRANCHÉ — OUI (OPE-899, 2026-06-30). SuperPDP archive 10 ans. SAE tiers non requis. Investigation clôturée. → Voir `ope-295-archivage-superpdp-findings.md`.**
+
 **Date** : 2026-06-27  
-**Status** : En cours  
+**Status** : Clôturé  
 **Issue** : [OPE-295](https://linear.app/operioz/issue/OPE-295)
 
 ---

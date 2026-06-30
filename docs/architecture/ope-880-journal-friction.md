@@ -1,7 +1,6 @@
 # OPE-880 — Éliminer la friction `drizzle/meta/_journal.json` en vague de migrations parallèles
 
-> **Statut : SPIKE — recherche + reco + POC isolé. Aucune implémentation prod.**
-> Reco soumise à validation humaine (cf. mémoire `awaiting-human-validation-gate`) avant toute mise en œuvre.
+> **IMPLÉMENTÉ — OPE-891 (commit a5c63525, 2026-06-30). Merge driver actif + gate verify intégré au reviewer-agent.**
 > Auteur : session `spike-journal-friction` (opus). Date : 2026-06-30.
 
 ## TL;DR
