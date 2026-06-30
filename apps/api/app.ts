@@ -585,6 +585,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       await getDbHandle().db.execute(sql`SELECT 1`);
       return { status: "ok" as const };
     } catch (err: unknown) {
+      /* ponytail: best-effort — DB down → 503, erreur dans corps de réponse */
       reply.code(503);
       return { status: "database_down" as const, error: err instanceof Error ? err.message : String(err) };
     }

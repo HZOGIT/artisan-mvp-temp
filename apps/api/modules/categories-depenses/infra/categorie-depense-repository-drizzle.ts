@@ -112,6 +112,7 @@ export class CategorieDepenseRepositoryDrizzle implements ICategorieDepenseRepos
           .returning();
         return toCategorie(row);
       } catch (err) {
+        /* ponytail: best-effort — relancerSiDoublon rethrow si doublon, sinon erreur propagée */
         return relancerSiDoublon(err);
       }
     });
@@ -136,6 +137,7 @@ export class CategorieDepenseRepositoryDrizzle implements ICategorieDepenseRepos
           .returning();
         return row ? toCategorie(row) : null;
       } catch (err) {
+        /* ponytail: best-effort — relancerSiDoublon rethrow si doublon, sinon erreur propagée */
         return relancerSiDoublon(err);
       }
     });

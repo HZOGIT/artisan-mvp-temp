@@ -35,7 +35,7 @@ export function registerVoiceDebugRoute(app: FastifyInstance, deps: VoiceDebugDe
         log(`[VoiceDebug] ${sanitizeLogLine(body.msg)}`);
       }
     } catch {
-      /* fire-and-forget : ne jamais échouer */
+      /* ponytail: best-effort — fire-and-forget, ne jamais échouer */
     }
     return reply.send({ ok: true });
   });

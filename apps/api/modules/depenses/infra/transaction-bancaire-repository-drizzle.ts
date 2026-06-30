@@ -86,7 +86,7 @@ export class TransactionBancaireRepositoryDrizzle implements ITransactionBancair
           });
           nbImportees++;
         } catch {
-          /* ligne en erreur ignorée (parité) */
+          /* ponytail: best-effort — ligne en erreur ignorée (parité) */
         }
       }
       await tx.update(relevesBancaires).set({ nb_importees: nbImportees, statut: "termine" }).where(eq(relevesBancaires.id, releveId));

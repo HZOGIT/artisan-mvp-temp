@@ -59,6 +59,7 @@ export async function processStripeWebhook(
   try {
     event = await deps.stripe.constructEvent(input.rawBody, input.signature, deps.webhookSecret);
   } catch {
+    /* ponytail: best-effort — signature invalide → 400 */
     return { http: 400, body: { error: "Webhook signature verification failed" } };
   }
 
@@ -130,7 +131,7 @@ async function handleCheckoutCompleted(deps: StripeWebhookDeps, session: Record<
     factureId: resolved.factureId,
     stripePaymentIntentId: session.payment_intent ? String(session.payment_intent) : "",
   });
-  await deps.genererEcrituresFacture?.(resolved.artisanId, resolved.factureId).catch(() => {});
+  await deps.genererEcrituresFacture?.(resolved.artisanId, resolved.factureId).catch(() => { /* ponytail: best-effort — écritures diff (non-bloquant pour le paiement) */ });
   stripePaymentCounter.inc({ status: "succeeded" });
   deps.log?.info({ event: "stripe_checkout_completed", artisanId: resolved.artisanId, factureId: resolved.factureId }, `Paiement portail complété (artisan ${resolved.artisanId})`);
   try {

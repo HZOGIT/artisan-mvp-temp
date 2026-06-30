@@ -84,6 +84,7 @@ export async function runConnectReconciler(
         try {
           acct = await stripe.retrieveConnectAccount(row.account_id);
         } catch {
+          /* ponytail: best-effort — Stripe API échec pour ce compte, on skip */
           continue;
         }
         const derivedStatus = deriveConnectStatus(acct.charges_enabled, acct.details_submitted);

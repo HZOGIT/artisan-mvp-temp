@@ -92,8 +92,9 @@ export async function envoyerMessageClients(
           entiteType: "client",
           entiteId: client.id,
         }),
-      ).catch(() => { /* ignored */ });
+      ).catch(() => { /* ponytail: best-effort — emailLogWriter non-critique */ });
     } catch {
+      /* ponytail: best-effort — erreur comptée dans errors, boucle continue */
       errors++;
     }
   }

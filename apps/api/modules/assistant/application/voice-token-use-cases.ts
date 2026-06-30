@@ -56,6 +56,7 @@ export async function mintVoiceToken(deps: VoiceTokenDeps, ctx: TenantContext, i
     try {
       threadId = await deps.threadWriter.createThread(ctx, "Conversation vocale");
     } catch {
+      /* ponytail: best-effort — thread creation non critique */
       threadId = 0;
     }
   }
@@ -78,7 +79,7 @@ export async function mintVoiceToken(deps: VoiceTokenDeps, ctx: TenantContext, i
       const owned = await deps.threadsRepo.getThreadOwned(ctx, threadId);
       if (owned) history = await deps.threadsRepo.listMessages(ctx, threadId, HISTORY_LIMIT);
     } catch {
-      /* history optional */
+      /* ponytail: best-effort — historique optionnel */
     }
   }
 

@@ -27,6 +27,7 @@ export async function autoGenererFacturesContrats(
         });
         generees++;
       } catch (e) {
+        /* ponytail: best-effort — ConflictError normal (continue), autre erreur comptée */
         if (e instanceof ConflictError) continue;
         erreurs++;
       }

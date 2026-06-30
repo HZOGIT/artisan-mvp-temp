@@ -51,6 +51,7 @@ export function registerUploadPieceJointeRoute(app: FastifyInstance, deps: Uploa
           try {
             fileBuffer = await part.toBuffer();
           } catch (_) {
+            /* ponytail: best-effort — toBuffer overflow → 400 */
             return reply.code(400).send({ error: "Fichier trop volumineux (max 10MB)" });
           }
           if ((part as unknown as { file: { truncated: boolean } }).file.truncated) {

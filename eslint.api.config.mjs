@@ -8,6 +8,7 @@ import noDirectEnvAccess from "./eslint/no-direct-env-access.mjs";
 import requireZodInput from "./eslint/require-zod-input.mjs";
 import requireLlmTracking from "./eslint/require-llm-tracking.mjs";
 import eventsOutboxConvention from "./eslint/events-outbox-convention.mjs";
+import noSilentCatch from "./eslint/no-silent-catch.mjs";
 
 export default tseslint.config(
   {
@@ -24,6 +25,7 @@ export default tseslint.config(
         "require-zod-input": requireZodInput,
         "require-llm-tracking": requireLlmTracking,
         "events-outbox-convention": eventsOutboxConvention,
+        "no-silent-catch": noSilentCatch,
       },
     },
   },
@@ -68,6 +70,7 @@ export default tseslint.config(
     "local/require-zod-input": "warn",
     "local/require-llm-tracking": "error",
     "local/events-outbox-convention": "error",
+    "local/no-silent-catch": "error",
   },
   },
   {

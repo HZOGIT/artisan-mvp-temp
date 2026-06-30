@@ -71,6 +71,7 @@ async function loadSdk(secretKey: string, factory?: StripeSdkFactory): Promise<S
     const mod = (await import(STRIPE_MODULE)) as { default: new (key: string) => StripeWebhookSDK };
     return new mod.default(secretKey);
   } catch {
+    /* ponytail: best-effort — module Stripe indisponible → null */
     return null;
   }
 }

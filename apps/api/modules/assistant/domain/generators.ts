@@ -40,6 +40,7 @@ export function parseRelances(text: string): unknown[] {
     const data = JSON.parse(match[0]);
     return Array.isArray(data) ? data : [{ error: text }];
   } catch {
+    /* ponytail: best-effort — JSON LLM malformé, fallback */
     return [{ error: text }];
   }
 }
@@ -64,6 +65,7 @@ export function parseDevisLignes(text: string): unknown[] {
     const data = JSON.parse(match[0]);
     return Array.isArray(data) ? data : [];
   } catch {
+    /* ponytail: best-effort — JSON LLM malformé, fallback */
     return [];
   }
 }

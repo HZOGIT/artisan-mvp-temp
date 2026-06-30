@@ -24,6 +24,7 @@ export async function autoGenererInterventionsContrats(
         await creerInterventionContratAvecAvance(repo, ctx, contrat.id, () => now);
         generees++;
       } catch (e) {
+        /* ponytail: best-effort — ConflictError normal (continue), autre erreur comptée */
         if (e instanceof ConflictError) continue;
         erreurs++;
       }

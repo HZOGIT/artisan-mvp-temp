@@ -148,6 +148,7 @@ function getImageDimensions(buf: Buffer, format: ImgFormat): { width: number; he
     }
     return null;
   } catch {
+    /* ponytail: best-effort — PDF invalide → null */
     return null;
   }
 }
@@ -185,7 +186,7 @@ function renderLogo(doc: jsPDF, artisan: Artisan): boolean {
       }
     }
   } catch {
-    /** Fall back to max box; addImage will still receive valid base64. */
+    /* ponytail: best-effort — dimensions image inconnues, fallback sur max-box */
   }
 
   /** Center vertically in the 40mm band. */
@@ -1313,7 +1314,7 @@ export function generateInterventionPDF(data: PDFInterventionData): Buffer {
       const fmt = /jpe?g/i.test(sig) ? "JPEG" : "PNG";
       doc.addImage(sig, fmt, MARGIN, y + 8, 60, 25);
     } catch (e) {
-      /** signature illisible → on n'embarque pas l'image, le cadre reste */
+      /* ponytail: best-effort — signature illisible → cadre reste sans image */
     }
   }
   doc.setDrawColor(...DIVIDER);

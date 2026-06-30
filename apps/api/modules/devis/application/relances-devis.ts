@@ -74,9 +74,10 @@ async function envoyerEtEnregistrer(
   try {
     await deps.email.send({ to: client.email, subject: emailContent.subject, body: emailContent.body, fromName: emailContent.fromName, replyTo: emailContent.replyTo });
     if (deps.emailLogWriter) {
-      await deps.emailLogWriter.create({ artisanId: ctx.artisanId, destinataire: client.email, sujet: emailContent.subject, type: "relance_devis", entiteType: "devis", entiteId: devisId }).catch(() => {});
+      await deps.emailLogWriter.create({ artisanId: ctx.artisanId, destinataire: client.email, sujet: emailContent.subject, type: "relance_devis", entiteType: "devis", entiteId: devisId }).catch(() => { /* ponytail: best-effort — emailLogWriter non-critique */ });
     }
   } catch {
+    /* ponytail: best-effort — email relance échoué, ok = false retourné au caller */
     ok = false;
   }
   await deps.relanceRepo.create(ctx, {

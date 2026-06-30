@@ -85,6 +85,7 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte autour) :
   try {
     data = JSON.parse(jsonMatch[0]);
   } catch {
+    /* ponytail: best-effort — JSON LLM malformé, fallback vide */
     return [];
   }
   const raw = Array.isArray(data.articles) ? (data.articles as Array<Record<string, unknown>>) : [];

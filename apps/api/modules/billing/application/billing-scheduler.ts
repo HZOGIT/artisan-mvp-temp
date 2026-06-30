@@ -274,6 +274,7 @@ export async function chargeOffSessionForCycle(
       await deps.repo.updateCycleStatus(cycleId, { status: "processing", failedAt: null, nextRetryAt: null });
     }
   } catch (err) {
+    /* ponytail: best-effort — échec traité via handleDunning (erreur dans dunning payload) */
     if (chargeSucceeded) return;
     const failureMessage = err instanceof Error ? err.message : String(err);
     await handleDunning(deps, { cycleId, subscriptionId, artisanId, now, newAttemptCount, attempt, failureMessage });

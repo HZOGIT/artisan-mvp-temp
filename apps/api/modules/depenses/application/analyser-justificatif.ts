@@ -70,12 +70,14 @@ export async function analyserJustificatif(
       try {
         data = JSON.parse(jsonMatch[0]);
       } catch {
+        /* ponytail: best-effort — JSON LLM malformé, fallback vide */
         data = {};
       }
     }
     if (input.depenseId != null) await deps.depenseRepo.setOcr(ctx, input.depenseId, data);
     return { success: true, data };
   } catch (e) {
+    /* ponytail: best-effort — erreur retournée dans { success: false, error: msg } */
     return { success: false, data: {}, error: `OCR IA echouee : ${sanitizeIaError(e)}` };
   }
 }

@@ -35,6 +35,7 @@ export function registerVoiceTokenRoute(app: FastifyInstance, deps: VoiceTokenRo
       req.log.info({ artisanId: auth.artisanId }, 'voice_token_issued');
       return reply.send(out);
     } catch (e) {
+      req.log.warn({ err: e }, "voice_token_error");
       if (e instanceof RealtimeTokenError) return reply.code(502).send({ error: "Impossible de créer le token vocal" });
       return reply.code(500).send({ error: "Erreur serveur" });
     }

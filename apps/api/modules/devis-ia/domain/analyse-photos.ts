@@ -78,6 +78,7 @@ export function parseAnalyseResponse(responseText: string): TravailIA[] | null {
   try {
     parsed = JSON.parse(jsonMatch[0]);
   } catch {
+    /* ponytail: best-effort — JSON LLM malformé, fallback vide */
     return null;
   }
   const travaux = (parsed as { travaux?: unknown })?.travaux;

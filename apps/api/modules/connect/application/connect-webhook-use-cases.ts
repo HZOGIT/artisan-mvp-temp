@@ -31,6 +31,7 @@ export async function processConnectWebhook(
   try {
     event = await deps.stripe.constructEvent(input.rawBody, input.signature, deps.webhookSecret);
   } catch {
+    /* ponytail: best-effort — signature invalide → 400 */
     return { http: 400, body: { error: "Webhook signature verification failed" } };
   }
 

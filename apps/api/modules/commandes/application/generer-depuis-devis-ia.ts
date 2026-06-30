@@ -79,13 +79,13 @@ export async function genererCommandeDepuisDevisIA(
   try {
     stocks = await deps.stockRepo.list(ctx);
   } catch {
-    /* ok */
+    /* ponytail: best-effort — stocks optionnels */
   }
   let articles: Awaited<ReturnType<IArticleRepository["list"]>> = [];
   try {
     articles = await deps.articleRepo.list(ctx);
   } catch {
-    /* ok */
+    /* ponytail: best-effort — articles optionnels */
   }
 
   const lignesPourPrompt = lignesDevis.map((l) => ({
@@ -123,6 +123,7 @@ Réponds UNIQUEMENT en JSON pur :
   try {
     data = JSON.parse(jsonMatch[0]);
   } catch {
+    /* ponytail: best-effort — JSON LLM malformé, fallback vide */
     return { lignes: [], notes: "", devisNumero: devis.numero };
   }
 

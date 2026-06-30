@@ -57,6 +57,7 @@ export class StripeAdapter implements StripePort {
         : (session.payment_intent as { id: string } | null)?.id ?? null;
       return { paymentStatus: session.payment_status, paymentIntentId: piId, sessionStatus: session.status };
     } catch {
+      /* ponytail: best-effort — Stripe session invalide → null */
       return null;
     }
   }

@@ -20,6 +20,7 @@ export async function runJob(
     await repo.markDone(claimed.id, completedAt);
     return "done";
   } catch (err) {
+    /* ponytail: best-effort — erreur stockée via markFailed, observable dans la BDD */
     const msg = err instanceof Error ? err.message : String(err);
     await repo.markFailed(claimed.id, completedAt, msg);
     return "failed";

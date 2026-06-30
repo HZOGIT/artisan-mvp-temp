@@ -20,6 +20,7 @@ export function verifyUnsubscribeToken(token: string, secret: string): string | 
   try {
     email = Buffer.from(emailB64, "base64url").toString("utf8");
   } catch {
+    /* ponytail: best-effort — base64 invalide → null */
     return null;
   }
   if (!email) return null;
@@ -27,6 +28,7 @@ export function verifyUnsubscribeToken(token: string, secret: string): string | 
   try {
     if (!timingSafeEqual(Buffer.from(providedSig), Buffer.from(expectedSig))) return null;
   } catch {
+    /* ponytail: best-effort — timingSafeEqual impossible → null */
     return null;
   }
   return email;

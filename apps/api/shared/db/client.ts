@@ -18,7 +18,7 @@ export interface DbHandle {
 export function createDbClient(connectionString: string, max = 10): DbHandle {
   const pool = new Pool({ connectionString, max });
   pool.on("connect", (client) => {
-    client.query("SET TIME ZONE 'Europe/Paris'").catch(() => {});
+    client.query("SET TIME ZONE 'Europe/Paris'").catch(() => { /* ponytail: best-effort — connexion utilisable même sans timezone */ });
   });
   const db = drizzle(pool);
   return { db, pool, close: () => pool.end() };
