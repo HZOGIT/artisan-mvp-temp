@@ -9,6 +9,7 @@ import type { IModeleEmailRepository } from "../../modeles-email/application/mod
 import { buildModeleEmail } from "../../modeles-email/domain/render";
 import type { IEmailOptoutRepository } from "../../emails/application/email-optout-repository";
 import type { IEmailLogWriter } from "../../emails/application/email-log-writer";
+import type { PortalTokenReader } from "./envoyer-facture-email";
 
 /*
  * Relance d'une facture impayée par email (parité fonctionnelle du legacy `execEnvoyerRelance`) :
@@ -26,6 +27,10 @@ export interface RelanceMailingDeps {
   /** Optionnel : si présent, vérifie l'opt-out RGPD avant envoi. */
   readonly optoutRepo?: IEmailOptoutRepository;
   readonly emailLogWriter?: IEmailLogWriter;
+  /** URL publique du frontend (ex. https://staging.operioz.com) pour construire le lien portail. */
+  readonly appUrl?: string;
+  /** Optionnel : lecteur d'accès portail client (lien « Payer en ligne »). */
+  readonly portalTokenReader?: PortalTokenReader;
 }
 
 export interface EnvoyerRelanceInput {
@@ -64,8 +69,9 @@ export function buildRelanceEmail(params: {
   joursRetard: number;
   niveau?: number;
   customMessage?: string | null;
+  portalUrl?: string | null;
 }): { subject: string; body: string } {
-  const { factureNumero, totalTTC, joursRetard, niveau = 1 } = params;
+  const { factureNumero, totalTTC, joursRetard, niveau = 1, portalUrl } = params;
   const artisanName = escapeHtml(params.artisanName);
   const clientName = escapeHtml(params.clientName);
   let subject: string;
@@ -104,7 +110,10 @@ export function buildRelanceEmail(params: {
             </td></tr>
           </table>
         </td></tr>
-        <tr><td style="padding:0 40px 36px 40px;">
+        ${portalUrl ? `<tr><td style="padding:0 40px 28px 40px;text-align:center;">
+          <a href="${portalUrl}" style="display:inline-block;background-color:#dc2626;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;padding:14px 32px;border-radius:6px;">Payer en ligne</a>
+        </td></tr>` : ""}
+        <tr><td style="padding:${portalUrl ? "0" : "0"} 40px 36px 40px;">
           ${niveau >= 3 ? `<p style="margin:0 0 16px 0;font-size:15px;color:#dc2626;line-height:1.6;font-weight:600;">Mise en demeure</p>
           <p style="margin:0 0 14px 0;font-size:14px;color:#374151;line-height:1.6;">Faute de règlement dans un délai de 8 jours à compter de la présente mise en demeure, nous serons contraints d'engager une action en justice conformément aux dispositions du Code de commerce. Vous serez alors redevable de pénalités de retard et d'une indemnité forfaitaire de 40 € (article L. 441-10 du Code de commerce).</p>` : `<p style="margin:0 0 14px 0;font-size:15px;color:#374151;line-height:1.6;">Nous vous serions reconnaissants de bien vouloir procéder au règlement dans les meilleurs délais.</p>`}
           <p style="margin:0 0 4px 0;font-size:15px;color:#374151;">Cordialement,</p>
@@ -156,6 +165,12 @@ export async function envoyerRelanceFacture(
   const joursRetard = joursDeRetard(facture.dateEcheance, Date.now());
   const niveau = (facture.nombreRelances ?? 0) + 1;
 
+  let portalUrl: string | null = null;
+  if (deps.portalTokenReader && deps.appUrl) {
+    const ps = await deps.portalTokenReader.getStatusByClientId(ctx, facture.clientId);
+    if (ps?.actif) portalUrl = `${deps.appUrl}/portail/${ps.token}`;
+  }
+
   const modele = deps.modeleEmailRepo ? await deps.modeleEmailRepo.getDefaultByType(ctx, "rappel_paiement") : null;
   const { subject, body } = modele
     ? buildModeleEmail(
@@ -167,6 +182,7 @@ export async function envoyerRelanceFacture(
           montant_ttc: totalTTC,
           jours_retard: String(joursRetard),
           nom_entreprise: artisanName,
+          lien_paiement: portalUrl ?? "",
         },
         input.customMessage ?? null,
       )
@@ -178,6 +194,7 @@ export async function envoyerRelanceFacture(
         joursRetard,
         niveau,
         customMessage: input.customMessage ?? null,
+        portalUrl,
       });
 
   if (deps.optoutRepo && await deps.optoutRepo.isOptedOut(client.email)) {

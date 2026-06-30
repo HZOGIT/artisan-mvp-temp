@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { FakeFactureRepository } from "../infra/facture-repository-fake";
 import { buildRelanceEmail, joursDeRetard, envoyerRelanceFacture, type RelanceMailingDeps } from "./envoyer-relance-facture";
+import type { PortalTokenReader } from "./envoyer-facture-email";
 import { FakeEmailPort, FakeRateLimiter } from "../../../shared/ports";
 import { NotFoundError, ValidationError, TooManyRequestsError } from "../../../shared/errors";
 import { expectCrossTenantDenied } from "../../../shared/testing";
@@ -36,7 +37,29 @@ async function seedFacture(
   return f;
 }
 
+function fakePortalReader(token: string | null): PortalTokenReader {
+  return { getStatusByClientId: async () => (token ? { actif: true, token } : null) };
+}
+
 describe("buildRelanceEmail (pur)", () => {
+  it("OPE-975 — affiche le bouton 'Payer en ligne' quand portalUrl fourni", () => {
+    const { body } = buildRelanceEmail({
+      artisanName: "ACME",
+      clientName: "Marie Durand",
+      factureNumero: "FAC-00001",
+      totalTTC: "120.00 €",
+      joursRetard: 12,
+      portalUrl: "https://staging.operioz.com/portail/tok-xyz",
+    });
+    expect(body).toContain("https://staging.operioz.com/portail/tok-xyz");
+    expect(body).toContain("Payer en ligne");
+  });
+
+  it("OPE-975 — n'affiche pas le bouton quand portalUrl absent", () => {
+    const { body } = buildRelanceEmail({ artisanName: "ACME", clientName: "Marie Durand", factureNumero: "FAC-00001", totalTTC: "120.00 €", joursRetard: 12 });
+    expect(body).not.toContain("Payer en ligne");
+  });
+
   it("sujet rappel + n° facture + montant + jours de retard ; message libre échappé", () => {
     const { subject, body } = buildRelanceEmail({
       artisanName: "ACME",
@@ -213,5 +236,24 @@ describe("envoyerRelanceFacture", () => {
     const res = await envoyerRelanceFacture(repo, makeDeps({ email, optoutRepo }), A, { factureId: f.id });
     expect(res.success).toBe(false);
     expect(email.sent).toHaveLength(0);
+  });
+
+  it("OPE-975 — email contient le lien portail quand token actif", async () => {
+    const repo = new FakeFactureRepository();
+    const f = await seedFacture(repo, A, new Date(Date.now() - 5 * 86400000));
+    const deps = makeDeps({ portalTokenReader: fakePortalReader("tok-xyz"), appUrl: "https://staging.operioz.com" });
+    await envoyerRelanceFacture(repo, deps, A, { factureId: f.id });
+    const sent = (deps.email as FakeEmailPort).sent[0];
+    expect(sent.body).toContain("https://staging.operioz.com/portail/tok-xyz");
+    expect(sent.body).toContain("Payer en ligne");
+  });
+
+  it("OPE-975 — pas de lien portail si portalTokenReader absent", async () => {
+    const repo = new FakeFactureRepository();
+    const f = await seedFacture(repo, A, new Date(Date.now() - 5 * 86400000));
+    const deps = makeDeps();
+    await envoyerRelanceFacture(repo, deps, A, { factureId: f.id });
+    const sent = (deps.email as FakeEmailPort).sent[0];
+    expect(sent.body).not.toContain("Payer en ligne");
   });
 });
