@@ -420,8 +420,10 @@ export async function convertirDevisEnFacture(
   if (devis.statut !== "accepte" && devis.statut !== "envoye") {
     throw new ConflictError("Seul un devis envoyé ou accepté peut être converti en facture");
   }
-  if (await factureRepo.existsForDevis(ctx, devisId)) {
-    throw new ConflictError("Ce devis a déjà été converti en facture");
+  const existingFacture = await factureRepo.findForDevis(ctx, devisId);
+  if (existingFacture) {
+    if (existingFacture.statut !== "brouillon") throw new ConflictError("Ce devis a déjà été converti en facture");
+    return existingFacture;
   }
   const lignesDevis = await devisReader.getLignes(ctx, devisId);
   const lignes: CopiedLigneData[] = lignesDevis.map((l) => ({

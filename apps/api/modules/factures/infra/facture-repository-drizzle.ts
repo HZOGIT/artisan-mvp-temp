@@ -542,6 +542,17 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
     });
   }
 
+  findForDevis(ctx: TenantContext, devisId: number): Promise<Facture | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .select()
+        .from(factures)
+        .where(and(eq(factures.artisanId, ctx.artisanId), eq(factures.devisId, devisId), eq(factures.typeDocument, "facture"), eq(factures.estAcompte, false)))
+        .limit(1);
+      return row ? toFacture(row) : null;
+    });
+  }
+
   listAcomptes(ctx: TenantContext, devisId: number): Promise<Facture[]> {
     return withTenant(this.db, ctx, async (tx) => {
       const rows = await tx
