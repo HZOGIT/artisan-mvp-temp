@@ -60,7 +60,9 @@ export const planComptable = pgTable("plan_comptable", {
   type: compteTypeEnum("type").notNull(),
   actif: boolean("actif").default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => ({
+  uqArtisanCompte: unique("uq_plan_comptable_artisan_compte").on(t.artisanId, t.numeroCompte),
+}));
 export type CompteComptable = typeof planComptable.$inferSelect;
 export type InsertCompteComptable = typeof planComptable.$inferInsert;
 

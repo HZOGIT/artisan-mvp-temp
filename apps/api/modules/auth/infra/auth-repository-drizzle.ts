@@ -1,9 +1,26 @@
 import { and, eq, gte, inArray, notInArray, sql } from "drizzle-orm";
-import { artisans, billingCycles, billingEvents, billingSubscriptions, clients, conversations, factures, llmUsage, messages, permissionsUtilisateur, rdvEnLigne, users } from "../../../../../drizzle/schema.pg";
+import { artisans, billingCycles, billingEvents, billingSubscriptions, clients, conversations, factures, llmUsage, messages, permissionsUtilisateur, planComptable, rdvEnLigne, users } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import type { IAuthRepository } from "../application/auth-repository";
 import type { AuthCredentials, AuthUser } from "../domain/auth";
 import { ALL_PERMISSIONS } from "../../../../../packages/contract/permissions";
+
+/** Comptes PCG minimaux à créer pour chaque nouveau tenant (plan comptable de base). */
+const PCG_COMPTES = [
+  { numeroCompte: "401000", libelle: "Fournisseurs",               classe: 4, type: "passif" as const },
+  { numeroCompte: "411000", libelle: "Clients",                     classe: 4, type: "actif" as const },
+  { numeroCompte: "425000", libelle: "Personnel — notes de frais",  classe: 4, type: "passif" as const },
+  { numeroCompte: "445660", libelle: "TVA déductible",              classe: 4, type: "actif" as const },
+  { numeroCompte: "445710", libelle: "TVA collectée",               classe: 4, type: "passif" as const },
+  { numeroCompte: "445711", libelle: "TVA collectée 20 %",          classe: 4, type: "passif" as const },
+  { numeroCompte: "445712", libelle: "TVA collectée 10 %",          classe: 4, type: "passif" as const },
+  { numeroCompte: "445713", libelle: "TVA collectée 5,5 %",         classe: 4, type: "passif" as const },
+  { numeroCompte: "445714", libelle: "TVA collectée 2,1 %",         classe: 4, type: "passif" as const },
+  { numeroCompte: "512000", libelle: "Banque",                      classe: 5, type: "actif" as const },
+  { numeroCompte: "530000", libelle: "Caisse",                      classe: 5, type: "actif" as const },
+  { numeroCompte: "607000", libelle: "Achats de marchandises",      classe: 6, type: "charge" as const },
+  { numeroCompte: "706000", libelle: "Prestations de services",     classe: 7, type: "produit" as const },
+] satisfies { numeroCompte: string; libelle: string; classe: number; type: "actif" | "passif" | "charge" | "produit" }[];
 
 /*
  * Repo auth Drizzle. `users` est HORS RLS (auth précède la résolution du tenant) → accès direct par
@@ -125,6 +142,16 @@ export class AuthRepositoryDrizzle implements IAuthRepository {
     } catch {
       /* best-effort */
     }
+    try {
+      await this.db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT set_config('app.tenant', ${String(artisanId)}, true)`);
+        await tx.insert(planComptable)
+          .values(PCG_COMPTES.map((c) => ({ ...c, artisanId })))
+          .onConflictDoNothing({ target: [planComptable.artisanId, planComptable.numeroCompte] });
+      });
+    } catch {
+      /* best-effort */
+    }
     return { id: userId, email: userEmail };
   }
 
@@ -173,6 +200,17 @@ export class AuthRepositoryDrizzle implements IAuthRepository {
       await this.db.insert(permissionsUtilisateur)
         .values(ALL_PERMISSIONS.map((p) => ({ userId, permission: p, autorise: true })))
         .onConflictDoNothing({ target: [permissionsUtilisateur.userId, permissionsUtilisateur.permission] });
+    } catch {
+      /* best-effort */
+    }
+    /** 5. Plan comptable PCG — comptes de base (best-effort, idempotent). */
+    try {
+      await this.db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT set_config('app.tenant', ${String(artisanId)}, true)`);
+        await tx.insert(planComptable)
+          .values(PCG_COMPTES.map((c) => ({ ...c, artisanId })))
+          .onConflictDoNothing({ target: [planComptable.artisanId, planComptable.numeroCompte] });
+      });
     } catch {
       /* best-effort */
     }
