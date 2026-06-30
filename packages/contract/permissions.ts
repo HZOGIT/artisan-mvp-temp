@@ -18,6 +18,7 @@ export type PermissionCode =
   | "comptabilite.voir"
   | "exports.voir"
   | "notes_frais.approuver"
+  | "integrations-comptables.configurer"
   | "parametres.voir" | "parametres.modifier"
   | "utilisateurs.gerer"
   | "vitrine.gerer";
@@ -79,6 +80,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { code: "comptabilite.voir", label: "Accéder à la comptabilité" },
       { code: "exports.voir", label: "Exporter FEC/CSV" },
       { code: "notes_frais.approuver", label: "Approuver les notes de frais" },
+      { code: "integrations-comptables.configurer", label: "Configurer les intégrations comptables" },
     ],
   },
   {

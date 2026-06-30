@@ -7,10 +7,11 @@ import { injectTrpc } from "../../../../shared/testing/trpc-inject";
 const URL = process.env.DATABASE_URL;
 const SECRET = "test-secret-at-least-32-characters-long-xxxx";
 const UID = 9962331;
+const COLLAB_UID = 9962332; // collaborateur non-owner de UID — gate integrations-comptables.configurer
 const EMAIL = `u${UID}@t.fr`;
 
 const jwt = (userId: number) =>
-  new SignJWT({ userId, email: EMAIL }).setProtectedHeader({ alg: "HS256" }).setExpirationTime("1h").sign(new TextEncoder().encode(SECRET));
+  new SignJWT({ userId, email: `u${userId}@t.fr` }).setProtectedHeader({ alg: "HS256" }).setExpirationTime("1h").sign(new TextEncoder().encode(SECRET));
 
 // L3 e2e (HTTP → tRPC `integrationsComptables.*`) : exports/sync vers logiciels comptables (protégé).
 describe.skipIf(!URL)("integrationsComptables.router e2e (protégé)", () => {
@@ -18,6 +19,8 @@ describe.skipIf(!URL)("integrationsComptables.router e2e (protégé)", () => {
   let app: ReturnType<typeof buildApp>;
 
   const cleanup = async () => {
+    await admin.query("delete from permissions_utilisateur where \"userId\"=$1", [COLLAB_UID]);
+    await admin.query("delete from users where id=$1", [COLLAB_UID]);
     await admin.query('delete from artisans where "userId"=$1', [UID]);
     await admin.query("delete from users where id=$1", [UID]);
   };
@@ -25,7 +28,9 @@ describe.skipIf(!URL)("integrationsComptables.router e2e (protégé)", () => {
   beforeAll(async () => {
     await cleanup();
     await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [UID, EMAIL]);
-    await admin.query('insert into artisans ("userId","nomEntreprise") values ($1,$2)', [UID, "IntegrComptables SARL"]);
+    const { rows } = await admin.query<{ id: number }>('insert into artisans ("userId","nomEntreprise") values ($1,$2) returning id', [UID, "IntegrComptables SARL"]);
+    const artisanId = rows[0].id;
+    await admin.query('insert into users (id, email, password, role, "artisanId") values ($1,$2,\'x\',\'artisan\',$3)', [COLLAB_UID, `u${COLLAB_UID}@t.fr`, artisanId]);
     app = buildApp({ jwtSecret: SECRET });
   });
 
@@ -62,5 +67,19 @@ describe.skipIf(!URL)("integrationsComptables.router e2e (protégé)", () => {
     const after = await injectTrpc(app, "GET", "integrationsComptables.getLockDate", undefined, tok);
     expect(JSON.parse(after.body).result.data?.json ?? JSON.parse(after.body).result.data).toBe("2024-12-31");
     expect((await injectTrpc(app, "POST", "integrationsComptables.verrouillerCompta", { date: "31/12/2024" }, tok)).statusCode).toBe(400);
+  });
+
+  it("gate permission : collaborateur non-owner sans `integrations-comptables.configurer` → saveConfig 403, verrouillerCompta 403", async () => {
+    await admin.query("delete from permissions_utilisateur where \"userId\"=$1", [COLLAB_UID]);
+    const tC = await jwt(COLLAB_UID);
+    expect((await injectTrpc(app, "POST", "integrationsComptables.saveConfig", { actif: false }, tC)).statusCode).toBe(403);
+    expect((await injectTrpc(app, "POST", "integrationsComptables.verrouillerCompta", { date: null }, tC)).statusCode).toBe(403);
+  });
+
+  it("gate permission : owner (UID) sans permission DB → saveConfig 200, verrouillerCompta 200 (bypass propriétaire)", async () => {
+    await admin.query("delete from permissions_utilisateur where \"userId\"=$1", [UID]);
+    const tok = await jwt(UID);
+    expect((await injectTrpc(app, "POST", "integrationsComptables.saveConfig", { actif: true }, tok)).statusCode).toBe(200);
+    expect((await injectTrpc(app, "POST", "integrationsComptables.verrouillerCompta", { date: null }, tok)).statusCode).toBe(200);
   });
 });

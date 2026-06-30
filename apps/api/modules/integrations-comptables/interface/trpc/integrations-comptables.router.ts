@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import { router, protectedProcedure, permissionProcedure } from "../../../../interface/trpc/trpc";
 import type { IIntegrationsComptablesRepository } from "../../application/integrations-comptables-repository";
 import type { TenantContext } from "../../../../shared/tenant";
 import { getConfig, saveConfig, saveSyncConfig, getSyncStatus, getExports, genererExport, getSyncLogs, getPendingItems, lancerSync, retrySync, getLockDate, verrouillerCompta } from "../../application/use-cases";
@@ -31,7 +31,7 @@ const saveSyncConfigSchema = z.object({
 export function createIntegrationsComptablesRouter(repo: IIntegrationsComptablesRepository, fec: { getFecContent(ctx: TenantContext, period: { dateDebut: Date; dateFin: Date }): Promise<string> }) {
   return router({
     getConfig: protectedProcedure.query(({ ctx }) => getConfig(repo, ctx.tenant)),
-    saveConfig: protectedProcedure.input(saveConfigSchema).mutation(({ ctx, input }) => saveConfig(repo, ctx.tenant, input)),
+    saveConfig: permissionProcedure("integrations-comptables.configurer").input(saveConfigSchema).mutation(({ ctx, input }) => saveConfig(repo, ctx.tenant, input)),
     saveSyncConfig: protectedProcedure.input(saveSyncConfigSchema).mutation(({ ctx, input }) => saveSyncConfig(repo, ctx.tenant, input)),
     getSyncStatus: protectedProcedure.query(({ ctx }) => getSyncStatus(repo, ctx.tenant)),
     getExports: protectedProcedure.query(({ ctx }) => getExports(repo, ctx.tenant)),
@@ -58,7 +58,7 @@ export function createIntegrationsComptablesRouter(repo: IIntegrationsComptables
 
     getLockDate: protectedProcedure.query(({ ctx }) => getLockDate(repo, ctx.tenant)),
 
-    verrouillerCompta: protectedProcedure
+    verrouillerCompta: permissionProcedure("integrations-comptables.configurer")
       .input(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable() }))
       .mutation(async ({ ctx, input }) => {
         await verrouillerCompta(repo, ctx.tenant, input.date);
