@@ -8,28 +8,41 @@ import { BcryptPasswordHasher } from "../../../../shared/ports/password-hasher-b
 const URL = process.env.DATABASE_URL;
 const SECRET = "test-secret-at-least-32-characters-long-xxxx";
 const UID = 9941121;
+/** userId d'un collaborateur (MEMBRE non-owner) du même tenant */
+const MEMBER_UID = 9941122;
 const EMAIL = `u${UID}@t.fr`;
 const PASSWORD = "IbanTest123!";
 const VALID_IBAN = "FR7630006000011234567890189";
 
 const jwt = (userId: number) =>
-  new SignJWT({ userId, email: EMAIL }).setProtectedHeader({ alg: "HS256" }).setExpirationTime("1h").sign(new TextEncoder().encode(SECRET));
+  new SignJWT({ userId, email: `u${userId}@t.fr` }).setProtectedHeader({ alg: "HS256" }).setExpirationTime("1h").sign(new TextEncoder().encode(SECRET));
 
 // L3 e2e (HTTP → tRPC `artisan.*`) : profil entreprise du tenant. Toujours scopé `ctx.tenant`.
 describe.skipIf(!URL)("artisan.router e2e (profil protégé)", () => {
   const admin = new Pool({ connectionString: URL });
   let app: ReturnType<typeof buildApp>;
+  /** artisans.id du test user — résolu après insertion dans beforeAll */
+  let ARTISAN_ID: number;
 
   const cleanup = async () => {
     await admin.query('delete from artisans where "userId"=$1', [UID]);
-    await admin.query("delete from users where id=$1", [UID]);
+    await admin.query("delete from users where id in ($1,$2)", [UID, MEMBER_UID]);
   };
 
   beforeAll(async () => {
     await cleanup();
     const hash = await new BcryptPasswordHasher().hash(PASSWORD);
     await admin.query("insert into users (id, email, password, role) values ($1,$2,$3,'artisan')", [UID, EMAIL, hash]);
-    await admin.query('insert into artisans ("userId","nomEntreprise") values ($1,$2)', [UID, "Avant"]);
+    const { rows } = await admin.query<{ id: number }>(
+      'insert into artisans ("userId","nomEntreprise") values ($1,$2) returning id',
+      [UID, "Avant"],
+    );
+    ARTISAN_ID = rows[0]!.id;
+    /** Collaborateur non-owner : users.artisanId pointe vers ARTISAN_ID, pas de ligne dans artisans. */
+    await admin.query(
+      'insert into users (id, email, password, role, "artisanId") values ($1,$2,\'x\',\'secretaire\',$3)',
+      [MEMBER_UID, `u${MEMBER_UID}@t.fr`, ARTISAN_ID],
+    );
     app = buildApp({ jwtSecret: SECRET });
   });
 
@@ -127,5 +140,17 @@ describe.skipIf(!URL)("artisan.router e2e (profil protégé)", () => {
     const tok = await jwt(UID);
     const res = await injectTrpc(app, "POST", "artisan.updateProfile", { iban: "" }, tok);
     expect(res.statusCode).toBe(400);
+  });
+
+  it("garde owner — updateProfile refusé à un membre non-owner (→ 403)", async () => {
+    const memberTok = await jwt(MEMBER_UID);
+    const res = await injectTrpc(app, "POST", "artisan.updateProfile", { nomEntreprise: "Hacker" }, memberTok);
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("garde owner — updateProfile autorisé pour l'owner (→ 200)", async () => {
+    const ownerTok = await jwt(UID);
+    const res = await injectTrpc(app, "POST", "artisan.updateProfile", { nomEntreprise: "OwnerOK" }, ownerTok);
+    expect(res.statusCode).toBe(200);
   });
 });
