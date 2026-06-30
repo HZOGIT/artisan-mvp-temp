@@ -76,14 +76,14 @@ describe("processConnectWebhook", () => {
     expect(result.body).toMatchObject({ error: "Webhook signature verification failed" });
   });
 
-  it("retourne 200 sans toucher le writer pour evt_test_*", async () => {
+  it("traite les events evt_test_* comme de vrais events (mode test Stripe = préfixe evt_test_ sur tous les events réels)", async () => {
     const writer = makeWriter();
-    const event: StripeWebhookEvent = { id: "evt_test_123", type: "account.updated", account: "acct_1", data: { object: { id: "acct_1" } } };
+    const obj = { id: "acct_1", charges_enabled: true, payouts_enabled: true, details_submitted: true };
+    const event: StripeWebhookEvent = { id: "evt_test_123", type: "account.updated", account: "acct_1", data: { object: obj } };
     const result = await processConnectWebhook(makeDeps(event, { writer }), { rawBody: RAW, signature: SIG });
     expect(result.http).toBe(200);
-    expect(result.body).toMatchObject({ verified: true });
-    expect(writer.upsertConnectStatus).not.toHaveBeenCalled();
-    expect(writer.resetConnectStatus).not.toHaveBeenCalled();
+    expect(result.body).toMatchObject({ received: true });
+    expect(writer.upsertConnectStatus).toHaveBeenCalledWith("acct_1", obj);
   });
 
   describe("account.updated", () => {

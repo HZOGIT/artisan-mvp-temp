@@ -34,8 +34,6 @@ export async function processConnectWebhook(
     return { http: 400, body: { error: "Webhook signature verification failed" } };
   }
 
-  if (event.id.startsWith("evt_test_")) return { http: 200, body: { verified: true } };
-
   deps.log?.info({ event: "stripe_connect_webhook_received", stripeEvent: event.type, eventId: event.id, accountId: event.account }, `Connect webhook: ${event.type}`);
 
   try {
