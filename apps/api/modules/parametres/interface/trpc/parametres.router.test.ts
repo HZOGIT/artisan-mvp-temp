@@ -49,6 +49,7 @@ describe.skipIf(!URL)("parametres.router e2e (HTTP → tRPC → use-case → rep
       await purge(uid);
       await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [uid, `u${uid}@t.fr`]);
     }
+    await admin.query("delete from permissions_utilisateur where \"userId\"=$1", [UC]);
     await admin.query("delete from users where id=$1", [UC]);
     artisanA = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UA])).rows[0].id;
     await admin.query('insert into artisans ("userId") values ($1) returning id', [UB]);
@@ -58,6 +59,7 @@ describe.skipIf(!URL)("parametres.router e2e (HTTP → tRPC → use-case → rep
 
   afterAll(async () => {
     await server.close();
+    await admin.query("delete from permissions_utilisateur where \"userId\"=$1", [UC]);
     await admin.query("delete from users where id=$1", [UC]);
     for (const uid of [UA, UB]) await purge(uid);
     await app.close();
@@ -129,12 +131,16 @@ describe.skipIf(!URL)("parametres.router e2e (HTTP → tRPC → use-case → rep
   });
 
   it("gate permission : collaborateur non-owner sans `parametres.modifier` → update 403", async () => {
+    await admin.query("delete from permissions_utilisateur where \"userId\"=$1", [UC]);
     const tC = await token(UC);
     expect((await mut(server, "parametres.update", { prefixeDevis: "X" }, tC)).statusCode).toBe(403);
   });
 
   it("gate permission : collaborateur non-owner AVEC `parametres.modifier` → update 200", async () => {
-    await admin.query('insert into permissions_utilisateur ("userId", permission, autorise) values ($1,$2,true)', [UC, "parametres.modifier"]);
+    await admin.query(
+      'insert into permissions_utilisateur ("userId", permission, autorise) values ($1,$2,true) on conflict ("userId", permission) do update set autorise = true',
+      [UC, "parametres.modifier"],
+    );
     const tC = await token(UC);
     expect((await mut(server, "parametres.update", { prefixeDevis: "P" }, tC)).statusCode).toBe(200);
   });
