@@ -3,6 +3,8 @@ import { Pool } from "pg";
 import { createDbClient } from "../db";
 import { PortalPaymentWriterDrizzle } from "../../modules/paiement/infra/portal-payment-writer-drizzle";
 import { FakeStripePort } from "../ports/stripe-adapter";
+import { expirePaymentIfNeeded } from "./portal-payment-expiration-poller";
+import type { PendingSession } from "./portal-payment-expiration-poller";
 
 /**
  * L2 anti-régression OPE-954 : expiration reconciler.
@@ -10,6 +12,7 @@ import { FakeStripePort } from "../ports/stripe-adapter";
  *   Avec app_tenant sans SET app.tenant → 0 lignes (FORCE RLS) → faux-vert silencieux.
  * - L'expiration DOIT utiliser withTenant (app_tenant + artisanId) : atomique update+outbox.
  * - Test exécuté sous APP_DATABASE_URL (anti false-green owner-bypass).
+ * - OPE-970 : session "complete" (= paiement réussi) ne doit PAS être expirée.
  */
 const OWNER_URL = process.env.DATABASE_URL;
 const APP_URL = process.env.APP_DATABASE_URL;
@@ -65,10 +68,9 @@ describe.skipIf(!OWNER_URL || !APP_URL)("portal-payment-expiration-poller — L2
   it("session Stripe EXPIRÉE → expirePaiement marque en_attente→expire + insère outbox atomiquement", async () => {
     stripe.sessionStatuses.set("cs_expire_l2_test", { paymentStatus: "unpaid", paymentIntentId: null, sessionStatus: "expired" });
 
-    const status = await stripe.retrieveCheckoutSession("cs_expire_l2_test", undefined);
-    expect(status?.sessionStatus).not.toBe("open");
-
-    await writer.expirePaiement({ artisanId: TEST_ARTISAN, userId: 0 }, paiementId);
+    const row: PendingSession = { id: paiementId, artisanId: TEST_ARTISAN, stripeSessionId: "cs_expire_l2_test", stripeConnectAccountId: null };
+    const outcome = await expirePaymentIfNeeded(row, stripe, writer);
+    expect(outcome).toBe("expired");
 
     const { rows: pRows } = await owner.query('SELECT statut FROM paiements_stripe WHERE id = $1', [paiementId]);
     expect(pRows[0].statut).toBe("expire");
@@ -80,16 +82,35 @@ describe.skipIf(!OWNER_URL || !APP_URL)("portal-payment-expiration-poller — L2
     expect(oRows.some((r: { action: string }) => r.action === "paiement.expire")).toBe(true);
   });
 
-  it("session OPEN → skip (ne pas expirer)", async () => {
-    await owner.query('INSERT INTO paiements_stripe ("artisanId", "factureId", "stripeSessionId", "tokenPaiement", statut, montant) VALUES ($1, 0, $2, $3, $4, $5)', [TEST_ARTISAN, "cs_open_l2", "tok_open_l2", "en_attente", "0.00"]);
-    const { rows } = await owner.query('SELECT id FROM paiements_stripe WHERE "stripeSessionId" = $1', ["cs_open_l2"]);
-    const openId = rows[0].id;
+  it("session OPEN → outcome skipped-open (ne pas expirer)", async () => {
+    const { rows: ins } = await owner.query<{ id: number }>(
+      'INSERT INTO paiements_stripe ("artisanId", "factureId", "stripeSessionId", "tokenPaiement", statut, montant) VALUES ($1, 1, $2, $3, $4, $5) RETURNING id',
+      [TEST_ARTISAN, "cs_open_l2", "tok_open_l2", "en_attente", "0.00"],
+    );
+    const openId = ins[0].id;
 
     stripe.sessionStatuses.set("cs_open_l2", { paymentStatus: "unpaid", paymentIntentId: null, sessionStatus: "open" });
-    const status = await stripe.retrieveCheckoutSession("cs_open_l2", undefined);
-    expect(status?.sessionStatus).toBe("open");
+    const row: PendingSession = { id: openId, artisanId: TEST_ARTISAN, stripeSessionId: "cs_open_l2", stripeConnectAccountId: null };
+    const outcome = await expirePaymentIfNeeded(row, stripe, writer);
+    expect(outcome).toBe("skipped-open");
 
-    const { rows: before } = await owner.query('SELECT statut FROM paiements_stripe WHERE id = $1', [openId]);
-    expect(before[0].statut).toBe("en_attente");
+    const { rows: after } = await owner.query('SELECT statut FROM paiements_stripe WHERE id = $1', [openId]);
+    expect(after[0].statut).toBe("en_attente");
+  });
+
+  it("session COMPLETE (paiement réussi) → outcome skipped-complete, statut inchangé — anti-régression OPE-970", async () => {
+    const { rows: ins } = await owner.query<{ id: number }>(
+      'INSERT INTO paiements_stripe ("artisanId", "factureId", "stripeSessionId", "tokenPaiement", statut, montant) VALUES ($1, 2, $2, $3, $4, $5) RETURNING id',
+      [TEST_ARTISAN, "cs_complete_l2", "tok_complete_l2", "en_attente", "0.00"],
+    );
+    const completeId = ins[0].id;
+
+    stripe.sessionStatuses.set("cs_complete_l2", { paymentStatus: "paid", paymentIntentId: "pi_paid_l2", sessionStatus: "complete" });
+    const row: PendingSession = { id: completeId, artisanId: TEST_ARTISAN, stripeSessionId: "cs_complete_l2", stripeConnectAccountId: null };
+    const outcome = await expirePaymentIfNeeded(row, stripe, writer);
+    expect(outcome).toBe("skipped-complete");
+
+    const { rows: after } = await owner.query('SELECT statut FROM paiements_stripe WHERE id = $1', [completeId]);
+    expect(after[0].statut).toBe("en_attente");
   });
 });
