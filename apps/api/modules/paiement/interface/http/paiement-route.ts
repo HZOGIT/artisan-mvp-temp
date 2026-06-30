@@ -54,14 +54,11 @@ export function registerPaiementRoute(app: FastifyInstance, deps: PaiementRouteD
     const body = (req.body ?? {}) as { factureId?: unknown; token?: unknown };
     const factureId = typeof body.factureId === "number" ? body.factureId : parseInt(String(body.factureId ?? ""), 10);
     const token = typeof body.token === "string" ? body.token : undefined;
-    const origin = deps.appUrl;
+    const fwdHost = typeof req.headers["x-forwarded-host"] === "string" ? req.headers["x-forwarded-host"] : undefined;
+    const fwdProto = typeof req.headers["x-forwarded-proto"] === "string" ? (req.headers["x-forwarded-proto"] as string).split(",")[0]?.trim() : undefined;
+    const origin = fwdHost && fwdProto ? `${fwdProto}://${fwdHost}` : deps.appUrl;
 
-    let outcome;
-    try {
-      outcome = await createInvoiceCheckout(deps, { factureId: Number.isFinite(factureId) ? factureId : undefined, token, origin });
-    } catch {
-      return reply.code(500).send({ error: "Le paiement en ligne est momentanément indisponible. Veuillez réessayer plus tard ou contacter votre artisan." });
-    }
+    const outcome = await createInvoiceCheckout(deps, { factureId: Number.isFinite(factureId) ? factureId : undefined, token, origin });
     switch (outcome.kind) {
       case "bad-request":
         return reply.code(400).send({ error: outcome.message });
