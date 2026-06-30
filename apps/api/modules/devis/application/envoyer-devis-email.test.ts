@@ -136,6 +136,18 @@ describe("envoyerDevisParEmail", () => {
     expect(email.sent[0].body).toContain("Veuillez trouver ci-joint");
   });
 
+  it("lien signature pointe vers /devis-public/<token>, pas /portail/<token>", async () => {
+    const repo = new FakeDevisRepository();
+    const d = await seedDevis(repo, A);
+    const mailing = makeMailing({
+      signatureReader: { getByDevisId: async () => ({ id: 1, token: "tok-abc123", createdAt: new Date() }) },
+    });
+    await envoyerDevisParEmail(repo, mailing, A, { devisId: d.id, attachPdf: false });
+    const { body } = (mailing.email as FakeEmailPort).sent[0];
+    expect(body).toContain("/devis-public/tok-abc123");
+    expect(body).not.toContain("/portail/tok-abc123");
+  });
+
   it("modèle + customMessage → message ajouté après le contenu du modèle", async () => {
     const repo = new FakeDevisRepository();
     const d = await seedDevis(repo, A);
