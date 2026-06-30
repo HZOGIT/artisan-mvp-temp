@@ -16,5 +16,11 @@ export default defineConfig({
     environment: "node",
     include: ["apps/api/**/*.test.ts", "apps/api/**/*.spec.ts"],
     setupFiles: ["./vitest.setup.api.ts"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "lcov"],
+      include: ["apps/api/**/*.ts"],
+      exclude: ["apps/api/**/*.test.ts", "apps/api/**/*.spec.ts"],
+    },
   },
 });

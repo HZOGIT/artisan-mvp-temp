@@ -22,5 +22,11 @@ export default defineConfig({
     experimental: {
       fsModuleCache: true,
     },
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "lcov"],
+      include: ["apps/web/src/**/*.{ts,tsx}"],
+      exclude: ["apps/web/src/**/*.test.ts", "apps/web/src/**/*.test.tsx"],
+    },
   },
 });
