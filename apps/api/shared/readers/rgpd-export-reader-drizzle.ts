@@ -14,6 +14,15 @@ import {
   techniciens,
   vehicules,
   parametresArtisan,
+  demandesContact,
+  historiqueDeplacements,
+  contratsMaintenance,
+  conversations,
+  messages,
+  avisClients,
+  commandesFournisseurs,
+  lignesCommandesFournisseurs,
+  emailsLog,
 } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../db/client";
 import { withTenant } from "../db/with-tenant";
@@ -34,6 +43,13 @@ export interface RgpdExportData {
   readonly chantiers: readonly Record<string, unknown>[];
   readonly techniciens: readonly Record<string, unknown>[];
   readonly vehicules: readonly Record<string, unknown>[];
+  readonly demandesContact: readonly Record<string, unknown>[];
+  readonly deplacements: readonly Record<string, unknown>[];
+  readonly contratsMaintenance: readonly Record<string, unknown>[];
+  readonly conversations: readonly Record<string, unknown>[];
+  readonly avisClients: readonly Record<string, unknown>[];
+  readonly commandesFournisseurs: readonly Record<string, unknown>[];
+  readonly emailsLog: readonly Record<string, unknown>[];
 }
 
 /** Supprime les champs techniques internes qui ne sont pas des données personnelles au sens RGPD. */
@@ -103,6 +119,48 @@ export class RgpdExportReaderDrizzle {
 
       const vehiculesRows = await tx.select().from(vehicules).where(eq(vehicules.artisanId, artisanId));
 
+      const demandesContactRows = await tx.select().from(demandesContact).where(eq(demandesContact.artisanId, artisanId));
+
+      const technicienIds = techniciensRows.map((t) => t.id);
+      const deplacementsRows = technicienIds.length > 0
+        ? await tx.select().from(historiqueDeplacements).where(inArray(historiqueDeplacements.technicienId, technicienIds))
+        : [];
+
+      const contratsRows = await tx.select().from(contratsMaintenance).where(eq(contratsMaintenance.artisanId, artisanId));
+
+      const conversationsRows = await tx.select().from(conversations).where(eq(conversations.artisanId, artisanId));
+      const conversationIds = conversationsRows.map((c) => c.id);
+      const messagesRows = conversationIds.length > 0
+        ? await tx.select().from(messages).where(inArray(messages.conversationId, conversationIds))
+        : [];
+      const messagesParConversation = new Map<number, typeof messagesRows>();
+      for (const m of messagesRows) {
+        const list = messagesParConversation.get(m.conversationId) ?? [];
+        list.push(m);
+        messagesParConversation.set(m.conversationId, list);
+      }
+      const conversationsAvecMessages = conversationsRows.map((c) => ({
+        ...c,
+        messages: messagesParConversation.get(c.id) ?? [],
+      }));
+
+      const avisClientsRows = await tx.select().from(avisClients).where(eq(avisClients.artisanId, artisanId));
+
+      const commandesRows = await tx.select().from(commandesFournisseurs).where(eq(commandesFournisseurs.artisanId, artisanId));
+      const commandeIds = commandesRows.map((c) => c.id);
+      const lignesCommandesRows = commandeIds.length > 0
+        ? await tx.select().from(lignesCommandesFournisseurs).where(inArray(lignesCommandesFournisseurs.commandeId, commandeIds))
+        : [];
+      const lignesParCommande = new Map<number, typeof lignesCommandesRows>();
+      for (const l of lignesCommandesRows) {
+        const list = lignesParCommande.get(l.commandeId) ?? [];
+        list.push(l);
+        lignesParCommande.set(l.commandeId, list);
+      }
+      const commandesAvecLignes = commandesRows.map((c) => ({ ...c, lignes: lignesParCommande.get(c.id) ?? [] }));
+
+      const emailsLogRows = await tx.select().from(emailsLog).where(eq(emailsLog.artisanId, artisanId));
+
       return {
         version: "1.0",
         exportedAt: new Date().toISOString(),
@@ -119,6 +177,13 @@ export class RgpdExportReaderDrizzle {
         chantiers: chantiersRows as readonly Record<string, unknown>[],
         techniciens: techniciensRows as readonly Record<string, unknown>[],
         vehicules: vehiculesRows as readonly Record<string, unknown>[],
+        demandesContact: demandesContactRows as readonly Record<string, unknown>[],
+        deplacements: deplacementsRows as readonly Record<string, unknown>[],
+        contratsMaintenance: contratsRows as readonly Record<string, unknown>[],
+        conversations: conversationsAvecMessages as readonly Record<string, unknown>[],
+        avisClients: avisClientsRows as readonly Record<string, unknown>[],
+        commandesFournisseurs: commandesAvecLignes as readonly Record<string, unknown>[],
+        emailsLog: emailsLogRows as readonly Record<string, unknown>[],
       };
     });
   }
