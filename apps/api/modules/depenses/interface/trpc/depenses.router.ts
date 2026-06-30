@@ -427,7 +427,7 @@ export function createDepensesRouter(
      * Paiement d'une note de frais (parité client). Transition `approuvee→payee` + datePaiement ;
      * idempotent (déjà payee → no-op) ; 409 si non approuvée ; hors tenant → 404.
      */
-    payerNoteFrais: protectedProcedure
+    payerNoteFrais: approuverNdf
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         const result = await payerNoteDeFrais(noteRepo, ctx.tenant, input.id);
