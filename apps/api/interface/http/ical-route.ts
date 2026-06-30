@@ -27,12 +27,7 @@ export function registerIcalRoute(app: FastifyInstance, deps: IcalRouteDeps): vo
     if (!token) return reply.code(404).type("text/plain").send("Calendrier introuvable");
 
     const since = new Date(Date.now() - FENETRE_MS);
-    let feed;
-    try {
-      feed = await deps.reader.getFeedByToken(token, since);
-    } catch {
-      return reply.code(500).type("text/plain").send("Erreur de génération du calendrier");
-    }
+    const feed = await deps.reader.getFeedByToken(token, since);
     if (!feed) return reply.code(404).type("text/plain").send("Calendrier introuvable");
 
     const ics = buildIcalFeed({ calName: feed.calName, events: feed.events });
