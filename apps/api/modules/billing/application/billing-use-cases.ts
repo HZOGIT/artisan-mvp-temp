@@ -196,6 +196,7 @@ export async function changePlan(deps: Pick<BillingDeps, "repo">, ctx: TenantCon
   if (sub.plan_id === newPlanId) return;
 
   await deps.repo.updateSubscriptionPlan(ctx, newPlanId);
+  await deps.repo.deactivateLockedModules(ctx.artisanId, newPlanId);
 
   const pendingCycle = await deps.repo.findPendingCycle(sub.id);
   if (pendingCycle) {

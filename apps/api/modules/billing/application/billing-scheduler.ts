@@ -236,7 +236,11 @@ async function handleDunning(deps: SchedulerDeps, p: DunningParams): Promise<voi
   });
 
   if (isFinalAttempt) {
+    const GRACE_48H_MS = 48 * 3600_000;
+    await deps.repo.updateCancelAt({ artisanId, userId: 0 }, new Date(now.getTime() + GRACE_48H_MS));
     await deps.repo.updateSubscriptionStatus({ artisanId, userId: 0 }, "past_due");
+    const suspendedSub = await deps.repo.findSubscriptionById(subscriptionId);
+    if (suspendedSub) await deps.repo.deactivateLockedModules(artisanId, suspendedSub.plan_id);
     await deps.repo.appendEvent({
       entityType: "billing_subscription",
       entityId: subscriptionId,
@@ -510,6 +514,7 @@ async function activateExpiredTrials(deps: SchedulerDeps, now: Date): Promise<nu
 
       if (!sub.payment_method_id) {
         await deps.repo.updateSubscriptionPeriod(sub.id, "past_due", trialEnd, periodEnd);
+        await deps.repo.deactivateLockedModules(sub.artisan_id, sub.plan_id);
         await deps.repo.appendEvent({
           entityType: "billing_subscription",
           entityId: sub.id,

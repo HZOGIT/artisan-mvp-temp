@@ -827,6 +827,27 @@ describe("dunning & suspension (IT-3)", () => {
     expect(calls.emailCalls.length).toBe(MAX_ATTEMPTS);
     calls.notifyCalls.forEach(id => expect(id).toBe(ARTISAN_ID));
   });
+
+  it("dunning épuisé → cancel_at positionné à 48h", async () => {
+    const { repo, billing } = makeDeps();
+    const before = Date.now();
+    await driveToFinalAttempt(repo, billing);
+    const after = Date.now();
+
+    const sub = repo.subs.find(s => s.artisan_id === ARTISAN_ID)!;
+    expect(sub.cancel_at).not.toBeNull();
+    const cancelAt = sub.cancel_at!.getTime();
+    expect(cancelAt).toBeGreaterThanOrEqual(before + 48 * 3600_000 - 1000);
+    expect(cancelAt).toBeLessThanOrEqual(after + 48 * 3600_000 + 1000);
+  });
+
+  it("dunning épuisé → deactivateLockedModules appelé", async () => {
+    const { repo, billing } = makeDeps();
+    await driveToFinalAttempt(repo, billing);
+
+    expect(repo.deactivateLockedModulesCalls).toHaveLength(1);
+    expect(repo.deactivateLockedModulesCalls[0]).toMatchObject({ artisanId: ARTISAN_ID, planId: "starter" });
+  });
 });
 
 describe("FIX-CDM — handleDunning : notif in-app et email dans des try/catch indépendants", () => {
@@ -1341,6 +1362,21 @@ describe("FIX-N — activateExpiredTrials : transition trialing→active au tick
     const updated = repo.subs.find(s => s.id === sub.id)!;
     expect(updated.status).toBe("past_due");
     expect(updated.trial_ends_at).toBeNull();
+  });
+
+  it("trial expiré sans PM → deactivateLockedModules appelé", async () => {
+    const { repo, billing } = makeDeps();
+    const trialEnd = new Date(Date.now() - 3600_000);
+    await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "pro", billingMode: "maison",
+      status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: trialEnd, paymentMethodId: null,
+    });
+
+    await runSchedulerTick({ repo, billing });
+
+    expect(repo.deactivateLockedModulesCalls).toHaveLength(1);
+    expect(repo.deactivateLockedModulesCalls[0]).toMatchObject({ artisanId: ARTISAN_ID, planId: "pro" });
   });
 
   it("sub trialing avec trial_ends_at dans le futur → inchangée", async () => {

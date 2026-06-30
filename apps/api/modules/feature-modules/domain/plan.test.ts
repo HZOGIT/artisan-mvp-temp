@@ -56,6 +56,28 @@ describe("plan", () => {
     it("plan inconnu → essentiel (défaut sécurisé)", () => {
       expect(resolveGatingPlan(sub("unknown", "active"))).toBe("essentiel");
     });
+
+    it("past_due pro → essentiel (accès révoqué)", () => {
+      expect(resolveGatingPlan(sub("pro", "past_due"))).toBe("essentiel");
+    });
+
+    it("past_due enterprise → essentiel (accès révoqué)", () => {
+      expect(resolveGatingPlan(sub("enterprise", "past_due"))).toBe("essentiel");
+    });
+
+    it("canceled pro → essentiel", () => {
+      expect(resolveGatingPlan(sub("pro", "canceled"))).toBe("essentiel");
+    });
+
+    it("trial expiré pro → essentiel (pas de fenêtre de grâce)", () => {
+      const past = new Date(Date.now() - 1000);
+      expect(resolveGatingPlan(sub("pro", "trialing", past))).toBe("essentiel");
+    });
+
+    it("trial expiré enterprise → essentiel (pas de fenêtre de grâce)", () => {
+      const past = new Date(Date.now() - 1000);
+      expect(resolveGatingPlan(sub("enterprise", "trialing", past))).toBe("essentiel");
+    });
   });
 
   it("isPlanInsuffisant : hiérarchie essentiel < pro < entreprise", () => {
