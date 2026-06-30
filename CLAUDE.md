@@ -201,6 +201,14 @@ tsc -p tsconfig.api.json --noEmit   # backend seul
 tsc -p tsconfig.web.json --noEmit   # frontend seul (strict)
 ```
 
+## Gestion d'erreurs HTTP (routes Fastify)
+
+Le `setErrorHandler` central (`apps/api/interface/http/app.ts`) logge et mappe **toutes** les erreurs ≥ 500.
+
+- **Interdit** : avaler une erreur en route — catch muet (`catch {}`) ou réponse 500 maison sans rethrow.
+- **Autorisé** : catch local pour ajouter du contexte ou effectuer une recovery ciblée, suivi d'un `throw` obligatoire.
+- Règle ESLint `no-empty` + `no-useless-catch` active en `error` sur `apps/api/**`.
+
 ## Events de domaine — règle atomique obligatoire
 
 **Toute émission d'event de domaine / outbox est TOUJOURS atomique avec le changement d'état.**

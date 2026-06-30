@@ -48,6 +48,8 @@ export default tseslint.config(
       }
     ],
     "no-console": ["error", { allow: ["warn", "error"] }],
+    "no-empty": "error",
+    "no-useless-catch": "error",
     "local/module-layer-structure": "error",
     "local/module-layer-imports": "error",
     "local/module-completeness": "error",

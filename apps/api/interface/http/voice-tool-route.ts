@@ -30,12 +30,8 @@ export function registerVoiceToolRoute(app: FastifyInstance, deps: VoiceToolRout
     if (!body.name || typeof body.name !== "string") return reply.code(400).send({ error: "name requis" });
     const args = (body.args && typeof body.args === "object" ? body.args : {}) as Record<string, unknown>;
 
-    try {
-      const result = await deps.registry.execute(body.name, args, { artisanId: auth.artisanId, userId: auth.userId });
-      req.log.info({ artisanId: auth.artisanId, tool: body.name }, 'voice_tool_called');
-      return reply.send({ result });
-    } catch {
-      return reply.send({ result: { ok: false, error: "Erreur exécution outil" } });
-    }
+    const result = await deps.registry.execute(body.name, args, { artisanId: auth.artisanId, userId: auth.userId });
+    req.log.info({ artisanId: auth.artisanId, tool: body.name }, 'voice_tool_called');
+    return reply.send({ result });
   });
 }
