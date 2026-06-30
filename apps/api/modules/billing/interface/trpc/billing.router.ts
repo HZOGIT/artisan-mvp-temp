@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import { router, protectedProcedure, ownerProcedure } from "../../../../interface/trpc/trpc";
 import type { BillingDeps } from "../../application/billing-use-cases";
 import {
   createSetupIntent,
@@ -26,12 +26,12 @@ function mapError(err: unknown): never {
 export function createBillingRouter(deps: BillingDeps) {
   return router({
     /** Étape 1 SetupIntent : retourne le clientSecret pour Stripe Elements. */
-    createSetupIntent: protectedProcedure.mutation(({ ctx }) =>
+    createSetupIntent: ownerProcedure.mutation(({ ctx }) =>
       createSetupIntent(deps, ctx.tenant).catch(mapError),
     ),
 
     /** Étape 2 : confirme la carte après Stripe Elements et la persiste. */
-    confirmPaymentMethod: protectedProcedure
+    confirmPaymentMethod: ownerProcedure
       .input(
         z.object({
           stripePaymentMethodId: z.string().min(1),
@@ -49,14 +49,14 @@ export function createBillingRouter(deps: BillingDeps) {
       ),
 
     /** Révoque (soft-delete) un moyen de paiement. */
-    revokePaymentMethod: protectedProcedure
+    revokePaymentMethod: ownerProcedure
       .input(z.object({ paymentMethodId: z.number().int().positive() }))
       .mutation(({ ctx, input }) =>
         revokePaymentMethod(deps, ctx.tenant, input.paymentMethodId).catch(mapError),
       ),
 
     /** Change la carte par défaut + met à jour l'abonnement. */
-    setDefaultPaymentMethod: protectedProcedure
+    setDefaultPaymentMethod: ownerProcedure
       .input(z.object({ paymentMethodId: z.number().int().positive() }))
       .mutation(({ ctx, input }) =>
         setDefaultPaymentMethod(deps, ctx.tenant, input.paymentMethodId).catch(mapError),
@@ -70,19 +70,19 @@ export function createBillingRouter(deps: BillingDeps) {
       ),
 
     /** Change de plan (upgrade ou downgrade). */
-    changePlan: protectedProcedure
+    changePlan: ownerProcedure
       .input(z.object({ planId: z.enum(["starter", "pro", "enterprise"]) }))
       .mutation(({ ctx, input }) =>
         changePlan(deps, ctx.tenant, input.planId).catch(mapError),
       ),
 
     /** Programme l'annulation à la fin de la période en cours. */
-    cancelAtPeriodEnd: protectedProcedure.mutation(({ ctx }) =>
+    cancelAtPeriodEnd: ownerProcedure.mutation(({ ctx }) =>
       cancelAtPeriodEnd(deps, ctx.tenant).catch(mapError),
     ),
 
     /** Annule l'annulation programmée (réactivation). */
-    reactivate: protectedProcedure.mutation(({ ctx }) =>
+    reactivate: ownerProcedure.mutation(({ ctx }) =>
       reactivateSubscription(deps, ctx.tenant).catch(mapError),
     ),
 
@@ -92,7 +92,7 @@ export function createBillingRouter(deps: BillingDeps) {
     ),
 
     /** Fin d'onboarding avec plan : crée un abonnement trialing J+15. */
-    activateOnboardingSubscription: protectedProcedure
+    activateOnboardingSubscription: ownerProcedure
       .input(
         z.object({
           planId: z.enum(["starter", "pro", "enterprise"]),

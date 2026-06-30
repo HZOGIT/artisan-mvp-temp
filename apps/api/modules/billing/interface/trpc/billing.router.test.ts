@@ -9,6 +9,8 @@ const URL = process.env.DATABASE_URL;
 const SECRET = "test-secret-at-least-32-characters-long-xxxx";
 /** userId injecté dans le JWT */
 const UID = 9939201;
+/** userId d'un collaborateur (MEMBRE non-owner) du même tenant */
+const MEMBER_UID = 9939202;
 
 const jwt = (userId: number) =>
   new SignJWT({ userId, email: `u${userId}@t.fr` })
@@ -49,7 +51,7 @@ describe.skipIf(!URL)("billing.router e2e (billing maison protégé)", () => {
 
   const cleanupUser = async () => {
     await admin.query('delete from artisans where "userId"=$1', [UID]);
-    await admin.query("delete from users where id=$1", [UID]);
+    await admin.query("delete from users where id in ($1,$2)", [UID, MEMBER_UID]);
   };
 
   beforeAll(async () => {
@@ -64,6 +66,11 @@ describe.skipIf(!URL)("billing.router e2e (billing maison protégé)", () => {
       [UID, "Billing E2E"],
     );
     ARTISAN_ID = rows[0]!.id;
+    /** Collaborateur non-owner : users.artisanId pointe vers ARTISAN_ID, pas de ligne dans artisans. */
+    await admin.query(
+      'insert into users (id, email, password, role, "artisanId") values ($1,$2,\'x\',\'secretaire\',$3)',
+      [MEMBER_UID, `u${MEMBER_UID}@t.fr`, ARTISAN_ID],
+    );
     app = buildApp({ jwtSecret: SECRET, stripePort: new FakeStripePort() });
   });
 
@@ -340,6 +347,37 @@ describe.skipIf(!URL)("billing.router e2e (billing maison protégé)", () => {
     );
     expect(evts).toHaveLength(1);
     expect(evts[0]!.actor).toBe(`user:${UID}`);
+  });
+
+  it("garde owner — mutations billing refusées à un membre non-owner (→ 403)", async () => {
+    const memberTok = await jwt(MEMBER_UID);
+    const mutations: Array<["POST", string, unknown]> = [
+      ["POST", "billing.createSetupIntent", undefined],
+      ["POST", "billing.confirmPaymentMethod", { stripePaymentMethodId: "pm_x", stripeCustomerId: "cus_x", setAsDefault: true }],
+      ["POST", "billing.revokePaymentMethod", { paymentMethodId: 1 }],
+      ["POST", "billing.setDefaultPaymentMethod", { paymentMethodId: 1 }],
+      ["POST", "billing.changePlan", { planId: "pro" }],
+      ["POST", "billing.cancelAtPeriodEnd", undefined],
+      ["POST", "billing.reactivate", undefined],
+      ["POST", "billing.activateOnboardingSubscription", { planId: "starter", paymentMethodId: 1 }],
+    ];
+    for (const [method, path, input] of mutations) {
+      const res = await injectTrpc(app, method, path, input, memberTok);
+      expect(res.statusCode, `${path} doit être 403 pour un membre non-owner`).toBe(403);
+    }
+  });
+
+  it("garde owner — getBillingInfo accessible au membre non-owner (lecture seule)", async () => {
+    const memberTok = await jwt(MEMBER_UID);
+    const res = await injectTrpc(app, "GET", "billing.getBillingInfo", undefined, memberTok);
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("garde owner — mutations billing autorisées pour l'owner (→ pas de 403)", async () => {
+    const ownerTok = await jwt(UID);
+    const res = await injectTrpc(app, "POST", "billing.cancelAtPeriodEnd", undefined, ownerTok);
+    /** 404 (pas de sub) ou 200 — l'important est que le gate owner ne bloque PAS l'owner. */
+    expect([200, 404]).toContain(res.statusCode);
   });
 
   it("setDefaultPaymentMethod avec sub active — sub.payment_method_id basculé vers la 2e PM (scénario prod OPE-725)", async () => {
