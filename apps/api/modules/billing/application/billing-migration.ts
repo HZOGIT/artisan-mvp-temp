@@ -30,9 +30,9 @@ export function mapPlan(stripePriceId: string | null | undefined, legacyPlan: st
 }
 
 /**
- * Normalise un statut Stripe legacy vers le set valide de billing_subscriptions.
- * Stripe expose 7 statuts (trialing/active/past_due/canceled/incomplete/incomplete_expired/unpaid)
- * mais notre state machine n'en supporte que 4.
+ * Normalise un statut Stripe vers le set valide de billing_subscriptions.
+ * Fail-closed : tout statut non explicitement reconnu → past_due (accès restreint, jamais active).
+ * Stripe expose : trialing, active, past_due, canceled, unpaid, incomplete, incomplete_expired, paused.
  */
 export function normalizeStatus(legacyStatus: string | null | undefined): "trialing" | "active" | "past_due" | "canceled" {
   switch (legacyStatus) {
@@ -42,7 +42,9 @@ export function normalizeStatus(legacyStatus: string | null | undefined): "trial
     case "canceled": return "canceled";
     case "unpaid": return "past_due";
     case "incomplete_expired": return "canceled";
-    default: return "active";
+    case "incomplete": return "past_due";
+    case "paused": return "past_due";
+    default: return "past_due";
   }
 }
 

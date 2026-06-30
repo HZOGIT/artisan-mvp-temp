@@ -1286,9 +1286,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     onBillingWebhookEvent: (eventType, piId, fc, fm, stripeEventId) =>
       handleBillingWebhookEvent({ repo: billingRepo }, eventType, piId, fc, fm, stripeEventId),
     onSubscriptionWebhookEvent: async (artisanId, priceId, stripeStatus) => {
+      const ctx = { artisanId, userId: 0 };
+      const existing = await billingRepo.findSubscription(ctx);
+      if (!existing || existing.billing_mode !== "stripe") return;
       const planId = mapPlan(priceId, null);
       const status = normalizeStatus(stripeStatus);
-      const ctx = { artisanId, userId: 0 };
       await billingRepo.updateSubscriptionPlan(ctx, planId);
       await billingRepo.updateSubscriptionStatus(ctx, status);
     },
