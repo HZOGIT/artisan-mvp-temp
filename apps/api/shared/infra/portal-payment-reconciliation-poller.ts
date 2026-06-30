@@ -7,8 +7,8 @@ import type { WebhookPaymentWriter } from "../../modules/subscription/applicatio
 
 /* ponytail: lock différent des autres pollers (outbox 0xb111d0cc, inbound 0xb111d1bb, pa-reconcil 0xb111d3cc) */
 const LOCK_ID = BigInt("0xb111d5cc");
-/** Délai minimal entre création et premier poll — laisse le webhook arriver en priorité. */
-const MIN_AGE_SECONDS = 10 * 60;
+/** Délai minimal entre création et premier poll — 2 min (laisse le webhook arriver en priorité). */
+const MIN_AGE_SECONDS = 2 * 60;
 
 export interface PortalPaymentReconciliationPollerOptions {
   readonly stripe: StripePort;
