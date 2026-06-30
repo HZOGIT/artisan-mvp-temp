@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { Signature } from "../domain/signature";
 import type {
@@ -105,5 +106,9 @@ export class FakeSignaturePublicWriter implements SignaturePublicWriter {
 
   async selectOption(_ctx: TenantContext, devisId: number, optionId: number): Promise<void> {
     this.selected.push({ devisId, optionId });
+  }
+
+  withDb(_db: DbClient): FakeSignaturePublicWriter {
+    return this;
   }
 }

@@ -9,8 +9,9 @@ import { buildSignedDevisArtisanEmail, buildRefusedDevisArtisanEmail } from "../
 import type { SignaturePublicReader, SignatureDevisView } from "./signature-public-reader";
 import type { SignaturePublicWriter } from "./signature-public-writer";
 import type { SignatureNotificationWriter } from "./signature-repository";
-import type { EventBusPort } from "../../../shared/ports/event-bus";
-import { emitEvent } from "../../../shared/events/emit-event";
+import type { DbClient } from "../../../shared/db";
+import { withOutbox } from "../../../shared/events/with-outbox";
+import { outboxEvent } from "../../../shared/events/outbox-event";
 
 /** Dépendances de la surface PUBLIQUE par token (portail de signature). */
 export interface SignaturePublicDeps {
@@ -20,7 +21,8 @@ export interface SignaturePublicDeps {
   readonly notifications: SignatureNotificationWriter;
   readonly email: EmailPort;
   readonly maintenant?: () => Date;
-  readonly eventBus?: EventBusPort;
+  /** Pool DB pour l'atomicité outbox (withOutbox) — undefined = dégradé sans outbox. */
+  readonly db?: DbClient;
 }
 
 const clientFullName = (client: { prenom: string | null; nom: string } | null): string =>
@@ -186,21 +188,23 @@ export async function signDevis(
   const documentHash = signView ? computeDevisHash(signView) : null;
   const documentHashedAt = documentHash ? now : null;
 
-  const signature = await deps.writer.signDevis(ctx, {
-    token: input.token,
-    devisId: resolution.devisId,
-    signatureData: input.signatureData,
-    signataireName: input.signataireName,
-    signataireEmail: input.signataireEmail,
-    ipAddress: input.ipAddress,
-    userAgent: input.userAgent,
-    documentHash,
-    documentHashedAt,
+  const signature = await withOutbox(deps.db, deps.writer, async (w, tx) => {
+    const sig = await w.signDevis(ctx, {
+      token: input.token,
+      devisId: resolution.devisId,
+      signatureData: input.signatureData,
+      signataireName: input.signataireName,
+      signataireEmail: input.signataireEmail,
+      ipAddress: input.ipAddress,
+      userAgent: input.userAgent,
+      documentHash,
+      documentHashedAt,
+    });
+    if (tx) await outboxEvent(tx, ctx, { action: "devis.signe", entityType: "devis", entityId: resolution.devisId, payload: { devisId: resolution.devisId } });
+    return sig;
   });
 
   signatureCounter.inc({ action: "signed" });
-
-  if (deps.eventBus) emitEvent(deps.eventBus, ctx, { type: "devis.signe", entityType: "devis", entityId: resolution.devisId, payload: { devisId: resolution.devisId } });
 
   await notifyArtisanBestEffort(deps, ctx, resolution.devisId, async (view) => {
     await deps.notifications.notify(ctx, {

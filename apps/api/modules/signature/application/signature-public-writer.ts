@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { Signature } from "../domain/signature";
 
@@ -39,4 +40,6 @@ export interface SignaturePublicWriter {
   getOptionDevisId(ctx: TenantContext, optionId: number): Promise<number | null>;
   /** Choisit l'option (une seule `selectionnee` par devis : reset les autres puis set celle-ci). */
   selectOption(ctx: TenantContext, devisId: number, optionId: number): Promise<void>;
+  /** Retourne une instance utilisant `db` — pour atomicité outbox via withOutbox. */
+  withDb(db: DbClient): SignaturePublicWriter;
 }
