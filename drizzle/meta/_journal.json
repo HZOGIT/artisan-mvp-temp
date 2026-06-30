@@ -330,6 +330,13 @@
       "when": 1782864000000,
       "tag": "20260701000000_add-connect-snapshot-to-paiements-stripe",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1782829957168,
+      "tag": "20260630143237_lien-paiement-text",
+      "breakpoints": true
     }
   ]
 }

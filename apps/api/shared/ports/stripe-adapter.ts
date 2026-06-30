@@ -156,7 +156,8 @@ export class FakeStripePort implements StripePort {
   async createInvoiceCheckout(p: CreateInvoiceCheckoutParams): Promise<{ url: string | null; sessionId: string }> {
     this.invoiceCheckouts.push(p);
     const id = `cs_invoice_${++this.seq}`;
-    return { url: `https://checkout.stripe.test/${id}`, sessionId: id };
+    const hash = "a".repeat(600);
+    return { url: `https://checkout.stripe.test/${id}#${hash}`, sessionId: id };
   }
 
   public sessionStatuses: Map<string, CheckoutSessionStatus> = new Map();
