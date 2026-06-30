@@ -190,6 +190,7 @@ import { makeDepensesRecurrentesJob } from "./modules/depenses/application/depen
 import { createOutboxBloqueJob, createEventManquantNotificationJob } from "./modules/events/application/events-healing";
 import { createEmailsLogReconcilerJob } from "./modules/emails/application/emails-log-reconciler";
 import { createStocksQuantiteReconcilerJob } from "./modules/stocks/application/stocks-reconciler";
+import { createComptaReconcilerJob } from "./modules/ecritures/application/compta-reconciler";
 import { contratsVisitesCronPlugin } from "./shared/infra/contrats-visites-cron";
 import { rappelRdvClientCronPlugin } from "./shared/infra/rappel-rdv-client-cron";
 import { analysePhotosCronPlugin } from "./shared/infra/analyse-photos-cron";
@@ -1556,6 +1557,12 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       );
       registry.register(
         createStocksQuantiteReconcilerJob(getOwnerDbHandle().db, {
+          dryRun: process.env.HEALING_DRYRUN !== "false",
+        }),
+      );
+      /** ponytail: dry-run par défaut — compta = légal, observer avant d'armer */
+      registry.register(
+        createComptaReconcilerJob(getOwnerDbHandle().db, {
           dryRun: process.env.HEALING_DRYRUN !== "false",
         }),
       );
