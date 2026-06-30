@@ -1379,6 +1379,47 @@ describe("FIX-N — activateExpiredTrials : transition trialing→active au tick
     expect(repo.deactivateLockedModulesCalls[0]).toMatchObject({ artisanId: ARTISAN_ID, planId: "pro" });
   });
 
+  it("FIX-OPE864 — trial expiré sans PM → notif in-app + email envoyés", async () => {
+    const { repo, billing } = makeDeps();
+    const trialEnd = new Date(Date.now() - 3600_000);
+    await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: trialEnd, paymentMethodId: null,
+    });
+
+    const calls = { notifyCalls: [] as number[], emailCalls: [] as number[] };
+    const notifier = {
+      notifyArtisan: async (id: number) => { calls.notifyCalls.push(id); },
+      emailArtisanOwner: async (id: number) => { calls.emailCalls.push(id); },
+    };
+
+    await runSchedulerTick({ repo, billing, notifier });
+
+    expect(calls.notifyCalls).toEqual([ARTISAN_ID]);
+    expect(calls.emailCalls).toEqual([ARTISAN_ID]);
+  });
+
+  it("FIX-OPE864 — notifyArtisan échoue → email quand même envoyé (trial expiré sans PM)", async () => {
+    const { repo, billing } = makeDeps();
+    const trialEnd = new Date(Date.now() - 3600_000);
+    await repo.saveSubscription({
+      artisanId: ARTISAN_ID, planId: "starter", billingMode: "maison",
+      status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: trialEnd, paymentMethodId: null,
+    });
+
+    let emailCalled = 0;
+    const notifier = {
+      notifyArtisan: async () => { throw new Error("notif service down"); },
+      emailArtisanOwner: async () => { emailCalled++; },
+    };
+
+    await runSchedulerTick({ repo, billing, notifier });
+
+    expect(emailCalled).toBe(1);
+  });
+
   it("sub trialing avec trial_ends_at dans le futur → inchangée", async () => {
     const { repo, billing } = makeDeps();
     const futureEnd = new Date(Date.now() + 86_400_000);
