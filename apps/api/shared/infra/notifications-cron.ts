@@ -13,6 +13,8 @@ export interface NotificationsCronDeps {
   readonly generateCommandeRetardAlerts: () => Promise<{ alertsCreated: number }>;
   /** Génère alertes reconduction tacite contrats maintenance (loi Chatel) pour TOUS les artisans. */
   readonly generateAlertesReconduction: () => Promise<{ alertsCreated: number }>;
+  /** Crée les notifications in-app manquantes pour les events de domaine notifiables. */
+  readonly generateFromEvents: () => Promise<{ created: number }>;
 }
 
 export interface NotificationsCronOptions {
@@ -42,11 +44,12 @@ export const notificationsCronPlugin = fp(
             return;
           }
 
-          const [reminders, alerts, commandeRetardAlerts, reconductionAlerts] = await Promise.allSettled([
+          const [reminders, alerts, commandeRetardAlerts, reconductionAlerts, fromEvents] = await Promise.allSettled([
             opts.deps.generateOverdueReminders(),
             opts.deps.generateAlerts(),
             opts.deps.generateCommandeRetardAlerts(),
             opts.deps.generateAlertesReconduction(),
+            opts.deps.generateFromEvents(),
           ]);
           if (reminders.status === "rejected") {
             app.log.error({ event: "notifications_tick_reminders_error", error: reminders.reason instanceof Error ? reminders.reason.message : String(reminders.reason) }, "Rappels factures tick échoué");
@@ -60,6 +63,9 @@ export const notificationsCronPlugin = fp(
           if (reconductionAlerts.status === "rejected") {
             app.log.error({ event: "notifications_tick_reconduction_error", error: reconductionAlerts.reason instanceof Error ? reconductionAlerts.reason.message : String(reconductionAlerts.reason) }, "Alertes reconduction Chatel tick échoué");
           }
+          if (fromEvents.status === "rejected") {
+            app.log.error({ event: "notifications_tick_from_events_error", error: fromEvents.reason instanceof Error ? fromEvents.reason.message : String(fromEvents.reason) }, "Notifications depuis events tick échoué");
+          }
           app.log.info(
             {
               event: "notifications_tick_done",
@@ -67,6 +73,7 @@ export const notificationsCronPlugin = fp(
               alertsCreated: alerts.status === "fulfilled" ? alerts.value.alertsCreated : 0,
               commandeRetardAlertsCreated: commandeRetardAlerts.status === "fulfilled" ? commandeRetardAlerts.value.alertsCreated : 0,
               reconductionAlertsCreated: reconductionAlerts.status === "fulfilled" ? reconductionAlerts.value.alertsCreated : 0,
+              fromEventsCreated: fromEvents.status === "fulfilled" ? fromEvents.value.created : 0,
             },
             "Notifications tick terminé",
           );
