@@ -13,6 +13,7 @@ import type { PushPort } from "../../../../shared/push/web-push-adapter";
 import type { DbClient } from "../../../../shared/db";
 import type { IStockRepository } from "../../../stocks/application/stock-repository";
 import type { StoragePort } from "../../../../shared/ports/storage";
+import type { INotificationRepository } from "../../../notifications/application/notification-repository";
 import type { TenantContext } from "../../../../shared/tenant";
 import { outboxEvent } from "../../../../shared/events/outbox-event";
 import { withOutbox } from "../../../../shared/events/with-outbox";
@@ -136,7 +137,7 @@ const avoirInputSchema = z.object({
  * use-cases (scoping tenant + numérotation serveur + anti-IDOR-FK + immutabilité post-émission),
  * laisse remonter les Domain errors (NotFound→404, Validation→400, Conflict→409).
  */
-export function createFacturesRouter(repo: IFactureRepository, devisReader: IDevisReader, compta: ComptaPort, mailing: FactureMailingDeps, push?: PushPort, outboxInTx?: (artisanId: number, factureId: number, tx: DbClient) => Promise<void>, db?: DbClient, stockRepo?: IStockRepository, storage?: StoragePort, attestationRepo?: IAttestationTvaRepository, lockDateReader?: { getLockDate(ctx: TenantContext): Promise<string | null> }) {
+export function createFacturesRouter(repo: IFactureRepository, devisReader: IDevisReader, compta: ComptaPort, mailing: FactureMailingDeps, push?: PushPort, outboxInTx?: (artisanId: number, factureId: number, tx: DbClient) => Promise<void>, db?: DbClient, stockRepo?: IStockRepository, storage?: StoragePort, attestationRepo?: IAttestationTvaRepository, lockDateReader?: { getLockDate(ctx: TenantContext): Promise<string | null> }, notifRepo?: INotificationRepository) {
 
   return router({
     list: protectedProcedure.query(({ ctx }) => listFactures(repo, ctx.tenant)),
@@ -313,7 +314,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
       .input(z.object({ id: z.number().int(), montant: decimal, date: isoDate.optional(), mode: z.string().max(50).optional() }))
       .mutation(async ({ ctx, input }) => {
         return withOutbox(db, repo, async (r, tx) => {
-          const result = await enregistrerPaiementFacture(r, ctx.tenant, input.id, { montant: input.montant, date: toDate(input.date), mode: input.mode ?? null }, compta);
+          const result = await enregistrerPaiementFacture(r, ctx.tenant, input.id, { montant: input.montant, date: toDate(input.date), mode: input.mode ?? null }, compta, notifRepo);
           ctx.log.info({ event: "facture_paiement_enregistre", factureId: input.id, montant: Number(input.montant), mode: input.mode ?? null }, "Paiement facture enregistré");
           if (tx) await outboxEvent(tx, ctx.tenant, { action: "facture.paiement_enregistre", entityType: "facture", entityId: input.id, payload: { montant: input.montant, mode: input.mode ?? null } });
           return result;
@@ -328,7 +329,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
       .input(z.object({ id: z.number().int(), montantPaye: decimal, datePaiement: isoDate }))
       .mutation(async ({ ctx, input }) => {
         return withOutbox(db, repo, async (r, tx) => {
-          const result = await enregistrerPaiementFacture(r, ctx.tenant, input.id, { montant: input.montantPaye, date: toDate(input.datePaiement) }, compta);
+          const result = await enregistrerPaiementFacture(r, ctx.tenant, input.id, { montant: input.montantPaye, date: toDate(input.datePaiement) }, compta, notifRepo);
           ctx.log.info({ event: "facture_paiement_enregistre", factureId: input.id, montant: Number(input.montantPaye) }, "Paiement facture enregistré");
           if (tx) await outboxEvent(tx, ctx.tenant, { action: "facture.paiement_enregistre", entityType: "facture", entityId: input.id, payload: { montant: input.montantPaye } });
           return result;

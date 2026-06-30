@@ -18,6 +18,8 @@ export interface INotificationRepository {
   markAllAsRead(ctx: TenantContext): Promise<number>;
   /** Archive une notification — false si elle n'appartient pas au tenant. */
   archive(ctx: TenantContext, id: number): Promise<boolean>;
+  /** Archive toutes les notifications actives portant ce lien (ex. `/factures/42`). */
+  archiveByLien(ctx: TenantContext, lien: string): Promise<void>;
 
   /*
    * Factures impayées en retard du tenant (lecture seule, scopé artisanId + RLS) :

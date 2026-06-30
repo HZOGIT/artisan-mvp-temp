@@ -801,6 +801,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     stockRepo,
     storage: facturesStorage,
     lockDateReader: integrationsComptablesRepo,
+    notifRepo: notificationRepo,
   });
   /*
    * Domaine compta/écritures — lecture seule (balance/grand-livre/FEC). La génération est

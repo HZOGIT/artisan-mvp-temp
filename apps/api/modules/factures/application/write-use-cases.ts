@@ -11,6 +11,7 @@ import type { ComptaPort } from "./compta-port";
 import { NOOP_COMPTA } from "./compta-port";
 import type { ArtisanReader } from "./contact-readers";
 import type { IStockRepository } from "../../stocks/application/stock-repository";
+import type { INotificationRepository } from "../../notifications/application/notification-repository";
 import { calculerMontantsAvoirLigne } from "./montants";
 import type {
   Facture,
@@ -173,6 +174,7 @@ export async function enregistrerPaiementFacture(
   id: number,
   input: EnregistrerPaiementInput,
   compta: ComptaPort = NOOP_COMPTA,
+  notifRepo?: INotificationRepository,
 ): Promise<Facture> {
   const facture = await getFactureOwned(repo, ctx, id);
   if (facture.statut !== "envoyee" && facture.statut !== "en_retard") {
@@ -202,6 +204,7 @@ export async function enregistrerPaiementFacture(
    */
   if (soldee) {
     factureCounter.inc({ action: "paid" });
+    await notifRepo?.archiveByLien(ctx, `/factures/${id}`).catch(() => {});
     try {
       await compta.genererEcrituresVente(ctx, id);
       await compta.genererEcrituresEncaissement(ctx, id, updated);
@@ -236,6 +239,7 @@ export async function marquerFacturePayee(
   id: number,
   input: MarquerPayeeInput,
   compta: ComptaPort = NOOP_COMPTA,
+  notifRepo?: INotificationRepository,
 ): Promise<Facture> {
   const facture = await getFactureOwned(repo, ctx, id);
   if (facture.statut !== "envoyee" && facture.statut !== "en_retard") {
@@ -253,6 +257,7 @@ export async function marquerFacturePayee(
   });
   if (!updated) throw new NotFoundError("Facture introuvable");
   factureCounter.inc({ action: "paid" });
+  await notifRepo?.archiveByLien(ctx, `/factures/${id}`).catch(() => {});
   try {
     await compta.genererEcrituresVente(ctx, id);
     await compta.genererEcrituresEncaissement(ctx, id, updated);

@@ -9,6 +9,7 @@ import { FactureRepositoryDrizzle } from "../../factures/infra/facture-repositor
 import { ComptaEcrituresAdapter } from "../../ecritures/infra/compta-ecritures-adapter";
 import { EcritureRepositoryDrizzle } from "../../ecritures/infra/ecriture-repository-drizzle";
 import { FactureReaderDrizzle } from "../../ecritures/infra/facture-reader-drizzle";
+import { NotificationRepositoryDrizzle } from "../../notifications/infra/notification-repository-drizzle";
 
 export class FactureLettrerDrizzle implements IFactureLettrerPort {
   constructor(private readonly db: DbClient) {}
@@ -48,6 +49,7 @@ export class FactureLettrerDrizzle implements IFactureLettrerPort {
       new EcritureRepositoryDrizzle(this.db),
       new FactureReaderDrizzle(this.db),
     );
-    await marquerFacturePayee(repo, ctx, factureId, { montantPaye, datePaiement: datePaiement.toISOString() }, compta);
+    const notifRepo = new NotificationRepositoryDrizzle(this.db);
+    await marquerFacturePayee(repo, ctx, factureId, { montantPaye, datePaiement: datePaiement.toISOString() }, compta, notifRepo);
   }
 }

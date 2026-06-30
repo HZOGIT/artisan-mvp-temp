@@ -10,6 +10,7 @@ export interface SeedNotificationInput {
   readonly titre: string;
   readonly type?: Notification["type"];
   readonly message?: string | null;
+  readonly lien?: string | null;
   readonly lu?: boolean;
   readonly archived?: boolean;
 }
@@ -39,7 +40,7 @@ export class FakeNotificationRepository implements INotificationRepository {
       type: input.type ?? "info",
       titre: input.titre,
       message: input.message ?? null,
-      lien: null,
+      lien: input.lien ?? null,
       lu: input.lu ?? false,
       archived: input.archived ?? false,
       /** ordre stable d'insertion */
@@ -89,6 +90,12 @@ export class FakeNotificationRepository implements INotificationRepository {
     if (!n) return false;
     this.store = this.store.map((x) => (x.id === id ? { ...x, archived: true } : x));
     return true;
+  }
+
+  async archiveByLien(ctx: TenantContext, lien: string): Promise<void> {
+    this.store = this.store.map((n) =>
+      n.artisanId === ctx.artisanId && n.lien === lien && !n.archived ? { ...n, archived: true } : n,
+    );
   }
 
   async listFacturesEnRetard(ctx: TenantContext): Promise<FactureEnRetard[]> {

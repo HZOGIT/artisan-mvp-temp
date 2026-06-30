@@ -7,6 +7,7 @@ import type { PushPort } from "../../shared/push/web-push-adapter";
 import type { DbClient } from "../../shared/db";
 import type { IStockRepository } from "../stocks/application/stock-repository";
 import type { StoragePort } from "../../shared/ports/storage";
+import type { INotificationRepository } from "../notifications/application/notification-repository";
 import { createFacturesRouter } from "./interface/trpc/factures.router";
 import { AttestationTvaRepositoryDrizzle } from "./infra/attestation-tva-repository-drizzle";
 import type { TenantContext } from "../../shared/tenant";
@@ -34,6 +35,8 @@ export interface FacturesModuleDeps {
   readonly storage?: StoragePort;
   /** Lecteur de date de verrouillage comptable (garde anti-création/modif en période close). */
   readonly lockDateReader?: { getLockDate(ctx: TenantContext): Promise<string | null> };
+  /** Repository notifications (archivage des rappels à la mise en payée). Optionnel. */
+  readonly notifRepo?: INotificationRepository;
 }
 
 export interface FacturesModule {
@@ -43,5 +46,5 @@ export interface FacturesModule {
 
 export function createFacturesModule(deps: FacturesModuleDeps): FacturesModule {
   const attestationRepo = deps.db ? new AttestationTvaRepositoryDrizzle(deps.db) : undefined;
-  return { deps, router: createFacturesRouter(deps.repository, deps.devisReader, deps.compta ?? NOOP_COMPTA, deps.mailing, deps.push, deps.outboxInTx, deps.db, deps.stockRepo, deps.storage, attestationRepo, deps.lockDateReader) };
+  return { deps, router: createFacturesRouter(deps.repository, deps.devisReader, deps.compta ?? NOOP_COMPTA, deps.mailing, deps.push, deps.outboxInTx, deps.db, deps.stockRepo, deps.storage, attestationRepo, deps.lockDateReader, deps.notifRepo) };
 }

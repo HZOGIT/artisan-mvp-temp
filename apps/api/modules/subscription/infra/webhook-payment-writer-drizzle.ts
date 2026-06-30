@@ -55,6 +55,11 @@ export class WebhookPaymentWriterDrizzle implements WebhookPaymentWriter {
       const nom = clientNom(c?.prenom ?? null, c?.nom ?? null);
       const montant = Number(facture.totalTTC ?? 0).toFixed(2);
 
+      await tx
+        .update(notifications)
+        .set({ archived: true })
+        .where(and(eq(notifications.artisanId, input.artisanId), eq(notifications.lien, `/factures/${input.factureId}`), eq(notifications.archived, false)));
+
       await tx.insert(notifications).values({
         artisanId: input.artisanId,
         type: "succes",
