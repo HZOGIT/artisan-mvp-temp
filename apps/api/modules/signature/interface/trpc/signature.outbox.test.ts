@@ -35,7 +35,7 @@ describe.skipIf(!URL)("signature.outbox atomicité (L2 — devis.signe via withO
     artisanId = (await admin.query('insert into artisans ("userId","nomEntreprise") values ($1,$2) returning id', [UID, "Outbox Sig Test"])).rows[0].id;
     const clientId = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [artisanId, "TestClient"])).rows[0].id;
     devisId = (await admin.query('insert into devis ("artisanId","clientId",numero,statut) values ($1,$2,$3,$4) returning id', [artisanId, clientId, `SIG-OUT-${UID}`, "envoye"])).rows[0].id;
-    await admin.query("insert into signatures_devis (\"devisId\",token,\"expiresAt\") values ($1,$2, now() + interval '30 days')", [devisId, SIG_TOKEN]);
+    await admin.query("insert into signatures_devis (\"artisanId\",\"devisId\",token,\"expiresAt\") values ($1,$2,$3, now() + interval '30 days')", [artisanId, devisId, SIG_TOKEN]);
     server = buildApp({ emailPort: new FakeEmailPort(), signaturePublicDb: appDb.db });
   });
 
@@ -77,7 +77,7 @@ describe.skipIf(!URL)("signature.outbox atomicité (L2 — devis.signe via withO
   it("outbox atomicité — rollback: signDevis + outbox non persistés si erreur TX", async () => {
     const tokenRollback = "sigout-rollback-xxxxxxxxxxxxxxxxxxxxxxxxxx";
     const devisRollback = (await admin.query('insert into devis ("artisanId","clientId",numero,statut) values ($1,(select id from clients where "artisanId"=$1 limit 1),$2,$3) returning id', [artisanId, `SIG-RB-${UID}`, "envoye"])).rows[0].id as number;
-    await admin.query("insert into signatures_devis (\"devisId\",token,\"expiresAt\") values ($1,$2, now() + interval '30 days')", [devisRollback, tokenRollback]);
+    await admin.query("insert into signatures_devis (\"artisanId\",\"devisId\",token,\"expiresAt\") values ($1,$2,$3, now() + interval '30 days')", [artisanId, devisRollback, tokenRollback]);
     const sigBefore = Number((await admin.query("select count(*) from signatures_devis where statut='accepte'")).rows[0].count);
     const outboxBefore = Number((await admin.query("select count(*) from event_outbox where action='devis.signe'")).rows[0].count);
 

@@ -31,7 +31,7 @@ describe.skipIf(!URL)("signature e2e (routeur monté, surface publique par token
     const artisanId = (await admin.query('insert into artisans ("userId","nomEntreprise") values ($1,$2) returning id', [UID, "E2E"])).rows[0].id;
     const clientId = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [artisanId, "C"])).rows[0].id;
     devisId = (await admin.query('insert into devis ("artisanId","clientId",numero,statut) values ($1,$2,$3,$4) returning id', [artisanId, clientId, `E2E-${UID}`, "envoye"])).rows[0].id;
-    await admin.query('insert into signatures_devis ("devisId",token,"expiresAt") values ($1,$2, now() + interval \'30 days\')', [devisId, TOKEN]);
+    await admin.query('insert into signatures_devis ("artisanId","devisId",token,"expiresAt") values ($1,$2,$3, now() + interval \'30 days\')', [artisanId, devisId, TOKEN]);
     app = buildApp();
   });
   afterAll(async () => {
@@ -56,7 +56,7 @@ describe.skipIf(!URL)("signature e2e (routeur monté, surface publique par token
     const artisanId2 = (await admin.query('insert into artisans ("userId","nomEntreprise") values ($1,$2) returning id', [UID + 1, "E2E2"])).rows[0].id;
     const clientId2 = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [artisanId2, "C2"])).rows[0].id;
     const devisId2 = (await admin.query('insert into devis ("artisanId","clientId",numero,statut) values ($1,$2,$3,$4) returning id', [artisanId2, clientId2, `E2E-TypeA-${UID}`, "accepte"])).rows[0].id;
-    await admin.query('insert into signatures_devis ("devisId",token,"expiresAt",statut) values ($1,$2, now() + interval \'30 days\', \'en_attente\')', [devisId2, token2]);
+    await admin.query('insert into signatures_devis ("artisanId","devisId",token,"expiresAt",statut) values ($1,$2,$3, now() + interval \'30 days\', \'en_attente\')', [artisanId2, devisId2, token2]);
     try {
       const body = { "0": { json: { token: token2, signatureData: "data:image/png;base64,AAA", signataireName: "Jean", signataireEmail: "jean@test.com" } } };
       const res = await app.inject({

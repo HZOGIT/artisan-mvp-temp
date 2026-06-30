@@ -43,7 +43,7 @@ export class SignatureRepositoryDrizzle implements ISignatureRepository {
   }
 
   async create(data: NewSignature): Promise<Signature> {
-    await this.db.insert(signaturesDevis).values({ devisId: data.devisId, token: data.token, expiresAt: data.expiresAt });
+    await this.db.insert(signaturesDevis).values({ artisanId: data.artisanId, devisId: data.devisId, token: data.token, expiresAt: data.expiresAt });
     const created = await this.getByToken(data.token);
     if (!created) throw new Error("Création de la signature échouée");
     return created;

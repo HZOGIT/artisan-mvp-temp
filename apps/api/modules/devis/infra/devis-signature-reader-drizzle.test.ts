@@ -36,7 +36,7 @@ describe.skipIf(!URL)("DevisSignatureReaderDrizzle (lecture signature par devisI
     const clientId = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [artisanId, "C"])).rows[0].id;
     devisSigne = (await admin.query('insert into devis ("artisanId","clientId",numero,statut) values ($1,$2,$3,$4) returning id', [artisanId, clientId, "DSR-1", "accepte"])).rows[0].id;
     devisNonSigne = (await admin.query('insert into devis ("artisanId","clientId",numero,statut) values ($1,$2,$3,$4) returning id', [artisanId, clientId, "DSR-2", "envoye"])).rows[0].id;
-    await admin.query('insert into signatures_devis ("devisId",token,"expiresAt") values ($1,$2,$3)', [devisSigne, TOKEN, new Date(Date.now() + 30 * 86400000)]);
+    await admin.query('insert into signatures_devis ("artisanId","devisId",token,"expiresAt") values ($1,$2,$3,$4)', [artisanId, devisSigne, TOKEN, new Date(Date.now() + 30 * 86400000)]);
   });
 
   afterAll(async () => {

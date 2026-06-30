@@ -22,7 +22,7 @@ import type { IEmailLogWriter } from "../../emails/application/email-log-writer"
  * la vérification que le devis appartient bien au tenant avant d'appeler ce creator.
  */
 export interface DevisSignatureCreator {
-  create(devisId: number): Promise<{ token: string }>;
+  create(devisId: number, artisanId: number): Promise<{ token: string }>;
 }
 
 export interface DevisMailingDeps {
@@ -164,7 +164,7 @@ export async function envoyerDevisParEmail(
   const existingSignature = await deps.signatureReader.getByDevisId(ctx, devis.id);
   let signatureToken = existingSignature?.token ?? null;
   if (!signatureToken && deps.signatureCreator) {
-    const created = await deps.signatureCreator.create(devis.id);
+    const created = await deps.signatureCreator.create(devis.id, ctx.artisanId);
     signatureToken = created.token;
   }
   const portalUrl = signatureToken ? `${deps.appUrl}/devis-public/${signatureToken}` : null;

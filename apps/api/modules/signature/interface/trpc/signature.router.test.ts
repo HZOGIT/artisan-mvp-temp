@@ -37,7 +37,7 @@ describe.skipIf(!URL)("signature.router e2e (admin protégé + refuseDevis publi
     const clientId = (await admin.query('insert into clients ("artisanId",nom,email) values ($1,$2,$3) returning id', [artisanId, "Durand", "c@test.com"])).rows[0].id;
     devisForLink = (await admin.query('insert into devis ("artisanId","clientId",numero,statut) values ($1,$2,$3,$4) returning id', [artisanId, clientId, "DEV-LINK", "envoye"])).rows[0].id;
     devisForRefuse = (await admin.query('insert into devis ("artisanId","clientId",numero,statut) values ($1,$2,$3,$4) returning id', [artisanId, clientId, "DEV-REF", "envoye"])).rows[0].id;
-    await admin.query('insert into signatures_devis ("devisId",token,"expiresAt") values ($1,$2, now() + interval \'30 days\')', [devisForRefuse, TOKEN_REFUSE]);
+    await admin.query('insert into signatures_devis ("artisanId","devisId",token,"expiresAt") values ($1,$2,$3, now() + interval \'30 days\')', [artisanId, devisForRefuse, TOKEN_REFUSE]);
     app = buildApp({ jwtSecret: SECRET, emailPort: new FakeEmailPort() });
   });
 

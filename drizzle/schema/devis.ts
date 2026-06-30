@@ -66,6 +66,7 @@ export type InsertDevisLigne = typeof devisLignes.$inferInsert;
 
 export const signaturesDevis = pgTable("signatures_devis", {
   id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
   devisId: integer("devisId").notNull().unique(),
   token: varchar("token", { length: 64 }).notNull().unique(),
   statut: signatureStatutEnum("statut").default("en_attente"),
@@ -80,7 +81,9 @@ export const signaturesDevis = pgTable("signatures_devis", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   documentHash: varchar("documentHash", { length: 64 }),
   documentHashedAt: timestamp("documentHashedAt"),
-});
+}, (t) => [
+  index("idx_signatures_devis_artisan").on(t.artisanId),
+]);
 export type SignatureDevis = typeof signaturesDevis.$inferSelect;
 export type InsertSignatureDevis = typeof signaturesDevis.$inferInsert;
 

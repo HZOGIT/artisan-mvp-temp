@@ -11,6 +11,8 @@ excluded_rules = [
   # FK adds : risque mais legitime et courant dans nos migrations
   "adding-foreign-key-constraint",
   "disallowed-unique-constraint",
+  # SET NOT NULL est sur apres backfill + NOT VALID/VALIDATE (pattern obligatoire pour grandes tables)
+  "adding-not-nullable-field",
   # Choix de types deliberes — drizzle-kit genere integer/timestamp/serial/varchar
   "prefer-text-field",
   "prefer-bigint-over-int",

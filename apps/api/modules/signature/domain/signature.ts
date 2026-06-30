@@ -32,6 +32,7 @@ export interface Signature {
 
 /** Entrée de création d'une demande de signature (token + échéance générés serveur). */
 export interface NewSignature {
+  readonly artisanId: number;
   readonly devisId: number;
   readonly token: string;
   readonly expiresAt: Date;
