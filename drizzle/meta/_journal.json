@@ -274,6 +274,13 @@
       "when": 1751295600000,
       "tag": "20260630130000_stock-check-non-negatif-fk-mouvements",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1751299200000,
+      "tag": "20260630140000_backfill-mouvements-stock-initiaux",
+      "breakpoints": true
     }
   ]
 }

@@ -15,13 +15,15 @@ describe("stocks — invariants métier (synthèse)", () => {
   it("INV-1 : la quantité ne change QUE via un mouvement tracé (create init ; update n'y touche pas)", async () => {
     const repo = new FakeStockRepository();
     const s = await creerStock(repo, A, { reference: "R", designation: "D", quantiteEnStock: "10" });
-    // `UpdateStockInput` n'expose pas `quantiteEnStock` → la quantité reste intacte.
+    /** creerStock avec qty > 0 trace un mouvement initial de type 'entree'. */
+    expect((await getMouvementsStock(repo, A, s.id)).length).toBe(1);
+    /** `UpdateStockInput` n'expose pas `quantiteEnStock` → la quantité reste intacte. */
     await modifierStock(repo, A, s.id, { designation: "Renommé", emplacement: "Allée 9" });
     expect((await getStock(repo, A, s.id)).quantiteEnStock).toBe("10.00");
-    // Seul `adjustQuantity` la modifie, en traçant un mouvement.
+    /** Seul `adjustQuantity` la modifie, en traçant un mouvement supplémentaire. */
     await ajusterQuantiteStock(repo, A, s.id, { type: "entree", quantite: "5" });
     expect((await getStock(repo, A, s.id)).quantiteEnStock).toBe("15.00");
-    expect((await getMouvementsStock(repo, A, s.id)).length).toBe(1);
+    expect((await getMouvementsStock(repo, A, s.id)).length).toBe(2);
   });
 
   it("INV-2 : tout mouvement laisse une trace avant/après cohérente", async () => {
@@ -35,14 +37,15 @@ describe("stocks — invariants métier (synthèse)", () => {
     expect(mvt.quantite).toBe("8.00");
   });
 
-  it("INV-3 : la quantité physique ne peut jamais devenir négative (sortie refusée, aucun mouvement)", async () => {
+  it("INV-3 : la quantité physique ne peut jamais devenir négative (sortie refusée, aucun mouvement supplémentaire)", async () => {
     const repo = new FakeStockRepository();
     const s = await creerStock(repo, A, { reference: "R", designation: "D", quantiteEnStock: "3" });
+    const mvtAvant = (await getMouvementsStock(repo, A, s.id)).length; /** 1 mouvement initial */
     await expect(ajusterQuantiteStock(repo, A, s.id, { type: "sortie", quantite: "5" })).rejects.toBeInstanceOf(
       ValidationError,
     );
-    expect((await getStock(repo, A, s.id)).quantiteEnStock).toBe("3.00"); // inchangée
-    expect(await getMouvementsStock(repo, A, s.id)).toEqual([]); // rien tracé
+    expect((await getStock(repo, A, s.id)).quantiteEnStock).toBe("3.00"); /** inchangée */
+    expect((await getMouvementsStock(repo, A, s.id)).length).toBe(mvtAvant); /** rien tracé de plus */
   });
 
   it("INV-4 : isolation cross-tenant sur toutes les voies d'écriture et de lecture", async () => {

@@ -60,6 +60,26 @@ describe.skipIf(!URL)("StockRepositoryDrizzle (PG, RLS + scope tenant)", () => {
     expect(maj?.quantiteEnStock).toBe("50.00"); // quantité intacte
   });
 
+  it("create avec quantiteEnStock > 0 insère un mouvement initial 'entree' (traçabilité)", async () => {
+    const s = await repo.create(ctx(A), { reference: "INIT-MV", designation: "Mouvement initial", quantiteEnStock: "42.00" });
+    const mvts = await repo.listMouvements(ctx(A), s.id);
+    expect(mvts).not.toBeNull();
+    expect(mvts!.length).toBe(1);
+    const [mv] = mvts!;
+    expect(mv.type).toBe("entree");
+    expect(mv.quantite).toBe("42.00");
+    expect(mv.quantiteAvant).toBe("0.00");
+    expect(mv.quantiteApres).toBe("42.00");
+    expect(mv.motif).toBe("Stock initial");
+  });
+
+  it("create avec quantiteEnStock = 0 ou absent : aucun mouvement initial", async () => {
+    const s0 = await repo.create(ctx(A), { reference: "INIT-ZERO", designation: "Zéro" });
+    expect((await repo.listMouvements(ctx(A), s0.id))!.length).toBe(0);
+    const sExplicit = await repo.create(ctx(A), { reference: "INIT-EXP0", designation: "Explicite zéro", quantiteEnStock: "0.00" });
+    expect((await repo.listMouvements(ctx(A), sExplicit.id))!.length).toBe(0);
+  });
+
   it("listEntrant : Σ(quantite-quantiteRecue) des commandes non soldées, isolé par tenant", async () => {
     const stock = await repo.create(ctx(A), { reference: "ENT-L2", designation: "Entrant L2", quantiteEnStock: "0.00" });
     const fId = (await admin.query("insert into fournisseurs (\"artisanId\", nom) values ($1, 'F-L2') returning id", [A])).rows[0].id as number;
