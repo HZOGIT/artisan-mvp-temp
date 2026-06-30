@@ -177,6 +177,31 @@ describe("processConnectWebhook", () => {
       expect(result.http).toBe(200);
       expect(paymentWriter.completeCheckout).not.toHaveBeenCalled();
     });
+
+    it("OPE-976 — onCheckoutCompletedEmail appelé avec données metadata Stripe", async () => {
+      const paymentWriter = makePaymentWriter();
+      const emailCalls: Array<{ artisanId: number; factureId: number; clientId: number; clientEmail: string; clientName: string; factureNumero: string; totalTTC: string }> = [];
+      const session = { payment_intent: "pi_em4", amount_total: 18000, metadata: { token_paiement: "tok_connect_em", facture_id: "99", customer_email: "client@connect.com", customer_name: "Charlie Martin", numero_facture: "FAC-2026-099", user_id: "77" } };
+      const event: StripeWebhookEvent = { id: "evt_connect_em1", type: "checkout.session.completed", account: "acct_1", data: { object: session } };
+      const result = await processConnectWebhook({ ...makeDeps(event, { paymentWriter }), onCheckoutCompletedEmail: async (d) => { emailCalls.push(d); } }, { rawBody: RAW, signature: SIG });
+      expect(result.http).toBe(200);
+      expect(emailCalls).toHaveLength(1);
+      expect(emailCalls[0]).toMatchObject({ artisanId: 7, factureId: 42, clientId: 77, clientEmail: "client@connect.com", clientName: "Charlie Martin", factureNumero: "FAC-2026-099", totalTTC: "180.00 €" });
+    });
+
+    it("OPE-976 — erreur onCheckoutCompletedEmail → 200 + loggée (best-effort)", async () => {
+      const paymentWriter = makePaymentWriter();
+      const logged: string[] = [];
+      const fakeLog = { error: (_obj: unknown, msg: string) => { logged.push(msg); }, info: () => {}, warn: () => {}, debug: () => {} };
+      const session = { payment_intent: "pi_em5", metadata: { token_paiement: "tok_connect_err", facture_id: "100", customer_email: "err@test.com", customer_name: "Test", numero_facture: "FAC-ERR", user_id: "1" } };
+      const event: StripeWebhookEvent = { id: "evt_connect_em2", type: "checkout.session.completed", account: "acct_1", data: { object: session } };
+      const result = await processConnectWebhook(
+        { ...makeDeps(event, { paymentWriter }), log: fakeLog as never, onCheckoutCompletedEmail: async () => { throw new Error("SMTP error"); } },
+        { rawBody: RAW, signature: SIG },
+      );
+      expect(result.http).toBe(200);
+      expect(logged.some(m => m.includes("Email confirmation client paiement Connect"))).toBe(true);
+    });
   });
 
   describe("payment_intent.payment_failed (direct charge Lot 4)", () => {

@@ -13,6 +13,19 @@ export interface ConnectWebhookDeps {
   readonly paymentWriter?: WebhookPaymentWriter;
   /** Best-effort compta après paiement portail (génération des écritures vente + encaissement). */
   readonly genererEcrituresFacture?: (artisanId: number, factureId: number) => Promise<void>;
+  /**
+   * Email de confirmation de paiement envoyé au client après checkout.session.completed Connect.
+   * Best-effort : l'erreur est loggée mais ne bloque pas la confirmation du paiement.
+   */
+  readonly onCheckoutCompletedEmail?: (data: {
+    artisanId: number;
+    factureId: number;
+    clientId: number;
+    clientEmail: string;
+    clientName: string;
+    factureNumero: string;
+    totalTTC: string;
+  }) => Promise<void>;
 }
 
 export interface ConnectWebhookResult {
@@ -83,6 +96,18 @@ async function handleConnectCheckoutCompleted(
   await deps.genererEcrituresFacture?.(resolved.artisanId, resolved.factureId).catch((err: unknown) => {
     deps.log?.error({ event: "connect_checkout_ecritures_error", factureId: resolved.factureId, error: err instanceof Error ? err.message : String(err) }, "Erreur genererEcritures après paiement Connect (best-effort compta)");
   });
+
+  const clientEmail = typeof metadata.customer_email === "string" && metadata.customer_email ? metadata.customer_email : null;
+  if (clientEmail && deps.onCheckoutCompletedEmail) {
+    const clientId = typeof metadata.user_id === "string" ? Number(metadata.user_id) : 0;
+    const clientName = typeof metadata.customer_name === "string" ? metadata.customer_name : "";
+    const factureNumero = typeof metadata.numero_facture === "string" ? metadata.numero_facture : "";
+    const amountCents = typeof session.amount_total === "number" ? session.amount_total : null;
+    const totalTTC = amountCents != null ? `${(amountCents / 100).toFixed(2)} €` : "";
+    await deps.onCheckoutCompletedEmail({ artisanId: resolved.artisanId, factureId: resolved.factureId, clientId, clientEmail, clientName, factureNumero, totalTTC }).catch((err: unknown) => {
+      deps.log?.error({ event: "connect_checkout_email_client_error", artisanId: resolved.artisanId, factureId: resolved.factureId, error: err instanceof Error ? err.message : String(err) }, "Email confirmation client paiement Connect échoué");
+    });
+  }
 }
 
 async function handleConnectPaymentFailed(

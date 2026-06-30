@@ -41,11 +41,75 @@ export interface StripeWebhookDeps {
    * Best-effort : une erreur compta ne doit pas annuler le paiement déjà confirmé.
    */
   readonly genererEcrituresFacture?: (artisanId: number, factureId: number) => Promise<void>;
+  /**
+   * Email de confirmation de paiement envoyé au client après checkout.session.completed.
+   * Best-effort : l'erreur est loggée mais ne bloque pas la confirmation du paiement.
+   * clientId = metadata.user_id (accès portail client).
+   */
+  readonly onCheckoutCompletedEmail?: (data: {
+    artisanId: number;
+    factureId: number;
+    clientId: number;
+    clientEmail: string;
+    clientName: string;
+    factureNumero: string;
+    totalTTC: string;
+  }) => Promise<void>;
 }
 
 export interface WebhookResult {
   readonly http: number;
   readonly body: Record<string, unknown>;
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+/** Corps HTML de l'email de confirmation de paiement envoyé au client (pur, testable). */
+export function buildPaiementConfirmationEmail(params: {
+  artisanName: string;
+  clientName: string;
+  factureNumero: string;
+  totalTTC: string;
+  portalUrl?: string | null;
+}): { subject: string; body: string } {
+  const { artisanName, clientName, factureNumero, totalTTC, portalUrl } = params;
+  const subject = `Confirmation de paiement - Facture ${factureNumero}`;
+  const portalButton = portalUrl
+    ? `<tr><td style="padding:16px 40px 36px 40px;text-align:center;">
+          <a href="${portalUrl}" style="display:inline-block;background-color:#16a34a;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;padding:14px 32px;border-radius:6px;">Consulter ma facture</a>
+       </td></tr>`
+    : `<tr><td style="padding:0 40px 36px 40px;"></td></tr>`;
+  const body = `<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 0;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;">
+        <tr><td style="background-color:#16a34a;padding:28px 40px;text-align:center;">
+          <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">${escapeHtml(artisanName)}</h1>
+        </td></tr>
+        <tr><td style="padding:36px 40px 16px 40px;">
+          <p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour ${escapeHtml(clientName)},</p>
+          <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Votre paiement a bien été reçu. Merci !</p>
+        </td></tr>
+        <tr><td style="padding:0 40px 28px 40px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;">
+            <tr><td style="padding:20px 24px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr><td style="padding:6px 0;font-size:14px;color:#6b7280;width:45%;">Numéro de facture</td><td style="padding:6px 0;font-size:14px;color:#111827;font-weight:600;text-align:right;">${escapeHtml(factureNumero)}</td></tr>
+                <tr><td style="padding:6px 0;font-size:14px;color:#6b7280;border-top:1px solid #bbf7d0;">Montant payé</td><td style="padding:6px 0;font-size:16px;color:#16a34a;font-weight:700;text-align:right;border-top:1px solid #bbf7d0;">${escapeHtml(totalTTC)}</td></tr>
+              </table>
+            </td></tr>
+          </table>
+        </td></tr>
+        ${portalButton}
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+  return { subject, body };
 }
 
 export async function processStripeWebhook(
@@ -142,6 +206,18 @@ async function handleCheckoutCompleted(deps: StripeWebhookDeps, session: Record<
       lien: `/factures/${resolved.factureId}`,
     });
   } catch { /* best-effort */ }
+
+  const clientEmail = typeof metadata.customer_email === "string" && metadata.customer_email ? metadata.customer_email : null;
+  if (clientEmail && deps.onCheckoutCompletedEmail) {
+    const clientId = typeof metadata.user_id === "string" ? Number(metadata.user_id) : 0;
+    const clientName = typeof metadata.customer_name === "string" ? metadata.customer_name : "";
+    const factureNumero = typeof metadata.numero_facture === "string" ? metadata.numero_facture : "";
+    const amountCents = typeof session.amount_total === "number" ? session.amount_total : null;
+    const totalTTC = amountCents != null ? `${(amountCents / 100).toFixed(2)} €` : "";
+    await deps.onCheckoutCompletedEmail({ artisanId: resolved.artisanId, factureId: resolved.factureId, clientId, clientEmail, clientName, factureNumero, totalTTC }).catch((err: unknown) => {
+      deps.log?.error({ event: "checkout_email_client_error", artisanId: resolved.artisanId, factureId: resolved.factureId, error: err instanceof Error ? err.message : String(err) }, "Email confirmation client paiement échoué");
+    });
+  }
 }
 
 async function handlePaymentFailed(deps: StripeWebhookDeps, pi: Record<string, unknown>): Promise<void> {

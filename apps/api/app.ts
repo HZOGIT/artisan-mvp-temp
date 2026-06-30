@@ -160,6 +160,7 @@ import { ChatClientNotifierDrizzle } from "./modules/chat/infra/chat-client-noti
 import { registerIcalRoute } from "./interface/http/ical-route";
 import { IcalPublicReaderDrizzle } from "./modules/calendrier/infra/ical-public-reader-drizzle";
 import { registerStripeWebhookRoute } from "./interface/http/stripe-webhook-route";
+import { buildPaiementConfirmationEmail } from "./modules/subscription/application/webhook-use-cases";
 import { registerStripeConnectWebhookRoute } from "./interface/http/stripe-connect-webhook-route";
 import { ConnectArtisanWriterDrizzle } from "./modules/connect/infra/connect-artisan-writer-drizzle";
 import { registerResendWebhookRoute } from "./interface/http/resend-webhook-route";
@@ -1327,13 +1328,28 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     rateLimiter: new SlidingWindowRateLimiter(60, 60 * 1000),
   });
 
+  const appUrlForPortail = deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com";
+  const onCheckoutCompletedEmail = async (data: { artisanId: number; factureId: number; clientId: number; clientEmail: string; clientName: string; factureNumero: string; totalTTC: string }): Promise<void> => {
+    const ctx = { artisanId: data.artisanId, userId: 0 };
+    const artisan = await new ArtisanReaderDrizzle(getDbHandle().db).getArtisan(ctx);
+    let portalUrl: string | null = null;
+    if (data.clientId) {
+      const ps = await new PortalAccessRepositoryDrizzle(getDbHandle().db).getStatusByClientId(ctx, data.clientId);
+      if (ps?.actif) portalUrl = `${appUrlForPortail}/portail/${ps.token}`;
+    }
+    const artisanName = artisan?.nomEntreprise || "Votre artisan";
+    const { subject, body } = buildPaiementConfirmationEmail({ artisanName, clientName: data.clientName, factureNumero: data.factureNumero, totalTTC: data.totalTTC, portalUrl });
+    await emailAdapter.send({ to: data.clientEmail, subject, body, fromName: artisan?.nomEntreprise ?? undefined, replyTo: artisan?.email ?? undefined });
+    await sharedEmailLogWriter?.create({ artisanId: data.artisanId, destinataire: data.clientEmail, sujet: subject, type: "confirmation_paiement", entiteType: "facture", entiteId: data.factureId }).catch(() => { /* ponytail: best-effort — emailLogWriter non-critique */ });
+  };
+
   /** Webhook Stripe SIGNÉ `/api/stripe/webhook` — vérif signature fail-closed → sync `subscriptions`. */
   registerStripeWebhookRoute(app, {
     stripe: deps.stripePort ?? new StripeAdapter(),
     paymentWriter: new WebhookPaymentWriterDrizzle(getDbHandle().db),
     notifier: new SubscriptionEventNotifierDrizzle(getDbHandle().db, emailAdapter),
     webhookSecret: deps.stripeWebhookSecret ?? process.env.STRIPE_WEBHOOK_SECRET ?? "",
-    appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+    appUrl: appUrlForPortail,
     onBillingWebhookEvent: (eventType, piId, fc, fm, stripeEventId) =>
       handleBillingWebhookEvent({ repo: billingRepo, db: getDbHandle().db }, eventType, piId, fc, fm, stripeEventId),
     onSubscriptionWebhookEvent: (artisanId, priceId, stripeStatus) =>
@@ -1344,6 +1360,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       await compta.genererEcrituresEncaissement({ artisanId, userId: 0 }, factureId);
       await compta.validerEcritures({ artisanId, userId: 0 }, factureId);
     },
+    onCheckoutCompletedEmail,
   });
 
   /** Webhook Stripe Connect `/api/stripe/connect-webhook` — account.updated / deauthorized + checkout.session.completed / payment_intent.payment_failed (direct charges factures). */
@@ -1357,6 +1374,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       await compta.genererEcrituresEncaissement({ artisanId, userId: 0 }, factureId);
       await compta.validerEcritures({ artisanId, userId: 0 }, factureId);
     },
+    onCheckoutCompletedEmail,
   });
 
   const resendSecret = deps.resendWebhookSecret ?? process.env.RESEND_WEBHOOK_SECRET;
