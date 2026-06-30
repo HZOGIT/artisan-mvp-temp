@@ -80,10 +80,24 @@ export function sectionSousTotaux(
   return result;
 }
 
+const TRANSITIONS_DEVIS: Record<string, readonly string[]> = {
+  brouillon: ["envoye"],
+  envoye: ["accepte", "refuse", "expire"],
+  accepte: [],
+  refuse: [],
+  expire: [],
+};
+
+/** Statuts légaux suivants depuis `current` (vide = état terminal). PUR. */
+export function nextStatuts(current: string): readonly string[] {
+  return TRANSITIONS_DEVIS[current] ?? [];
+}
+
 /** Mutation de transition de statut cible (ou null si non disponible). PUR. */
-export function statutTransition(target: string): "envoyer" | "accepter" | "refuser" | null {
+export function statutTransition(target: string): "envoyer" | "accepter" | "refuser" | "expirer" | null {
   if (target === "envoye") return "envoyer";
   if (target === "accepte") return "accepter";
   if (target === "refuse") return "refuser";
+  if (target === "expire") return "expirer";
   return null;
 }

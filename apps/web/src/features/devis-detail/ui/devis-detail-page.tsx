@@ -16,7 +16,7 @@ import { Badge } from "@/shared/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 import { Textarea } from "@/shared/ui/textarea";
 import { useDevisDetail } from "../application/use-devis-detail";
-import { formatCurrency, activitesForDevis, pendingCount, pdfLignes, statutTransition, STATUS_LABEL_KEY, STATUS_COLORS, RAPPEL_TYPE_KEY, sectionSousTotaux, type RappelType } from "../domain/devis-detail";
+import { formatCurrency, activitesForDevis, pendingCount, pdfLignes, statutTransition, nextStatuts, STATUS_LABEL_KEY, STATUS_COLORS, RAPPEL_TYPE_KEY, sectionSousTotaux, type RappelType } from "../domain/devis-detail";
 
 /*
  * Page `/devis/:id` — migration clean-archi de `pages/DevisDetail.tsx`. Markup à l'identique. Le dialog
@@ -55,6 +55,7 @@ export default function DevisDetailPage() {
     if (which === "envoyer") D.envoyer.mutate({ id }, { onSuccess: onOk, onError: onErr });
     else if (which === "accepter") D.accepter.mutate({ id }, { onSuccess: onOk, onError: onErr });
     else if (which === "refuser") D.refuser.mutate({ id }, { onSuccess: onOk, onError: onErr });
+    else if (which === "expirer") D.expirer.mutate({ id }, { onSuccess: onOk, onError: onErr });
   };
 
   const handleExportPDF = () => {
@@ -139,15 +140,20 @@ export default function DevisDetailPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Select value={statut} onValueChange={handleStatusChange}>
-            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="brouillon">{t("statutBrouillon")}</SelectItem>
-              <SelectItem value="envoye">{t("statutEnvoye")}</SelectItem>
-              <SelectItem value="accepte">{t("statutAccepte")}</SelectItem>
-              <SelectItem value="refuse">{t("statutRefuse")}</SelectItem>
-            </SelectContent>
-          </Select>
+          {(() => {
+            const suivants = nextStatuts(statut);
+            return (
+              <Select value={statut} onValueChange={handleStatusChange} disabled={suivants.length === 0}>
+                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={statut} disabled>{t(STATUS_LABEL_KEY[statut] ?? "statutBrouillon")}</SelectItem>
+                  {suivants.map((s) => (
+                    <SelectItem key={s} value={s}>{t(STATUS_LABEL_KEY[s] ?? s)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            );
+          })()}
           <Button variant="outline" onClick={handleExportPDF}><Download className="h-4 w-4 mr-2" />{t("exportPDF")}</Button>
           <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
             <DialogTrigger asChild><Button variant="outline" disabled={!devis.client?.email}><Mail className="h-4 w-4 mr-2" />{t("envoyerEmail")}</Button></DialogTrigger>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCurrency, activitesForDevis, pendingCount, pdfLignes, statutTransition, type Activite, type Ligne } from "./devis-detail";
+import { formatCurrency, activitesForDevis, pendingCount, pdfLignes, statutTransition, nextStatuts, type Activite, type Ligne } from "./devis-detail";
 
 const act = (over: Partial<Activite>): Activite => ({ id: 1, entiteType: "devis", entiteId: 5, fait: false, titre: "T", echeance: "2026-06-20", type: "relance", ...over } as unknown as Activite);
 
@@ -9,7 +9,15 @@ describe("devis-detail — domain pur", () => {
     expect(statutTransition("envoye")).toBe("envoyer");
     expect(statutTransition("accepte")).toBe("accepter");
     expect(statutTransition("refuse")).toBe("refuser");
+    expect(statutTransition("expire")).toBe("expirer");
     expect(statutTransition("brouillon")).toBeNull();
+  });
+  it("nextStatuts : machine à états — transitions légales par statut", () => {
+    expect(nextStatuts("brouillon")).toEqual(["envoye"]);
+    expect(nextStatuts("envoye")).toEqual(["accepte", "refuse", "expire"]);
+    expect(nextStatuts("accepte")).toEqual([]);
+    expect(nextStatuts("refuse")).toEqual([]);
+    expect(nextStatuts("expire")).toEqual([]);
   });
   it("activitesForDevis : filtre entité + tri par échéance", () => {
     const list = [act({ id: 1, entiteId: 5, echeance: "2026-06-25" }), act({ id: 2, entiteId: 9, echeance: "2026-06-21" }), act({ id: 3, entiteId: 5, echeance: "2026-06-20" })];
