@@ -1,4 +1,5 @@
 export default {
+  "drizzle/*.sql": (files) => `squawk ${files.join(" ")}`,
   "apps/api/**/*.ts": (files) => [
     `eslint -c eslint.api.config.mjs --max-warnings=-1 --no-warn-ignored --cache --cache-strategy=content --cache-location node_modules/.cache/eslint/api/ ${files.join(" ")}`,
     `vitest related --run --passWithNoTests -c vitest.unit.api.config.ts ${files.join(" ")}`,

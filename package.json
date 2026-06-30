@@ -23,6 +23,7 @@
     "test:unit:api": "vitest run -c vitest.unit.api.config.ts",
     "test:coverage": "vitest run -c vitest.api.config.ts --coverage",
     "test:coverage:web": "vitest run -c vitest.web.config.ts --coverage",
+    "squawk": "squawk drizzle/*.sql",
     "prepare": "husky && (git config merge.drizzle-journal.driver 'node scripts/drizzle/canonicalize-journal.mjs merge %O %A %B' 2>/dev/null; true)"
   },
   "dependencies": {
@@ -165,6 +166,7 @@
     "pnpm": "^11.8.0",
     "postcss": "^8.4.47",
     "prettier": "^3.6.2",
+    "squawk-cli": "^2.59.0",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.19.1",
     "tw-animate-css": "^1.4.0",

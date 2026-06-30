@@ -1,0 +1,15 @@
+# squawk : linter de sûreté des migrations Postgres
+# Règles actives (crash-loop potentiel) :
+#   adding-required-field, require-concurrent-index-creation,
+#   constraint-missing-not-valid, adding-foreign-key-constraint,
+#   disallowed-unique-constraint
+excluded_rules = [
+  # Choix délibérés du projet — drizzle-kit génère integer/timestamp/serial
+  "prefer-text-field",
+  "prefer-bigint-over-int",
+  "prefer-timestamp-tz",
+  "prefer-identity",
+  # Trop bruyantsqué — timeouts gérés par le migrateur ; IF NOT EXISTS hors-scope
+  "require-timeout-settings",
+  "prefer-robust-stmts",
+]

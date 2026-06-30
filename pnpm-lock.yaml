@@ -423,6 +423,9 @@ importers:
       prettier:
         specifier: ^3.6.2
         version: 3.6.2
+      squawk-cli:
+        specifier: ^2.59.0
+        version: 2.59.0
       tailwindcss:
         specifier: ^4.1.14
         version: 4.1.14
@@ -2954,6 +2957,31 @@ packages:
   '@smithy/uuid@1.1.0':
     resolution: {integrity: sha512-4aUIteuyxtBUhVdiQqcDhKFitwfd9hqoSDYY2KRXiWtgoWJ9Bmise+KfEPDiVHWeJepvF8xJO9/9+WDIciMFFw==}
     engines: {node: '>=18.0.0'}
+
+  '@squawk-cli/darwin-arm64@2.59.0':
+    resolution: {integrity: sha512-nmc/6KgNLjeChGv6WlqimmbrU/pszuKsZhEnomxCozXp8OeNvk9WlMXZVpRt7p9/uI5EXunnL390KQ8ueoQFXA==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@squawk-cli/darwin-x64@2.59.0':
+    resolution: {integrity: sha512-LAqi4NDW5ziB1gClxnpQCaWT7pxANhVi5YW3amSDdl5Nf9NDd9vJYafdbnhJxu0J8N9hDzhMU28SoTCljWEy1Q==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@squawk-cli/linux-arm64@2.59.0':
+    resolution: {integrity: sha512-DZyyXK4FxJYd7yO8Niu8Jdvmu/5NP/Ipa+hL52ydk6Qj+WcN5Q23dluuhi0n/RYombyo937elncqQr2we3X/4A==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@squawk-cli/linux-x64@2.59.0':
+    resolution: {integrity: sha512-09CDxHy/dtL5X28sMKlTpb/hxHRkWbVmdvS6U7vyU1cW4ECEpnfmj7Z6g+BV1WlD+vhaJ4TBb86Pkqc/pA+BFw==}
+    cpu: [x64]
+    os: [linux]
+
+  '@squawk-cli/win32-x64@2.59.0':
+    resolution: {integrity: sha512-mSAscGq67sK4W9qdph7ALxuInyIBN7EeHs3WSxu/wFV5HsNNMSWlc9rfmsjAlGTtV8fJaRcAkeS38fyrRGWZSg==}
+    cpu: [x64]
+    os: [win32]
 
   '@stablelib/base64@1.0.1':
     resolution: {integrity: sha512-1bnPQqSxSuc3Ii6MhBysoWCg58j97aUjuCSZrGSmDxNqtytIi0k8utUenAwTZN4V5mXXYGsVUI9zeBqy+jBOSQ==}
@@ -6371,6 +6399,10 @@ packages:
   sqlstring@2.3.3:
     resolution: {integrity: sha512-qC9iz2FlN7DQl3+wjwn3802RTyjCx7sDvfQEXchwa6CWOx07/WVfh91gBmQ9fahw8snwGEWU3xGzOt4tFyHLxg==}
     engines: {node: '>= 0.6'}
+
+  squawk-cli@2.59.0:
+    resolution: {integrity: sha512-SzUUI+tyJeXbBtDfkDGxJOn+9k6NO1cdOly4AHpOPopuv2JOEA4oTJi/HimsCLvE2MRQhxRnGKaav58OaFEUXQ==}
+    hasBin: true
 
   stable-hash-x@0.2.0:
     resolution: {integrity: sha512-o3yWv49B/o4QZk5ZcsALc6t0+eCelPc44zZsLtCQnZPDwFpDYSWcDnrv2TtMmMbQ7uKo3J0HTURCqckw23czNQ==}
@@ -10014,6 +10046,21 @@ snapshots:
   '@smithy/uuid@1.1.0':
     dependencies:
       tslib: 2.8.1
+
+  '@squawk-cli/darwin-arm64@2.59.0':
+    optional: true
+
+  '@squawk-cli/darwin-x64@2.59.0':
+    optional: true
+
+  '@squawk-cli/linux-arm64@2.59.0':
+    optional: true
+
+  '@squawk-cli/linux-x64@2.59.0':
+    optional: true
+
+  '@squawk-cli/win32-x64@2.59.0':
+    optional: true
 
   '@stablelib/base64@1.0.1': {}
 
@@ -13859,6 +13906,14 @@ snapshots:
 
   sqlstring@2.3.3:
     optional: true
+
+  squawk-cli@2.59.0:
+    optionalDependencies:
+      '@squawk-cli/darwin-arm64': 2.59.0
+      '@squawk-cli/darwin-x64': 2.59.0
+      '@squawk-cli/linux-arm64': 2.59.0
+      '@squawk-cli/linux-x64': 2.59.0
+      '@squawk-cli/win32-x64': 2.59.0
 
   stable-hash-x@0.2.0: {}
 
