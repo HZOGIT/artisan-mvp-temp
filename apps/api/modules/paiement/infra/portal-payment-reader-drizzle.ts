@@ -102,6 +102,11 @@ export class PortalPaymentReaderDrizzle implements PortalPaymentReader {
     return !!(a?.accountId && a?.chargesEnabled);
   }
 
+  async getArtisanConnectAccountId(ctx: TenantContext): Promise<string | null> {
+    const [a] = await this.db.select({ accountId: artisans.stripeConnectAccountId }).from(artisans).where(eq(artisans.id, ctx.artisanId)).limit(1);
+    return a?.accountId ?? null;
+  }
+
   getSessionEnAttente(ctx: TenantContext, factureId: number, now: Date): Promise<{ url: string | null; sessionId: string | null } | null> {
     const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     return withTenant(this.db, ctx, async (tx) => {

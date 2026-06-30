@@ -1342,11 +1342,16 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     eventBus,
   });
 
-  /** Webhook Stripe Connect `/api/stripe/connect-webhook` — account.updated / deauthorized via owner pool. */
+  /** Webhook Stripe Connect `/api/stripe/connect-webhook` — account.updated / deauthorized + checkout.session.completed / payment_intent.payment_failed (direct charges factures). */
   registerStripeConnectWebhookRoute(app, {
     stripe: deps.stripePort ?? new StripeAdapter(),
     writer: new ConnectArtisanWriterDrizzle(getOwnerDbHandle().db),
     webhookSecret: getStripeConnectWebhookSecret() ?? "",
+    paymentWriter: new WebhookPaymentWriterDrizzle(getDbHandle().db),
+    genererEcrituresFacture: async (artisanId: number, factureId: number) => {
+      await compta.genererEcrituresVente({ artisanId, userId: 0 }, factureId);
+      await compta.genererEcrituresEncaissement({ artisanId, userId: 0 }, factureId);
+    },
   });
 
   const resendSecret = deps.resendWebhookSecret ?? process.env.RESEND_WEBHOOK_SECRET;

@@ -24,6 +24,8 @@ export interface CreateInvoiceCheckoutParams {
   readonly origin: string;
   readonly tokenPaiement: string;
   readonly portalToken: string;
+  /** ID du compte Stripe Connect de l'artisan (direct charge — Stripe-Account header). */
+  readonly stripeConnectAccountId: string;
 }
 
 export interface CheckoutSessionStatus {
@@ -54,7 +56,8 @@ export interface StripePort {
   constructEvent(rawBody: Buffer, signature: string, secret: string): Promise<StripeWebhookEvent>;
   createCustomer(params: CreateCustomerParams): Promise<{ id: string }>;
   createInvoiceCheckout(params: CreateInvoiceCheckoutParams): Promise<{ url: string | null; sessionId: string }>;
-  retrieveCheckoutSession(sessionId: string): Promise<CheckoutSessionStatus | null>;
+  /** `accountId` : ID du compte connecté pour les Checkout Sessions direct charge (Lot 4+). */
+  retrieveCheckoutSession(sessionId: string, accountId?: string): Promise<CheckoutSessionStatus | null>;
   createConnectAccount(params: CreateConnectAccountParams): Promise<{ id: string }>;
   createAccountLink(params: CreateAccountLinkParams): Promise<{ url: string }>;
   retrieveConnectAccount(accountId: string): Promise<ConnectAccountData>;

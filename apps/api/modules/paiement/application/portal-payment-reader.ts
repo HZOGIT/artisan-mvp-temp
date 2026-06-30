@@ -53,4 +53,6 @@ export interface PortalPaymentReader {
   getSessionEnAttente(ctx: TenantContext, factureId: number, now: Date): Promise<{ url: string | null; sessionId: string | null } | null>;
   /** Vrai si l'artisan a un compte Stripe Connect actif (charges_enabled). Garde gating paiement portail. */
   getArtisanChargesEnabled(ctx: TenantContext): Promise<boolean>;
+  /** ID du compte Stripe Connect de l'artisan (null si non connecté). Direct charge Lot 4. */
+  getArtisanConnectAccountId(ctx: TenantContext): Promise<string | null>;
 }
