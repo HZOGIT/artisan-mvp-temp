@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, protectedProcedure, permissionProcedure } from "../../../../interface/trpc/trpc";
+import { router, permissionProcedure } from "../../../../interface/trpc/trpc";
 import type { IEcritureRepository } from "../../application/ecriture-repository";
 import {
   listEcritures,
@@ -20,9 +20,9 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format A
 export function createEcrituresRouter(repo: IEcritureRepository) {
   const compta = permissionProcedure("comptabilite.voir");
   return router({
-    list: protectedProcedure.query(({ ctx }) => listEcritures(repo, ctx.tenant)),
+    list: compta.query(({ ctx }) => listEcritures(repo, ctx.tenant)),
 
-    byFacture: protectedProcedure
+    byFacture: compta
       .input(z.object({ factureId: z.number().int() }))
       .query(({ ctx, input }) => listEcrituresFacture(repo, ctx.tenant, input.factureId)),
 
