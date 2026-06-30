@@ -65,10 +65,20 @@ describe("factures — conversion devis→facture", () => {
     expect((await repo.listLignes(A, f.id)).length).toBe(1);
   });
 
-  it("devis non accepté (brouillon/envoye/refuse) → Conflict", async () => {
+  it("devis envoyé (envoye) → converti en facture (régression OPE-927)", async () => {
     const { repo, reader } = setup();
     reader.register(devisAccepte({ statut: "envoye" }), [ligne()]);
-    await expect(convertirDevisEnFacture(repo, reader, A, 7)).rejects.toBeInstanceOf(ConflictError);
+    const f = await convertirDevisEnFacture(repo, reader, A, 7);
+    expect(f.statut).toBe("brouillon");
+    expect(f.devisId).toBe(7);
+  });
+
+  it("devis non convertible (brouillon/refuse/expire) → Conflict", async () => {
+    for (const statut of ["brouillon", "refuse", "expire"] as const) {
+      const { repo, reader } = setup();
+      reader.register(devisAccepte({ statut }), [ligne()]);
+      await expect(convertirDevisEnFacture(repo, reader, A, 7)).rejects.toBeInstanceOf(ConflictError);
+    }
   });
 
   it("devis d'un autre tenant → NotFound (anti-IDOR-FK)", async () => {
