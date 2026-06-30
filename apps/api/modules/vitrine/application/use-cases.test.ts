@@ -52,13 +52,16 @@ function submitDeps(over: Partial<SubmitContactDeps> = {}): { deps: SubmitContac
 const INPUT = { slug: "acme", nom: "Bob", email: "bob@x.fr", message: "Bonjour je voudrais un devis." };
 
 describe("submitContact", () => {
-  it("succès → email artisan + notif + lead persisté", async () => {
+  it("succès → email artisan + notif + lead persisté avec consentement tracé", async () => {
     const { deps, sent, leadsCreated, notifs } = submitDeps();
     expect(await submitContact(deps, INPUT, "1.2.3.4")).toEqual({ success: true });
     expect(sent[0].to).toBe("pro@acme.fr");
     expect(sent[0].body).toContain("bob@x.fr");
     expect(notifs[0].titre).toBe("Nouveau contact vitrine");
     expect(leadsCreated[0]).toMatchObject({ nom: "Bob", source: "vitrine" });
+    expect(leadsCreated[0].consentementAt).toBeInstanceOf(Date);
+    expect(leadsCreated[0].consentementIp).toBe("1.2.3.4");
+    expect(typeof leadsCreated[0].consentementTexte).toBe("string");
   });
   it("artisan inconnu → NotFound (pas d'email)", async () => {
     const { deps, sent } = submitDeps({ reader: reader({ artisansBySlug: {} }) });

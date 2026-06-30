@@ -45,6 +45,9 @@ export async function getBySlug(reader: IVitrinePublicReader, slug: string): Pro
   };
 }
 
+/** Texte exact affiché à l'utilisateur au moment du recueil du consentement (Art. 7 RGPD). */
+export const TEXTE_RGPD_CONSENTEMENT = "J'accepte d'être recontacté(e) par cet artisan pour ma demande et de recevoir ses propositions commerciales. Je peux me désinscrire à tout moment via le lien en bas de chaque email.";
+
 /** ── submitContact (public) ──────────────────────────────────────────────────── */
 export interface SubmitContactInput {
   readonly slug: string;
@@ -109,7 +112,7 @@ export async function submitContact(deps: SubmitContactDeps, input: SubmitContac
   }
   /** Persistance du lead (best-effort, parité legacy). */
   try {
-    await deps.leads.create(ctx, { nom: input.nom, email: input.email, telephone: input.telephone ?? null, message: input.message, source: "vitrine" });
+    await deps.leads.create(ctx, { nom: input.nom, email: input.email, telephone: input.telephone ?? null, message: input.message, source: "vitrine", consentementAt: new Date(), consentementIp: clientIp, consentementTexte: TEXTE_RGPD_CONSENTEMENT });
   } catch {
     /* best-effort */
   }
@@ -133,7 +136,7 @@ export interface LeadRepo {
   list(ctx: TenantContext): Promise<DemandeContact[]>;
   getById(ctx: TenantContext, id: number): Promise<{ id: number; clientId: number | null; nom: string; email: string | null; telephone: string | null } | null>;
   setStatut(ctx: TenantContext, id: number, statut: LeadStatut, clientId?: number | null): Promise<unknown>;
-  create(ctx: TenantContext, input: { nom: string; email?: string | null; telephone?: string | null; message?: string | null; source?: string }): Promise<unknown>;
+  create(ctx: TenantContext, input: { nom: string; email?: string | null; telephone?: string | null; message?: string | null; source?: string; consentementAt?: Date | null; consentementIp?: string | null; consentementTexte?: string | null }): Promise<unknown>;
 }
 export interface ClientCreator {
   create(ctx: TenantContext, input: { nom: string; email?: string | null; telephone?: string | null }): Promise<{ id: number }>;

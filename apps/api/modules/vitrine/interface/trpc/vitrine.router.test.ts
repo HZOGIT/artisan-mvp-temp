@@ -56,10 +56,12 @@ describe.skipIf(!URL)("vitrine.router e2e (public + admin leads)", () => {
     expect(Array.isArray(res.json().result.data)).toBe(true);
   });
 
-  it("PUBLIC submitContact : validation (message < 10 / email invalide) → 400 (sans cookie)", async () => {
-    const base = { slug: "vitrine-sarl", nom: "Jean", email: "jean@example.com", message: "Bonjour je suis intéressé." };
+  it("PUBLIC submitContact : validation (message < 10 / email invalide / pas de consentement) → 400 (sans cookie)", async () => {
+    const base = { slug: "vitrine-sarl", nom: "Jean", email: "jean@example.com", message: "Bonjour je suis intéressé.", consentementMarketing: true };
     expect((await injectTrpc(app, "POST", "vitrine.submitContact", { ...base, message: "court" })).statusCode).toBe(400);
     expect((await injectTrpc(app, "POST", "vitrine.submitContact", { ...base, email: "pas-un-email" })).statusCode).toBe(400);
+    expect((await injectTrpc(app, "POST", "vitrine.submitContact", { ...base, consentementMarketing: false })).statusCode).toBe(400);
+    expect((await injectTrpc(app, "POST", "vitrine.submitContact", { slug: base.slug, nom: base.nom, email: base.email, message: base.message })).statusCode).toBe(400);
   });
 
   it("ADMIN updateDemandeContactStatut : sans cookie → 401 ; statut hors enum → 400", async () => {

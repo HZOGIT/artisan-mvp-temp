@@ -18,6 +18,9 @@ export interface DemandeContact {
   readonly source: string;
   readonly statut: DemandeContactStatut;
   readonly clientId: number | null;
+  readonly consentementAt: Date | null;
+  readonly consentementIp: string | null;
+  readonly consentementTexte: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
@@ -32,6 +35,9 @@ export interface CreateDemandeInput {
   readonly telephone?: string | null;
   readonly message?: string | null;
   readonly source?: string;
+  readonly consentementAt?: Date | null;
+  readonly consentementIp?: string | null;
+  readonly consentementTexte?: string | null;
 }
 
 /*

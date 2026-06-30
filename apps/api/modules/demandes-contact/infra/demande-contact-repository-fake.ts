@@ -51,9 +51,11 @@ export class FakeDemandeContactRepository implements IDemandeContactRepository {
       telephone: input.telephone ?? null,
       message: input.message ?? null,
       source: input.source ?? "vitrine",
-      /** forcé */
       statut: "nouveau",
       clientId: null,
+      consentementAt: input.consentementAt ?? null,
+      consentementIp: input.consentementIp ?? null,
+      consentementTexte: input.consentementTexte ?? null,
       createdAt: now,
       updatedAt: now,
     };

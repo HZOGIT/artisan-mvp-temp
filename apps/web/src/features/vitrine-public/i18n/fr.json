@@ -57,6 +57,8 @@
   "message": "Message",
   "devis": "Devis",
   "errContact": "Impossible d'envoyer le message",
+  "consentementMarketing": "J'accepte d'être recontacté(e) par cet artisan pour ma demande et de recevoir ses propositions commerciales. Je peux me désinscrire à tout moment via le lien en bas de chaque email.",
+  "consentementRequis": "Vous devez accepter pour envoyer votre demande.",
   "titreOnglet": "{{nom}} — {{specialite}} | Operioz",
   "themePlomberie": "Plomberie",
   "themeElectricite": "Électricité",
