@@ -91,7 +91,7 @@ export default function DevisDetailPage() {
   };
 
   const handleDeleteLine = (lineId: number) => { if (confirm(t("confirmSupprimerLigne"))) D.deleteLigne.mutate({ id: lineId, devisId: id }, { onSuccess: () => toast.success(t("toastLigneSupprimee")) }); };
-  const handleConvert = () => { if (confirm(t("confirmConvertirFacture"))) D.convertToFacture.mutate({ devisId: id }, { onSuccess: (data) => { toast.success(t("toastFactureCree")); window.location.href = `/factures/${data.id}`; }, onError: () => toast.error(t("errFacture")) }); };
+  const handleConvert = () => { if (confirm(t("confirmConvertirFacture"))) D.convertToFacture.mutate({ devisId: id }, { onSuccess: (data) => { toast.success(t("toastFactureCree")); window.location.href = `/factures/${data.id}`; }, onError: (err) => toast.error(err.message || t("errFacture")) }); };
   const handleDuplicate = () => { if (confirm(t("confirmDupliquer"))) D.duplicate.mutate({ devisId: id }, { onSuccess: (nd) => { toast.success(t("toastDuplique")); window.location.href = `/devis/${nd.id}`; }, onError: () => toast.error(t("errDuplication")) }); };
 
   const handleFacturerAcompte = () => {
