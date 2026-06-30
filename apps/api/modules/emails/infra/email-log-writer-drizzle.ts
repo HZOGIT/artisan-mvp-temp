@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { emailsLog } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import type { IEmailLogWriter } from "../application/email-log-writer";
@@ -17,7 +17,7 @@ export class EmailLogWriterDrizzle implements IEmailLogWriter {
     const rows = await this.db
       .update(emailsLog)
       .set({ statut })
-      .where(eq(emailsLog.resendId, resendId))
+      .where(and(eq(emailsLog.resendId, resendId), ne(emailsLog.statut, statut)))
       .returning({ artisanId: emailsLog.artisanId, destinataire: emailsLog.destinataire });
     return rows[0] ?? null;
   }
