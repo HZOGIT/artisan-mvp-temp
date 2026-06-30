@@ -12,6 +12,11 @@ const WEBHOOK_EVENTS = [
   "payment_intent.payment_failed",
 ] as const;
 
+const CONNECT_WEBHOOK_EVENTS = [
+  "account.updated",
+  "account.application.deauthorized",
+] as const;
+
 type StripeWebhookEndpoints = {
   list(params: { limit: number }): Promise<{
     data: Array<{
@@ -22,7 +27,7 @@ type StripeWebhookEndpoints = {
       secret?: string;
     }>;
   }>;
-  create(params: { url: string; enabled_events: string[]; description?: string }): Promise<{
+  create(params: { url: string; enabled_events: string[]; description?: string; connect?: boolean }): Promise<{
     id: string;
     url: string;
     secret?: string;
@@ -120,6 +125,57 @@ export async function ensureStripeWebhookEndpoint(
   log?.warn(
     { event: "stripe_webhook_created", id: created.id, url: webhookUrl },
     `Webhook Stripe créé. ⚠️ Copiez ce secret dans STRIPE_WEBHOOK_SECRET : ${newSecret ?? "(secret non retourné)"}`,
+  );
+  return newSecret;
+}
+
+/**
+ * S'assure qu'un webhook Stripe Connect (`connect=true`) pointe vers `connectWebhookUrl`.
+ *
+ * Même sémantique qu'`ensureStripeWebhookEndpoint` : idempotent, fail-closed, secret retourné
+ * uniquement à la création → à stocker dans STRIPE_CONNECT_WEBHOOK_SECRET.
+ */
+export async function ensureStripeConnectWebhookEndpoint(
+  secretKey: string,
+  connectWebhookUrl: string,
+  log?: AppLogger,
+  sdkFactory?: StripeSdkFactory,
+): Promise<string | null> {
+  if (!secretKey) {
+    log?.warn({ event: "stripe_connect_webhook_setup_skip" }, "STRIPE_SECRET_KEY absent — auto-setup Connect webhook ignoré");
+    return null;
+  }
+
+  const sdk = await loadSdk(secretKey, sdkFactory);
+  if (!sdk) {
+    log?.warn({ event: "stripe_connect_webhook_setup_skip" }, "Module Stripe non disponible — auto-setup Connect webhook ignoré");
+    return null;
+  }
+
+  const events = [...CONNECT_WEBHOOK_EVENTS] as string[];
+
+  const list = await withStripeRetry(() => sdk.webhookEndpoints.list({ limit: 50 }));
+  const existing = list.data.find((w) => w.url === connectWebhookUrl);
+
+  if (existing) {
+    const missing = events.filter((e) => !existing.enabled_events.includes(e));
+    const hasAll = existing.enabled_events.includes("*") || missing.length === 0;
+    if (!hasAll) {
+      await withStripeRetry(() => sdk.webhookEndpoints.update(existing.id, { enabled_events: events }));
+      log?.info({ event: "stripe_connect_webhook_updated", id: existing.id, url: connectWebhookUrl, added: missing }, `Webhook Connect mis à jour (${missing.join(", ")} ajouté)`);
+    } else {
+      log?.info({ event: "stripe_connect_webhook_ok", id: existing.id, url: connectWebhookUrl }, "Webhook Connect déjà configuré");
+    }
+    return null;
+  }
+
+  const created = await withStripeRetry(() =>
+    sdk.webhookEndpoints.create({ url: connectWebhookUrl, enabled_events: events, description: "Operioz Connect — auto-setup", connect: true }),
+  );
+  const newSecret = created.secret ?? null;
+  log?.warn(
+    { event: "stripe_connect_webhook_created", id: created.id, url: connectWebhookUrl },
+    `Webhook Connect créé. ⚠️ Copiez ce secret dans STRIPE_CONNECT_WEBHOOK_SECRET : ${newSecret ?? "(secret non retourné)"}`,
   );
   return newSecret;
 }
