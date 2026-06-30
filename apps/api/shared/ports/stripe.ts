@@ -31,6 +31,8 @@ export interface CreateInvoiceCheckoutParams {
 export interface CheckoutSessionStatus {
   readonly paymentStatus: string;
   readonly paymentIntentId: string | null;
+  /** Stripe session.status : "open" | "complete" | "expired". Null si la session est introuvable. */
+  readonly sessionStatus: string | null;
 }
 
 export interface CreateConnectAccountParams {

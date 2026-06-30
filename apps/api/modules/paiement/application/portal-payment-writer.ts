@@ -9,4 +9,6 @@ export interface PortalPaymentWriter {
     ctx: TenantContext,
     input: { factureId: number; stripeSessionId: string; montant: string; lienPaiement: string | null; tokenPaiement: string; stripeConnectAccountId?: string | null },
   ): Promise<void>;
+  /** Marque un paiement en_attente comme expiré (session Stripe expirée/abandonnée). Libère le slot UNIQUE pour un nouveau Checkout. */
+  expirePaiement(ctx: TenantContext, paiementId: number): Promise<void>;
 }

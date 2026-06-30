@@ -1,7 +1,9 @@
+import { and, eq } from "drizzle-orm";
 import { paiementsStripe } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import { ConflictError } from "../../../shared/errors";
+import { outboxEvent } from "../../../shared/events/outbox-event";
 import type { TenantContext } from "../../../shared/tenant";
 import type { PortalPaymentWriter } from "../application/portal-payment-writer";
 
@@ -43,5 +45,12 @@ export class PortalPaymentWriterDrizzle implements PortalPaymentWriter {
       if (estViolationUnique(err)) throw new ConflictError("Session paiement déjà en cours pour cette facture");
       throw err;
     }
+  }
+
+  async expirePaiement(ctx: TenantContext, paiementId: number): Promise<void> {
+    await withTenant(this.db, ctx, async (tx) => {
+      await tx.update(paiementsStripe).set({ statut: "expire" }).where(and(eq(paiementsStripe.id, paiementId), eq(paiementsStripe.artisanId, ctx.artisanId)));
+      await outboxEvent(tx, ctx, { action: "paiement.expire", entityType: "paiement", entityId: paiementId, payload: { paiementId } });
+    });
   }
 }

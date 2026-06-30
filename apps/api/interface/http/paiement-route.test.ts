@@ -71,6 +71,42 @@ describe.skipIf(!URL)("GET /api/paiement/status/:factureId (public par token por
     expect(rows[0].tokenPaiement).toHaveLength(32);
   });
 
+  it("OPE-954 — session OPEN existante → 200 avec l'URL existante (reprise, pas de nouvelle session Stripe)", async () => {
+    await admin.query('delete from paiements_stripe where "factureId"=$1', [factureId]);
+    const { rows: cs } = await admin.query(
+      `insert into paiements_stripe ("artisanId","factureId","stripeSessionId","tokenPaiement",statut,montant,"lienPaiement","stripe_connect_account_id")
+       values ((select id from artisans where "userId"=$1),$2,'cs_open_route_test','tok_open_route','en_attente','240.00','https://checkout.stripe.test/cs_open_route_test#${"a".repeat(600)}','acct_e2e_checkout_test')
+       returning "stripeSessionId"`,
+      [UID, factureId],
+    );
+    expect(cs).toHaveLength(1);
+    stripe.sessionStatuses.set("cs_open_route_test", { paymentStatus: "unpaid", paymentIntentId: null, sessionStatus: "open" });
+    const res = await app.inject({ method: "POST", url: "/api/paiement/create-checkout-session", headers: { "content-type": "application/json" }, payload: JSON.stringify({ factureId, token: TOKEN }) });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().url).toContain("cs_open_route_test");
+    const { rows } = await admin.query('select count(*) as n from paiements_stripe where "factureId"=$1 and statut=$2', [factureId, "en_attente"]);
+    expect(Number(rows[0].n)).toBe(1);
+  });
+
+  it("OPE-954 — session EXPIRÉE existante → 200 nouvelle session + ancienne marquée expire", async () => {
+    await admin.query('delete from paiements_stripe where "factureId"=$1', [factureId]);
+    const { rows: old } = await admin.query(
+      `insert into paiements_stripe ("artisanId","factureId","stripeSessionId","tokenPaiement",statut,montant,"stripe_connect_account_id")
+       values ((select id from artisans where "userId"=$1),$2,'cs_expired_route_test','tok_exp_route','en_attente','240.00','acct_e2e_checkout_test')
+       returning id`,
+      [UID, factureId],
+    );
+    const oldId = old[0].id;
+    stripe.sessionStatuses.set("cs_expired_route_test", { paymentStatus: "unpaid", paymentIntentId: null, sessionStatus: "expired" });
+    const res = await app.inject({ method: "POST", url: "/api/paiement/create-checkout-session", headers: { "content-type": "application/json" }, payload: JSON.stringify({ factureId, token: TOKEN }) });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().url).toContain("checkout.stripe.test");
+    const { rows: oldRow } = await admin.query('select statut from paiements_stripe where id=$1', [oldId]);
+    expect(oldRow[0].statut).toBe("expire");
+    const { rows: newRow } = await admin.query('select statut from paiements_stripe where "factureId"=$1 and statut=$2', [factureId, "en_attente"]);
+    expect(newRow).toHaveLength(1);
+  });
+
   it("origin des redirections Stripe : x-forwarded-host (hôte PUBLIC) prime sur host (hôte interne proxy)", async () => {
     // Régression : derrière le dispatcher Pages, `host` = hôte INTERNE du new-stack ; bâtir la
     // redirection dessus renvoie l'utilisateur vers le BACKEND (→ 404 sur /portail/*). Le dispatcher
