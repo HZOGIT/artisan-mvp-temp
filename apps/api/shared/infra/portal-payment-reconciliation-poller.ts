@@ -29,13 +29,12 @@ export type ReconcileOutcome = "reconciled" | "not-paid" | "no-session" | "no-to
 
 /**
  * Réconcilie un paiement en attente : interroge Stripe et appelle completeCheckout si payé.
- * Exporté pour test L1.
+ * Exporté pour test L1. genererEcritures est géré par l'appelant (plugin) avec log observable.
  */
 export async function reconcileOrphanedPayment(
   payment: OrphanedPayment,
   stripe: StripePort,
   writer: WebhookPaymentWriter,
-  genererEcritures?: (artisanId: number, factureId: number) => Promise<void>,
 ): Promise<ReconcileOutcome> {
   if (!payment.tokenPaiement) return "no-token";
 
@@ -49,8 +48,6 @@ export async function reconcileOrphanedPayment(
     factureId: payment.factureId,
     stripePaymentIntentId: session.paymentIntentId ?? "",
   });
-
-  await genererEcritures?.(payment.artisanId, payment.factureId).catch(() => {});
 
   return "reconciled";
 }
@@ -80,13 +77,21 @@ export const portalPaymentReconciliationPollerPlugin = fp(
             let reconciled = 0;
             for (const payment of rows) {
               try {
-                const outcome = await reconcileOrphanedPayment(payment, opts.stripe, opts.writer, opts.genererEcritures);
+                const outcome = await reconcileOrphanedPayment(payment, opts.stripe, opts.writer);
                 if (outcome === "reconciled") {
                   reconciled++;
                   app.log.warn(
                     { event: "portal_payment_reconciled", factureId: payment.factureId, artisanId: payment.artisanId },
                     `Paiement portail réconcilié hors-webhook (artisan ${payment.artisanId}, facture ${payment.factureId})`,
                   );
+                  if (opts.genererEcritures) {
+                    await opts.genererEcritures(payment.artisanId, payment.factureId).catch((err: unknown) => {
+                      app.log.error(
+                        { event: "portal_payment_ecritures_error", factureId: payment.factureId, artisanId: payment.artisanId, error: err instanceof Error ? err.message : String(err) },
+                        "Erreur genererEcritures après réconciliation portail (best-effort compta)",
+                      );
+                    });
+                  }
                 }
               } catch (err) {
                 app.log.error(

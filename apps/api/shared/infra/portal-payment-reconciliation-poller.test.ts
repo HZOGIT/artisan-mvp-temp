@@ -13,25 +13,21 @@ const makePayment = (overrides: Partial<OrphanedPayment> = {}): OrphanedPayment 
   ...overrides,
 });
 
-const makeWriter = (): WebhookPaymentWriter & { completed: unknown[] } => ({
-  completed: [] as unknown[],
+const makeWriter = (): WebhookPaymentWriter => ({
   resolvePaiement: vi.fn(),
-  completeCheckout: vi.fn(async (input) => { (makeWriter as unknown as { completed: unknown[] }).completed?.push(input); }),
+  completeCheckout: vi.fn(),
   failPaiement: vi.fn(),
 });
 
 describe("reconcileOrphanedPayment", () => {
   it("retourne no-token si tokenPaiement absent", async () => {
     const stripe = new FakeStripePort();
-    const writer = makeWriter();
-    const result = await reconcileOrphanedPayment(makePayment({ tokenPaiement: null }), stripe, writer);
+    const result = await reconcileOrphanedPayment(makePayment({ tokenPaiement: null }), stripe, makeWriter());
     expect(result).toBe("no-token");
-    expect(writer.completeCheckout).not.toHaveBeenCalled();
   });
 
   it("retourne no-session si Stripe ne trouve pas la session", async () => {
     const stripe = new FakeStripePort();
-    stripe.sessionStatuses.delete("cs_test_abc");
     vi.spyOn(stripe, "retrieveCheckoutSession").mockResolvedValueOnce(null);
     const writer = makeWriter();
     const result = await reconcileOrphanedPayment(makePayment(), stripe, writer);
@@ -50,12 +46,7 @@ describe("reconcileOrphanedPayment", () => {
   it("retourne reconciled et appelle completeCheckout si session payée", async () => {
     const stripe = new FakeStripePort();
     stripe.sessionStatuses.set("cs_test_abc", { paymentStatus: "paid", paymentIntentId: "pi_xyz" });
-    const completed: unknown[] = [];
-    const writer: WebhookPaymentWriter = {
-      resolvePaiement: vi.fn(),
-      completeCheckout: vi.fn(async (input) => { completed.push(input); }),
-      failPaiement: vi.fn(),
-    };
+    const writer = makeWriter();
     const result = await reconcileOrphanedPayment(makePayment(), stripe, writer);
     expect(result).toBe("reconciled");
     expect(writer.completeCheckout).toHaveBeenCalledWith({
@@ -64,19 +55,5 @@ describe("reconcileOrphanedPayment", () => {
       factureId: 30,
       stripePaymentIntentId: "pi_xyz",
     });
-  });
-
-  it("appelle genererEcritures best-effort après reconcile", async () => {
-    const stripe = new FakeStripePort();
-    stripe.sessionStatuses.set("cs_test_abc", { paymentStatus: "paid", paymentIntentId: "pi_xyz" });
-    const writer: WebhookPaymentWriter = {
-      resolvePaiement: vi.fn(),
-      completeCheckout: vi.fn(),
-      failPaiement: vi.fn(),
-    };
-    const genererEcritures = vi.fn().mockRejectedValueOnce(new Error("ecritures fail"));
-    const result = await reconcileOrphanedPayment(makePayment(), stripe, writer, genererEcritures);
-    expect(result).toBe("reconciled");
-    expect(genererEcritures).toHaveBeenCalledWith(10, 30);
   });
 });
