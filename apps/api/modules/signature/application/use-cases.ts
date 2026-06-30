@@ -1,5 +1,7 @@
 import { NotFoundError } from "../../../shared/errors";
 import type { EmailPort } from "../../../shared/ports/email";
+import type { PdfPort } from "../../../shared/ports/pdf";
+import type { ArtisanReader, ClientReader } from "../../../shared/readers/contact-readers";
 import type { TenantContext } from "../../../shared/tenant";
 import type { Signature } from "../domain/signature";
 import {
@@ -23,6 +25,12 @@ export interface SignatureDeps {
   readonly appUrl: string;
   readonly maintenant?: () => Date;
   readonly emailLogWriter?: IEmailLogWriter;
+  /** PDF joint au mail de signature — si l'un des quatre est absent, pas de PJ (dégradé silencieux). */
+  readonly pdf?: PdfPort;
+  readonly artisanReader?: ArtisanReader;
+  readonly clientReader?: ClientReader;
+  readonly lignesReader?: { listLignes(ctx: TenantContext, devisId: number): Promise<unknown[]> };
+  readonly logger?: { warn(obj: Record<string, unknown>, msg: string): void };
 }
 
 /*
@@ -82,8 +90,25 @@ export async function createSignatureLink(
       totalTTC: devis.totalTTC,
       signatureUrl,
     });
+
+    /** PDF joint (best-effort : l'email part sans PJ si la génération échoue). */
+    let pdfAttachment: { filename: string; content: Buffer; contentType: string } | undefined;
+    if (deps.pdf && deps.artisanReader && deps.clientReader && deps.lignesReader) {
+      try {
+        const [lignes, fullArtisan, fullClient] = await Promise.all([
+          deps.lignesReader.listLignes(ctx, devis.id),
+          deps.artisanReader.getArtisan(ctx),
+          deps.clientReader.getClient(ctx, devis.clientId),
+        ]);
+        const buf = await deps.pdf.render("devis", { devis: { ...devis, lignes }, artisan: fullArtisan, client: fullClient });
+        pdfAttachment = { filename: `Devis_${devis.numero}.pdf`, content: buf, contentType: "application/pdf" };
+      } catch (err) {
+        deps.logger?.warn({ err, devisId, event: "signature_email_pdf_error" }, "PDF devis non généré — email envoyé sans PJ");
+      }
+    }
+
     try {
-      await deps.email.send({ to: client.email, subject, body, fromName: artisan?.nomEntreprise ?? undefined, replyTo: artisan?.email ?? undefined });
+      await deps.email.send({ to: client.email, subject, body, fromName: artisan?.nomEntreprise ?? undefined, replyTo: artisan?.email ?? undefined, ...(pdfAttachment ? { attachments: [pdfAttachment] } : {}) });
       if (deps.emailLogWriter) {
         await deps.emailLogWriter.create({ artisanId: ctx.artisanId, destinataire: client.email, sujet: subject, type: "lien_signature", entiteType: "devis", entiteId: devisId }).catch(() => { /* ponytail: best-effort — emailLogWriter non-critique */ });
       }
