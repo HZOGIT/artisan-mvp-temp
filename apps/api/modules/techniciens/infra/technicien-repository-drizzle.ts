@@ -7,6 +7,10 @@ import {
   objectifsTechniciens,
   classementTechniciens,
   habilitationsTechniciens,
+  historiqueDeplacements,
+  pushSubscriptions,
+  preferencesNotifications,
+  historiqueNotificationsPush,
   interventions,
   users,
   artisans,
@@ -155,6 +159,11 @@ export class TechnicienRepositoryDrizzle implements ITechnicienRepository {
         .limit(1);
       if (!owned) return false;
 
+      await tx.delete(historiqueDeplacements).where(eq(historiqueDeplacements.technicienId, id));
+      await tx.delete(habilitationsTechniciens).where(eq(habilitationsTechniciens.technicienId, id));
+      await tx.delete(pushSubscriptions).where(eq(pushSubscriptions.technicienId, id));
+      await tx.delete(preferencesNotifications).where(eq(preferencesNotifications.technicienId, id));
+      await tx.delete(historiqueNotificationsPush).where(eq(historiqueNotificationsPush.technicienId, id));
       await tx.delete(positionsTechniciens).where(eq(positionsTechniciens.technicienId, id));
       await tx.delete(disponibilitesTechniciens).where(eq(disponibilitesTechniciens.technicienId, id));
       await tx.delete(badgesTechniciens).where(eq(badgesTechniciens.technicienId, id));

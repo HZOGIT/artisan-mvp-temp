@@ -20,14 +20,15 @@ describe.skipIf(!URL)("TechnicienRepositoryDrizzle (PG, RLS + scope tenant)", ()
   const repo = new TechnicienRepositoryDrizzle(app.db);
 
   const cleanup = async () => {
-    await admin.query(
-      'delete from positions_techniciens where "technicienId" in (select id from techniciens where "artisanId" in ($1,$2))',
-      [A, B],
-    );
-    await admin.query(
-      'delete from disponibilites_techniciens where "technicienId" in (select id from techniciens where "artisanId" in ($1,$2))',
-      [A, B],
-    );
+    const ids = `(select id from techniciens where "artisanId" in ($1,$2))`;
+    for (const t of [
+      "historique_deplacements", "habilitations_techniciens", "push_subscriptions",
+      "preferences_notifications", "historique_notifications_push",
+      "positions_techniciens", "disponibilites_techniciens",
+      "badges_techniciens", "objectifs_techniciens", "classement_techniciens",
+    ]) {
+      await admin.query(`delete from ${t} where "technicienId" in ${ids}`, [A, B]);
+    }
     await admin.query('delete from techniciens where "artisanId" in ($1,$2)', [A, B]);
   };
 
@@ -78,5 +79,41 @@ describe.skipIf(!URL)("TechnicienRepositoryDrizzle (PG, RLS + scope tenant)", ()
     const pos = await admin.query('select count(*)::int as n from positions_techniciens where "technicienId"=$1', [t.id]);
     expect(dispos.rows[0].n).toBe(0);
     expect(pos.rows[0].n).toBe(0);
+  });
+
+  it("delete RGPD : purge GPS, habilitations, push-subscriptions et historique notifications (OPE-815)", async () => {
+    const t = await repo.create(ctx(A), { nom: "TechRGPD" });
+    await admin.query(
+      'insert into historique_deplacements ("technicienId","dateDebut") values ($1,now())',
+      [t.id],
+    );
+    await admin.query(
+      'insert into habilitations_techniciens ("technicienId","artisanId",type) values ($1,$2,$3)',
+      [t.id, A, "Habilitation électrique"],
+    );
+    await admin.query(
+      "insert into push_subscriptions (\"technicienId\",endpoint,p256dh,auth) values ($1,'https://push.example.com/x','key','auth')",
+      [t.id],
+    );
+    await admin.query(
+      'insert into preferences_notifications ("technicienId") values ($1)',
+      [t.id],
+    );
+    await admin.query(
+      "insert into historique_notifications_push (\"technicienId\",type,titre) values ($1,'assignation','Nouvelle mission')",
+      [t.id],
+    );
+
+    expect(await repo.delete(ctx(A), t.id)).toBe(true);
+    expect(await repo.getById(ctx(A), t.id)).toBeNull();
+
+    const counts = await Promise.all([
+      admin.query('select count(*)::int n from historique_deplacements where "technicienId"=$1', [t.id]),
+      admin.query('select count(*)::int n from habilitations_techniciens where "technicienId"=$1', [t.id]),
+      admin.query('select count(*)::int n from push_subscriptions where "technicienId"=$1', [t.id]),
+      admin.query('select count(*)::int n from preferences_notifications where "technicienId"=$1', [t.id]),
+      admin.query('select count(*)::int n from historique_notifications_push where "technicienId"=$1', [t.id]),
+    ]);
+    for (const r of counts) expect(r.rows[0].n).toBe(0);
   });
 });

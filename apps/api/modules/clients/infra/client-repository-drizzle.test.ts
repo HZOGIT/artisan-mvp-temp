@@ -262,6 +262,28 @@ describe.skipIf(!URL)("ClientRepositoryDrizzle (PG, RLS + scope tenant)", () => 
     expect(await repo.listByIds(ctx(A), [])).toEqual([]);
   });
 
+  it("anonymiser : PII écrasées, enregistrement conservé (ancre légale), scopé tenant (RLS)", async () => {
+    const c = await repo.create(ctx(A), { nom: "Martin", prenom: "Paul", email: "paul@m.fr", telephone: "0611223344" });
+    expect(await repo.anonymiser(ctx(A), c.id)).toBe(true);
+    const apres = await repo.getById(ctx(A), c.id);
+    expect(apres).not.toBeNull();
+    expect(apres?.nom).toBe("[CLIENT ANONYMISÉ]");
+    expect(apres?.prenom).toBeNull();
+    expect(apres?.email).toBeNull();
+    expect(apres?.telephone).toBeNull();
+    expect(apres?.adresse).toBeNull();
+    expect(apres?.notes).toBeNull();
+    /* l'enregistrement subsiste (ancre documents légaux) */
+    const row = await admin.query("select id from clients where id=$1", [c.id]);
+    expect(row.rows).toHaveLength(1);
+  });
+
+  it("anonymiser : cross-tenant → false (PII non révélées, enregistrement intact)", async () => {
+    const c = await repo.create(ctx(A), { nom: "Secret", email: "s@a.fr" });
+    expect(await repo.anonymiser(ctx(B), c.id)).toBe(false);
+    expect((await repo.getById(ctx(A), c.id))?.email).toBe("s@a.fr");
+  });
+
   it("fusionner : isolation RLS — refus de fusionner vers/depuis le client d'un autre tenant", async () => {
     const survivantA = await repo.create(ctx(A), { nom: "Survivant A" });
     const doublonA = await repo.create(ctx(A), { nom: "Doublon A" });

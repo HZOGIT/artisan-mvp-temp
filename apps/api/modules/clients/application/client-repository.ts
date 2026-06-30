@@ -20,6 +20,12 @@ export interface IClientRepository {
   update(ctx: TenantContext, id: number, input: UpdateClientInput): Promise<Client | null>;
   /** false si le client n'appartient pas au tenant. */
   delete(ctx: TenantContext, id: number): Promise<boolean>;
+  /**
+   * RGPD Art. 17 — droit à l'effacement. Écrase toutes les PII du client (nom → "[CLIENT ANONYMISÉ]",
+   * prenom/email/telephone/adresse* → null) en conservant la ligne comme ancre pour les documents légaux
+   * (factures 10 ans). false si le client n'appartient pas au tenant.
+   */
+  anonymiser(ctx: TenantContext, id: number): Promise<boolean>;
   /*
    * Nombre de documents métier (devis/factures/interventions/chantiers/contrats/rdv) liés à ce
    * client dans le tenant. Garde d'intégrité référentielle avant suppression : on refuse de

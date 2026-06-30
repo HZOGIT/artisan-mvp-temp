@@ -83,6 +83,32 @@ export class FakeClientRepository implements IClientRepository {
     return true;
   }
 
+  async anonymiser(ctx: TenantContext, id: number): Promise<boolean> {
+    const c = await this.getById(ctx, id);
+    if (!c) return false;
+    const anonymised: Client = {
+      ...c,
+      nom: "[CLIENT ANONYMISÉ]",
+      prenom: null,
+      email: null,
+      telephone: null,
+      adresse: null,
+      codePostal: null,
+      ville: null,
+      adresseFacturation: null,
+      codePostalFacturation: null,
+      villeFacturation: null,
+      raisonSociale: null,
+      siret: null,
+      numeroTVA: null,
+      etiquettes: null,
+      notes: null,
+      updatedAt: new Date(),
+    };
+    this.store = this.store.map((x) => (x.id === id ? anonymised : x));
+    return true;
+  }
+
   async countDocumentsLies(ctx: TenantContext, clientId: number): Promise<number> {
     /** Le client doit appartenir au tenant ; sinon 0 (rien de visible cross-tenant). */
     const c = await this.getById(ctx, clientId);
