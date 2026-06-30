@@ -19,6 +19,9 @@ function toDemande(r: DemandeRow): DemandeContact {
     source: r.source ?? "vitrine",
     statut: (r.statut ?? "nouveau") as DemandeContactStatut,
     clientId: r.clientId ?? null,
+    consentementAt: r.consentementAt ?? null,
+    consentementIp: r.consentementIp ?? null,
+    consentementTexte: r.consentementTexte ?? null,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };
@@ -80,11 +83,12 @@ export class DemandeContactRepositoryDrizzle implements IDemandeContactRepositor
           email: input.email ?? null,
           telephone: input.telephone ?? null,
           message: input.message ?? null,
-          /** défaut PG "vitrine" */
           source: input.source ?? undefined,
-          /** forcé */
           statut: "nouveau",
           clientId: null,
+          consentementAt: input.consentementAt ?? null,
+          consentementIp: input.consentementIp ?? null,
+          consentementTexte: input.consentementTexte ?? null,
         })
         .returning();
       return toDemande(row);

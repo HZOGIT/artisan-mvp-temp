@@ -39,7 +39,7 @@ export default function VitrinePage() {
   const slug = slugParam || "";
   const { data, isLoading, error, submitContact } = useVitrine(slug);
 
-  const [contactForm, setContactForm] = useState({ nom: "", email: "", telephone: "", message: "", type: "" });
+  const [contactForm, setContactForm] = useState({ nom: "", email: "", telephone: "", message: "", type: "", consentementMarketing: false });
   const [contactSent, setContactSent] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
@@ -52,9 +52,10 @@ export default function VitrinePage() {
   const handleSubmitContact = (e: React.FormEvent) => {
     e.preventDefault();
     if (!slug) return;
+    if (!contactForm.consentementMarketing) return;
     submitContact.mutate(
-      { slug, nom: contactForm.nom, email: contactForm.email, telephone: contactForm.telephone || undefined, message: buildContactMessage(contactForm.type, contactForm.message) },
-      { onSuccess: () => { setContactSent(true); setContactForm({ nom: "", email: "", telephone: "", message: "", type: "" }); }, onError: (err) => toast.error(err.message || t("errContact")) },
+      { slug, nom: contactForm.nom, email: contactForm.email, telephone: contactForm.telephone || undefined, message: buildContactMessage(contactForm.type, contactForm.message), consentementMarketing: true },
+      { onSuccess: () => { setContactSent(true); setContactForm({ nom: "", email: "", telephone: "", message: "", type: "", consentementMarketing: false }); }, onError: (err) => toast.error(err.message || t("errContact")) },
     );
   };
 
@@ -274,7 +275,11 @@ export default function VitrinePage() {
                 </div>
               </div>
               <div><Label htmlFor="v-msg">{t("votreMessage")}</Label><Textarea id="v-msg" rows={5} required minLength={10} placeholder={t("messagePlaceholder")} value={contactForm.message} onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })} /></div>
-              <Button type="submit" className="w-full text-white font-semibold py-6 text-base shadow-md hover:shadow-lg transition-shadow" style={{ backgroundColor: theme.hex }} disabled={submitContact.isPending}>{submitContact.isPending ? t("envoiEnCours") : (<><Send className="h-4 w-4 mr-2" /> {t("envoyerDemande")}</>)}</Button>
+              <div className="flex items-start gap-2">
+                <input id="v-consent" type="checkbox" required checked={contactForm.consentementMarketing} onChange={(e) => setContactForm({ ...contactForm, consentementMarketing: e.target.checked })} className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 accent-current" />
+                <Label htmlFor="v-consent" className="text-xs text-slate-600 leading-relaxed cursor-pointer">{t("consentementMarketing")} <span className="text-red-500">*</span></Label>
+              </div>
+              <Button type="submit" className="w-full text-white font-semibold py-6 text-base shadow-md hover:shadow-lg transition-shadow" style={{ backgroundColor: theme.hex }} disabled={submitContact.isPending || !contactForm.consentementMarketing}>{submitContact.isPending ? t("envoiEnCours") : (<><Send className="h-4 w-4 mr-2" /> {t("envoyerDemande")}</>)}</Button>
             </form>
           )}
         </div>

@@ -382,6 +382,9 @@ export const demandesContact = pgTable("demandes_contact", {
   source: varchar("source", { length: 50 }).default("vitrine"),
   statut: demandeContactStatutEnum("statut").default("nouveau"),
   clientId: integer("clientId"),
+  consentementAt: timestamp("consentementAt"),
+  consentementIp: varchar("consentementIp", { length: 64 }),
+  consentementTexte: text("consentementTexte"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
 });

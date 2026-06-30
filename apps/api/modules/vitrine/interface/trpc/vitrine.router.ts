@@ -19,6 +19,7 @@ const submitSchema = z.object({
   email: z.string().email().max(320),
   telephone: z.string().max(30).optional(),
   message: z.string().min(10).max(5000),
+  consentementMarketing: z.literal(true),
 });
 
 const statutEnum = z.enum(["nouveau", "contacte", "converti", "perdu"]);
