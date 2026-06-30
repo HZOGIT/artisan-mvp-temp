@@ -140,7 +140,7 @@ export function createDevisRouter(
       .input(z.object({ devisId: z.number().int() }))
       .query(({ ctx, input }) => listLignesDevis(repo, ctx.tenant, input.devisId)),
 
-    create: protectedProcedure
+    create: devisCreer
       .input(createSchema)
       .mutation(async ({ ctx, input }) => {
         const parsed = { ...input, dateValidite: toDate(input.dateValidite) };
@@ -153,7 +153,7 @@ export function createDevisRouter(
         });
       }),
 
-    update: protectedProcedure
+    update: devisCreer
       .input(z.object({ id: z.number().int() }).and(updateSchema))
       .mutation(async ({ ctx, input }) => {
         const { id, dateValidite, ...data } = input;
@@ -164,7 +164,7 @@ export function createDevisRouter(
         });
       }),
 
-    delete: protectedProcedure
+    delete: devisCreer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         return withOutbox(db, repo, async (r, tx) => {
@@ -211,7 +211,7 @@ export function createDevisRouter(
       }),
 
     /** Transitions de statut (machine à états dans le use-case : Conflict→409 si invalide). */
-    envoyer: protectedProcedure
+    envoyer: devisCreer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         return withOutbox(db, repo, async (r, tx) => {
@@ -222,7 +222,7 @@ export function createDevisRouter(
         });
       }),
 
-    accepter: protectedProcedure
+    accepter: devisCreer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         return withOutbox(db, repo, async (r, tx) => {
