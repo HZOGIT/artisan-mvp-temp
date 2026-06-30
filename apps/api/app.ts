@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance, type FastifyError } from "fastify";
 import metrics from "fastify-metrics";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
+import helmet from "@fastify/helmet";
 import { randomUUID } from "node:crypto";
 import { sql, eq, and } from "drizzle-orm";
 import { buildFastifyLoggerConfig } from "./shared/ports/logger-fastify";
@@ -570,6 +571,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     origin: corsOrigins,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  });
+  app.register(helmet, {
+    contentSecurityPolicy: { useDefaults: true, reportOnly: true },
+    crossOriginEmbedderPolicy: false,
   });
 
   const backendPublicUrl = deps.backendPublicUrl ?? process.env.BACKEND_PUBLIC_URL ?? deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com";
