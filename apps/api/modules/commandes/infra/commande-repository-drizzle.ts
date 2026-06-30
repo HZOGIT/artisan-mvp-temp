@@ -287,14 +287,19 @@ export class CommandeRepositoryDrizzle implements ICommandeRepository {
          */
         const delta = valeur - ancienneRecue;
         if (ligne.stockId != null && Math.abs(delta) > 1e-9) {
+          /* ponytail: FOR UPDATE sérialise les réceptions concurrentes (symétrique à adjustQuantity) */
           const [stock] = await tx
             .select({ id: stocks.id, q: stocks.quantiteEnStock })
             .from(stocks)
             .where(and(eq(stocks.id, ligne.stockId), eq(stocks.artisanId, ctx.artisanId)))
+            .for("update")
             .limit(1);
           if (stock) {
             const avant = Number(stock.q ?? 0);
             const apres = round2(avant + delta);
+            if (apres < 0) {
+              throw new Error(`Correction de réception rendrait le stock négatif (avant: ${avant}, delta: ${delta})`);
+            }
             await tx.update(stocks).set({ quantiteEnStock: apres.toFixed(2), updatedAt: new Date() }).where(eq(stocks.id, stock.id));
             await tx.insert(mouvementsStock).values({
               stockId: stock.id,

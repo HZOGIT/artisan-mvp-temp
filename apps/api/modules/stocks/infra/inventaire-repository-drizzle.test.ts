@@ -101,4 +101,24 @@ describe.skipIf(!URL)("InventaireRepositoryDrizzle (PG L2, RLS tenant)", () => {
     const r = await repo.validerInventaire(ctx(A), inv.inventaire.id);
     expect(r!.inventaire.statut).toBe("valide");
   });
+
+  it("validerInventaire : écart dépassant le stock courant → throw, stock inchangé (OPE-834)", async () => {
+    /** Stock initial = 50 → quantiteTheorique figée à 50 lors du démarrage */
+    const s = await repo.create(ctx(A), { reference: "NEG1", designation: "Robinet", quantiteEnStock: "50.00" });
+    const inv = await repo.demarrerInventaire(ctx(A), {});
+    const ligne = inv.lignes.find((l) => l.reference === "NEG1")!;
+
+    /** Simule 48 unités consommées entre démarrage et validation → stock courant = 2 */
+    await admin.query('update stocks set "quantiteEnStock"=$1 where id=$2', ["2.00", s.id]);
+
+    /** Comptage physique = 1 → écart = 1 - 50 = -49 */
+    await repo.saisirComptage(ctx(A), ligne.id, "1");
+
+    /** Validation : apres = 2 + (-49) = -47 → doit rejeter */
+    await expect(repo.validerInventaire(ctx(A), inv.inventaire.id)).rejects.toThrow();
+
+    /** Stock reste à 2 (transaction rollbackée) */
+    const row = (await admin.query('select "quantiteEnStock" from stocks where id=$1', [s.id])).rows[0];
+    expect(parseFloat(row.quantiteEnStock)).toBeCloseTo(2, 2);
+  });
 });

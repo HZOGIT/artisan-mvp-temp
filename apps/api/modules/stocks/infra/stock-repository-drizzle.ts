@@ -398,7 +398,11 @@ export class StockRepositoryDrizzle implements IStockRepository {
         if (ecartNum === 0) continue;
 
         const avant = Number(stock.quantiteEnStock ?? "0");
-        const apres = round2(avant + ecartNum).toFixed(2);
+        const apresNum = round2(avant + ecartNum);
+        if (apresNum < 0) {
+          throw new Error(`Écart d'inventaire incompatible avec le stock courant (avant: ${avant}, écart: ${ecartNum})`);
+        }
+        const apres = apresNum.toFixed(2);
         const deltaAbs = Math.abs(ecartNum).toFixed(2);
         const motif = `Régularisation inventaire #${id}`;
 
