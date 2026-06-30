@@ -1,6 +1,6 @@
 import { ConflictError, NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
-import { TVA_CATEGORIES_MAP } from "../../../shared/tva/taux-tva-fr";
+import { TVA_CATEGORIES_MAP, TAUX_TVA_LEGAUX } from "../../../shared/tva/taux-tva-fr";
 import { round2 } from "../../../shared/money";
 import { assertDateNonVerrouillee } from "../../../shared/compta-lock";
 import { factureCounter } from "../../../shared/observability/business-metrics";
@@ -61,6 +61,38 @@ function assertLigneValide(designation: string | undefined, prixUnitaireHT?: str
   }
 }
 
+function assertTauxTVALegal(tauxTVA: string | null | undefined): void {
+  if (tauxTVA == null) return;
+  if (!TAUX_TVA_LEGAUX.has(parseFloat(tauxTVA))) {
+    throw new ValidationError(`Taux TVA ${tauxTVA} hors catalogue légal FR (autorisés : 0, 2.1, 5.5, 10, 20)`);
+  }
+}
+
+function ventilerHTParGroupeTVA(
+  produits: DevisLigneReadModel[],
+  totalHTProduits: number,
+  montantHTTarget: number,
+): SituationLigneCalc[] {
+  const groupes = new Map<string, { tauxTVA: string; tvaCategorieId?: string | null; groupHT: number }>();
+  for (const l of produits) {
+    const g = groupes.get(l.tauxTVA);
+    if (g) { g.groupHT += Number(l.montantHT) || 0; }
+    else { groupes.set(l.tauxTVA, { tauxTVA: l.tauxTVA, tvaCategorieId: l.tvaCategorieId, groupHT: Number(l.montantHT) || 0 }); }
+  }
+  const groupList = Array.from(groupes.values());
+  const result: SituationLigneCalc[] = [];
+  let htRestant = montantHTTarget;
+  for (let i = 0; i < groupList.length; i++) {
+    const g = groupList[i];
+    const montantHT = i === groupList.length - 1
+      ? htRestant
+      : round2(montantHTTarget * g.groupHT / totalHTProduits);
+    result.push({ tauxTVA: g.tauxTVA, tvaCategorieId: g.tvaCategorieId, montantHT });
+    htRestant = round2(htRestant - montantHT);
+  }
+  return result;
+}
+
 export async function creerFacture(repo: IFactureRepository, ctx: TenantContext, input: CreerFactureInput, inTx?: (tx: DbClient) => Promise<void>, lockDate?: string | null): Promise<Facture> {
   assertDateNonVerrouillee(new Date(), lockDate ?? null);
   /** Anti-IDOR-FK : client (et devis lié) du tenant uniquement (ne révèle pas l'existence). */
@@ -106,6 +138,7 @@ export async function ajouterLigneFacture(
   const facture = await getFactureOwned(repo, ctx, factureId);
   assertModifiable(facture);
   assertLigneValide(input.designation, input.prixUnitaireHT, input.quantite);
+  assertTauxTVALegal(input.tauxTVA);
   const ligne = await repo.addLigne(ctx, factureId, input);
   if (!ligne) throw new NotFoundError("Facture introuvable");
   return ligne;
@@ -123,6 +156,7 @@ export async function modifierLigneFacture(
   const lignes = await repo.listLignes(ctx, factureId);
   if (!lignes.some((l) => l.id === ligneId)) throw new NotFoundError("Ligne introuvable");
   assertLigneValide(input.designation, input.prixUnitaireHT, input.quantite);
+  assertTauxTVALegal(input.tauxTVA);
   const updated = await repo.updateLigne(ctx, ligneId, input);
   if (!updated) throw new NotFoundError("Ligne introuvable");
   return updated;
@@ -555,10 +589,14 @@ export async function facturerAcompte(
 
   const totalHT = Number(devisData.totalHT) || 0;
   const proportion = totalDevis > 0 ? totalHT / totalDevis : 1 / 1.2;
-  const montantHT = round2(montantTTC * proportion);
-  const tauxTVA = totalHT > 0 && totalDevis > totalHT
-    ? round2((totalDevis - totalHT) / totalHT * 100).toFixed(2)
-    : "20.00";
+  const montantHTAcompte = round2(montantTTC * proportion);
+
+  /* Ventiler par groupe TVA (évite un taux composite hors catalogue légal FR). */
+  const devisLignes = await devisReader.getLignes(ctx, input.devisId);
+  const produits = devisLignes.filter((l) => l.type === "produit");
+  const ventilationLignes = produits.length > 0
+    ? ventilerHTParGroupeTVA(produits, totalHT, montantHTAcompte)
+    : [{ tauxTVA: "20", tvaCategorieId: undefined, montantHT: montantHTAcompte }];
 
   const label = `Acompte sur devis n° ${devisData.numero}`;
 
@@ -568,13 +606,14 @@ export async function facturerAcompte(
     estAcompte: true,
     objet: label,
     notes: `Acompte ${montantTTC.toFixed(2)} € TTC — devis n° ${devisData.numero}`,
-    lignes: [{
-      designation: label,
-      prixUnitaireHT: montantHT.toFixed(2),
+    lignes: ventilationLignes.map((v) => ({
+      designation: ventilationLignes.length > 1 ? `${label} — TVA ${v.tauxTVA} %` : label,
+      prixUnitaireHT: v.montantHT.toFixed(2),
       quantite: "1.00",
-      tauxTVA,
+      tauxTVA: v.tauxTVA,
+      tvaCategorieId: v.tvaCategorieId ?? null,
       remise: "0",
-    }],
+    })),
   }, (tx) => devisReader.updateMontantDejaFactureTx(tx, ctx, input.devisId, montantTTC.toFixed(2)));
 
   return facture;
@@ -629,26 +668,30 @@ export async function facturerSolde(
 
   let ordreDeduction = lignes.length;
   for (const acompte of acomptes) {
-    const htNum = Math.abs(Number(acompte.totalHT) || 0);
-    const ttcNum = Math.abs(Number(acompte.totalTTC) || 0);
-    const tauxTVA = htNum > 0 ? round2((ttcNum - htNum) / htNum * 100).toFixed(2) : "20.00";
-    const m = calculerMontantsAvoirLigne("1", String(htNum), tauxTVA);
-    lignes.push({
-      ordre: ordreDeduction++,
-      reference: acompte.numero,
-      designation: `Acompte déjà facturé (${acompte.numero ?? `Facture #${acompte.id}`})`,
-      description: null,
-      quantite: "1.00",
-      unite: "unité",
-      prixUnitaireHT: m.prixUnitaireHT,
-      tauxTVA,
-      remise: "0",
-      tvaCategorieId: null,
-      montantHT: m.montantHT,
-      montantTVA: m.montantTVA,
-      montantTTC: m.montantTTC,
-      type: "produit",
-    });
+    const acompteLignes = await factureRepo.listLignes(ctx, acompte.id);
+    const prodAcompte = acompteLignes.filter((al) => al.type === "produit");
+    const srcLignes = prodAcompte.length > 0 ? prodAcompte : [{ montantHT: acompte.totalHT, tauxTVA: "20", tvaCategorieId: null }];
+    const label = `Acompte déjà facturé (${acompte.numero ?? `Facture #${acompte.id}`})`;
+    for (const al of srcLignes) {
+      const htNum = Math.abs(Number(al.montantHT) || 0);
+      const m = calculerMontantsAvoirLigne("1", String(htNum), al.tauxTVA);
+      lignes.push({
+        ordre: ordreDeduction++,
+        reference: acompte.numero,
+        designation: label,
+        description: null,
+        quantite: "1.00",
+        unite: "unité",
+        prixUnitaireHT: m.prixUnitaireHT,
+        tauxTVA: al.tauxTVA,
+        remise: "0",
+        tvaCategorieId: al.tvaCategorieId ?? null,
+        montantHT: m.montantHT,
+        montantTVA: m.montantTVA,
+        montantTTC: m.montantTTC,
+        type: "produit",
+      });
+    }
   }
 
   const facture = await factureRepo.createFromDevis(ctx, {
@@ -722,36 +765,13 @@ export function calculerMontantSituation(
 
   /* Cas dégénéré (devis sans ligne produit) : une ligne 20% avec HT = TTC / 1.2. */
   if (produits.length === 0) {
-    return { montantSituationTTC, situationLignes: [{ tauxTVA: "20.00", montantHT: round2(montantSituationTTC / 1.2) }] };
+    return { montantSituationTTC, situationLignes: [{ tauxTVA: "20", montantHT: round2(montantSituationTTC / 1.2) }] };
   }
 
   const totalHT = produits.reduce((s, l) => s + (Number(l.montantHT) || 0), 0);
   const proportion = ttc > 0 ? totalHT / ttc : 1 / 1.2;
   const montantHTSituation = round2(montantSituationTTC * proportion);
-
-  /* Grouper par taux TVA (ordre d'apparition pour stabilité). */
-  const groupes = new Map<string, { tauxTVA: string; tvaCategorieId?: string | null; groupHT: number }>();
-  for (const l of produits) {
-    const g = groupes.get(l.tauxTVA);
-    if (g) {
-      g.groupHT += Number(l.montantHT) || 0;
-    } else {
-      groupes.set(l.tauxTVA, { tauxTVA: l.tauxTVA, tvaCategorieId: l.tvaCategorieId, groupHT: Number(l.montantHT) || 0 });
-    }
-  }
-
-  /* Ventiler montantHTSituation proportionnellement ; le dernier groupe absorbe l'arrondi. */
-  const groupList = Array.from(groupes.values());
-  const situationLignes: SituationLigneCalc[] = [];
-  let htRestant = montantHTSituation;
-  for (let i = 0; i < groupList.length; i++) {
-    const g = groupList[i];
-    const montantHT = i === groupList.length - 1
-      ? htRestant
-      : round2(montantHTSituation * g.groupHT / totalHT);
-    situationLignes.push({ tauxTVA: g.tauxTVA, tvaCategorieId: g.tvaCategorieId, montantHT });
-    htRestant = round2(htRestant - montantHT);
-  }
+  const situationLignes = ventilerHTParGroupeTVA(produits, totalHT, montantHTSituation);
 
   return { montantSituationTTC, situationLignes };
 }

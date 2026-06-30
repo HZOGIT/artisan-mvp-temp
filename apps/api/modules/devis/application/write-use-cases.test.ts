@@ -233,3 +233,32 @@ describe("devis — use-cases d'écriture", () => {
     });
   });
 });
+
+describe("tauxTVA — validation catalogue légal FR (devis)", () => {
+  it("ajouterLigneDevis : tauxTVA illégal (16.10) → ValidationError", async () => {
+    const repo = repoWithClient(A, 100);
+    const d = await creerDevis(repo, A, { clientId: 100 });
+    await expect(
+      ajouterLigneDevis(repo, A, d.id, { designation: "L", prixUnitaireHT: "100.00", tauxTVA: "16.10" }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("ajouterLigneDevis : taux légaux (0, 2.1, 5.5, 10, 20) → OK", async () => {
+    const repo = repoWithClient(A, 100);
+    const d = await creerDevis(repo, A, { clientId: 100 });
+    for (const taux of ["0", "2.1", "5.5", "10", "20"]) {
+      await expect(
+        ajouterLigneDevis(repo, A, d.id, { designation: "L", prixUnitaireHT: "10.00", tauxTVA: taux }),
+      ).resolves.toBeDefined();
+    }
+  });
+
+  it("modifierLigneDevis : tauxTVA illégal (3.7) → ValidationError", async () => {
+    const repo = repoWithClient(A, 100);
+    const d = await creerDevis(repo, A, { clientId: 100 });
+    const l = await ajouterLigneDevis(repo, A, d.id, { designation: "L", prixUnitaireHT: "50.00", tauxTVA: "20" });
+    await expect(
+      modifierLigneDevis(repo, A, d.id, l.id, { tauxTVA: "3.7" }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+});
