@@ -8,7 +8,7 @@ chirurgicaux sur la branche partagée respectée.
 ## Étape 1 (À FAIRE EN PREMIER) — Inventaire des issues BetterStack dans Linear
 
 Avant tout code, **liste et synthétise toutes les issues Linear relatives à BetterStack/monitoring**.
-Utilise les outils MCP Linear (`list_issues`, `get_issue`, `search`) avec des requêtes variées :
+Utilise la CLI `linearis` avec des requêtes variées :
 - `betterstack`, `better stack`, `better-stack`
 - `monitoring`, `observability`, `observabilité`, `alerting`, `alertes`, `heartbeat`, `uptime`, `logs`
 - l'issue connue **OPE-521** (enrichissement logs BetterStack — déjà traitée par une session passée)
