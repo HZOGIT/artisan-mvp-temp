@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { fournisseurs, articlesFournisseurs, articlesArtisan } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
@@ -122,6 +122,19 @@ export class FournisseurRepositoryDrizzle implements IFournisseurRepository {
         .from(articlesFournisseurs)
         .innerJoin(fournisseurs, eq(fournisseurs.id, articlesFournisseurs.fournisseurId))
         .where(and(eq(articlesFournisseurs.articleId, articleId), eq(fournisseurs.artisanId, ctx.artisanId)))
+        .orderBy(desc(articlesFournisseurs.id));
+      return rows.map((r) => toAssoc(r.a));
+    });
+  }
+
+  listAssociationsByArticleIds(ctx: TenantContext, articleIds: number[]): Promise<ArticleFournisseur[]> {
+    if (articleIds.length === 0) return Promise.resolve([]);
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select({ a: articlesFournisseurs })
+        .from(articlesFournisseurs)
+        .innerJoin(fournisseurs, eq(fournisseurs.id, articlesFournisseurs.fournisseurId))
+        .where(and(inArray(articlesFournisseurs.articleId, articleIds), eq(fournisseurs.artisanId, ctx.artisanId)))
         .orderBy(desc(articlesFournisseurs.id));
       return rows.map((r) => toAssoc(r.a));
     });

@@ -76,6 +76,12 @@ export class FakeFournisseurRepository implements IFournisseurRepository {
     return this.assocs.filter((a) => a.articleId === articleId && this.ownsFournisseur(ctx, a.fournisseurId));
   }
 
+  async listAssociationsByArticleIds(ctx: TenantContext, articleIds: number[]): Promise<ArticleFournisseur[]> {
+    return this.assocs.filter(
+      (a) => articleIds.includes(a.articleId) && this.ownsFournisseur(ctx, a.fournisseurId),
+    );
+  }
+
   async listAssociationsFournisseur(ctx: TenantContext, fournisseurId: number): Promise<ArticleFournisseur[]> {
     if (!this.ownsFournisseur(ctx, fournisseurId)) return [];
     return this.assocs.filter((a) => a.fournisseurId === fournisseurId);
