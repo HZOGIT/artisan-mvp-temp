@@ -1,4 +1,4 @@
-export type PaiementStatut = "en_attente" | "payee" | "echouee" | "remboursee";
+export type PaiementStatut = "en_attente" | "payee" | "echouee" | "remboursee" | "expire";
 
 export interface PaiementStripe {
   readonly id: number;

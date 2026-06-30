@@ -99,7 +99,16 @@ export async function createInvoiceCheckout(
   if (facture.statut === "brouillon" || facture.statut === "annulee") return { kind: "bad-request", message: "Cette facture n'est pas payable en ligne" };
 
   const sessionExistante = await deps.reader.getSessionEnAttente(ctx, input.factureId, now);
-  if (sessionExistante) return { kind: "bad-request", message: "Un paiement est déjà en cours pour cette facture. Veuillez patienter ou contacter votre artisan." };
+  if (sessionExistante) {
+    if (!sessionExistante.sessionId) {
+      return { kind: "bad-request", message: "Un paiement est déjà en cours pour cette facture. Veuillez patienter ou contacter votre artisan." };
+    }
+    const stripeStatus = await deps.stripe.retrieveCheckoutSession(sessionExistante.sessionId, sessionExistante.stripeConnectAccountId ?? undefined);
+    if (stripeStatus?.sessionStatus === "open") {
+      return { kind: "ok", url: sessionExistante.url, sessionId: sessionExistante.sessionId };
+    }
+    await deps.writer.expirePaiement(ctx, sessionExistante.id);
+  }
 
   const client = await deps.reader.getClientContact(ctx, access.clientId);
   const artisanNom = await deps.reader.getArtisanNom(ctx);
@@ -137,7 +146,11 @@ export async function createInvoiceCheckout(
      * On relit la session gagnante (idempotent) plutôt que de renvoyer une erreur.
      */
     const existante = await deps.reader.getSessionEnAttente(ctx, input.factureId, now);
-    if (existante?.sessionId) return { kind: "ok", url: existante.url, sessionId: existante.sessionId };
+    if (existante?.sessionId) {
+      const status = await deps.stripe.retrieveCheckoutSession(existante.sessionId, existante.stripeConnectAccountId ?? undefined);
+      if (status?.sessionStatus === "open") return { kind: "ok", url: existante.url, sessionId: existante.sessionId };
+      await deps.writer.expirePaiement(ctx, existante.id);
+    }
     return { kind: "bad-request", message: "Un paiement est déjà en cours pour cette facture. Veuillez patienter ou contacter votre artisan." };
   }
 

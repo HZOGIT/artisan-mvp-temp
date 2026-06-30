@@ -19,7 +19,7 @@ export class FakePortalPaymentReader implements PortalPaymentReader {
   private checkouts = new Map<string, FactureCheckout>();
   private contacts = new Map<string, ClientContact>();
   private artisanNoms = new Map<number, string>();
-  private sessionsEnAttente = new Map<string, { url: string | null; sessionId: string | null; createdAt: Date }>();
+  private sessionsEnAttente = new Map<string, { id: number; url: string | null; sessionId: string | null; stripeConnectAccountId: string | null; createdAt: Date }>();
   /** Par défaut true pour ne pas casser les tests existants (Connect non concerné). */
   private artisanChargesEnabled = new Map<number, boolean>();
   private connectAccountIds = new Map<number, string>();
@@ -42,8 +42,8 @@ export class FakePortalPaymentReader implements PortalPaymentReader {
   seedArtisanConnectAccountId(artisanId: number, accountId: string): void {
     this.connectAccountIds.set(artisanId, accountId);
   }
-  seedSessionEnAttente(artisanId: number, factureId: number, session: { url: string | null; sessionId?: string | null; createdAt?: Date }): void {
-    this.sessionsEnAttente.set(`${artisanId}:${factureId}`, { url: session.url, sessionId: session.sessionId ?? null, createdAt: session.createdAt ?? new Date() });
+  seedSessionEnAttente(artisanId: number, factureId: number, session: { id?: number; url: string | null; sessionId?: string | null; stripeConnectAccountId?: string | null; createdAt?: Date }): void {
+    this.sessionsEnAttente.set(`${artisanId}:${factureId}`, { id: session.id ?? 0, url: session.url, sessionId: session.sessionId ?? null, stripeConnectAccountId: session.stripeConnectAccountId ?? null, createdAt: session.createdAt ?? new Date() });
   }
 
   seedAccess(token: string, a: PortalAccess): void {
@@ -80,7 +80,7 @@ export class FakePortalPaymentReader implements PortalPaymentReader {
   async getArtisanConnectAccountId(ctx: TenantContext): Promise<string | null> {
     return this.connectAccountIds.get(ctx.artisanId) ?? "acct_fake_test";
   }
-  async getSessionEnAttente(ctx: TenantContext, factureId: number, now: Date): Promise<{ url: string | null; sessionId: string | null } | null> {
+  async getSessionEnAttente(ctx: TenantContext, factureId: number, now: Date): Promise<{ id: number; url: string | null; sessionId: string | null; stripeConnectAccountId: string | null } | null> {
     if (this.skipFirstSessionLookup && !this.firstSessionLookupDone) {
       this.firstSessionLookupDone = true;
       return null;
@@ -88,13 +88,14 @@ export class FakePortalPaymentReader implements PortalPaymentReader {
     const s = this.sessionsEnAttente.get(`${ctx.artisanId}:${factureId}`);
     if (!s) return null;
     const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    return s.createdAt >= cutoff ? { url: s.url, sessionId: s.sessionId } : null;
+    return s.createdAt >= cutoff ? { id: s.id, url: s.url, sessionId: s.sessionId, stripeConnectAccountId: s.stripeConnectAccountId } : null;
   }
 }
 
-/** Writer paiement portail fake : collecte les paiements créés (assertions). */
+/** Writer paiement portail fake : collecte les paiements créés et expirés (assertions). */
 export class FakePortalPaymentWriter implements PortalPaymentWriter {
   public created: Array<{ artisanId: number; factureId: number; stripeSessionId: string; tokenPaiement: string; stripeConnectAccountId?: string | null }> = [];
+  public expired: number[] = [];
   /** Simule la violation UNIQUE PG (race TOCTOU) au premier appel si vrai. */
   public forceConflictOnce = false;
   async createPaiement(
@@ -106,5 +107,8 @@ export class FakePortalPaymentWriter implements PortalPaymentWriter {
       throw new ConflictError("Session paiement déjà en cours pour cette facture");
     }
     this.created.push({ artisanId: ctx.artisanId, factureId: input.factureId, stripeSessionId: input.stripeSessionId, tokenPaiement: input.tokenPaiement, stripeConnectAccountId: input.stripeConnectAccountId });
+  }
+  async expirePaiement(_ctx: TenantContext, paiementId: number): Promise<void> {
+    this.expired.push(paiementId);
   }
 }

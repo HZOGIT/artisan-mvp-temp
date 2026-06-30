@@ -178,6 +178,7 @@ import { paOutboxDrainerPlugin } from "./shared/infra/pa-outbox-drainer";
 import { paInboundPollerPlugin } from "./shared/infra/pa-inbound-poller";
 import { paReconciliationPollerPlugin } from "./shared/infra/pa-reconciliation-poller";
 import { portalPaymentReconciliationPollerPlugin } from "./shared/infra/portal-payment-reconciliation-poller";
+import { portalPaymentExpirationPollerPlugin } from "./shared/infra/portal-payment-expiration-poller";
 import { eventOutboxDrainerPlugin } from "./shared/events/outbox-drainer";
 import { geoPurgeCronPlugin } from "./shared/infra/geo-purge-cron";
 import { rgpdCronPlugin } from "./shared/infra/rgpd-cron";
@@ -1415,6 +1416,13 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       await compta.genererEcrituresEncaissement({ artisanId, userId: 0 }, factureId);
       await compta.validerEcritures({ artisanId, userId: 0 }, factureId);
     },
+  });
+  /** Poller expiration paiements portail — toutes les 10 min, marque 'expire' les sessions Stripe abandonnées/expirées. Débloque les retries. ⚠️ ownerDbUrl requis (paiements_stripe FORCE RLS). */
+  app.register(portalPaymentExpirationPollerPlugin, {
+    stripe: deps.stripePort ?? new StripeAdapter(),
+    writer: new PortalPaymentWriterDrizzle(getDbHandle().db),
+    ownerDbUrl: getOwnerDbHandle().pool.options.connectionString ?? "",
+    dbUrl: getDbHandle().pool.options.connectionString ?? "",
   });
   app.register(eventOutboxDrainerPlugin, { db: getDbHandle().db });
 

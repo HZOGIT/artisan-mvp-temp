@@ -9,7 +9,7 @@ type StripeSDK = {
   checkout: {
     sessions: {
       create(p: unknown, options?: StripeRequestOptions): Promise<{ id: string; url: string | null }>;
-      retrieve(id: string, params?: unknown, options?: StripeRequestOptions): Promise<{ payment_status: string; payment_intent: string | { id: string } | null }>;
+      retrieve(id: string, params?: unknown, options?: StripeRequestOptions): Promise<{ status: string; payment_status: string; payment_intent: string | { id: string } | null }>;
     };
   };
   accounts: {
@@ -55,7 +55,7 @@ export class StripeAdapter implements StripePort {
       const piId = typeof session.payment_intent === "string"
         ? session.payment_intent
         : (session.payment_intent as { id: string } | null)?.id ?? null;
-      return { paymentStatus: session.payment_status, paymentIntentId: piId };
+      return { paymentStatus: session.payment_status, paymentIntentId: piId, sessionStatus: session.status };
     } catch {
       return null;
     }
@@ -162,7 +162,7 @@ export class FakeStripePort implements StripePort {
 
   public sessionStatuses: Map<string, CheckoutSessionStatus> = new Map();
   async retrieveCheckoutSession(sessionId: string): Promise<CheckoutSessionStatus | null> {
-    return this.sessionStatuses.get(sessionId) ?? { paymentStatus: "unpaid", paymentIntentId: null };
+    return this.sessionStatuses.get(sessionId) ?? { paymentStatus: "unpaid", paymentIntentId: null, sessionStatus: "open" };
   }
 
   public connectAccounts: CreateConnectAccountParams[] = [];
