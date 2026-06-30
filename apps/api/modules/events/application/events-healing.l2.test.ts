@@ -249,6 +249,27 @@ describe.skipIf(!DB_URL)("createEventManquantNotificationJob — L2", () => {
     expect(rows).toHaveLength(0);
   });
 
+  it("notification.lue antérieure au cutoff OPE-952 → exclue du détecteur (backlog historique)", async () => {
+    const notifId = NOTIF_BASE_ID + 5;
+    await admin.query(
+      `INSERT INTO notifications (id, "artisanId", titre, lu, "createdAt")
+       VALUES ($1, $2, 'test-heal-backlog', true, '2026-06-01T00:00:00Z')
+       ON CONFLICT (id) DO NOTHING`,
+      [notifId, TEST_ARTISAN_ID],
+    );
+
+    const job = createEventManquantNotificationJob({ db, ownerDb: db, dryRun: false });
+    await job.run();
+
+    const { rows } = await admin.query(
+      `SELECT 1 FROM event_outbox WHERE action IN ('notification.lue', 'healing.events.notification-manquant') AND "entityId" = $1`,
+      [notifId],
+    );
+    expect(rows).toHaveLength(0);
+
+    await admin.query(`DELETE FROM notifications WHERE id = $1`, [notifId]);
+  });
+
   it("dry-run : healing event dryRun:true, aucun event notification.lue émis", async () => {
     const notifId = NOTIF_BASE_ID + 4;
     await admin.query(
