@@ -31,9 +31,22 @@ export interface CheckoutSessionStatus {
   readonly paymentIntentId: string | null;
 }
 
+export interface CreateConnectAccountParams {
+  readonly country: string;
+  readonly email: string | null;
+}
+
+export interface CreateAccountLinkParams {
+  readonly accountId: string;
+  readonly refreshUrl: string;
+  readonly returnUrl: string;
+}
+
 export interface StripePort {
   constructEvent(rawBody: Buffer, signature: string, secret: string): Promise<StripeWebhookEvent>;
   createCustomer(params: CreateCustomerParams): Promise<{ id: string }>;
   createInvoiceCheckout(params: CreateInvoiceCheckoutParams): Promise<{ url: string | null; sessionId: string }>;
   retrieveCheckoutSession(sessionId: string): Promise<CheckoutSessionStatus | null>;
+  createConnectAccount(params: CreateConnectAccountParams): Promise<{ id: string }>;
+  createAccountLink(params: CreateAccountLinkParams): Promise<{ url: string }>;
 }
