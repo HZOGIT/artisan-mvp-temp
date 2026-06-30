@@ -107,6 +107,9 @@ export async function createInvoiceCheckout(
     if (stripeStatus?.sessionStatus === "open") {
       return { kind: "ok", url: sessionExistante.url, sessionId: sessionExistante.sessionId };
     }
+    if (stripeStatus?.sessionStatus === "complete") {
+      return { kind: "bad-request", message: "Le paiement est en cours de validation — la facture sera marquée payée dans quelques instants." };
+    }
     await deps.writer.expirePaiement(ctx, sessionExistante.id);
   }
 
@@ -149,6 +152,9 @@ export async function createInvoiceCheckout(
     if (existante?.sessionId) {
       const status = await deps.stripe.retrieveCheckoutSession(existante.sessionId, existante.stripeConnectAccountId ?? undefined);
       if (status?.sessionStatus === "open") return { kind: "ok", url: existante.url, sessionId: existante.sessionId };
+      if (status?.sessionStatus === "complete") {
+        return { kind: "bad-request", message: "Le paiement est en cours de validation — la facture sera marquée payée dans quelques instants." };
+      }
       await deps.writer.expirePaiement(ctx, existante.id);
     }
     return { kind: "bad-request", message: "Un paiement est déjà en cours pour cette facture. Veuillez patienter ou contacter votre artisan." };

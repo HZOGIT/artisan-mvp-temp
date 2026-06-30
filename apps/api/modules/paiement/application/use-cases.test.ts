@@ -125,6 +125,17 @@ describe("createInvoiceCheckout (public par token portail)", () => {
     if (out.kind === "ok") expect(out.url).not.toBe("https://checkout.stripe.test/old");
   });
 
+  it("OPE-981 — session COMPLETE sur Stripe → ne pas expirer, retourner bad-request (anti-régression)", async () => {
+    const { reader, writer, stripe, deps } = build();
+    seedFacturePayable(reader);
+    reader.seedSessionEnAttente(7, 42, { id: 12, url: "https://checkout.stripe.test/paid", sessionId: "cs_complete", stripeConnectAccountId: "acct_test", createdAt: new Date(NOW.getTime() - 1 * 60 * 60 * 1000) });
+    stripe.sessionStatuses.set("cs_complete", { paymentStatus: "paid", paymentIntentId: "pi_xyz", sessionStatus: "complete" });
+    const out = await createInvoiceCheckout(deps, { factureId: 42, token: "tok", origin: "https://o.test" });
+    expect(out.kind).toBe("bad-request");
+    expect(writer.expired).toHaveLength(0);
+    expect(writer.created).toHaveLength(0);
+  });
+
   it("OPE-903 — artisan sans charges_enabled → bad-request (gating Connect)", async () => {
     const { reader, deps } = build();
     reader.seedArtisanChargesEnabled(7, false);
