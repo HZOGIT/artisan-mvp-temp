@@ -17,5 +17,8 @@
   "connectIncompletMsg": "Inscription Stripe incomplète.",
   "connectIncompletDetail": "Complétez votre inscription pour activer le paiement en ligne.",
   "connectDeconnecteMsg": "Votre compte Stripe a été déconnecté. Reconnectez-le pour réactiver le paiement en ligne.",
-  "connectRetourStripe": "Retour de Stripe — vérification du statut en cours."
+  "connectRetourStripe": "Retour de Stripe — vérification du statut en cours.",
+  "fraisStripeInfo": "0 % de commission Operioz. Stripe applique ses frais de traitement standards directement sur les paiements que vous recevez — le montant varie selon le moyen de paiement et le pays d'émission de la carte.",
+  "fraisStripeLienLabel": "Consulter la grille tarifaire Stripe",
+  "fraisStripeDashboard": "Le détail exact de vos frais est disponible dans votre Dashboard Stripe."
 }

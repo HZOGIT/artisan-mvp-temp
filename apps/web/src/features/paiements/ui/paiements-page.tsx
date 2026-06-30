@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { CreditCard, CheckCircle, AlertCircle, Clock } from "lucide-react";
+import { CreditCard, CheckCircle, AlertCircle, Clock, Info } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
@@ -53,6 +53,20 @@ export default function PaiementsPage() {
           <CardDescription>{t("connectDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="flex gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200 text-sm">
+            <Info className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+            <p className="text-blue-800">
+              {t("fraisStripeInfo")}{" "}
+              <a
+                href="https://stripe.com/fr/pricing"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline font-medium"
+              >
+                {t("fraisStripeLienLabel")}
+              </a>
+            </p>
+          </div>
           {connectStatus.isLoading ? (
             <div className="animate-pulse h-8 bg-muted rounded" />
           ) : connectStatus.data?.status === "active" ? (
