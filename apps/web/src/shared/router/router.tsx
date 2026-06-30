@@ -10,7 +10,6 @@ import {
 import { useTranslation } from "react-i18next";
 import { DashboardLayoutMount } from "../../shell/ui/dashboard-layout-mount";
 import NotFoundPage from "../../features/not-found/ui/not-found-page";
-import OnboardingPage from "../../features/onboarding/ui/onboarding-page";
 
 /*
  * Socle de routage du FRONT NEUF (refonte strangler-fig). TanStack Router prend la main sur tout le
@@ -56,11 +55,11 @@ const indexRoute = createRoute({
   beforeLoad: () => { throw redirect({ to: "/home" }); },
 });
 
-/** Onboarding plein écran (authentifié mais SANS shell) — port du comportement App.tsx (eager, pas de chrome). */
+/** Onboarding plein écran (authentifié mais SANS shell) — port du comportement App.tsx (hors chrome). */
 const onboardingRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/onboarding",
-  component: OnboardingPage,
+  component: lazyRouteComponent(() => import("../../features/onboarding/ui/onboarding-page")),
   validateSearch: (s: Record<string, unknown>) => ({
     plan: typeof s.plan === "string" ? s.plan : undefined,
   }),

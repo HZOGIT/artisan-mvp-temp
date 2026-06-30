@@ -17,9 +17,8 @@ import { trpc } from "@/shared/trpc";
 import { useOnboarding } from "../application/use-onboarding";
 import { METIERS, metierFinal as computeMetierFinal, buildCompletePayload, type Step } from "../domain/onboarding";
 
-const stripePromise = loadStripe(
-  (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined) ?? "",
-);
+const _stripeKey = (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined) ?? "";
+const stripePromise = _stripeKey ? loadStripe(_stripeKey) : null;
 
 const VALID_PLAN_IDS = ["starter", "pro", "enterprise"] as const;
 type OnboardingPlanId = typeof VALID_PLAN_IDS[number];

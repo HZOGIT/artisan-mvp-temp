@@ -8,9 +8,8 @@ import { Button } from "@/shared/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 import { useBillingMaison } from "../application/use-billing-maison";
 
-const stripePromise = loadStripe(
-  (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined) ?? "",
-);
+const _stripeKey = (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined) ?? "";
+const stripePromise = _stripeKey ? loadStripe(_stripeKey) : null;
 
 interface SetupData {
   clientSecret: string;
