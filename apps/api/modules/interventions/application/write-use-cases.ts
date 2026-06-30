@@ -63,18 +63,26 @@ export async function modifierIntervention(
 ): Promise<Intervention> {
   if (input.titre !== undefined && !input.titre.trim()) throw new ValidationError("Le titre est requis");
   assertDatesCoherentes(input.dateDebut, input.dateFin ?? undefined);
+  let effectiveInput: UpdateInterventionInput = input;
   if (input.statut !== undefined) {
     const current = await repo.getById(ctx, id);
     if (!current) throw new NotFoundError("Intervention introuvable");
     if (input.statut !== current.statut && !TRANSITIONS[current.statut].has(input.statut)) {
       throw new ValidationError(`Transition de statut "${current.statut}" → "${input.statut}" non autorisée`);
     }
+    if (input.statut === "terminee" && current.statut !== "terminee") {
+      const effectiveTechnicienId = input.technicienId !== undefined ? input.technicienId : current.technicienId;
+      if (!effectiveTechnicienId) {
+        throw new ValidationError("Un technicien doit être assigné pour terminer une intervention");
+      }
+      if (input.dateFin === undefined) effectiveInput = { ...input, dateFin: new Date() };
+    }
   }
   /** Une FK (re)liée doit appartenir au tenant (anti-IDOR-FK). `null` = on détache, pas de vérif. */
-  if (input.technicienId != null) await assertRefOwned(repo, ctx, "technicien", input.technicienId);
-  if (input.devisId != null) await assertRefOwned(repo, ctx, "devis", input.devisId);
-  if (input.factureId != null) await assertRefOwned(repo, ctx, "facture", input.factureId);
-  const updated = await repo.update(ctx, id, input);
+  if (effectiveInput.technicienId != null) await assertRefOwned(repo, ctx, "technicien", effectiveInput.technicienId);
+  if (effectiveInput.devisId != null) await assertRefOwned(repo, ctx, "devis", effectiveInput.devisId);
+  if (effectiveInput.factureId != null) await assertRefOwned(repo, ctx, "facture", effectiveInput.factureId);
+  const updated = await repo.update(ctx, id, effectiveInput);
   if (!updated) throw new NotFoundError("Intervention introuvable");
   return updated;
 }
