@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import { router, protectedProcedure, permissionProcedure } from "../../../../interface/trpc/trpc";
 import type { DbClient } from "../../../../shared/db";
 import { outboxEvent } from "../../../../shared/events/outbox-event";
 import { withOutbox } from "../../../../shared/events/with-outbox";
@@ -47,6 +47,7 @@ const updateSchema = z.object({
  * errors (NotFound→404, Validation→400). Repo injecté (DI).
  */
 export function createNotesDeFraisRouter(repo: INoteDeFraisRepository, db?: DbClient) {
+  const approuverGate = permissionProcedure("notes_frais.approuver");
   return router({
     list: protectedProcedure.query(({ ctx }) => listNotesDeFrais(repo, ctx.tenant)),
 
@@ -97,7 +98,7 @@ export function createNotesDeFraisRouter(repo: INoteDeFraisRepository, db?: DbCl
         });
       }),
 
-    approuver: protectedProcedure
+    approuver: approuverGate
       .input(z.object({ id: z.number().int(), commentaire: z.string().max(2000).nullish() }))
       .mutation(async ({ ctx, input }) => {
         return withOutbox(db, repo, async (r, tx) => {
@@ -107,7 +108,7 @@ export function createNotesDeFraisRouter(repo: INoteDeFraisRepository, db?: DbCl
         });
       }),
 
-    rejeter: protectedProcedure
+    rejeter: approuverGate
       .input(z.object({ id: z.number().int(), commentaire: z.string().min(1).max(2000) }))
       .mutation(async ({ ctx, input }) => {
         return withOutbox(db, repo, async (r, tx) => {
@@ -117,7 +118,7 @@ export function createNotesDeFraisRouter(repo: INoteDeFraisRepository, db?: DbCl
         });
       }),
 
-    payer: protectedProcedure
+    payer: approuverGate
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         return withOutbox(db, repo, async (r, tx) => {
