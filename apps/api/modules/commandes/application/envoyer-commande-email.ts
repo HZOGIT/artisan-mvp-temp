@@ -104,7 +104,7 @@ export async function envoyerCommandeParEmail(
   });
 
   if (deps.emailLogWriter) {
-    await deps.emailLogWriter.create({ artisanId: ctx.artisanId, destinataire: destinataireEmail, sujet: subject, type: "envoi_commande", entiteType: "commande", entiteId: commande.id }).catch(() => {});
+    await deps.emailLogWriter.create({ artisanId: ctx.artisanId, destinataire: destinataireEmail, sujet: subject, type: "envoi_commande", entiteType: "commande", entiteId: commande.id }).catch(() => { /* ponytail: best-effort — emailLogWriter non-critique */ });
   }
 
   await deps.repo.updateStatut(ctx, commande.id, "envoyee");

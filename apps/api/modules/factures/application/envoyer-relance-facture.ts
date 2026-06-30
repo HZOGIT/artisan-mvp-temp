@@ -187,7 +187,7 @@ export async function envoyerRelanceFacture(
   await deps.email.send({ to: client.email, subject, body, fromName: artisan.nomEntreprise ?? undefined, replyTo: artisan.email ?? undefined });
 
   if (deps.emailLogWriter) {
-    await deps.emailLogWriter.create({ artisanId: ctx.artisanId, destinataire: client.email, sujet: subject, type: "relance_facture", entiteType: "facture", entiteId: input.factureId }).catch(() => {});
+    await deps.emailLogWriter.create({ artisanId: ctx.artisanId, destinataire: client.email, sujet: subject, type: "relance_facture", entiteType: "facture", entiteId: input.factureId }).catch(() => { /* ponytail: best-effort — emailLogWriter non-critique */ });
   }
 
   /** Incrémenter le compteur de relances après envoi réussi. */

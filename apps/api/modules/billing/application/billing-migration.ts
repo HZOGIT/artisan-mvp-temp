@@ -136,6 +136,7 @@ export async function migrateSubscriptionsFromLegacy(
 
       migrated++;
     } catch (err) {
+      /* ponytail: best-effort — erreur par tenant, boucle continue, agrégée dans errors */
       errors.push({ artisanId: sub.artisan_id, error: err instanceof Error ? err.message : String(err) });
     }
   }

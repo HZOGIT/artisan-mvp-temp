@@ -43,7 +43,7 @@ export function createRelancesDevisJob(deps: RelancesDevisJobDeps): JobDefinitio
           joursMinimum: cfg.joursApresEnvoi,
           joursEntreRelances: cfg.joursEntreRelances,
           nombreMaxRelances: cfg.nombreMaxRelances,
-        }).catch(() => {});
+        }).catch(() => { /* ponytail: best-effort — envoi relance non-critique */ });
       }
     },
   };

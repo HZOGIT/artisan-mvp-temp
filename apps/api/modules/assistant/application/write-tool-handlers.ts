@@ -169,6 +169,7 @@ function makeCreerClient(clients: ClientWriterForAgent): ToolHandler {
         data: { clientId: client.id, nom: client.nom, message: `Client ${client.prenom ? client.prenom + " " : ""}${client.nom} créé (ID ${client.id})` },
       };
     } catch (e) {
+      /* ponytail: best-effort — erreur retournée au caller via { ok: false } */
       return { ok: false, error: errMsg(e, "Erreur lors de la création du client") };
     }
   };
@@ -223,6 +224,7 @@ function makeCreerIntervention(clientsById: ClientByIdReaderForAgent, interventi
         },
       };
     } catch (e) {
+      /* ponytail: best-effort — erreur retournée au caller via { ok: false } */
       return { ok: false, error: errMsg(e, "Erreur lors de la création de l'intervention") };
     }
   };
@@ -276,6 +278,7 @@ function makeCreerDevis(devis: DevisWriterForAgent): ToolHandler {
         data: { devisId: d.devisId, numero: d.numero, totalTTC: d.totalTTC, statut: d.statut, message: `Devis ${d.numero} créé en brouillon (${parseFloat(d.totalTTC || "0").toFixed(2)} € TTC)` },
       };
     } catch (e) {
+      /* ponytail: best-effort — erreur retournée au caller via { ok: false } */
       return { ok: false, error: errMsg(e, "Erreur lors de la création du devis") };
     }
   };
@@ -302,6 +305,7 @@ function makeCreerEtEnvoyerDevis(devis: DevisWriterForAgent, sender: DevisSender
         },
       };
     } catch (e) {
+      /* ponytail: best-effort — erreur retournée au caller via { ok: false } */
       return { ok: false, error: errMsg(e, "Erreur lors de la création/envoi du devis") };
     }
   };
@@ -359,6 +363,7 @@ function makeCreerFacture(facture: FactureWriterForAgent): ToolHandler {
         },
       };
     } catch (e) {
+      /* ponytail: best-effort — erreur retournée au caller via { ok: false } */
       return { ok: false, error: errMsg(e, "Erreur lors de la création de la facture") };
     }
   };
@@ -375,6 +380,7 @@ function makeEnvoyerDevis(sender: DevisSenderForAgent): ToolHandler {
       const result = await sender.envoyer(ctx, Number(args.devisId), optStr(args.messagePersonnalise));
       return result.success ? { ok: true, data: { message: result.message } } : { ok: false, error: result.message };
     } catch (e) {
+      /* ponytail: best-effort — erreur retournée au caller via { ok: false } */
       return { ok: false, error: errMsg(e, "Erreur lors de l'envoi du devis") };
     }
   };
@@ -386,6 +392,7 @@ function makeEnvoyerFacture(sender: FactureSenderForAgent): ToolHandler {
       const result = await sender.envoyer(ctx, Number(args.factureId), optStr(args.messagePersonnalise));
       return result.success ? { ok: true, data: { message: result.message } } : { ok: false, error: result.message };
     } catch (e) {
+      /* ponytail: best-effort — erreur retournée au caller via { ok: false } */
       return { ok: false, error: errMsg(e, "Erreur lors de l'envoi de la facture") };
     }
   };
@@ -399,6 +406,7 @@ function makeEnvoyerRelance(sender: RelanceSenderForAgent): ToolHandler {
       const result = await sender.envoyer(ctx, Number(args.factureId), optStr(args.messagePersonnalise));
       return result.success ? { ok: true, data: { message: result.message } } : { ok: false, error: result.message };
     } catch (e) {
+      /* ponytail: best-effort — erreur retournée au caller via { ok: false } */
       return { ok: false, error: errMsg(e, "Erreur lors de l'envoi de la relance") };
     }
   };
@@ -445,6 +453,7 @@ function makeCreerCommande(commandes: CommandeWriterForAgent): ToolHandler {
         },
       };
     } catch (e) {
+      /* ponytail: best-effort — erreur retournée au caller via { ok: false } */
       return { ok: false, error: errMsg(e, "Erreur lors de la création de la commande") };
     }
   };
@@ -458,6 +467,7 @@ function makeEnvoyerCommande(sender: CommandeSenderForAgent): ToolHandler {
       const result = await sender.envoyer(ctx, Number(args.commandeId), optStr(args.messagePersonnalise));
       return result.success ? { ok: true, data: { message: result.message } } : { ok: false, error: result.message };
     } catch (e) {
+      /* ponytail: best-effort — erreur retournée au caller via { ok: false } */
       return { ok: false, error: errMsg(e, "Erreur lors de l'envoi de la commande") };
     }
   };
@@ -492,6 +502,7 @@ function makeModifierIntervention(updater: InterventionUpdaterForAgent): ToolHan
         data: { interventionId: updated.id, titre: updated.titre, statut: updated.statut, message: `Intervention #${Number(args.interventionId)} mise à jour` },
       };
     } catch (e) {
+      /* ponytail: best-effort — erreur retournée au caller via { ok: false } */
       return { ok: false, error: errMsg(e, "Erreur lors de la mise à jour de l'intervention") };
     }
   };

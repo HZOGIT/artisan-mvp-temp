@@ -65,6 +65,7 @@ export async function genererDepensesRecurrentes(
         });
         generees++;
       } catch {
+        /* ponytail: best-effort — erreur par dépense comptée dans erreurs, boucle continue */
         erreurs++;
       }
     }

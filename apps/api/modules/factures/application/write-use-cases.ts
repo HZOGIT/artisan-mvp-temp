@@ -238,7 +238,7 @@ export async function enregistrerPaiementFacture(
    */
   if (soldee) {
     factureCounter.inc({ action: "paid" });
-    await notifRepo?.archiveByLien(ctx, `/factures/${id}`).catch(() => {});
+    await notifRepo?.archiveByLien(ctx, `/factures/${id}`).catch(() => { /* ponytail: best-effort — archiveByLien non-critique */ });
     try {
       await compta.genererEcrituresVente(ctx, id);
       await compta.genererEcrituresEncaissement(ctx, id, updated);
@@ -291,7 +291,7 @@ export async function marquerFacturePayee(
   });
   if (!updated) throw new NotFoundError("Facture introuvable");
   factureCounter.inc({ action: "paid" });
-  await notifRepo?.archiveByLien(ctx, `/factures/${id}`).catch(() => {});
+  await notifRepo?.archiveByLien(ctx, `/factures/${id}`).catch(() => { /* ponytail: best-effort — archiveByLien non-critique */ });
   try {
     await compta.genererEcrituresVente(ctx, id);
     await compta.genererEcrituresEncaissement(ctx, id, updated);

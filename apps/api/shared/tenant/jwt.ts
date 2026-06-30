@@ -36,6 +36,7 @@ export async function verifyAuthToken(
     const base: TokenClaims = { userId, email };
     return typeof payload.iat === "number" ? { ...base, iat: payload.iat } : base;
   } catch {
+    /* ponytail: best-effort — JWT invalide → null */
     return null;
   }
 }

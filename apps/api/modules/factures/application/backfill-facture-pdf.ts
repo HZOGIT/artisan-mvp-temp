@@ -92,6 +92,7 @@ export async function backfillFacturePdf(
 
       traites++;
     } catch (_err) {
+      /* ponytail: best-effort — erreur par facture comptée, backfill continue */
       erreurs++;
     }
   }

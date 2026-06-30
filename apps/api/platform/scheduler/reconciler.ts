@@ -109,6 +109,7 @@ export async function runReconciler<T>(
       });
       healed++;
     } catch {
+      /* ponytail: best-effort — erreur par entrée comptée dans failed, boucle continue */
       failed++;
     }
   }

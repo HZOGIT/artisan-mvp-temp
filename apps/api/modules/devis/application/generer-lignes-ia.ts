@@ -93,6 +93,7 @@ Réponds UNIQUEMENT en JSON pur :
   try {
     data = JSON.parse(jsonMatch[0]);
   } catch {
+    /* ponytail: best-effort — JSON LLM malformé, fallback vide */
     return empty;
   }
 

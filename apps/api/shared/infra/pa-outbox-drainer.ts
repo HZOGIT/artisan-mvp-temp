@@ -41,6 +41,7 @@ export async function drainEntry(
     await update(entry.id, { statut: "sent", traiteeAt: new Date() });
     await onSuccess?.(entry.factureId, result.paDocumentId);
   } catch (err) {
+    /* ponytail: best-effort — erreur stockée dans derniereErreur, tentatives tracées en BDD */
     const tentatives = (entry.tentatives ?? 0) + 1;
     await update(entry.id, {
       statut: tentatives >= MAX_TENTATIVES ? "dead" : "failed",

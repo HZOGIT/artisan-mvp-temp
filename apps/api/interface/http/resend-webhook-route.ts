@@ -28,6 +28,7 @@ function verifyResendSignature(
     try {
       return timingSafeEqual(Buffer.from(expected), Buffer.from(sig));
     } catch {
+      /* ponytail: best-effort — buffer length mismatch → false */
       return false;
     }
   });

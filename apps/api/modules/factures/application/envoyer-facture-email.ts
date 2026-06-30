@@ -216,7 +216,7 @@ export async function envoyerFactureParEmail(
   await deps.email.send({ to: client.email, subject, body, ...(attachments.length ? { attachments } : {}), fromName: artisan.nomEntreprise ?? undefined, replyTo: artisan.email ?? undefined });
 
   if (deps.emailLogWriter) {
-    await deps.emailLogWriter.create({ artisanId: ctx.artisanId, destinataire: client.email, sujet: subject, type: "envoi_facture", entiteType: "facture", entiteId: facture.id }).catch(() => {});
+    await deps.emailLogWriter.create({ artisanId: ctx.artisanId, destinataire: client.email, sujet: subject, type: "envoi_facture", entiteType: "facture", entiteId: facture.id }).catch(() => { /* ponytail: best-effort — emailLogWriter non-critique */ });
   }
 
   /** Envoi réussi (pas d'exception) : passage `envoyee` depuis brouillon/validee uniquement. */

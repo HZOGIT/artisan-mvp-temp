@@ -19,6 +19,7 @@ export async function processPaWebhook(
   try {
     event = deps.pa.verifyWebhook(raw.rawBody, raw.signature);
   } catch {
+    /* ponytail: best-effort — signature invalide → 400 */
     return { http: 400, body: "Signature invalide" };
   }
 

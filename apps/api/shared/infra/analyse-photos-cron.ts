@@ -45,6 +45,7 @@ export async function processAnalysesEnAttente(
       await analyserPhotos(devisIADeps, { artisanId, userId: 0 }, id);
       processed++;
     } catch {
+      /* ponytail: best-effort — erreur par photo comptée dans errors, cron continue */
       errors++;
     }
   }

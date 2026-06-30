@@ -41,6 +41,7 @@ export async function drainEmailEntry(
     await sender.send(message);
     await update(entry.id, { statut: "sent", traiteeAt: new Date() });
   } catch (err) {
+    /* ponytail: best-effort — erreur stockée dans derniereErreur, tentatives tracées en BDD */
     const tentatives = entry.tentatives + 1;
     await update(entry.id, {
       statut: tentatives >= MAX_TENTATIVES ? "dead" : "pending",

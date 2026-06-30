@@ -38,7 +38,7 @@ export function registerRumVitalsRoute(app: FastifyInstance, deps: RumVitalsDeps
       const id = typeof body.id === "string" ? strip(body.id).slice(0, 64) : "-";
       log(`[RUM] ${name} value=${value ?? "?"} rating=${rating} id=${id}`);
     } catch {
-      /* fire-and-forget : ne jamais échouer */
+      /* ponytail: best-effort — fire-and-forget, ne jamais échouer */
     }
     return reply.send({ ok: true });
   });

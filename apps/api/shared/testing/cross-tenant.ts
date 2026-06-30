@@ -52,6 +52,7 @@ function safeStringify(v: unknown): string {
   try {
     return JSON.stringify(v);
   } catch {
+    /* ponytail: best-effort — JSON.stringify impossible, fallback String() */
     return String(v);
   }
 }

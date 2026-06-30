@@ -76,6 +76,7 @@ export function parseConseils(text: string): Conseil[] {
   try {
     data = JSON.parse(match[0]);
   } catch {
+    /* ponytail: best-effort — JSON LLM malformé, fallback vide */
     return [];
   }
   const liste = (data as { conseils?: unknown }).conseils;

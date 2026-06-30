@@ -65,6 +65,7 @@ export async function* streamAssistantReply(
     try {
       threadId = await deps.threadWriter.createThread(ctx, input.message);
     } catch {
+      /* ponytail: best-effort — historique non critique, stream continue sans thread */
       threadId = 0;
     }
   }

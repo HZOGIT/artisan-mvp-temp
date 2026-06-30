@@ -48,6 +48,7 @@ export async function importClients(repo: IImportErpRepository, ctx: TenantConte
       res.imported++;
       if (email) seenEmails.add(email);
     } catch (err) {
+      /* ponytail: best-effort — erreur détaillée dans res.errorDetails, boucle continue */
       res.errors++;
       res.errorDetails.push(`Ligne ${lineNum} : ${(err as Error)?.message || "erreur"}`);
     }
@@ -92,6 +93,7 @@ export async function importDevis(repo: IImportErpRepository, ctx: TenantContext
       });
       res.imported++;
     } catch (err) {
+      /* ponytail: best-effort — erreur détaillée dans res.errorDetails, boucle continue */
       res.errors++;
       res.errorDetails.push(`Ligne ${lineNum} : ${(err as Error)?.message || "erreur"}`);
     }
@@ -178,6 +180,7 @@ export async function importFactures(repo: IImportErpRepository, ctx: TenantCont
       if (numeroOrigine) numerosVus.add(numeroOrigine);
       res.imported++;
     } catch (err) {
+      /* ponytail: best-effort — erreur détaillée dans res.errorDetails, boucle continue */
       res.errors++;
       res.errorDetails.push(`Ligne ${lineNum} : ${(err as Error)?.message || "erreur"}`);
     }

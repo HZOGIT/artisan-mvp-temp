@@ -73,6 +73,7 @@ export function resoudreServices(vitrineServices: string | null, categories: rea
   try {
     services = vitrineServices ? (JSON.parse(vitrineServices) as string[]) : [];
   } catch {
+    /* ponytail: best-effort — JSON malformé, fallback vide */
     services = [];
   }
   return services.length > 0 ? services : [...categories];
