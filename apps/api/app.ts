@@ -830,6 +830,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       db: deps.facturesDb ?? getDbHandle().db,
       piecesJointesRepo: new PiecesJointesRepositoryDrizzle(getDbHandle().db),
       emailLogWriter: sharedEmailLogWriter,
+      appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+      portalTokenReader: new PortalAccessRepositoryDrizzle(getDbHandle().db),
     },
     push: pushAdapter,
     outboxInTx: (artisanId, factureId, tx) =>

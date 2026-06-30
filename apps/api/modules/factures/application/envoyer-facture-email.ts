@@ -13,6 +13,11 @@ import { buildModeleEmail } from "../../modeles-email/domain/render";
 import type { IPiecesJointesRepository } from "../../pieces-jointes/application/pieces-jointes-repository";
 import type { IEmailLogWriter } from "../../emails/application/email-log-writer";
 
+/** Lecture minimale du token d'accès portail d'un client (structural — satisfait par IPortalAccessRepository). */
+export interface PortalTokenReader {
+  getStatusByClientId(ctx: TenantContext, clientId: number): Promise<{ actif: boolean; token: string } | null>;
+}
+
 /*
  * Dépendances de l'envoi d'une facture par email (composition cross-domaine : artisan + client +
  * PDF + email + rate-limit). Tout est injecté (interfaces) → testable sans infra ni legacy.
@@ -31,6 +36,10 @@ export interface FactureMailingDeps {
   /** Optionnel : pièces jointes (plans, photos…) attachables à l'email. */
   readonly piecesJointesRepo?: IPiecesJointesRepository;
   readonly emailLogWriter?: IEmailLogWriter;
+  /** URL publique du frontend (ex. https://staging.operioz.com) pour construire le lien portail. */
+  readonly appUrl?: string;
+  /** Optionnel : lecteur d'accès portail client (lien « Consulter et payer »). */
+  readonly portalTokenReader?: PortalTokenReader;
 }
 
 export interface EnvoyerFactureEmailInput {
@@ -65,6 +74,7 @@ function escapeHtml(s: string): string {
  * Construit le sujet + corps HTML de l'email facture (pur, testable). Parité fonctionnelle avec le
  * template legacy `generateFactureEmailContent` (en-tête entreprise, n° facture, montant TTC,
  * échéance) ; le `customMessage` éventuel est ajouté en bas (échappé).
+ * `portalUrl` : lien portail client (`/portail/<token>`), affiché uniquement si fourni (facture non payée).
  */
 export function buildFactureEmail(params: {
   artisanName: string;
@@ -74,14 +84,20 @@ export function buildFactureEmail(params: {
   totalTTC: string;
   dateEcheance?: string | null;
   customMessage?: string | null;
+  portalUrl?: string | null;
 }): { subject: string; body: string } {
-  const { artisanName, clientName, numero, objet, totalTTC, dateEcheance, customMessage } = params;
+  const { artisanName, clientName, numero, objet, totalTTC, dateEcheance, customMessage, portalUrl } = params;
   const subject = `Facture ${numero}${objet ? ` - ${objet}` : ""} de ${artisanName}`;
   const note = customMessage
     ? `<tr><td style="padding:0 40px 24px 40px;font-size:14px;color:#6b7280;font-style:italic;line-height:1.6;border-top:1px solid #e5e7eb;padding-top:16px;">${escapeHtml(customMessage)}</td></tr>`
     : "";
   const echeance = dateEcheance
     ? `<tr><td style="padding:6px 0;font-size:14px;color:#6b7280;border-top:1px solid #dbeafe;">Échéance</td><td style="padding:6px 0;font-size:14px;color:#111827;font-weight:600;text-align:right;border-top:1px solid #dbeafe;">${escapeHtml(dateEcheance)}</td></tr>`
+    : "";
+  const paiementButton = portalUrl
+    ? `<tr><td style="padding:28px 40px 0 40px;text-align:center;">
+          <a href="${portalUrl}" style="display:inline-block;background-color:#1e40af;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;padding:14px 32px;border-radius:6px;">Consulter et payer en ligne</a>
+       </td></tr>`
     : "";
   const body = `<!DOCTYPE html>
 <html lang="fr"><head><meta charset="utf-8"></head>
@@ -107,6 +123,8 @@ export function buildFactureEmail(params: {
             </td></tr>
           </table>
         </td></tr>
+        ${paiementButton}
+        <tr><td style="padding:${portalUrl ? "16px" : "0"} 40px ${portalUrl ? "36px" : "0"} 40px;"></td></tr>
         ${note}
       </table>
     </td></tr>
@@ -155,6 +173,13 @@ export async function envoyerFactureParEmail(
   const totalTTC = `${round2(Number(facture.totalTTC) || 0).toFixed(2)} €`;
   const dateEcheance = facture.dateEcheance ? new Date(facture.dateEcheance).toLocaleDateString("fr-FR") : null;
 
+  const peutPayer = facture.typeDocument === "facture" && facture.statut !== "payee" && facture.statut !== "annulee";
+  let portalUrl: string | null = null;
+  if (peutPayer && deps.portalTokenReader && deps.appUrl) {
+    const ps = await deps.portalTokenReader.getStatusByClientId(ctx, facture.clientId);
+    if (ps?.actif) portalUrl = `${deps.appUrl}/portail/${ps.token}`;
+  }
+
   const modele = deps.modeleEmailRepo ? await deps.modeleEmailRepo.getDefaultByType(ctx, "envoi_facture") : null;
   const { subject, body } = modele
     ? buildModeleEmail(
@@ -166,6 +191,7 @@ export async function envoyerFactureParEmail(
           montant_ttc: totalTTC,
           date_echeance: dateEcheance ?? "",
           nom_entreprise: artisanName,
+          lien_paiement: portalUrl ?? "",
         },
         input.customMessage ?? null,
       )
@@ -177,6 +203,7 @@ export async function envoyerFactureParEmail(
         totalTTC,
         dateEcheance,
         customMessage: input.customMessage ?? null,
+        portalUrl,
       });
 
   const attachments: { filename: string; content: Buffer; contentType: string }[] = [];

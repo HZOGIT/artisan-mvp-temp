@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { FakeFactureRepository } from "../infra/facture-repository-fake";
-import { envoyerFactureParEmail, buildFactureEmail, type FactureMailingDeps } from "./envoyer-facture-email";
+import { envoyerFactureParEmail, buildFactureEmail, type FactureMailingDeps, type PortalTokenReader } from "./envoyer-facture-email";
 import { FakeEmailPort, FakePdfPort, FakeRateLimiter, InMemoryStoragePort } from "../../../shared/ports";
 import { NotFoundError, ValidationError, TooManyRequestsError } from "../../../shared/errors";
 import { expectCrossTenantDenied } from "../../../shared/testing";
@@ -33,6 +33,10 @@ async function seedFacture(repo: FakeFactureRepository, ctx: TenantContext) {
   return f;
 }
 
+function fakePortalReader(token: string | null): PortalTokenReader {
+  return { getStatusByClientId: async () => (token ? { actif: true, token } : null) };
+}
+
 describe("buildFactureEmail (pur)", () => {
   it("compose sujet/corps + injecte le message personnalisé (échappé)", () => {
     const { subject, body } = buildFactureEmail({
@@ -48,9 +52,25 @@ describe("buildFactureEmail (pur)", () => {
     expect(body).toContain("FAC-00001");
     expect(body).toContain("120.00 €");
     expect(body).toContain("14/07/2026");
-    // XSS : le message libre est échappé.
     expect(body).toContain("Merci &lt;b&gt;beaucoup&lt;/b&gt;");
     expect(body).not.toContain("Merci <b>beaucoup</b>");
+  });
+
+  it("OPE-974 — affiche le bouton 'Consulter et payer' quand portalUrl fourni", () => {
+    const { body } = buildFactureEmail({
+      artisanName: "ACME",
+      clientName: "Marie Durand",
+      numero: "FAC-00001",
+      totalTTC: "120.00 €",
+      portalUrl: "https://staging.operioz.com/portail/tok-abc",
+    });
+    expect(body).toContain("https://staging.operioz.com/portail/tok-abc");
+    expect(body).toContain("Consulter et payer en ligne");
+  });
+
+  it("OPE-974 — n'affiche pas le bouton quand portalUrl absent", () => {
+    const { body } = buildFactureEmail({ artisanName: "ACME", clientName: "Marie Durand", numero: "FAC-00001", totalTTC: "120.00 €" });
+    expect(body).not.toContain("Consulter et payer");
   });
 });
 
@@ -175,6 +195,36 @@ describe("envoyerFactureParEmail", () => {
     expect(saved?.pdfFileId).not.toBeNull();
     const storedBuf = await storage.get(saved!.pdfStorageKey!);
     expect(storedBuf).not.toBeNull();
+  });
+
+  it("OPE-974 — email contient le lien portail quand token actif et facture non payée", async () => {
+    const repo = new FakeFactureRepository();
+    const f = await seedFacture(repo, A);
+    const deps = makeDeps({ portalTokenReader: fakePortalReader("tok-abc"), appUrl: "https://staging.operioz.com" });
+    await envoyerFactureParEmail(repo, deps, A, { factureId: f.id, attachPdf: false });
+    const sent = (deps.email as FakeEmailPort).sent[0];
+    expect(sent.body).toContain("https://staging.operioz.com/portail/tok-abc");
+    expect(sent.body).toContain("Consulter et payer en ligne");
+  });
+
+  it("OPE-974 — pas de lien portail si facture déjà payée", async () => {
+    const repo = new FakeFactureRepository();
+    const f = await seedFacture(repo, A);
+    repo.setStatutForTest(f.id, "payee");
+    const deps = makeDeps({ portalTokenReader: fakePortalReader("tok-abc"), appUrl: "https://staging.operioz.com" });
+    await envoyerFactureParEmail(repo, deps, A, { factureId: f.id, attachPdf: false });
+    const sent = (deps.email as FakeEmailPort).sent[0];
+    expect(sent.body).not.toContain("tok-abc");
+    expect(sent.body).not.toContain("Consulter et payer");
+  });
+
+  it("OPE-974 — pas de lien portail pour un avoir", async () => {
+    const repo = new FakeFactureRepository();
+    const f = await repo.create(A, { clientId: CLIENT.id, numero: "AV-00001", typeDocument: "avoir" });
+    const deps = makeDeps({ portalTokenReader: fakePortalReader("tok-abc"), appUrl: "https://staging.operioz.com" });
+    await envoyerFactureParEmail(repo, deps, A, { factureId: f.id, attachPdf: false });
+    const sent = (deps.email as FakeEmailPort).sent[0];
+    expect(sent.body).not.toContain("tok-abc");
   });
 
   it("OPE-687 — réutilisation : si pdfStorageKey déjà posé, le PDF stocké est servi (pas de re-render)", async () => {
