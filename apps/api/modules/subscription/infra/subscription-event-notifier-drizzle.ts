@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { artisans, users, notifications } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
-import type { EmailPort } from "../../../shared/ports/email";
+import type { EmailPort, EmailAttachment } from "../../../shared/ports/email";
 import type { SignatureNotificationType } from "../../signature/application/signature-repository";
 import type { SubscriptionEventNotifier } from "../application/subscription-event-notifier";
 
@@ -23,11 +23,11 @@ export class SubscriptionEventNotifierDrizzle implements SubscriptionEventNotifi
     });
   }
 
-  async emailArtisanOwner(artisanId: number, subject: string, html: string): Promise<void> {
+  async emailArtisanOwner(artisanId: number, subject: string, html: string, attachments?: readonly EmailAttachment[]): Promise<void> {
     const [a] = await this.db.select({ userId: artisans.userId }).from(artisans).where(eq(artisans.id, artisanId)).limit(1);
     if (!a?.userId) return;
     const [u] = await this.db.select({ email: users.email }).from(users).where(eq(users.id, a.userId)).limit(1);
     if (!u?.email) return;
-    await this.email.send({ to: u.email, subject, body: html });
+    await this.email.send({ to: u.email, subject, body: html, attachments });
   }
 }

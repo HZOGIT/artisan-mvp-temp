@@ -1,12 +1,16 @@
 import type { IBillingRepository } from "./billing-repository";
 import type { BillingPort } from "../../../shared/ports/billing";
+import type { PdfPort } from "../../../shared/ports/pdf";
+import type { IEmailLogWriter } from "../../emails/application/email-log-writer";
 import type { SubscriptionEventNotifier } from "../../subscription/application/subscription-event-notifier";
 import type { DbClient } from "../../../shared/db";
+import type { BillingInvoice } from "../../../../../drizzle/schema.pg";
 import { isDue, isZombie, isStuckProcessing, nextPeriod, nextRetryAt, MAX_DUNNING_ATTEMPTS } from "../domain/billing-cycle";
 import { planById } from "../domain/plan";
 import { OPERIOZ } from "../domain/operioz-config";
 import { subscriptionEmail } from "../../subscription/domain/webhook";
 import { withOutbox } from "../../../shared/events/with-outbox";
+import type { FactureAbonnementData } from "../../../shared/pdf/pdf-generator";
 
 export interface SchedulerDeps {
   readonly repo: IBillingRepository;
@@ -14,10 +18,63 @@ export interface SchedulerDeps {
   readonly notifier?: SubscriptionEventNotifier;
   readonly appUrl?: string;
   readonly db?: DbClient;
+  readonly pdf?: PdfPort;
+  readonly emailLogWriter?: IEmailLogWriter;
 }
 
 const TICK_BATCH_SIZE = 200;
 const NO_PM_RETRY_DELAY_MS = 24 * 3600_000;
+
+/** Envoie la facture d'abonnement par email (best-effort — ne doit jamais bloquer la facturation). */
+async function sendInvoiceEmail(
+  deps: Pick<SchedulerDeps, "notifier" | "pdf" | "emailLogWriter" | "appUrl">,
+  invoice: BillingInvoice,
+  cyclePeriod: { period_start: Date; period_end: Date },
+  artisanInfo: { name: string | null; address: string | null; siret: string | null } | null,
+): Promise<void> {
+  if (!deps.notifier || !deps.pdf) return;
+  const pdfData: FactureAbonnementData = {
+    number: invoice.number ?? String(invoice.id),
+    date: invoice.paid_at ?? invoice.created_at,
+    periodStart: cyclePeriod.period_start,
+    periodEnd: cyclePeriod.period_end,
+    planDescription: "Abonnement Operioz",
+    subtotalCents: invoice.subtotal_cents,
+    taxCents: invoice.tax_cents,
+    totalCents: invoice.total_cents,
+    currency: invoice.currency,
+    sellerName: invoice.seller_name ?? OPERIOZ.name,
+    sellerAddress: invoice.seller_address ?? OPERIOZ.address,
+    sellerSiret: invoice.seller_siret ?? OPERIOZ.siret,
+    sellerTvaIntracom: invoice.seller_tva_intracom ?? OPERIOZ.tvaIntracom,
+    buyerName: artisanInfo?.name ?? "",
+    buyerAddress: artisanInfo?.address ?? "",
+    buyerSiret: artisanInfo?.siret ?? "",
+  };
+  const pdfBuf = await deps.pdf.render("facture-abonnement", pdfData as unknown as Record<string, unknown>);
+  const invoiceRef = invoice.number ?? String(invoice.id);
+  const subject = `Votre facture Operioz ${invoiceRef} est disponible`;
+  const appUrl = deps.appUrl ?? "https://www.operioz.com";
+  const html = subscriptionEmail({
+    title: "Votre facture Operioz",
+    body: `Votre facture ${invoiceRef} est disponible en pièce jointe. Conservez-la pour votre comptabilité.`,
+    ctaLabel: "Accéder à mon abonnement",
+    ctaUrl: `${appUrl}/parametres?tab=abonnement`,
+  });
+  await deps.notifier.emailArtisanOwner(invoice.artisan_id, subject, html, [
+    { filename: `Facture_Operioz_${invoiceRef}.pdf`, content: pdfBuf, contentType: "application/pdf" },
+  ]);
+  if (deps.emailLogWriter) {
+    await deps.emailLogWriter.create({
+      artisanId: invoice.artisan_id,
+      destinataire: "",
+      sujet: subject,
+      type: "facture_abonnement",
+      entiteType: "billing_invoice",
+      entiteId: invoice.id,
+    }).catch(() => {});
+  }
+}
 
 function resolveInterval(raw: string | null | undefined): "monthly" | "yearly" {
   return raw === "yearly" ? "yearly" : "monthly";
@@ -170,7 +227,7 @@ export async function chargeOffSessionForCycle(
       const interval = resolveInterval(sub?.billing_interval);
       const plan = sub ? planById(sub.plan_id) : undefined;
       const artisanInfo = await deps.repo.findArtisanInfo(artisanId);
-      await deps.repo.createInvoiceForCycle({
+      const invoice = await deps.repo.createInvoiceForCycle({
         artisanId,
         cycleId,
         amountCents: cycle.amount_cents,
@@ -185,6 +242,8 @@ export async function chargeOffSessionForCycle(
         buyerAddress: artisanInfo?.address ?? undefined,
         buyerSiret: artisanInfo?.siret ?? undefined,
       });
+      /* ponytail: best-effort — ne jamais laisser l'email bloquer le flux de facturation */
+      sendInvoiceEmail(deps, invoice, cycle, artisanInfo).catch(() => {});
       /*
        * Guard symétrique de FIX-CE (webhook) et FIX-CC (zombie recovery) :
        * ne pas avancer la période si la sub a été annulée entre le claimCycleForCharging
@@ -449,7 +508,7 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
       });
       const zombiePlan = planById(sub.plan_id);
       const zombieArtisanInfo = await deps.repo.findArtisanInfo(artisanId);
-      await deps.repo.createInvoiceForCycle({
+      const zombieInvoice = await deps.repo.createInvoiceForCycle({
         artisanId,
         cycleId: cycle.id,
         amountCents: cycle.amount_cents,
@@ -464,6 +523,8 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
         buyerAddress: zombieArtisanInfo?.address ?? undefined,
         buyerSiret: zombieArtisanInfo?.siret ?? undefined,
       });
+      /* ponytail: best-effort — ne jamais laisser l'email bloquer la récupération zombie */
+      sendInvoiceEmail(deps, zombieInvoice, cycle, zombieArtisanInfo).catch(() => {});
       await advanceSubscriptionAfterPayment(deps.repo, cycle.subscription_id, artisanId, cycle, resolveInterval(sub.billing_interval));
     } else if (pi.status === "processing") {
       /*

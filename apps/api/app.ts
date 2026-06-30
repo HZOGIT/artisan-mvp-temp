@@ -1391,6 +1391,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     notifier: billingNotifier,
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
     db: getDbHandle().db,
+    pdf: new JsPdfAdapter(),
+    emailLogWriter: sharedEmailLogWriter,
   };
 
   registerBillingSchedulerRoute(app, { ...billingSchedulerDeps, secret: process.env.SCHEDULER_SECRET ?? "" });
