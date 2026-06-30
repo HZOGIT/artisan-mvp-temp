@@ -19,6 +19,10 @@ export async function reviserPrixContrat(repo: IContratRepository, ctx: TenantCo
   const contrat = await repo.getById(ctx, id);
   if (!contrat) throw new NotFoundError("Contrat introuvable");
 
+  if (contrat.statut !== "actif") {
+    throw new ValidationError(`Seul un contrat actif peut être révisé (statut actuel : ${contrat.statut})`);
+  }
+
   if (!contrat.tauxIndexationAnnuel || parseFloat(contrat.tauxIndexationAnnuel) <= 0) {
     throw new ValidationError("Aucun taux d'indexation annuel défini sur ce contrat");
   }

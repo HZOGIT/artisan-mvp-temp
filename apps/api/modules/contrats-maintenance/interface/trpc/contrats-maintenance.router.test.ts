@@ -145,4 +145,22 @@ describe.skipIf(!URL)("contrats.router e2e (HTTP → tRPC → use-case → repo 
     const id = (await creer(tA)).json().result.data.id as number;
     expect((await mut(server, "contrats.reviserPrix", { id }, tA)).statusCode).toBe(400);
   });
+
+  it("reviserPrix sur contrat terminé → 400", async () => {
+    const tA = await token(UA);
+    const id = (await creer(tA, { tauxIndexationAnnuel: "2", montantHT: "300.00" })).json().result.data.id as number;
+    await mut(server, "contrats.terminer", { id }, tA);
+    expect((await mut(server, "contrats.reviserPrix", { id }, tA)).statusCode).toBe(400);
+  });
+
+  it("tauxIndexationAnnuel=0 refusé à la création → 400", async () => {
+    const tA = await token(UA);
+    expect((await creer(tA, { tauxIndexationAnnuel: "0" })).statusCode).toBe(400);
+  });
+
+  it("tauxIndexationAnnuel=0 refusé à la mise à jour → 400", async () => {
+    const tA = await token(UA);
+    const id = (await creer(tA)).json().result.data.id as number;
+    expect((await mut(server, "contrats.update", { id, tauxIndexationAnnuel: "0" }, tA)).statusCode).toBe(400);
+  });
 });
