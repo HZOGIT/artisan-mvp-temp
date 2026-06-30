@@ -21,6 +21,8 @@
     "lint:api": "eslint -c eslint.api.config.mjs --concurrency=auto --cache --cache-strategy=content --cache-location node_modules/.cache/eslint/api/ apps/api",
     "lint:parallel": "concurrently -n api,web --kill-others-on-fail \"pnpm lint:api\" \"pnpm lint:web\"",
     "test:unit:api": "vitest run -c vitest.unit.api.config.ts",
+    "test:coverage": "vitest run -c vitest.api.config.ts --coverage",
+    "test:coverage:web": "vitest run -c vitest.web.config.ts --coverage",
     "prepare": "husky && (git config merge.drizzle-journal.driver 'node scripts/drizzle/canonicalize-journal.mjs merge %O %A %B' 2>/dev/null; true)"
   },
   "dependencies": {
@@ -148,6 +150,7 @@
     "@types/react": "^19.2.1",
     "@types/react-dom": "^19.2.1",
     "@vitejs/plugin-react": "^5.0.4",
+    "@vitest/coverage-v8": "^4.1.9",
     "add": "^2.0.6",
     "autoprefixer": "^10.4.20",
     "concurrently": "^10.0.3",
