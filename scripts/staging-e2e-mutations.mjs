@@ -61,6 +61,10 @@ async function casDevisStatut() {
     if (!created?.id) { issues.push({ tag, step: 'create-id', error: 'id absent dans la réponse' }); return; }
     devisId = created.id;
 
+    // OPE-831 — devis.envoyer requiert au moins une ligne (garde ajoutée post fix)
+    const rl = await trpcPost('devis.addLigne', { devisId, designation: 'E2E-ligne', prixUnitaireHT: '100.00' });
+    if (!rl.ok()) { issues.push({ tag, step: 'addLigne', error: `HTTP ${rl.status()}` }); return; }
+
     const re = await trpcPost('devis.envoyer', { id: devisId });
     if (!re.ok()) { issues.push({ tag, step: 'envoyer', error: `HTTP ${re.status()}` }); return; }
 
