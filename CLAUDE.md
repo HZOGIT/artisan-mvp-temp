@@ -13,6 +13,32 @@ Il injecte automatiquement une règle YAGNI dans chaque session agent via 3 hook
 
 ---
 
+## Porte de validation humaine
+
+**Tout changement NON-TRIVIAL ou RISQUÉ** passe par le statut Linear **`Awaiting Human Validation`** avant implémentation.
+
+Catégories concernées (non exhaustif) :
+- Migration de schéma / changement de BDD
+- Modification de contrat/API (rupture de compatibilité)
+- Registre central partagé (`MIGRATED_DOMAINS`, `permissions.ts`, etc.)
+- Sécurité / authz / RLS
+- Billing / argent (Stripe, facturation, comptabilité)
+- RGPD / légal / archivage
+- Architecture (nouveaux modules, dépendances majeures)
+- Suppression de données
+- Effets externes irréversibles (emails envoyés, webhooks, déploiements hors routine)
+
+**Protocole PM** :
+1. Créer l'issue dans le statut **`Awaiting Human Validation`** avec la proposition détaillée.
+2. **Ne pas dispatcher** — attendre la validation explicite de l'humain (changement de statut ou commentaire « go »).
+3. Sans validation → l'issue reste en attente, le PM la saute dans son cycle de dispatch.
+
+**Changements triviaux / réversibles / locaux** (refacto, fix affichage, ajout de test, doc) = flux normal, sans porte.
+
+**Le reviewer** ne merge pas une PR implémentant une catégorie risquée sans trace de validation humaine (issue passée par `Awaiting Human Validation` ou commentaire « go » explicite).
+
+---
+
 ## Lancer une session agent
 
 Voir le skill → `.claude/skills/launch-agent/SKILL.md` (ou `/launch-agent`)

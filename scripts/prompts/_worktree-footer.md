@@ -196,6 +196,17 @@ Applique les corrections **dans le worktree** (`/tmp/wt-__SESSION_NAME__/...`), 
 Le worktree est supprimé au merge → le daemon hérite d'un `cwd` mort et tous ses chemins relatifs
 (`$HERE/script.sh`) cassent silencieusement. Lancer depuis le **repo persistant** (`/home/developer/artisan-mvp-temp`).
 
+### Porte de validation humaine
+
+Si tu découvres que ce que tu implémentes relève d'une catégorie risquée (migration BDD, contrat/API, sécurité/authz/RLS, billing/argent, RGPD/légal, archi, suppression data, effet externe irréversible) **et qu'il n'y a pas de trace de validation humaine sur l'issue Linear** (statut `Awaiting Human Validation` passé, ou commentaire « go ») → **stoppe et notifie le PM** :
+
+```bash
+/tmp/wt-__SESSION_NAME__/scripts/agents/notify.sh project-manager BLOCKED \
+  "OPE-XXX : implémentation risquée non validée par l'humain — en attente de go avant de continuer."
+```
+
+Ne pas implémenter et ne pas créer de PR tant que la validation n'est pas reçue.
+
 ### Fin
 
 Une fois mergé par le reviewer, ta mission est terminée. Le reviewer gère le cleanup du worktree et le déploiement.
