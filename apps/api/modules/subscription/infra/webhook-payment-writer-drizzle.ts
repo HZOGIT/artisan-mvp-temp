@@ -4,6 +4,7 @@ import type { DbClient } from "../../../shared/db";
 import { withPublicToken, withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { WebhookPaymentWriter, PaiementResolu } from "../application/webhook-payment-writer";
+import { outboxEvent } from "../../../shared/events/outbox-event";
 
 const clientNom = (prenom: string | null, nom: string | null): string => `${prenom ?? ""} ${nom ?? ""}`.trim() || "Client";
 
@@ -67,6 +68,7 @@ export class WebhookPaymentWriterDrizzle implements WebhookPaymentWriter {
         message: `Facture ${facture.numero ?? ""} payée en ligne par ${nom} (${montant} €)`,
         lien: `/factures/${input.factureId}`,
       });
+      await outboxEvent(tx, ctx, { action: "facture.payee", entityType: "facture", entityId: input.factureId, payload: { factureId: input.factureId } });
     });
   }
 
