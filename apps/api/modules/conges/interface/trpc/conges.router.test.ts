@@ -214,6 +214,17 @@ describe.skipIf(!URL)("conges.router e2e (HTTP → tRPC → use-case → repo �
     expect((await callMutation(server, "conges.refuser", { id: 1 }, tC)).statusCode).toBe(403);
   });
 
+  it("PERMISSION GATE : create/update/delete sans conges.gerer → 403 (OPE-791)", async () => {
+    /* UC est collaborateur de artisanA (isOwner=false) sans conges.gerer → le gate doit 403 avant le use-case. */
+    const tC = await token(UC);
+    expect((await callMutation(server, "conges.create", { technicienId: techA, type: "rtt", dateDebut: "2026-07-01", dateFin: "2026-07-02" }, tC)).statusCode).toBe(403);
+    expect((await callMutation(server, "conges.update", { id: 1, motif: "hack" }, tC)).statusCode).toBe(403);
+    expect((await callMutation(server, "conges.delete", { id: 1 }, tC)).statusCode).toBe(403);
+    /* owner bypasse la garde. */
+    const tA = await token(UA);
+    expect((await callMutation(server, "conges.create", { technicienId: techA, type: "rtt", dateDebut: "2027-01-10", dateFin: "2027-01-11" }, tA)).statusCode).toBe(200);
+  });
+
   it("getSolde par exercice : jan 2028 (exercice 2027-2028) → joursPris=3", async () => {
     const tA = await token(UA);
     await admin.query('delete from soldes_conges where "artisanId"=$1 and "technicienId"=$2', [artisanA, techA]);

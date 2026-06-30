@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import { router, protectedProcedure, permissionProcedure } from "../../../../interface/trpc/trpc";
 import type { IEcritureRepository } from "../../application/ecriture-repository";
 import {
   listEcritures,
@@ -18,6 +18,7 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format A
  * via ctx.tenant). Repo injecté (DI).
  */
 export function createEcrituresRouter(repo: IEcritureRepository) {
+  const compta = permissionProcedure("comptabilite.voir");
   return router({
     list: protectedProcedure.query(({ ctx }) => listEcritures(repo, ctx.tenant)),
 
@@ -25,13 +26,13 @@ export function createEcrituresRouter(repo: IEcritureRepository) {
       .input(z.object({ factureId: z.number().int() }))
       .query(({ ctx, input }) => listEcrituresFacture(repo, ctx.tenant, input.factureId)),
 
-    balance: protectedProcedure.query(({ ctx }) => balanceComptable(repo, ctx.tenant)),
+    balance: compta.query(({ ctx }) => balanceComptable(repo, ctx.tenant)),
 
-    grandLivre: protectedProcedure
+    grandLivre: compta
       .input(z.object({ numeroCompte: z.string().max(10).optional() }).optional())
       .query(({ ctx, input }) => grandLivreComptable(repo, ctx.tenant, input?.numeroCompte)),
 
-    exportFec: protectedProcedure
+    exportFec: compta
       .input(z.object({ debut: isoDate, fin: isoDate }))
       .query(({ ctx, input }) => genererExportFEC(repo, ctx.tenant, new Date(input.debut), new Date(input.fin))),
   });
