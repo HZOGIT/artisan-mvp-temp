@@ -60,22 +60,28 @@ describe.skipIf(!URL)("ImportErpRepositoryDrizzle (RLS import ERP)", () => {
     expect(a.some((c) => c.nom === "Nouveau" && c.email === "n@cli.fr")).toBe(true);
   });
 
-  it("createDevisLight : insère un devis avec numéro serveur généré, scopé artisan", async () => {
+  it("createDevisLight : insère un devis avec numéro serveur généré, scopé artisan, header cohérent (HT+TVA=TTC)", async () => {
     await repo.createDevisLight(ctx(artisanA), {
       clientId: clientA, objet: "Import devis", statut: "accepte",
       dateDevis: new Date("2026-01-10"), dateValidite: new Date("2026-02-10"), totalTTC: "600.00",
     });
-    const { rows } = await admin.query('select numero, "totalTTC", statut, "artisanId" from devis where "clientId"=$1', [clientA]);
+    const { rows } = await admin.query('select numero, "totalTTC", "totalHT", "totalTVA", statut, "artisanId" from devis where "clientId"=$1', [clientA]);
     expect(rows).toHaveLength(1);
     expect(rows[0].artisanId).toBe(artisanA);
     expect(rows[0].totalTTC).toBe("600.00");
-    expect(rows[0].numero).toBeTruthy(); // numéro généré serveur
+    expect(rows[0].numero).toBeTruthy();
+    /* anti-régression OPE-1004 : header cohérent — HT+TVA=TTC, HT ne reste pas à 0.00 */
+    const ht = parseFloat(rows[0].totalHT);
+    const tva = parseFloat(rows[0].totalTVA);
+    expect(ht).toBeGreaterThan(0);
+    expect(Math.abs(ht + tva - 600)).toBeLessThan(0.02);
   });
 
-  it("createFactureLight : PRÉSERVE le numéro légal fourni ; en génère un si absent + crée ligne HT/TVA", async () => {
+  it("createFactureLight : PRÉSERVE le numéro légal fourni ; en génère un si absent + crée ligne HT/TVA ; header reflète les lignes", async () => {
+    /* totalTTC=0 car pas de lignes — la garde rejette totalTTC>0 sans lignes (OPE-1004) */
     await repo.createFactureLight(ctx(artisanA), {
       clientId: clientA, numero: "LEGACY-2024-007", objet: "Hist", statut: "payee",
-      dateFacture: new Date("2024-03-01"), dateEcheance: new Date("2024-03-31"), totalTTC: "300.00",
+      dateFacture: new Date("2024-03-01"), dateEcheance: new Date("2024-03-31"), totalTTC: "0.00",
     });
     await repo.createFactureLight(ctx(artisanA), {
       clientId: clientA, objet: "Sans numero", statut: "envoyee",
@@ -98,17 +104,29 @@ describe.skipIf(!URL)("ImportErpRepositoryDrizzle (RLS import ERP)", () => {
     expect(await repo.listFactureNumeros(ctx(artisanB))).toEqual([]);
     const generated = numeros.filter((n) => n !== "LEGACY-2024-007")[0];
     const { rows: lignes } = await admin.query(
-      'select f.numero, f."totalTTC", l."montantHT", l."montantTVA", l."montantTTC" from factures f left join factures_lignes l on f.id = l."factureId" where f.numero = $1',
+      'select f.numero, f."totalTTC", f."totalHT", f."totalTVA", l."montantHT", l."montantTVA", l."montantTTC" from factures f left join factures_lignes l on f.id = l."factureId" where f.numero = $1',
       [generated],
     );
     expect(lignes).toHaveLength(1);
     expect(lignes[0].totalTTC).toBe("150.00");
+    /* anti-régression OPE-1004 : header totalHT/totalTVA reflète les lignes, pas 0.00 */
+    expect(lignes[0].totalHT).toBe("125.00");
+    expect(lignes[0].totalTVA).toBe("25.00");
     expect(lignes[0].montantHT).toBe("125.00");
     expect(lignes[0].montantTVA).toBe("25.00");
     expect(lignes[0].montantTTC).toBe("150.00");
   });
 
-  it("createFactureLight : dérive HT à partir de TTC (TTC=120 → HT=100, TVA=20)", async () => {
+  it("createFactureLight : REJETTE totalTTC > 0 sans lignes (garde OPE-1004)", async () => {
+    await expect(
+      repo.createFactureLight(ctx(artisanA), {
+        clientId: clientA, numero: "FAC-SANS-LIGNE-001", objet: "Test", statut: "brouillon",
+        dateFacture: new Date("2026-01-01"), dateEcheance: new Date("2026-02-01"), totalTTC: "500.00",
+      }),
+    ).rejects.toThrow("au moins une ligne");
+  });
+
+  it("createFactureLight : dérive HT à partir de TTC (TTC=120 → HT=100, TVA=20), header cohérent", async () => {
     await repo.createFactureLight(ctx(artisanA), {
       clientId: clientA, numero: "IMPORT-DERIVE-001", objet: "Import dérivé", statut: "brouillon",
       dateFacture: new Date("2026-01-15"), dateEcheance: new Date("2026-02-15"), totalTTC: "120.00",
@@ -125,11 +143,14 @@ describe.skipIf(!URL)("ImportErpRepositoryDrizzle (RLS import ERP)", () => {
       ],
     });
     const { rows } = await admin.query(
-      'select f.numero, f."totalTTC", l."montantHT", l."montantTVA", l."montantTTC" from factures f left join factures_lignes l on f.id = l."factureId" where f.numero = $1',
+      'select f.numero, f."totalTTC", f."totalHT", f."totalTVA", l."montantHT", l."montantTVA", l."montantTTC" from factures f left join factures_lignes l on f.id = l."factureId" where f.numero = $1',
       ["IMPORT-DERIVE-001"],
     );
     expect(rows).toHaveLength(1);
     expect(rows[0].totalTTC).toBe("120.00");
+    /* anti-régression OPE-1004 : header totalHT/totalTVA ne doit pas rester à 0.00 */
+    expect(rows[0].totalHT).toBe("100.00");
+    expect(rows[0].totalTVA).toBe("20.00");
     expect(rows[0].montantHT).toBe("100.00");
     expect(rows[0].montantTVA).toBe("20.00");
     expect(rows[0].montantTTC).toBe("120.00");
