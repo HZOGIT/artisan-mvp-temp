@@ -45,12 +45,12 @@ export class PortalAccessRepositoryDrizzle implements IPortalAccessRepository {
 
   async getArtisanPublic(artisanId: number): Promise<ArtisanPortalInfo | null> {
     const [a] = await this.db
-      .select({ id: artisans.id, nomEntreprise: artisans.nomEntreprise, telephone: artisans.telephone, email: artisans.email, adresse: artisans.adresse, codePostal: artisans.codePostal, ville: artisans.ville, siret: artisans.siret, logo: artisans.logo })
+      .select({ id: artisans.id, nomEntreprise: artisans.nomEntreprise, telephone: artisans.telephone, email: artisans.email, adresse: artisans.adresse, codePostal: artisans.codePostal, ville: artisans.ville, siret: artisans.siret, logo: artisans.logo, stripeConnectAccountId: artisans.stripeConnectAccountId, stripeConnectChargesEnabled: artisans.stripeConnectChargesEnabled })
       .from(artisans)
       .where(eq(artisans.id, artisanId))
       .limit(1);
     if (!a) return null;
-    return { id: a.id, nomEntreprise: a.nomEntreprise ?? null, telephone: a.telephone ?? null, email: a.email ?? null, adresse: a.adresse ?? null, codePostal: a.codePostal ?? null, ville: a.ville ?? null, siret: a.siret ?? null, logo: a.logo ?? null };
+    return { id: a.id, nomEntreprise: a.nomEntreprise ?? null, telephone: a.telephone ?? null, email: a.email ?? null, adresse: a.adresse ?? null, codePostal: a.codePostal ?? null, ville: a.ville ?? null, siret: a.siret ?? null, logo: a.logo ?? null, paiementEnLigneActif: !!(a.stripeConnectAccountId && a.stripeConnectChargesEnabled) };
   }
 
   async createAccess(ctx: TenantContext, data: CreateAccessData): Promise<void> {

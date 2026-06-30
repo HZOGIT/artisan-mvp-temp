@@ -25,6 +25,7 @@
   "pdf": "PDF",
   "signer": "Signer",
   "payerEnLigne": "Payer en ligne",
+  "paiementNonActif": "Le paiement en ligne n'est pas encore activé par cet artisan",
   "echeance": "Échéance : {{date}}",
   "paiementSucces": "Paiement effectué avec succès ! Merci.",
   "paiementAnnule": "Paiement annulé.",

@@ -340,10 +340,17 @@ export default function PortailClientPage() {
                               <a href={`${BACKEND_URL}/api/portail/${token}/factures/${f.id}/pdf`} target="_blank" rel="noopener noreferrer"><Download className="h-4 w-4 mr-1" />{t("pdf")}</a>
                             </Button>
                             {isFacturePayable(f.statut || "") && (
-                              <Button size="sm" onClick={() => handlePayerEnLigne(f.id)} disabled={payingFactureId === f.id} className="bg-green-600 hover:bg-green-700">
-                                {payingFactureId === f.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CreditCard className="h-4 w-4 mr-1" />}
-                                {t("payerEnLigne")}
-                              </Button>
+                              access.artisan?.paiementEnLigneActif ? (
+                                <Button size="sm" onClick={() => handlePayerEnLigne(f.id)} disabled={payingFactureId === f.id} className="bg-green-600 hover:bg-green-700">
+                                  {payingFactureId === f.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CreditCard className="h-4 w-4 mr-1" />}
+                                  {t("payerEnLigne")}
+                                </Button>
+                              ) : (
+                                <Button size="sm" disabled variant="outline" title={t("paiementNonActif")}>
+                                  <CreditCard className="h-4 w-4 mr-1 opacity-40" />
+                                  {t("payerEnLigne")}
+                                </Button>
+                              )
                             )}
                           </div>
                         </div>
