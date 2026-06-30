@@ -1,4 +1,5 @@
 import { pgTable, serial, integer, varchar, text, timestamp, unique, boolean, index } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { artisans } from "./artisans";
 import { cycleVieEnum, factures } from "./factures";
 
@@ -41,7 +42,9 @@ export const paOutbox = pgTable("pa_outbox", {
   derniereErreur: text("derniereErreur"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   traiteeAt: timestamp("traiteeAt"),
-});
+}, (t) => [
+  index("idx_pa_outbox_pending").on(t.statut, t.tentatives).where(sql`${t.statut} IN ('pending', 'failed')`),
+]);
 export type PaOutbox = typeof paOutbox.$inferSelect;
 export type InsertPaOutbox = typeof paOutbox.$inferInsert;
 

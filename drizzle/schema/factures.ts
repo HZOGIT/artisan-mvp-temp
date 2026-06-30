@@ -11,6 +11,7 @@ import {
   date,
   index,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { files } from "./files";
 
 export const factureStatutEnum = pgEnum("facture_statut", ["brouillon", "validee", "envoyee", "payee", "en_retard", "annulee"]);
@@ -124,7 +125,11 @@ export const paiementsStripe = pgTable("paiements_stripe", {
   paidAt: timestamp("paidAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_paiements_stripe_artisan").on(t.artisanId),
+  index("idx_paiements_stripe_facture").on(t.factureId),
+  index("idx_paiements_stripe_statut").on(t.statut).where(sql`${t.statut} = 'en_attente'`),
+]);
 export type PaiementStripe = typeof paiementsStripe.$inferSelect;
 export type InsertPaiementStripe = typeof paiementsStripe.$inferInsert;
 
@@ -137,7 +142,10 @@ export const relancesDevis = pgTable("relances_devis", {
   message: text("message"),
   statut: relanceStatutEnum("statut").default("envoye"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_relances_devis_artisan").on(t.artisanId),
+  index("idx_relances_devis_devis").on(t.devisId),
+]);
 export type RelanceDevis = typeof relancesDevis.$inferSelect;
 export type InsertRelanceDevis = typeof relancesDevis.$inferInsert;
 
@@ -183,7 +191,9 @@ export const emailsLog = pgTable("emails_log", {
   entiteType: varchar("entiteType", { length: 50 }),
   entiteId: integer("entiteId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_emails_log_artisan").on(t.artisanId),
+]);
 export type EmailLog = typeof emailsLog.$inferSelect;
 export type InsertEmailLog = typeof emailsLog.$inferInsert;
 
@@ -197,7 +207,9 @@ export const reglements = pgTable("reglements", {
   reference: varchar("reference", { length: 100 }),
   note: text("note"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_reglements_artisan").on(t.artisanId),
+]);
 export type Reglement = typeof reglements.$inferSelect;
 export type InsertReglement = typeof reglements.$inferInsert;
 

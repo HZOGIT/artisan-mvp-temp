@@ -10,6 +10,7 @@ import {
   boolean,
   numeric,
   unique,
+  index,
 } from "drizzle-orm/pg-core";
 
 export const regimeTVAEnum = pgEnum("regime_tva", ["encaissements", "debits"]);
@@ -47,7 +48,9 @@ export const ecrituresComptables = pgTable("ecritures_comptables", {
   /** Numéro de pièce permanent (A47 A-1 LPF) — assigné à la validation, immuable. */
   ecritureNum: integer("ecritureNum"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_ecritures_artisan").on(t.artisanId),
+]);
 export type EcritureComptable = typeof ecrituresComptables.$inferSelect;
 export type InsertEcritureComptable = typeof ecrituresComptables.$inferInsert;
 
@@ -185,7 +188,9 @@ export const depenses = pgTable("depenses", {
   coeff_deductibilite: numeric("coeff_deductibilite", { precision: 5, scale: 2 }).default("100").notNull(),
   created_at: timestamp("created_at").defaultNow(),
   updated_at: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
-});
+}, (t) => [
+  index("idx_depenses_artisan").on(t.artisan_id),
+]);
 export type Depense = typeof depenses.$inferSelect;
 export type InsertDepense = typeof depenses.$inferInsert;
 
@@ -277,7 +282,9 @@ export const transactionsBancaires = pgTable("transactions_bancaires", {
   facture_id: integer("facture_id"),
   ignoree: boolean("ignoree").default(false),
   created_at: timestamp("created_at").defaultNow(),
-});
+}, (t) => [
+  index("idx_transactions_artisan").on(t.artisan_id),
+]);
 export type TransactionBancaire = typeof transactionsBancaires.$inferSelect;
 export type InsertTransactionBancaire = typeof transactionsBancaires.$inferInsert;
 

@@ -102,7 +102,9 @@ export const vehicules = pgTable("vehicules", {
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
-});
+}, (t) => [
+  index("idx_vehicules_artisan").on(t.artisanId),
+]);
 export type Vehicule = typeof vehicules.$inferSelect;
 export type InsertVehicule = typeof vehicules.$inferInsert;
 
@@ -285,7 +287,9 @@ export const conges = pgTable("conges", {
   validePar: integer("validePar"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
-});
+}, (t) => [
+  index("idx_conges_artisan").on(t.artisanId),
+]);
 export type Conge = typeof conges.$inferSelect;
 export type InsertConge = typeof conges.$inferInsert;
 

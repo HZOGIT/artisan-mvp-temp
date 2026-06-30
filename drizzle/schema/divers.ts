@@ -109,7 +109,9 @@ export const stocks = pgTable("stocks", {
   fournisseur: varchar("fournisseur", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
-});
+}, (t) => [
+  index("idx_stocks_artisan").on(t.artisanId),
+]);
 export type Stock = typeof stocks.$inferSelect;
 export type InsertStock = typeof stocks.$inferInsert;
 
@@ -123,7 +125,9 @@ export const mouvementsStock = pgTable("mouvements_stock", {
   motif: text("motif"),
   reference: varchar("reference", { length: 100 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_mouvements_stock_stock").on(t.stockId),
+]);
 export type MouvementStock = typeof mouvementsStock.$inferSelect;
 export type InsertMouvementStock = typeof mouvementsStock.$inferInsert;
 
@@ -337,7 +341,9 @@ export const activites = pgTable("activites", {
   faitAt: timestamp("faitAt"),
   note: text("note"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_activites_artisan").on(t.artisanId),
+]);
 export type Activite = typeof activites.$inferSelect;
 export type InsertActivite = typeof activites.$inferInsert;
 
@@ -351,7 +357,10 @@ export const notifications = pgTable("notifications", {
   lu: boolean("lu").default(false),
   archived: boolean("archived").default(false),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_notifications_artisan").on(t.artisanId),
+  index("idx_notifications_artisan_unread").on(t.artisanId, t.lu, t.archived).where(sql`${t.lu} = false AND ${t.archived} = false`),
+]);
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = typeof notifications.$inferInsert;
 

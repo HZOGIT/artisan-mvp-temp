@@ -355,29 +355,36 @@
     {
       "idx": 50,
       "version": "7",
+      "when": 1782851462000,
+      "tag": "20260630203102_rls-signatures-devis",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1782852044000,
+      "tag": "20260630204044_rls-tables-enfants",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
       "when": 1782853200000,
       "tag": "20260630210000_artisans-stripe-connect",
       "breakpoints": true
     },
     {
-      "idx": 51,
+      "idx": 53,
       "version": "7",
       "when": 1782864000000,
       "tag": "20260701000000_add-connect-snapshot-to-paiements-stripe",
       "breakpoints": true
     },
     {
-      "idx": 52,
+      "idx": 55,
       "version": "7",
-      "when": 1782852044745,
-      "tag": "20260630204044_rls-tables-enfants",
-      "breakpoints": true
-    },
-    {
-      "idx": 53,
-      "version": "7",
-      "when": 1782851462000,
-      "tag": "20260630203102_rls-signatures-devis",
+      "when": 1782858220411,
+      "tag": "20260630222340_idx-perf-all-tables",
       "breakpoints": true
     }
   ]
