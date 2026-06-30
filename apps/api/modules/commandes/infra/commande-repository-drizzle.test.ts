@@ -1,4 +1,4 @@
-import { describe, it, expect, afterAll, beforeAll } from "vitest";
+import { describe, it, expect, afterAll, afterEach, beforeAll, beforeEach } from "vitest";
 import { Pool } from "pg";
 import { createDbClient } from "../../../shared/db";
 import { CommandeRepositoryDrizzle } from "./commande-repository-drizzle";
@@ -104,5 +104,60 @@ describe.skipIf(!URL)("CommandeRepositoryDrizzle (PG, RLS + scope tenant)", () =
     const sommeTVA = lignes.reduce((s, l) => s + (Number(l.montantTotal) * (Number(l.tauxTVA) / 100)), 0);
     /* La somme des TVA par ligne arrondies doit égaler totalTVA au 2e décimal */
     expect(Math.abs(sommeTVA - Number(cmd!.totalTVA))).toBeLessThan(0.001);
+  });
+
+  describe("recevoir() — garde non-négative + atomicité stock (OPE-833/835)", () => {
+    const cleanupStock = async () => {
+      await admin.query('delete from mouvements_stock where "stockId" in (select id from stocks where "artisanId"=$1)', [A]);
+      await admin.query('delete from stocks where "artisanId"=$1', [A]);
+    };
+    beforeEach(cleanupStock);
+    afterEach(cleanupStock);
+
+    it("correction corrective rendant le stock négatif → throw, stock inchangé (OPE-833)", async () => {
+      const stockId: number = (await admin.query(
+        'insert into stocks ("artisanId", reference, designation, "quantiteEnStock") values ($1,$2,$3,$4) returning id',
+        [A, "S-NEG", "Tube test", "4.00"],
+      )).rows[0].id;
+
+      const cmd = await repo.create(ctx(A), { fournisseurId: fournA, lignes: [{ designation: "Tube test", quantite: "10", prixUnitaire: "5" }] });
+      const lignes = await repo.listLignes(ctx(A), cmd!.id);
+      await admin.query('update lignes_commandes_fournisseurs set "stockId"=$1 where id=$2', [stockId, lignes[0].id]);
+
+      /** Réception initiale : +8 → stock 4+8=12 */
+      await repo.recevoir(ctx(A), cmd!.id, [{ ligneId: lignes[0].id, quantiteRecue: 8 }]);
+
+      /** Consommation externe — ramène le stock à 1 */
+      await admin.query('update stocks set "quantiteEnStock"=$1 where id=$2', ["1.00", stockId]);
+
+      /** Correction à 0 reçu : delta = 0-8 = -8, apres = 1-8 = -7 → doit rejeter */
+      await expect(
+        repo.recevoir(ctx(A), cmd!.id, [{ ligneId: lignes[0].id, quantiteRecue: 0 }]),
+      ).rejects.toThrow();
+
+      /** Stock reste à 1 (transaction rollbackée) */
+      const row = (await admin.query('select "quantiteEnStock" from stocks where id=$1', [stockId])).rows[0];
+      expect(parseFloat(row.quantiteEnStock)).toBeCloseTo(1, 2);
+    });
+
+    it("correction valide dans les limites du stock → stock mis à jour (OPE-833/835)", async () => {
+      const stockId: number = (await admin.query(
+        'insert into stocks ("artisanId", reference, designation, "quantiteEnStock") values ($1,$2,$3,$4) returning id',
+        [A, "S-OK", "Coude test", "10.00"],
+      )).rows[0].id;
+
+      const cmd = await repo.create(ctx(A), { fournisseurId: fournA, lignes: [{ designation: "Coude test", quantite: "10", prixUnitaire: "2" }] });
+      const lignes = await repo.listLignes(ctx(A), cmd!.id);
+      await admin.query('update lignes_commandes_fournisseurs set "stockId"=$1 where id=$2', [stockId, lignes[0].id]);
+
+      /** Réception initiale +8 → stock 10+8=18 */
+      await repo.recevoir(ctx(A), cmd!.id, [{ ligneId: lignes[0].id, quantiteRecue: 8 }]);
+
+      /** Correction à 6 : delta = 6-8 = -2, apres = 18-2 = 16 → OK */
+      await repo.recevoir(ctx(A), cmd!.id, [{ ligneId: lignes[0].id, quantiteRecue: 6 }]);
+
+      const row = (await admin.query('select "quantiteEnStock" from stocks where id=$1', [stockId])).rows[0];
+      expect(parseFloat(row.quantiteEnStock)).toBeCloseTo(16, 2);
+    });
   });
 });
