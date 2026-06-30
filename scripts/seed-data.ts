@@ -16,6 +16,7 @@ import {
   users, artisans, parametresArtisan, clients, techniciens, articlesArtisan,
   devis, factures, chantiers, interventions, contratsMaintenance, fournisseurs, notifications,
   devisLignes, facturesLignes, commandesFournisseurs, lignesCommandesFournisseurs, stocks,
+  ecrituresComptables,
 } from "../drizzle/schema.pg";
 
 const isRiche = process.argv.includes("--riche");
@@ -264,11 +265,11 @@ async function seed() {
           for (const d of dv) await db.delete(devisLignes).where(eq(devisLignes.devisId, d.id));
           const fa = await db.select({ id: factures.id }).from(factures).where(eq(factures.artisanId, aId));
           for (const f of fa) await db.delete(facturesLignes).where(eq(facturesLignes.factureId, f.id));
-          for (const t of [stocks, commandesFournisseurs, interventions, factures, devis, fournisseurs, parametresArtisan, clients]) {
+          for (const t of [stocks, commandesFournisseurs, interventions, ecrituresComptables, factures, devis, fournisseurs, parametresArtisan, clients]) {
             await db.delete(t).where(eq((t as typeof clients).artisanId, aId));
           }
         } else {
-          for (const t of [notifications, interventions, contratsMaintenance, chantiers, factures, devis, articlesArtisan, techniciens, clients, parametresArtisan, fournisseurs]) {
+          for (const t of [notifications, interventions, contratsMaintenance, chantiers, ecrituresComptables, factures, devis, articlesArtisan, techniciens, clients, parametresArtisan, fournisseurs]) {
             await db.delete(t).where(eq((t as typeof clients).artisanId, a.id));
           }
         }
@@ -326,6 +327,7 @@ async function seed() {
       console.log(`✅ ${devisCreated.length} devis (+ lignes)`);
 
       let facCounter = 1;
+      let ecritureNumRiche = 0;
       const acceptes = devisCreated.filter((d) => d.def.statut === "accepte");
       for (let i = 0; i < acceptes.length; i++) {
         const dv = acceptes[i];
@@ -343,6 +345,17 @@ async function seed() {
           const mHT = l.pu * l.qty;
           return { factureId: f.id, ordre: j + 1, designation: l.designation, quantite: n2(l.qty), unite: l.unite, prixUnitaireHT: n2(l.pu), tauxTVA: "20.00", montantHT: n2(mHT), montantTVA: n2(mHT * 0.2), montantTTC: n2(mHT * 1.2) };
         }));
+        if (payee) {
+          const numVE = ++ecritureNumRiche; const numBQ = ++ecritureNumRiche;
+          const ttc = dv.totalTTC; const ht = dv.totalHT; const tva = dv.totalTVA;
+          await db.insert(ecrituresComptables).values([
+            { artisanId, factureId: f.id, dateEcriture: dateFacture, journal: "VE", numeroCompte: "411000", libelleCompte: "Clients", libelle: `Facture ${numero}`, pieceRef: numero, debit: n2(ttc), statut: "validee", ecritureNum: numVE },
+            { artisanId, factureId: f.id, dateEcriture: dateFacture, journal: "VE", numeroCompte: "706000", libelleCompte: "Prestations de services", libelle: `Facture ${numero}`, pieceRef: numero, credit: n2(ht), statut: "validee", ecritureNum: numVE },
+            { artisanId, factureId: f.id, dateEcriture: dateFacture, journal: "VE", numeroCompte: "445711", libelleCompte: "TVA collectée 20%", libelle: `Facture ${numero}`, pieceRef: numero, credit: n2(tva), statut: "validee", ecritureNum: numVE },
+            { artisanId, factureId: f.id, dateEcriture: dateFacture, journal: "BQ", numeroCompte: "512000", libelleCompte: "Banque", libelle: `Règlement ${numero}`, pieceRef: numero, debit: n2(ttc), lettrage: `VL${f.id}`, statut: "validee", ecritureNum: numBQ },
+            { artisanId, factureId: f.id, dateEcriture: dateFacture, journal: "BQ", numeroCompte: "411000", libelleCompte: "Clients", libelle: `Règlement ${numero}`, pieceRef: numero, credit: n2(ttc), lettrage: `VL${f.id}`, statut: "validee", ecritureNum: numBQ },
+          ]);
+        }
       }
       for (let i = 0; i < facturesStandalone.length; i++) {
         const sf = facturesStandalone[i];
@@ -406,11 +419,26 @@ async function seed() {
       }))).returning({ id: devis.id });
       console.log(`✅ ${devisRows.length} devis créés`);
 
-      await db.insert(factures).values(facturesDataSimple.map((f) => ({
+      const factureRowsSimple = await db.insert(factures).values(facturesDataSimple.map((f) => ({
         artisanId, clientId: clientRows[f.clientIdx].id, devisId: f.devisIdx !== null ? devisRows[f.devisIdx].id : null,
         numero: f.numero, dateFacture: now, dateEcheance: plusJours(30), statut: f.statut, objet: f.objet,
         totalHT: f.totalHT, totalTVA: f.totalTVA, totalTTC: f.totalTTC, montantPaye: f.montantPaye,
-      })));
+      }))).returning({ id: factures.id });
+      let ecritureCounter = 0;
+      for (let i = 0; i < facturesDataSimple.length; i++) {
+        const fd = facturesDataSimple[i];
+        if (fd.statut !== "payee") continue;
+        const fId = factureRowsSimple[i].id;
+        const ht = Number(fd.totalHT); const tva = Number(fd.totalTVA); const ttc = Number(fd.totalTTC);
+        const numVE = ++ecritureCounter; const numBQ = ++ecritureCounter;
+        await db.insert(ecrituresComptables).values([
+          { artisanId, factureId: fId, dateEcriture: now, journal: "VE", numeroCompte: "411000", libelleCompte: "Clients", libelle: `Facture ${fd.numero}`, pieceRef: fd.numero, debit: n2(ttc), statut: "validee", ecritureNum: numVE },
+          { artisanId, factureId: fId, dateEcriture: now, journal: "VE", numeroCompte: "706000", libelleCompte: "Prestations de services", libelle: `Facture ${fd.numero}`, pieceRef: fd.numero, credit: n2(ht), statut: "validee", ecritureNum: numVE },
+          { artisanId, factureId: fId, dateEcriture: now, journal: "VE", numeroCompte: "445711", libelleCompte: "TVA collectée 20%", libelle: `Facture ${fd.numero}`, pieceRef: fd.numero, credit: n2(tva), statut: "validee", ecritureNum: numVE },
+          { artisanId, factureId: fId, dateEcriture: now, journal: "BQ", numeroCompte: "512000", libelleCompte: "Banque", libelle: `Règlement ${fd.numero}`, pieceRef: fd.numero, debit: n2(ttc), lettrage: `VL${fId}`, statut: "validee", ecritureNum: numBQ },
+          { artisanId, factureId: fId, dateEcriture: now, journal: "BQ", numeroCompte: "411000", libelleCompte: "Clients", libelle: `Règlement ${fd.numero}`, pieceRef: fd.numero, credit: n2(ttc), lettrage: `VL${fId}`, statut: "validee", ecritureNum: numBQ },
+        ]);
+      }
       console.log(`✅ ${facturesDataSimple.length} factures créées`);
 
       await db.insert(chantiers).values(chantiersDataSimple.map((c) => ({

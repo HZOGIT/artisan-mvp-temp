@@ -10,7 +10,7 @@ import type { EcritureComptable, CreateEcritureInput } from "../domain/ecriture"
 export class FakeEcritureRepository implements IEcritureRepository {
   private store: EcritureComptable[] = [];
   private seq = 0;
-  private numSeq = 0;
+  private numSeqByExercice = new Map<number, number>();
 
   async list(ctx: TenantContext): Promise<EcritureComptable[]> {
     return this.store.filter((e) => e.artisanId === ctx.artisanId);
@@ -74,12 +74,19 @@ export class FakeEcritureRepository implements IEcritureRepository {
   }
 
   async validateByFacture(ctx: TenantContext, factureId: number): Promise<number> {
-    const journaux = Array.from(new Set(
-      this.store
-        .filter((e) => e.artisanId === ctx.artisanId && e.factureId === factureId && e.statut === "brouillon")
-        .map((e) => e.journal),
-    ));
-    const numParJournal = new Map(journaux.map((j) => [j, ++this.numSeq]));
+    const toBrouillon = this.store.filter(
+      (e) => e.artisanId === ctx.artisanId && e.factureId === factureId && e.statut === "brouillon",
+    );
+    if (toBrouillon.length === 0) return 0;
+    const exercice = toBrouillon[0].dateEcriture.getFullYear();
+    const journaux = Array.from(new Set(toBrouillon.map((e) => e.journal)));
+    const numParJournal = new Map<string, number>();
+    for (const j of journaux) {
+      const cur = this.numSeqByExercice.get(exercice) ?? 0;
+      const next = cur + 1;
+      this.numSeqByExercice.set(exercice, next);
+      numParJournal.set(j, next);
+    }
     let count = 0;
     this.store = this.store.map((e) => {
       if (e.artisanId === ctx.artisanId && e.factureId === factureId && e.statut === "brouillon") {

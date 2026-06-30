@@ -142,12 +142,9 @@ export class EcritureRepositoryDrizzle implements IEcritureRepository {
 
   validateByFacture(ctx: TenantContext, factureId: number): Promise<number> {
     return withTenant(this.db, ctx, async (tx) => {
-      /* Sérialise les attributions concurrentes par tenant — relâché au commit de la tx */
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('ecriture_num:' || ${String(ctx.artisanId)}))`);
-
-      /* Récupère les journaux distincts des écritures brouillon à valider */
+      /* Récupère les journaux distincts ET la date des écritures brouillon à valider */
       const toValidate = await tx
-        .select({ journal: ecrituresComptables.journal })
+        .select({ journal: ecrituresComptables.journal, dateEcriture: ecrituresComptables.dateEcriture })
         .from(ecrituresComptables)
         .where(
           and(
@@ -158,11 +155,23 @@ export class EcritureRepositoryDrizzle implements IEcritureRepository {
         );
       if (toValidate.length === 0) return 0;
 
-      /* Prochain ecritureNum : MAX actuel pour cet artisan + 1 (dans la transaction) */
+      const exercice = toValidate[0].dateEcriture.getFullYear();
+
+      /* Sérialise par tenant+exercice — relâché au commit de la tx */
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext('ecriture_num:' || ${String(ctx.artisanId)} || ':' || ${String(exercice)}))`,
+      );
+
+      /* Prochain ecritureNum : MAX actuel pour cet artisan et cet exercice + 1 */
       const [{ maxNum }] = await tx
         .select({ maxNum: max(ecrituresComptables.ecritureNum) })
         .from(ecrituresComptables)
-        .where(eq(ecrituresComptables.artisanId, ctx.artisanId));
+        .where(
+          and(
+            eq(ecrituresComptables.artisanId, ctx.artisanId),
+            sql`EXTRACT(YEAR FROM ${ecrituresComptables.dateEcriture})::int = ${exercice}`,
+          ),
+        );
       let nextNum = (maxNum ?? 0) + 1;
 
       /* Une pièce = un journal (même factureId) → un ecritureNum par journal */
