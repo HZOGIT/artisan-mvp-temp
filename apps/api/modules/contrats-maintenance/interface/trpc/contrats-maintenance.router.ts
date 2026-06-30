@@ -25,6 +25,11 @@ const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide
 const typeEnum = z.enum(["maintenance_preventive", "entretien", "depannage", "contrat_service"]);
 const periodiciteEnum = z.enum(["mensuel", "trimestriel", "semestriel", "annuel"]);
 const interventionStatutEnum = z.enum(["planifiee", "en_cours", "effectuee", "annulee"]);
+const tauxIndexation = z
+  .string()
+  .regex(/^\d+(\.\d{1,2})?$/)
+  .refine((v) => parseFloat(v) > 0, { message: "Le taux d'indexation doit être supérieur à 0" })
+  .nullish();
 /** `dateDebut`/`dateFin` arrivent en string ISO (transport JSON) ; `z.coerce.date()` → Date. */
 
 /*
@@ -45,7 +50,7 @@ const createSchema = z.object({
   preavisResiliation: z.number().int().min(0).optional(),
   conditionsParticulieres: z.string().max(5000).nullish(),
   notes: z.string().max(5000).nullish(),
-  tauxIndexationAnnuel: z.string().regex(/^\d+(\.\d{1,2})?$/).nullish(),
+  tauxIndexationAnnuel: tauxIndexation,
 });
 
 const updateSchema = z.object({
@@ -61,7 +66,7 @@ const updateSchema = z.object({
   preavisResiliation: z.number().int().min(0).optional(),
   conditionsParticulieres: z.string().max(5000).nullish(),
   notes: z.string().max(5000).nullish(),
-  tauxIndexationAnnuel: z.string().regex(/^\d+(\.\d{1,2})?$/).nullish(),
+  tauxIndexationAnnuel: tauxIndexation,
 });
 
 /*
