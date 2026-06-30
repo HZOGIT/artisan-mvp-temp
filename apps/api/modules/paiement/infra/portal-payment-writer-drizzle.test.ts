@@ -1,4 +1,5 @@
 import { describe, it, expect, afterAll, beforeAll } from "vitest";
+import { ConflictError } from "../../../shared/errors";
 import { and, eq } from "drizzle-orm";
 import { Pool } from "pg";
 import { createDbClient, withTenant } from "../../../shared/db";
@@ -54,6 +55,12 @@ describe.skipIf(!URL)("PortalPaymentWriterDrizzle (RLS écriture paiements_strip
     expect(rows[0].artisanId).toBe(artisanA);
     expect(rows[0].statut).toBe("en_attente");
     expect(rows[0].tokenPaiement).toBe("tok-9966371");
+  });
+
+  it("OPE-807 — double insert (factureId, artisanId) en_attente → ConflictError (UNIQUE partiel)", async () => {
+    await expect(
+      writer.createPaiement(ctx(artisanA), { factureId: factureA, stripeSessionId: "cs_test_race", montant: "120.00", lienPaiement: null, tokenPaiement: "tok-race" }),
+    ).rejects.toBeInstanceOf(ConflictError);
   });
 
   it("isolation RLS : l'artisan B ne voit PAS le paiement de A ; A le voit", async () => {

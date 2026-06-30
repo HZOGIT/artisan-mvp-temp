@@ -113,14 +113,35 @@ describe("createInvoiceCheckout (public par token portail)", () => {
     const out = await createInvoiceCheckout(deps, { factureId: 42, token: "tok", origin: "https://o.test" });
     expect(out.kind).toBe("ok");
     if (out.kind === "ok") expect(out.url).toContain("checkout.stripe.test");
-    // Stripe appelé avec le bon montant en euros + metadata cohérente (token_paiement)
     expect(stripe.invoiceCheckouts).toHaveLength(1);
     expect(stripe.invoiceCheckouts[0].montantTTC).toBe(120);
     expect(stripe.invoiceCheckouts[0].numeroFacture).toBe("FAC-1");
     expect(stripe.invoiceCheckouts[0].clientName).toBe("Jean Durand");
-    // ligne paiements_stripe créée avec le MÊME token que la metadata Stripe (cohérence webhook)
     expect(writer.created).toHaveLength(1);
     expect(writer.created[0].tokenPaiement).toBe(stripe.invoiceCheckouts[0].tokenPaiement);
     expect(writer.created[0].artisanId).toBe(7);
+  });
+
+  it("OPE-807 — race TOCTOU : INSERT rejeté (UNIQUE), session existante récupérée → ok idempotent", async () => {
+    const { reader, writer, deps } = build();
+    seedFacturePayable(reader);
+    reader.seedSessionEnAttente(7, 42, { url: "https://checkout.stripe.test/existing", sessionId: "cs_test_existing", createdAt: new Date(NOW.getTime() - 1000) });
+    reader.skipFirstSessionLookup = true;
+    writer.forceConflictOnce = true;
+    const out = await createInvoiceCheckout(deps, { factureId: 42, token: "tok", origin: "https://o.test" });
+    expect(out.kind).toBe("ok");
+    if (out.kind === "ok") {
+      expect(out.sessionId).toBe("cs_test_existing");
+      expect(out.url).toBe("https://checkout.stripe.test/existing");
+    }
+    expect(writer.created).toHaveLength(0);
+  });
+
+  it("OPE-807 — race TOCTOU : INSERT rejeté, session introuvable → bad-request fallback", async () => {
+    const { reader, writer, deps } = build();
+    seedFacturePayable(reader);
+    writer.forceConflictOnce = true;
+    const out = await createInvoiceCheckout(deps, { factureId: 42, token: "tok", origin: "https://o.test" });
+    expect(out.kind).toBe("bad-request");
   });
 });

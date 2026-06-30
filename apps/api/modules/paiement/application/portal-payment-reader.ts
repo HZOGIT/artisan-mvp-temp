@@ -50,5 +50,5 @@ export interface PortalPaymentReader {
   getClientContact(ctx: TenantContext, clientId: number): Promise<ClientContact | null>;
   getArtisanNom(ctx: TenantContext): Promise<string | null>;
   /** Retourne une session paiement en_attente récente (< 24h) pour cette facture, ou null. Anti double-session. */
-  getSessionEnAttente(ctx: TenantContext, factureId: number, now: Date): Promise<{ url: string | null } | null>;
+  getSessionEnAttente(ctx: TenantContext, factureId: number, now: Date): Promise<{ url: string | null; sessionId: string | null } | null>;
 }
