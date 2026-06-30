@@ -8,6 +8,7 @@ import type {
   ContratIntervention,
   CreateContratInterventionInput,
   UpdateContratInterventionInput,
+  RevisionPrix,
 } from "../domain/contrat";
 
 /*
@@ -26,6 +27,9 @@ export class FakeContratRepository implements IContratRepository {
   private interventionSeq = 0;
   /** Factures récurrentes enregistrées (exposées pour les assertions de test). */
   readonly facturesRecurrentes: RecordFactureRecurrenteInput[] = [];
+  /** Historique des révisions (exposé pour les assertions de test). */
+  readonly revisions: RevisionPrix[] = [];
+  private revisionSeq = 0;
 
   seedClient(artisanId: number, clientId: number, nom = "Client"): void {
     if (!this.clientsByArtisan.has(artisanId)) this.clientsByArtisan.set(artisanId, new Set());
@@ -217,14 +221,32 @@ export class FakeContratRepository implements IContratRepository {
     if (idx !== -1) this.store[idx] = { ...this.store[idx], alerteReconductionEnvoyeeLe: new Date() };
   }
 
-  async reviserPrix(ctx: TenantContext, id: number, nouveauMontantHT: string, dateDerniereRevision: Date): Promise<Contrat | null> {
+  async reviserPrix(ctx: TenantContext, id: number, ancienMontantHT: string, nouveauMontantHT: string, tauxApplique: string, dateDerniereRevision: Date, declencheur = "manuel"): Promise<Contrat | null> {
     const idx = this.store.findIndex((c) => c.id === id && c.artisanId === ctx.artisanId);
     if (idx === -1) return null;
     const current = this.store[idx];
     const anneeExistante = current.dateDerniereRevision?.getFullYear() ?? -1;
     if (anneeExistante >= new Date().getFullYear()) return null;
     this.store[idx] = { ...current, montantHT: nouveauMontantHT, dateDerniereRevision, updatedAt: new Date() };
+    const now = new Date();
+    this.revisions.push({
+      id: ++this.revisionSeq,
+      contratId: id,
+      artisanId: ctx.artisanId,
+      ancienMontantHT,
+      nouveauMontantHT,
+      tauxApplique,
+      dateRevision: dateDerniereRevision,
+      declencheur,
+      createdAt: now,
+    });
     return this.store[idx];
+  }
+
+  async getHistoriqueRevisions(ctx: TenantContext, contratId: number): Promise<RevisionPrix[]> {
+    return this.revisions
+      .filter((r) => r.contratId === contratId && r.artisanId === ctx.artisanId)
+      .sort((a, b) => b.dateRevision.getTime() - a.dateRevision.getTime());
   }
 
   withDb(_db: unknown): this {

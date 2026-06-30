@@ -146,3 +146,16 @@ export interface ReviserPrixResult {
   readonly ancienMontantHT: string;
   readonly nouveauMontantHT: string;
 }
+
+/** Entrée d'historique d'une révision de prix (table `historique_revisions_prix`). */
+export interface RevisionPrix {
+  readonly id: number;
+  readonly contratId: number;
+  readonly artisanId: number;
+  readonly ancienMontantHT: string;
+  readonly nouveauMontantHT: string;
+  readonly tauxApplique: string;
+  readonly dateRevision: Date;
+  readonly declencheur: string;
+  readonly createdAt: Date;
+}

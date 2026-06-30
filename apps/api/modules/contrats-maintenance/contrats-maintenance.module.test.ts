@@ -64,6 +64,7 @@ describe("contrats-maintenance.module", () => {
       "generateFacture",
       "getAFacturer",
       "getById",
+      "getHistoriqueRevisions",
       "getInterventions",
       "list",
       "reactiver",

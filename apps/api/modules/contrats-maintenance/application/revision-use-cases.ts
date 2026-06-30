@@ -23,13 +23,14 @@ export async function reviserPrixContrat(repo: IContratRepository, ctx: TenantCo
     throw new ValidationError(`Seul un contrat actif peut être révisé (statut actuel : ${contrat.statut})`);
   }
 
-  if (!contrat.tauxIndexationAnnuel || parseFloat(contrat.tauxIndexationAnnuel) <= 0) {
+  const taux = contrat.tauxIndexationAnnuel;
+  if (!taux || parseFloat(taux) <= 0) {
     throw new ValidationError("Aucun taux d'indexation annuel défini sur ce contrat");
   }
 
   const ancienMontantHT = contrat.montantHT;
-  const nouveauMontantHT = calculerNouveauMontant(contrat.montantHT, contrat.tauxIndexationAnnuel);
-  const updated = await repo.reviserPrix(ctx, id, nouveauMontantHT, new Date());
+  const nouveauMontantHT = calculerNouveauMontant(contrat.montantHT, taux);
+  const updated = await repo.reviserPrix(ctx, id, ancienMontantHT, nouveauMontantHT, taux, new Date());
   /*
    * `null` signifie 0 lignes mises à jour : la garde SQL a rejeté la requête
    * (dateDerniereRevision déjà dans l'année courante) — conflit de concurrence.

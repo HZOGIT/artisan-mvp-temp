@@ -100,6 +100,23 @@ export const facturesRecurrentes = pgTable("factures_recurrentes", {
 export type FactureRecurrente = typeof facturesRecurrentes.$inferSelect;
 export type InsertFactureRecurrente = typeof facturesRecurrentes.$inferInsert;
 
+export const historiqueRevisionsPrix = pgTable("historique_revisions_prix", {
+  id: serial("id").primaryKey(),
+  contratId: integer("contratId").notNull().references(() => contratsMaintenance.id, { onDelete: "cascade" }),
+  artisanId: integer("artisanId").notNull(),
+  ancienMontantHT: numeric("ancienMontantHT", { precision: 10, scale: 2 }).notNull(),
+  nouveauMontantHT: numeric("nouveauMontantHT", { precision: 10, scale: 2 }).notNull(),
+  tauxApplique: numeric("tauxApplique", { precision: 5, scale: 2 }).notNull(),
+  dateRevision: timestamp("dateRevision").defaultNow().notNull(),
+  declencheur: varchar("declencheur", { length: 20 }).notNull().default("manuel"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_historique_revisions_contrat").on(t.contratId),
+  index("idx_historique_revisions_artisan").on(t.artisanId),
+]);
+export type HistoriqueRevisionPrix = typeof historiqueRevisionsPrix.$inferSelect;
+export type InsertHistoriqueRevisionPrix = typeof historiqueRevisionsPrix.$inferInsert;
+
 export const interventionsContrat = pgTable("interventions_contrat", {
   id: serial("id").primaryKey(),
   contratId: integer("contratId").notNull().references(() => contratsMaintenance.id, { onDelete: "cascade" }),
