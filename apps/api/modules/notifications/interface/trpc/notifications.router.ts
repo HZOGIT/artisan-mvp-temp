@@ -59,8 +59,15 @@ export function createNotificationsRouter(repo: INotificationRepository, push?: 
       }),
 
     markAllAsRead: protectedProcedure.mutation(async ({ ctx }) => {
-      const count = await marquerToutesLues(repo, ctx.tenant);
-      return { success: true, count };
+      return withOutbox(db, repo, async (r, tx) => {
+        const ids = await marquerToutesLues(r, ctx.tenant);
+        if (tx) {
+          for (const id of ids) {
+            await outboxEvent(tx, ctx.tenant, { action: "notification.lue", entityType: "notification", entityId: id, payload: { notificationId: id } });
+          }
+        }
+        return { success: true, count: ids.length };
+      });
     }),
 
     archive: protectedProcedure

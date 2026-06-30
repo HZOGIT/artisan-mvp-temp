@@ -20,14 +20,14 @@ export interface NotificationsCronDeps {
 export interface NotificationsCronOptions {
   readonly deps: NotificationsCronDeps;
   readonly db: DbClient;
-  readonly intervalHours?: number;
+  readonly intervalMinutes?: number;
 }
 
 const LOCK_ID = BigInt("0xb111b113");
 
 export const notificationsCronPlugin = fp(
   (app: FastifyInstance, opts: NotificationsCronOptions) => {
-    const intervalHours = opts.intervalHours ?? 1;
+    const intervalMinutes = opts.intervalMinutes ?? 5;
 
     const task = new AsyncTask(
       "notifications-tick",
@@ -85,7 +85,7 @@ export const notificationsCronPlugin = fp(
     );
 
     app.scheduler.addSimpleIntervalJob(
-      new SimpleIntervalJob({ hours: intervalHours, runImmediately: false }, task),
+      new SimpleIntervalJob({ minutes: intervalMinutes, runImmediately: false }, task),
     );
   },
   { name: "notifications-cron" },
