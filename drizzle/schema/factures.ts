@@ -112,6 +112,10 @@ export const paiementsStripe = pgTable("paiements_stripe", {
   artisanId: integer("artisanId").notNull(),
   stripeSessionId: varchar("stripeSessionId", { length: 255 }),
   stripePaymentIntentId: varchar("stripePaymentIntentId", { length: 255 }),
+  /** Compte Connect utilisé à la création (snapshot) — ne jamais lire artisans.stripe_connect_account_id. */
+  stripeConnectAccountId: varchar("stripe_connect_account_id", { length: 255 }),
+  /** Charge Stripe associée (pour remboursements). Null sur paiements antérieurs à Lot 4. */
+  stripeChargeId: varchar("stripe_charge_id", { length: 255 }),
   montant: numeric("montant", { precision: 10, scale: 2 }).notNull(),
   devise: varchar("devise", { length: 3 }).default("EUR"),
   statut: paiementStatutEnum("statut").default("en_attente"),

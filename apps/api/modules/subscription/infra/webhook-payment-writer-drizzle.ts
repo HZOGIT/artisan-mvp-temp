@@ -26,13 +26,13 @@ export class WebhookPaymentWriterDrizzle implements WebhookPaymentWriter {
     });
   }
 
-  completeCheckout(input: { artisanId: number; paiementId: number; factureId: number; stripePaymentIntentId: string }): Promise<void> {
+  completeCheckout(input: { artisanId: number; paiementId: number; factureId: number; stripePaymentIntentId: string; stripeChargeId?: string | null }): Promise<void> {
     const ctx: TenantContext = { artisanId: input.artisanId, userId: 0 };
     return withTenant(this.db, ctx, async (tx) => {
       const now = new Date();
       await tx
         .update(paiementsStripe)
-        .set({ statut: "payee", stripePaymentIntentId: input.stripePaymentIntentId, paidAt: now })
+        .set({ statut: "payee", stripePaymentIntentId: input.stripePaymentIntentId, paidAt: now, ...(input.stripeChargeId != null ? { stripeChargeId: input.stripeChargeId } : {}) })
         .where(and(eq(paiementsStripe.id, input.paiementId), eq(paiementsStripe.artisanId, input.artisanId)));
 
       const [facture] = await tx

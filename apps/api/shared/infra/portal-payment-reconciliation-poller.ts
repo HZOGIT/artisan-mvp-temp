@@ -23,6 +23,8 @@ export interface OrphanedPayment {
   readonly factureId: number;
   readonly stripeSessionId: string;
   readonly tokenPaiement: string | null;
+  /** Null pour les paiements antérieurs à Lot 4 (interrogation sur le compte plateforme). */
+  readonly stripeConnectAccountId: string | null;
 }
 
 export type ReconcileOutcome = "reconciled" | "not-paid" | "no-session" | "no-token";
@@ -38,7 +40,7 @@ export async function reconcileOrphanedPayment(
 ): Promise<ReconcileOutcome> {
   if (!payment.tokenPaiement) return "no-token";
 
-  const session = await stripe.retrieveCheckoutSession(payment.stripeSessionId);
+  const session = await stripe.retrieveCheckoutSession(payment.stripeSessionId, payment.stripeConnectAccountId ?? undefined);
   if (!session) return "no-session";
   if (session.paymentStatus !== "paid") return "not-paid";
 
@@ -68,9 +70,10 @@ export const portalPaymentReconciliationPollerPlugin = fp(
           try {
             const cutoff = new Date(Date.now() - MIN_AGE_SECONDS * 1000);
             const { rows } = await client.query<OrphanedPayment>(
-              `SELECT id, "artisanId", "factureId", "stripeSessionId", "tokenPaiement"
-               FROM paiements_stripe
-               WHERE statut = 'en_attente' AND "createdAt" < $1`,
+              `SELECT ps.id, ps."artisanId", ps."factureId", ps."stripeSessionId", ps."tokenPaiement",
+                      ps."stripe_connect_account_id" AS "stripeConnectAccountId"
+               FROM paiements_stripe ps
+               WHERE ps.statut = 'en_attente' AND ps."createdAt" < $1`,
               [cutoff],
             );
 

@@ -1,6 +1,6 @@
 {
   "id": "20260629223000_fk-ecritures-factureid",
-  "prevId": "20260629222008_rls-disable-permissions-utilisateur",
+  "prevId": "385f7f8b-d403-4a4a-a1c0-ab5c2445bce4",
   "version": "7",
   "dialect": "postgresql",
   "tables": {

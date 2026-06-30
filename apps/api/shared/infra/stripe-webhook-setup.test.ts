@@ -90,7 +90,7 @@ describe("ensureStripeWebhookEndpoint", () => {
   });
 });
 
-const CONNECT_EVENTS = ["account.updated", "account.application.deauthorized"];
+const CONNECT_EVENTS = ["account.updated", "account.application.deauthorized", "checkout.session.completed", "payment_intent.payment_failed"];
 const CONNECT_URL = "https://example.com/api/stripe/connect-webhook";
 
 const makeConnectSDK = (endpoints: Array<{ id: string; url: string; status: string; enabled_events: string[]; secret?: string }> = []): StripeWebhookSDK => ({

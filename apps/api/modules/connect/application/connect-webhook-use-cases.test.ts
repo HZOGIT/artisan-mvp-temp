@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { processConnectWebhook } from "./connect-webhook-use-cases";
 import type { ConnectWebhookDeps } from "./connect-webhook-use-cases";
 import type { ConnectArtisanWriter } from "./connect-artisan-writer";
+import type { WebhookPaymentWriter } from "../../subscription/application/webhook-payment-writer";
 import type { StripePort, StripeWebhookEvent } from "../../../shared/ports/stripe";
 
 /*
@@ -29,11 +30,27 @@ function makeWriter(): ConnectArtisanWriter & { upsertConnectStatus: ReturnType<
   };
 }
 
-function makeDeps(event: StripeWebhookEvent | null, opts: { throwOnConstruct?: boolean; writer?: ConnectArtisanWriter } = {}): ConnectWebhookDeps {
+function makePaymentWriter(): WebhookPaymentWriter & {
+  resolvePaiement: ReturnType<typeof vi.fn>;
+  completeCheckout: ReturnType<typeof vi.fn>;
+  failPaiement: ReturnType<typeof vi.fn>;
+} {
+  return {
+    resolvePaiement: vi.fn().mockResolvedValue({ paiementId: 1, factureId: 42, artisanId: 7 }),
+    completeCheckout: vi.fn().mockResolvedValue(undefined),
+    failPaiement: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+function makeDeps(
+  event: StripeWebhookEvent | null,
+  opts: { throwOnConstruct?: boolean; writer?: ConnectArtisanWriter; paymentWriter?: WebhookPaymentWriter } = {},
+): ConnectWebhookDeps {
   return {
     stripe: makeStripe(event, opts.throwOnConstruct),
     writer: opts.writer ?? makeWriter(),
     webhookSecret: "whsec_test",
+    paymentWriter: opts.paymentWriter,
   };
 }
 
@@ -126,5 +143,62 @@ describe("processConnectWebhook", () => {
     const event: StripeWebhookEvent = { id: "evt_live_7", type: "account.updated", account: "acct_err", data: { object: { id: "acct_err" } } };
     const result = await processConnectWebhook(makeDeps(event, { writer }), { rawBody: RAW, signature: SIG });
     expect(result.http).toBe(500);
+  });
+
+  describe("checkout.session.completed (direct charge Lot 4)", () => {
+    it("solde le paiement si paymentWriter fourni + token présent", async () => {
+      const paymentWriter = makePaymentWriter();
+      const session = { payment_intent: "pi_test_1", metadata: { token_paiement: "tok_abc", facture_id: "42" } };
+      const event: StripeWebhookEvent = { id: "evt_live_8", type: "checkout.session.completed", account: "acct_123", data: { object: session } };
+      const result = await processConnectWebhook(makeDeps(event, { paymentWriter }), { rawBody: RAW, signature: SIG });
+      expect(result.http).toBe(200);
+      expect(paymentWriter.resolvePaiement).toHaveBeenCalledWith("tok_abc");
+      expect(paymentWriter.completeCheckout).toHaveBeenCalledWith(
+        expect.objectContaining({ artisanId: 7, factureId: 42, stripePaymentIntentId: "pi_test_1" }),
+      );
+    });
+
+    it("ignore si paymentWriter absent (rétrocompatibilité)", async () => {
+      const event: StripeWebhookEvent = {
+        id: "evt_live_9", type: "checkout.session.completed", account: "acct_123",
+        data: { object: { payment_intent: "pi_1", metadata: { token_paiement: "tok_x", facture_id: "1" } } },
+      };
+      const result = await processConnectWebhook(makeDeps(event), { rawBody: RAW, signature: SIG });
+      expect(result.http).toBe(200);
+    });
+
+    it("ignore si token_paiement absent (event non-facture)", async () => {
+      const paymentWriter = makePaymentWriter();
+      const event: StripeWebhookEvent = {
+        id: "evt_live_10", type: "checkout.session.completed", account: "acct_123",
+        data: { object: { payment_intent: "pi_1", metadata: {} } },
+      };
+      const result = await processConnectWebhook(makeDeps(event, { paymentWriter }), { rawBody: RAW, signature: SIG });
+      expect(result.http).toBe(200);
+      expect(paymentWriter.completeCheckout).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("payment_intent.payment_failed (direct charge Lot 4)", () => {
+    it("marque le paiement échoué si paymentWriter fourni + token présent", async () => {
+      const paymentWriter = makePaymentWriter();
+      const pi = { id: "pi_fail_1", metadata: { token_paiement: "tok_fail" } };
+      const event: StripeWebhookEvent = { id: "evt_live_11", type: "payment_intent.payment_failed", account: "acct_123", data: { object: pi } };
+      const result = await processConnectWebhook(makeDeps(event, { paymentWriter }), { rawBody: RAW, signature: SIG });
+      expect(result.http).toBe(200);
+      expect(paymentWriter.resolvePaiement).toHaveBeenCalledWith("tok_fail");
+      expect(paymentWriter.failPaiement).toHaveBeenCalledWith(expect.objectContaining({ artisanId: 7, paiementId: 1 }));
+    });
+
+    it("ignore si token_paiement absent (event billing abonnement)", async () => {
+      const paymentWriter = makePaymentWriter();
+      const event: StripeWebhookEvent = {
+        id: "evt_live_12", type: "payment_intent.payment_failed", account: "acct_123",
+        data: { object: { id: "pi_sub_1", metadata: {} } },
+      };
+      const result = await processConnectWebhook(makeDeps(event, { paymentWriter }), { rawBody: RAW, signature: SIG });
+      expect(result.http).toBe(200);
+      expect(paymentWriter.failPaiement).not.toHaveBeenCalled();
+    });
   });
 });

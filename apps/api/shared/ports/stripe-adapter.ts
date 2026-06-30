@@ -3,12 +3,13 @@ import { getSecret } from "../config/secrets";
 
 const STRIPE_MODULE = "stripe";
 
+type StripeRequestOptions = { stripeAccount?: string };
 type StripeSDK = {
   customers: { create(p: unknown): Promise<{ id: string }> };
   checkout: {
     sessions: {
-      create(p: unknown): Promise<{ id: string; url: string | null }>;
-      retrieve(id: string): Promise<{ payment_status: string; payment_intent: string | { id: string } | null }>;
+      create(p: unknown, options?: StripeRequestOptions): Promise<{ id: string; url: string | null }>;
+      retrieve(id: string, params?: unknown, options?: StripeRequestOptions): Promise<{ payment_status: string; payment_intent: string | { id: string } | null }>;
     };
   };
   accounts: {
@@ -46,10 +47,11 @@ export class StripeAdapter implements StripePort {
     return s.customers.create({ email: p.email || undefined, name: p.name, metadata: p.metadata });
   }
 
-  async retrieveCheckoutSession(sessionId: string): Promise<CheckoutSessionStatus | null> {
+  async retrieveCheckoutSession(sessionId: string, accountId?: string): Promise<CheckoutSessionStatus | null> {
     try {
       const s = await this.sdk();
-      const session = await s.checkout.sessions.retrieve(sessionId);
+      const opts: StripeRequestOptions | undefined = accountId ? { stripeAccount: accountId } : undefined;
+      const session = await s.checkout.sessions.retrieve(sessionId, undefined, opts);
       const piId = typeof session.payment_intent === "string"
         ? session.payment_intent
         : (session.payment_intent as { id: string } | null)?.id ?? null;
@@ -71,36 +73,41 @@ export class StripeAdapter implements StripePort {
   }
 
   async createInvoiceCheckout(p: CreateInvoiceCheckoutParams): Promise<{ url: string | null; sessionId: string }> {
+    /* ponytail: fail-fast — charge plateforme architecturalement impossible pour les paiements clients finaux */
+    if (!p.stripeConnectAccountId) throw new Error("stripeConnectAccountId requis — charge plateforme interdite pour les paiements clients finaux");
     const s = await this.sdk();
-    const session = await s.checkout.sessions.create({
-      payment_method_types: ["card"],
-      mode: "payment",
-      customer_email: p.clientEmail || undefined,
-      client_reference_id: String(p.factureId),
-      allow_promotion_codes: true,
-      locale: "fr",
-      line_items: [
-        {
-          price_data: {
-            currency: "eur",
-            product_data: { name: `Facture ${p.numeroFacture}`, description: `Paiement de facture pour ${p.clientName} - ${p.artisanName}` },
-            unit_amount: Math.round(parseFloat(p.montantTTC.toFixed(2)) * 100),
+    const session = await s.checkout.sessions.create(
+      {
+        payment_method_types: ["card"],
+        mode: "payment",
+        customer_email: p.clientEmail || undefined,
+        client_reference_id: String(p.factureId),
+        allow_promotion_codes: true,
+        locale: "fr",
+        line_items: [
+          {
+            price_data: {
+              currency: "eur",
+              product_data: { name: `Facture ${p.numeroFacture}`, description: `Paiement de facture pour ${p.clientName} - ${p.artisanName}` },
+              unit_amount: Math.round(parseFloat(p.montantTTC.toFixed(2)) * 100),
+            },
+            quantity: 1,
           },
-          quantity: 1,
+        ],
+        metadata: {
+          facture_id: String(p.factureId),
+          artisan_id: String(p.artisanId),
+          user_id: String(p.userId),
+          customer_email: p.clientEmail,
+          customer_name: p.clientName,
+          numero_facture: p.numeroFacture,
+          token_paiement: p.tokenPaiement,
         },
-      ],
-      metadata: {
-        facture_id: String(p.factureId),
-        artisan_id: String(p.artisanId),
-        user_id: String(p.userId),
-        customer_email: p.clientEmail,
-        customer_name: p.clientName,
-        numero_facture: p.numeroFacture,
-        token_paiement: p.tokenPaiement,
+        success_url: `${p.origin}/portail/${p.portalToken}?paiement=succes&factureId=${p.factureId}`,
+        cancel_url: `${p.origin}/portail/${p.portalToken}?paiement=annule`,
       },
-      success_url: `${p.origin}/portail/${p.portalToken}?paiement=succes&factureId=${p.factureId}`,
-      cancel_url: `${p.origin}/portail/${p.portalToken}?paiement=annule`,
-    });
+      { stripeAccount: p.stripeConnectAccountId },
+    );
     return { url: session.url, sessionId: session.id };
   }
 

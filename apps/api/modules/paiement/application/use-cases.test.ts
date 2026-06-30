@@ -131,6 +131,33 @@ describe("createInvoiceCheckout (public par token portail)", () => {
     expect(writer.created[0].artisanId).toBe(7);
   });
 
+  it("OPE-904 — direct charge : stripeConnectAccountId transmis au port Stripe (0 commission)", async () => {
+    const { reader, stripe, deps } = build();
+    reader.seedArtisanConnectAccountId(7, "acct_live_test123");
+    seedFacturePayable(reader);
+    await createInvoiceCheckout(deps, { factureId: 42, token: "tok", origin: "https://o.test" });
+    expect(stripe.invoiceCheckouts).toHaveLength(1);
+    expect(stripe.invoiceCheckouts[0].stripeConnectAccountId).toBe("acct_live_test123");
+  });
+
+  it("OPE-922 — snapshot compte Connect dans la ligne paiement (createPaiement reçoit stripeConnectAccountId)", async () => {
+    const { reader, writer, deps } = build();
+    reader.seedArtisanConnectAccountId(7, "acct_snapshot_test");
+    seedFacturePayable(reader);
+    await createInvoiceCheckout(deps, { factureId: 42, token: "tok", origin: "https://o.test" });
+    expect(writer.created).toHaveLength(1);
+    expect(writer.created[0].stripeConnectAccountId).toBe("acct_snapshot_test");
+  });
+
+  it("OPE-904 — garde explicite : stripeConnectAccountId vide → bad-request (charge plateforme IMPOSSIBLE)", async () => {
+    const { reader, deps } = build();
+    reader.seedArtisanConnectAccountId(7, "");
+    seedFacturePayable(reader);
+    const out = await createInvoiceCheckout(deps, { factureId: 42, token: "tok", origin: "https://o.test" });
+    expect(out.kind).toBe("bad-request");
+    if (out.kind === "bad-request") expect(out.message).toContain("pas encore activé");
+  });
+
   it("OPE-807 — race TOCTOU : INSERT rejeté (UNIQUE), session existante récupérée → ok idempotent", async () => {
     const { reader, writer, deps } = build();
     seedFacturePayable(reader);

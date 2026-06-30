@@ -7,6 +7,6 @@ import type { TenantContext } from "../../../shared/tenant";
 export interface PortalPaymentWriter {
   createPaiement(
     ctx: TenantContext,
-    input: { factureId: number; stripeSessionId: string; montant: string; lienPaiement: string | null; tokenPaiement: string },
+    input: { factureId: number; stripeSessionId: string; montant: string; lienPaiement: string | null; tokenPaiement: string; stripeConnectAccountId?: string | null },
   ): Promise<void>;
 }

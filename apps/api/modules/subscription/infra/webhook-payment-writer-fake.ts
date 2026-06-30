@@ -3,7 +3,7 @@ import type { WebhookPaymentWriter, PaiementResolu } from "../application/webhoo
 /** Writer paiement webhook fake (in-memory) pour les tests des use-cases. */
 export class FakeWebhookPaymentWriter implements WebhookPaymentWriter {
   private byToken = new Map<string, PaiementResolu>();
-  public completed: Array<{ artisanId: number; paiementId: number; factureId: number; stripePaymentIntentId: string }> = [];
+  public completed: Array<{ artisanId: number; paiementId: number; factureId: number; stripePaymentIntentId: string; stripeChargeId?: string | null }> = [];
   public failed: Array<{ artisanId: number; paiementId: number }> = [];
 
   seed(token: string, resolu: PaiementResolu): void {
@@ -13,7 +13,7 @@ export class FakeWebhookPaymentWriter implements WebhookPaymentWriter {
   async resolvePaiement(token: string): Promise<PaiementResolu | null> {
     return this.byToken.get(token) ?? null;
   }
-  async completeCheckout(input: { artisanId: number; paiementId: number; factureId: number; stripePaymentIntentId: string }): Promise<void> {
+  async completeCheckout(input: { artisanId: number; paiementId: number; factureId: number; stripePaymentIntentId: string; stripeChargeId?: string | null }): Promise<void> {
     this.completed.push(input);
   }
   async failPaiement(input: { artisanId: number; paiementId: number }): Promise<void> {

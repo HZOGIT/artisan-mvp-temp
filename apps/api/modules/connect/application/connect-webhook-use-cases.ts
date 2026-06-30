@@ -1,6 +1,7 @@
 import type { StripePort } from "../../../shared/ports/stripe";
 import type { AppLogger } from "../../../shared/ports/logger";
 import type { ConnectArtisanWriter } from "./connect-artisan-writer";
+import type { WebhookPaymentWriter } from "../../subscription/application/webhook-payment-writer";
 
 export interface ConnectWebhookDeps {
   readonly stripe: StripePort;
@@ -8,6 +9,10 @@ export interface ConnectWebhookDeps {
   readonly writer: ConnectArtisanWriter;
   readonly webhookSecret: string;
   readonly log?: AppLogger;
+  /** Soldage des paiements de factures (checkout.session.completed / payment_intent.payment_failed depuis compte connecté). */
+  readonly paymentWriter?: WebhookPaymentWriter;
+  /** Best-effort compta après paiement portail (génération des écritures vente + encaissement). */
+  readonly genererEcrituresFacture?: (artisanId: number, factureId: number) => Promise<void>;
 }
 
 export interface ConnectWebhookResult {
@@ -41,6 +46,10 @@ export async function processConnectWebhook(
     } else if (event.type === "account.application.deauthorized") {
       /* Pour deauthorized, event.account est la seule source fiable de l'account ID */
       if (event.account) await deps.writer.resetConnectStatus(event.account);
+    } else if (event.type === "checkout.session.completed" && deps.paymentWriter) {
+      await handleConnectCheckoutCompleted(deps as ConnectWebhookDeps & { paymentWriter: WebhookPaymentWriter }, event.data.object);
+    } else if (event.type === "payment_intent.payment_failed" && deps.paymentWriter) {
+      await handleConnectPaymentFailed(deps as ConnectWebhookDeps & { paymentWriter: WebhookPaymentWriter }, event.data.object);
     }
   } catch (err) {
     deps.log?.error({ event: "stripe_connect_webhook_error", stripeEvent: event.type, error: err instanceof Error ? err.message : String(err) }, "Connect webhook handler error");
@@ -48,4 +57,38 @@ export async function processConnectWebhook(
   }
 
   return { http: 200, body: { received: true } };
+}
+
+async function handleConnectCheckoutCompleted(
+  deps: ConnectWebhookDeps & { paymentWriter: WebhookPaymentWriter },
+  session: Record<string, unknown>,
+): Promise<void> {
+  const metadata = (session.metadata ?? {}) as Record<string, unknown>;
+  const token = metadata.token_paiement ? String(metadata.token_paiement) : null;
+  if (!token || !metadata.facture_id) return;
+  const resolved = await deps.paymentWriter.resolvePaiement(token);
+  if (!resolved) return;
+  await deps.paymentWriter.completeCheckout({
+    artisanId: resolved.artisanId,
+    paiementId: resolved.paiementId,
+    factureId: resolved.factureId,
+    stripePaymentIntentId: session.payment_intent ? String(session.payment_intent) : "",
+  });
+  deps.log?.info({ event: "connect_checkout_completed", artisanId: resolved.artisanId, factureId: resolved.factureId }, `Paiement portail Connect complété (artisan ${resolved.artisanId})`);
+  await deps.genererEcrituresFacture?.(resolved.artisanId, resolved.factureId).catch((err: unknown) => {
+    deps.log?.error({ event: "connect_checkout_ecritures_error", factureId: resolved.factureId, error: err instanceof Error ? err.message : String(err) }, "Erreur genererEcritures après paiement Connect (best-effort compta)");
+  });
+}
+
+async function handleConnectPaymentFailed(
+  deps: ConnectWebhookDeps & { paymentWriter: WebhookPaymentWriter },
+  pi: Record<string, unknown>,
+): Promise<void> {
+  const metadata = (pi.metadata ?? {}) as Record<string, unknown>;
+  const token = metadata.token_paiement ? String(metadata.token_paiement) : null;
+  if (!token) return;
+  const resolved = await deps.paymentWriter.resolvePaiement(token);
+  if (!resolved) return;
+  await deps.paymentWriter.failPaiement({ artisanId: resolved.artisanId, paiementId: resolved.paiementId });
+  deps.log?.warn({ event: "connect_payment_failed", artisanId: resolved.artisanId, paiementId: resolved.paiementId }, `Paiement Stripe Connect échoué (artisan ${resolved.artisanId})`);
 }

@@ -14,7 +14,7 @@ export interface WebhookPaymentWriter {
   /** Résout le paiement par son token (sous public-token RLS), ou null. */
   resolvePaiement(token: string): Promise<PaiementResolu | null>;
   /** Checkout payé (sous le tenant résolu) : paiement→complete + facture→payée + notification artisan. */
-  completeCheckout(input: { artisanId: number; paiementId: number; factureId: number; stripePaymentIntentId: string }): Promise<void>;
+  completeCheckout(input: { artisanId: number; paiementId: number; factureId: number; stripePaymentIntentId: string; stripeChargeId?: string | null }): Promise<void>;
   /** Paiement échoué (sous le tenant résolu) : paiement→echoue. */
   failPaiement(input: { artisanId: number; paiementId: number }): Promise<void>;
 }

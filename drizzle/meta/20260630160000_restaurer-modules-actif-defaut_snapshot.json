@@ -1,6 +1,6 @@
 {
-  "id": "8ae1cc2ff842c9a8144a1acd5601d9d8",
-  "prevId": "5537e4f1add34438b91b164c1bc850c1",
+  "id": "20260630160000_restaurer-modules-actif-defaut",
+  "prevId": "8ae1cc2ff842c9a8144a1acd5601d9d8",
   "version": "7",
   "dialect": "postgresql",
   "tables": {},

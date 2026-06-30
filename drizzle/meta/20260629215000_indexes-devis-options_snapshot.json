@@ -1,6 +1,6 @@
 {
   "id": "20260629215000_indexes-devis-options",
-  "prevId": "20260629211450_indexes-core",
+  "prevId": "e57ceb64-b71c-49de-b7a8-46eb594e8435",
   "version": "7",
   "dialect": "postgresql",
   "tables": {

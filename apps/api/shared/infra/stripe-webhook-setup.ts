@@ -15,6 +15,8 @@ const WEBHOOK_EVENTS = [
 const CONNECT_WEBHOOK_EVENTS = [
   "account.updated",
   "account.application.deauthorized",
+  "checkout.session.completed",
+  "payment_intent.payment_failed",
 ] as const;
 
 type StripeWebhookEndpoints = {

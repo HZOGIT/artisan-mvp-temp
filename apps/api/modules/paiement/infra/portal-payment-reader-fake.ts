@@ -22,6 +22,7 @@ export class FakePortalPaymentReader implements PortalPaymentReader {
   private sessionsEnAttente = new Map<string, { url: string | null; sessionId: string | null; createdAt: Date }>();
   /** Par défaut true pour ne pas casser les tests existants (Connect non concerné). */
   private artisanChargesEnabled = new Map<number, boolean>();
+  private connectAccountIds = new Map<number, string>();
   /** Quand vrai, le premier appel à getSessionEnAttente retourne null (simule la race TOCTOU : session pas encore en DB). */
   skipFirstSessionLookup = false;
   private firstSessionLookupDone = false;
@@ -37,6 +38,9 @@ export class FakePortalPaymentReader implements PortalPaymentReader {
   }
   seedArtisanChargesEnabled(artisanId: number, enabled: boolean): void {
     this.artisanChargesEnabled.set(artisanId, enabled);
+  }
+  seedArtisanConnectAccountId(artisanId: number, accountId: string): void {
+    this.connectAccountIds.set(artisanId, accountId);
   }
   seedSessionEnAttente(artisanId: number, factureId: number, session: { url: string | null; sessionId?: string | null; createdAt?: Date }): void {
     this.sessionsEnAttente.set(`${artisanId}:${factureId}`, { url: session.url, sessionId: session.sessionId ?? null, createdAt: session.createdAt ?? new Date() });
@@ -73,6 +77,9 @@ export class FakePortalPaymentReader implements PortalPaymentReader {
   async getArtisanChargesEnabled(ctx: TenantContext): Promise<boolean> {
     return this.artisanChargesEnabled.get(ctx.artisanId) ?? true;
   }
+  async getArtisanConnectAccountId(ctx: TenantContext): Promise<string | null> {
+    return this.connectAccountIds.get(ctx.artisanId) ?? "acct_fake_test";
+  }
   async getSessionEnAttente(ctx: TenantContext, factureId: number, now: Date): Promise<{ url: string | null; sessionId: string | null } | null> {
     if (this.skipFirstSessionLookup && !this.firstSessionLookupDone) {
       this.firstSessionLookupDone = true;
@@ -87,17 +94,17 @@ export class FakePortalPaymentReader implements PortalPaymentReader {
 
 /** Writer paiement portail fake : collecte les paiements créés (assertions). */
 export class FakePortalPaymentWriter implements PortalPaymentWriter {
-  public created: Array<{ artisanId: number; factureId: number; stripeSessionId: string; tokenPaiement: string }> = [];
+  public created: Array<{ artisanId: number; factureId: number; stripeSessionId: string; tokenPaiement: string; stripeConnectAccountId?: string | null }> = [];
   /** Simule la violation UNIQUE PG (race TOCTOU) au premier appel si vrai. */
   public forceConflictOnce = false;
   async createPaiement(
     ctx: TenantContext,
-    input: { factureId: number; stripeSessionId: string; montant: string; lienPaiement: string | null; tokenPaiement: string },
+    input: { factureId: number; stripeSessionId: string; montant: string; lienPaiement: string | null; tokenPaiement: string; stripeConnectAccountId?: string | null },
   ): Promise<void> {
     if (this.forceConflictOnce) {
       this.forceConflictOnce = false;
       throw new ConflictError("Session paiement déjà en cours pour cette facture");
     }
-    this.created.push({ artisanId: ctx.artisanId, factureId: input.factureId, stripeSessionId: input.stripeSessionId, tokenPaiement: input.tokenPaiement });
+    this.created.push({ artisanId: ctx.artisanId, factureId: input.factureId, stripeSessionId: input.stripeSessionId, tokenPaiement: input.tokenPaiement, stripeConnectAccountId: input.stripeConnectAccountId });
   }
 }
