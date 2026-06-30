@@ -28,14 +28,6 @@ export const NAV_GROUPS: NavGroup[] = [
     { icon: LayoutDashboard, label: "Tableau de bord", path: "/dashboard" },
     { icon: LineChart, label: "Statistiques", path: "/statistiques" },
   ] },
-  { id: "commercial", title: "Commercial", icon: Briefcase, color: "emerald", items: [
-    { icon: FileText, label: "Devis", path: "/devis" },
-    { icon: FileText, label: "Nouveau devis", path: "/devis/nouveau" },
-    { icon: Layers, label: "Variantes devis", path: "/devis-options" },
-    { icon: Receipt, label: "Factures", path: "/factures" },
-    { icon: ClipboardList, label: "Contrats", path: "/contrats" },
-    { icon: RefreshCw, label: "Relances", path: "/relances" },
-  ] },
   { id: "clients", title: "Clients", icon: Users, color: "orange", items: [
     { icon: Users, label: "Clients", path: "/clients" },
     { icon: Upload, label: "Nouveau Client", path: "/clients/nouveau" },
@@ -44,6 +36,14 @@ export const NAV_GROUPS: NavGroup[] = [
     { icon: Globe, label: "Portail client", path: "/portail-gestion" },
     { icon: MessageCircle, label: "Chat", path: "/chat" },
     { icon: Clock, label: "RDV en ligne", path: "/rdv-en-ligne" },
+  ] },
+  { id: "commercial", title: "Commercial", icon: Briefcase, color: "emerald", items: [
+    { icon: FileText, label: "Devis", path: "/devis" },
+    { icon: FileText, label: "Nouveau devis", path: "/devis/nouveau" },
+    { icon: Layers, label: "Variantes devis", path: "/devis-options" },
+    { icon: Receipt, label: "Factures", path: "/factures" },
+    { icon: ClipboardList, label: "Contrats", path: "/contrats" },
+    { icon: RefreshCw, label: "Relances", path: "/relances" },
   ] },
   { id: "terrain", title: "Terrain", icon: Wrench, color: "rose", items: [
     { icon: Calendar, label: "Interventions", path: "/interventions" },

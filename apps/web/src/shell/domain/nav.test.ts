@@ -8,7 +8,7 @@ const group = (id: string) => NAV_GROUPS.find((g) => g.id === id)!;
 
 describe("shell/nav — domain pur (port fidèle DashboardLayout)", () => {
   it("NAV_GROUPS : 8 groupes, items non vides, paths absolus uniques", () => {
-    expect(NAV_GROUPS.map((g) => g.id)).toEqual(["assistant", "dashboard", "commercial", "clients", "terrain", "gestion", "finance", "parametres"]);
+    expect(NAV_GROUPS.map((g) => g.id)).toEqual(["assistant", "dashboard", "clients", "commercial", "terrain", "gestion", "finance", "parametres"]);
     const paths: string[] = [];
     for (const g of NAV_GROUPS) {
       expect(g.items.length).toBeGreaterThan(0);
