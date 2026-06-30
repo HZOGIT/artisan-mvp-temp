@@ -15,6 +15,8 @@ export interface PortalPaymentReconciliationPollerOptions {
   readonly writer: WebhookPaymentWriter;
   readonly dbUrl: string;
   readonly genererEcritures?: (artisanId: number, factureId: number) => Promise<void>;
+  /** Best-effort email de confirmation paiement au client. Même callback que le webhook Connect. */
+  readonly onEmailConfirmation?: (artisanId: number, factureId: number) => Promise<void>;
 }
 
 export interface OrphanedPayment {
@@ -92,6 +94,14 @@ export const portalPaymentReconciliationPollerPlugin = fp(
                       app.log.error(
                         { event: "portal_payment_ecritures_error", factureId: payment.factureId, artisanId: payment.artisanId, error: err instanceof Error ? err.message : String(err) },
                         "Erreur genererEcritures après réconciliation portail (best-effort compta)",
+                      );
+                    });
+                  }
+                  if (opts.onEmailConfirmation) {
+                    await opts.onEmailConfirmation(payment.artisanId, payment.factureId).catch((err: unknown) => {
+                      app.log.error(
+                        { event: "portal_payment_email_confirmation_error", factureId: payment.factureId, artisanId: payment.artisanId, error: err instanceof Error ? err.message : String(err) },
+                        "Email confirmation paiement portail échoué (best-effort)",
                       );
                     });
                   }

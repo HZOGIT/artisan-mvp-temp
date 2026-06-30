@@ -57,3 +57,26 @@ describe("reconcileOrphanedPayment", () => {
     });
   });
 });
+
+describe("reconcileOrphanedPayment — retourne le bon outcome pour le plugin", () => {
+  it("retourne 'reconciled' uniquement si payé — le plugin doit appeler onEmailConfirmation dans ce cas", async () => {
+    const stripe = new FakeStripePort();
+    stripe.sessionStatuses.set("cs_paid", { paymentStatus: "paid", paymentIntentId: "pi_xyz" });
+    const paidPayment = makePayment({ stripeSessionId: "cs_paid" });
+    const pendingPayment = makePayment();
+
+    const resultPaid = await reconcileOrphanedPayment(paidPayment, stripe, makeWriter());
+    const resultPending = await reconcileOrphanedPayment(pendingPayment, stripe, makeWriter());
+
+    expect(resultPaid).toBe("reconciled");
+    expect(resultPending).toBe("not-paid");
+
+    /* Vérification du contrat plugin : le callback ne doit être déclenché que sur "reconciled" */
+    const onEmail = vi.fn().mockResolvedValue(undefined);
+    if (resultPaid === "reconciled") await onEmail(paidPayment.artisanId, paidPayment.factureId);
+    if (resultPending === "reconciled") await onEmail(pendingPayment.artisanId, pendingPayment.factureId);
+
+    expect(onEmail).toHaveBeenCalledTimes(1);
+    expect(onEmail).toHaveBeenCalledWith(10, 30);
+  });
+});
