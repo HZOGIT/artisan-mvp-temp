@@ -28,6 +28,8 @@ export interface AuthDeps {
   readonly resetRateLimiter?: RateLimiterPort;
   /** Base URL de confiance pour le lien de reset (JAMAIS l'Origin) — parité legacy APP_URL. */
   readonly appUrl?: string;
+  /** URL publique du backend — utilisée pour les liens /api/… (ex. désinscription email). Distinct de appUrl (frontend). */
+  readonly backendPublicUrl?: string;
   /** Génère le jeton de reset brut (défaut : 32 octets hex). Injectable (déterminisme test). */
   readonly genResetToken?: () => string;
   /** Vérification opt-out avant envoi email lifecycle (welcome). Optionnel : skip garde si absent. */
@@ -96,8 +98,9 @@ export async function signup(deps: AuthDeps, input: { email: string; password: s
   if (deps.email) {
     try {
       const appUrl = deps.appUrl ?? "https://www.operioz.com";
+      const backendUrl = deps.backendPublicUrl ?? appUrl;
       const unsubToken = deps.unsubscribeSecret ? signUnsubscribeToken(input.email, deps.unsubscribeSecret) : null;
-      const unsubscribeUrl = unsubToken ? `${appUrl}/api/emails/unsubscribe?token=${unsubToken}` : `${appUrl}/api/emails/unsubscribe`;
+      const unsubscribeUrl = unsubToken ? `${backendUrl}/api/emails/unsubscribe?token=${unsubToken}` : `${backendUrl}/api/emails/unsubscribe`;
       const message = { to: input.email, subject: "Bienvenue sur Operioz ! 🎉", body: welcomeEmail(input.name, appUrl), unsubscribeUrl };
       if (deps.optoutRepo) {
         await sendLifecycleEmail(deps.email, deps.optoutRepo, message);

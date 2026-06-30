@@ -15,6 +15,8 @@ export interface ClientsModuleDeps {
   readonly optoutRepo?: IEmailOptoutRepository;
   readonly db?: DbClient;
   readonly appUrl?: string;
+  /** URL publique du backend — utilisée pour les liens /api/… (ex. désinscription email). Distinct de appUrl (frontend). */
+  readonly backendPublicUrl?: string;
   readonly unsubscribeSecret?: string;
 }
 

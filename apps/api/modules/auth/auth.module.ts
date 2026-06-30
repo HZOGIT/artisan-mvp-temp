@@ -20,6 +20,8 @@ export interface AuthModuleDeps {
   readonly signupRateLimiter?: RateLimiterPort;
   readonly resetRateLimiter?: RateLimiterPort;
   readonly appUrl?: string;
+  /** URL publique du backend — utilisée pour les liens /api/… (ex. désinscription email). Distinct de appUrl (frontend). */
+  readonly backendPublicUrl?: string;
   readonly genResetToken?: () => string;
   readonly optoutRepo?: IEmailOptoutRepository;
   readonly unsubscribeSecret?: string;
@@ -41,6 +43,7 @@ export function createAuthModule(deps: AuthModuleDeps): AuthModule {
     signupRateLimiter: deps.signupRateLimiter,
     resetRateLimiter: deps.resetRateLimiter,
     appUrl: deps.appUrl,
+    backendPublicUrl: deps.backendPublicUrl,
     genResetToken: deps.genResetToken,
     optoutRepo: deps.optoutRepo,
     unsubscribeSecret: deps.unsubscribeSecret,

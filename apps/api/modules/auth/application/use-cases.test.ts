@@ -87,6 +87,20 @@ describe("auth use-cases", () => {
     expect(repo.bootstrapped).toEqual([user.id]);
   });
 
+  it("OPE-930 — signup : unsubscribeUrl utilise backendPublicUrl (pas appUrl front)", async () => {
+    const repo = new FakeAuthRepository();
+    const email = new FakeEmailPort();
+    const deps: AuthDeps = {
+      repo, hasher: new FakePasswordHasher(), jwtSecret: SECRET, email,
+      appUrl: "https://app.test",
+      backendPublicUrl: "https://api.test",
+      unsubscribeSecret: "s",
+    };
+    await signup(deps, { email: "back@t.fr", password: "pass1234" });
+    expect(email.sent[0].unsubscribeUrl).toContain("https://api.test/api/emails/unsubscribe");
+    expect(email.sent[0].unsubscribeUrl).not.toContain("https://app.test");
+  });
+
   it("OPE-723 — signup : user a un artisanId après inscription (invariant atomique)", async () => {
     const repo = new FakeAuthRepository();
     const deps: AuthDeps = { repo, hasher: new FakePasswordHasher(), jwtSecret: SECRET };
