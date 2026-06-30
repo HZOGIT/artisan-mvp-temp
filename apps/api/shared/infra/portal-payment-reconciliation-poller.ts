@@ -71,9 +71,8 @@ export const portalPaymentReconciliationPollerPlugin = fp(
             const cutoff = new Date(Date.now() - MIN_AGE_SECONDS * 1000);
             const { rows } = await client.query<OrphanedPayment>(
               `SELECT ps.id, ps."artisanId", ps."factureId", ps."stripeSessionId", ps."tokenPaiement",
-                      a."stripe_connect_account_id" AS "stripeConnectAccountId"
+                      ps."stripe_connect_account_id" AS "stripeConnectAccountId"
                FROM paiements_stripe ps
-               LEFT JOIN artisans a ON a.id = ps."artisanId"
                WHERE ps.statut = 'en_attente' AND ps."createdAt" < $1`,
               [cutoff],
             );

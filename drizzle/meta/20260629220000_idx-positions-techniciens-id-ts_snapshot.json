@@ -1,6 +1,6 @@
 {
   "id": "20260629220000_idx-positions-techniciens-id-ts",
-  "prevId": "20260629211450_indexes-core",
+  "prevId": "81b12bd8-adab-4bbb-b087-f3f8ac98d850",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2141,7 +2141,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -2829,7 +2829,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -3070,7 +3070,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -3278,7 +3278,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -8707,7 +8707,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixUnitaireHT": {
           "name": "prixUnitaireHT",
@@ -10492,7 +10492,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": true,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "quantiteTheorique": {
           "name": "quantiteTheorique",
@@ -10579,7 +10579,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixUnitaire": {
           "name": "prixUnitaire",
@@ -11532,7 +11532,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixAchat": {
           "name": "prixAchat",
@@ -11621,7 +11621,7 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'unit\u00e9'"
+          "default": "'unité'"
         },
         "prixEstime": {
           "name": "prixEstime",

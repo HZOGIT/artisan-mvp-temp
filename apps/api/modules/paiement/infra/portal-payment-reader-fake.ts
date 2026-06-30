@@ -94,17 +94,17 @@ export class FakePortalPaymentReader implements PortalPaymentReader {
 
 /** Writer paiement portail fake : collecte les paiements créés (assertions). */
 export class FakePortalPaymentWriter implements PortalPaymentWriter {
-  public created: Array<{ artisanId: number; factureId: number; stripeSessionId: string; tokenPaiement: string }> = [];
+  public created: Array<{ artisanId: number; factureId: number; stripeSessionId: string; tokenPaiement: string; stripeConnectAccountId?: string | null }> = [];
   /** Simule la violation UNIQUE PG (race TOCTOU) au premier appel si vrai. */
   public forceConflictOnce = false;
   async createPaiement(
     ctx: TenantContext,
-    input: { factureId: number; stripeSessionId: string; montant: string; lienPaiement: string | null; tokenPaiement: string },
+    input: { factureId: number; stripeSessionId: string; montant: string; lienPaiement: string | null; tokenPaiement: string; stripeConnectAccountId?: string | null },
   ): Promise<void> {
     if (this.forceConflictOnce) {
       this.forceConflictOnce = false;
       throw new ConflictError("Session paiement déjà en cours pour cette facture");
     }
-    this.created.push({ artisanId: ctx.artisanId, factureId: input.factureId, stripeSessionId: input.stripeSessionId, tokenPaiement: input.tokenPaiement });
+    this.created.push({ artisanId: ctx.artisanId, factureId: input.factureId, stripeSessionId: input.stripeSessionId, tokenPaiement: input.tokenPaiement, stripeConnectAccountId: input.stripeConnectAccountId });
   }
 }

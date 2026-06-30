@@ -128,6 +128,7 @@ export async function createInvoiceCheckout(
       montant: facture.totalTTC,
       lienPaiement: result.url,
       tokenPaiement,
+      stripeConnectAccountId,
     });
   } catch (err) {
     if (!(err instanceof ConflictError)) throw err;

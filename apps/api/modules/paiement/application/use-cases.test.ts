@@ -140,6 +140,15 @@ describe("createInvoiceCheckout (public par token portail)", () => {
     expect(stripe.invoiceCheckouts[0].stripeConnectAccountId).toBe("acct_live_test123");
   });
 
+  it("OPE-922 — snapshot compte Connect dans la ligne paiement (createPaiement reçoit stripeConnectAccountId)", async () => {
+    const { reader, writer, deps } = build();
+    reader.seedArtisanConnectAccountId(7, "acct_snapshot_test");
+    seedFacturePayable(reader);
+    await createInvoiceCheckout(deps, { factureId: 42, token: "tok", origin: "https://o.test" });
+    expect(writer.created).toHaveLength(1);
+    expect(writer.created[0].stripeConnectAccountId).toBe("acct_snapshot_test");
+  });
+
   it("OPE-904 — garde explicite : stripeConnectAccountId vide → bad-request (charge plateforme IMPOSSIBLE)", async () => {
     const { reader, deps } = build();
     reader.seedArtisanConnectAccountId(7, "");

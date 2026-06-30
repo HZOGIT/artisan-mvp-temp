@@ -965,7 +965,12 @@
         "uidx_artisans_stripe_connect_account_id": {
           "name": "uidx_artisans_stripe_connect_account_id",
           "columns": [
-            "stripe_connect_account_id"
+            {
+              "expression": "stripe_connect_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
           "isUnique": true,
           "concurrently": false,

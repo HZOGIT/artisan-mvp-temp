@@ -24,7 +24,7 @@ export class PortalPaymentWriterDrizzle implements PortalPaymentWriter {
 
   async createPaiement(
     ctx: TenantContext,
-    input: { factureId: number; stripeSessionId: string; montant: string; lienPaiement: string | null; tokenPaiement: string },
+    input: { factureId: number; stripeSessionId: string; montant: string; lienPaiement: string | null; tokenPaiement: string; stripeConnectAccountId?: string | null },
   ): Promise<void> {
     try {
       await withTenant(this.db, ctx, async (tx) => {
@@ -36,6 +36,7 @@ export class PortalPaymentWriterDrizzle implements PortalPaymentWriter {
           statut: "en_attente",
           lienPaiement: input.lienPaiement,
           tokenPaiement: input.tokenPaiement,
+          stripeConnectAccountId: input.stripeConnectAccountId ?? null,
         });
       });
     } catch (err) {

@@ -1,6 +1,6 @@
 {
   "id": "20260630100000_paiements-stripe-unique-en-attente",
-  "prevId": "20260629235900_add_ecriturenum_persiste",
+  "prevId": "8b75c13d-647a-4287-9948-0c9d4e7e9c26",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
