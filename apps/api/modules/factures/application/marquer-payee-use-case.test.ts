@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { FakeFactureRepository } from "../infra/facture-repository-fake";
-import { creerFacture, ajouterLigneFacture, changerStatutFacture, marquerFacturePayee } from "./write-use-cases";
+import { FakeNotificationRepository } from "../../notifications/infra/notification-repository-fake";
+import { creerFacture, ajouterLigneFacture, changerStatutFacture, marquerFacturePayee, enregistrerPaiementFacture } from "./write-use-cases";
 import type { ComptaPort } from "./compta-port";
 import { ConflictError, NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
@@ -99,5 +100,55 @@ describe("factures — marquerFacturePayee (markAsPaid + FEC)", () => {
     await expect(
       marquerFacturePayee(repo, A, f.id, { montantPaye: "0.00", datePaiement: "2026-03-10" }),
     ).rejects.toBeInstanceOf(ConflictError);
+  });
+});
+
+describe("factures — archivage notification rappel à la mise en payée (OPE-795)", () => {
+  it("marquerFacturePayee : notification rappel archivée après paiement", async () => {
+    const repo = new FakeFactureRepository();
+    repo.registerClient(A.artisanId, 100);
+    const id = await factureEmise(repo);
+    const notifRepo = new FakeNotificationRepository();
+    notifRepo.seed({ artisanId: A.artisanId, titre: "Rappel retard", type: "rappel", lien: `/factures/${id}` });
+    await marquerFacturePayee(repo, A, id, { montantPaye: "120.00", datePaiement: "2026-03-10" }, undefined, notifRepo);
+    const actives = await notifRepo.list(A, { includeArchived: false });
+    expect(actives.find((n) => n.lien === `/factures/${id}` && n.type === "rappel")).toBeUndefined();
+  });
+
+  it("enregistrerPaiementFacture soldée : notification rappel archivée", async () => {
+    const repo = new FakeFactureRepository();
+    repo.registerClient(A.artisanId, 100);
+    const f = await creerFacture(repo, A, { clientId: 100 });
+    await ajouterLigneFacture(repo, A, f.id, { designation: "Pose", quantite: "1", prixUnitaireHT: "100.00", tauxTVA: "20" });
+    await changerStatutFacture(repo, A, f.id, "envoyee", undefined, { getArtisan: async () => ({ id: 1, nomEntreprise: null, email: null, siret: "73282932000074" }) });
+    const notifRepo = new FakeNotificationRepository();
+    notifRepo.seed({ artisanId: A.artisanId, titre: "Rappel retard", type: "rappel", lien: `/factures/${f.id}` });
+    await enregistrerPaiementFacture(repo, A, f.id, { montant: "120.00" }, undefined, notifRepo);
+    const actives = await notifRepo.list(A, { includeArchived: false });
+    expect(actives.find((n) => n.lien === `/factures/${f.id}` && n.type === "rappel")).toBeUndefined();
+  });
+
+  it("paiement partiel (non soldé) : notification rappel NON archivée", async () => {
+    const repo = new FakeFactureRepository();
+    repo.registerClient(A.artisanId, 100);
+    const f = await creerFacture(repo, A, { clientId: 100 });
+    await ajouterLigneFacture(repo, A, f.id, { designation: "Pose", quantite: "1", prixUnitaireHT: "100.00", tauxTVA: "20" });
+    await changerStatutFacture(repo, A, f.id, "envoyee", undefined, { getArtisan: async () => ({ id: 1, nomEntreprise: null, email: null, siret: "73282932000074" }) });
+    const notifRepo = new FakeNotificationRepository();
+    notifRepo.seed({ artisanId: A.artisanId, titre: "Rappel retard", type: "rappel", lien: `/factures/${f.id}` });
+    await enregistrerPaiementFacture(repo, A, f.id, { montant: "50.00" }, undefined, notifRepo);
+    const actives = await notifRepo.list(A, { includeArchived: false });
+    expect(actives.find((n) => n.lien === `/factures/${f.id}` && n.type === "rappel")).toBeDefined();
+  });
+
+  it("notification d'un autre tenant non archivée (isolation)", async () => {
+    const repo = new FakeFactureRepository();
+    repo.registerClient(A.artisanId, 100);
+    const id = await factureEmise(repo);
+    const notifRepo = new FakeNotificationRepository();
+    notifRepo.seed({ artisanId: B.artisanId, titre: "Rappel autre", type: "rappel", lien: `/factures/${id}` });
+    await marquerFacturePayee(repo, A, id, { montantPaye: "120.00", datePaiement: "2026-03-10" }, undefined, notifRepo);
+    const actives = await notifRepo.list(B, { includeArchived: false });
+    expect(actives.find((n) => n.lien === `/factures/${id}`)).toBeDefined();
   });
 });

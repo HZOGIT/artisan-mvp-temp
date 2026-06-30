@@ -136,6 +136,15 @@ export class NotificationRepositoryDrizzle implements INotificationRepository {
     });
   }
 
+  archiveByLien(ctx: TenantContext, lien: string): Promise<void> {
+    return withTenant(this.db, ctx, async (tx) => {
+      await tx
+        .update(notifications)
+        .set({ archived: true })
+        .where(and(eq(notifications.artisanId, ctx.artisanId), eq(notifications.lien, lien), eq(notifications.archived, false)));
+    });
+  }
+
   existeNotificationActive(ctx: TenantContext, lien: string): Promise<boolean> {
     return withTenant(this.db, ctx, async (tx) => {
       const [row] = await tx
