@@ -42,6 +42,14 @@ export interface CreateAccountLinkParams {
   readonly returnUrl: string;
 }
 
+/** Données minimales d'un compte Connect Stripe (accounts.retrieve). */
+export interface ConnectAccountData {
+  readonly charges_enabled: boolean;
+  readonly payouts_enabled: boolean;
+  readonly details_submitted: boolean;
+  readonly requirements: Record<string, unknown> | null;
+}
+
 export interface StripePort {
   constructEvent(rawBody: Buffer, signature: string, secret: string): Promise<StripeWebhookEvent>;
   createCustomer(params: CreateCustomerParams): Promise<{ id: string }>;
@@ -49,4 +57,5 @@ export interface StripePort {
   retrieveCheckoutSession(sessionId: string): Promise<CheckoutSessionStatus | null>;
   createConnectAccount(params: CreateConnectAccountParams): Promise<{ id: string }>;
   createAccountLink(params: CreateAccountLinkParams): Promise<{ url: string }>;
+  retrieveConnectAccount(accountId: string): Promise<ConnectAccountData>;
 }

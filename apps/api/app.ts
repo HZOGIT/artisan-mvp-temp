@@ -193,6 +193,7 @@ import { createOutboxBloqueJob, createEventManquantNotificationJob } from "./mod
 import { createEmailsLogReconcilerJob } from "./modules/emails/application/emails-log-reconciler";
 import { createStocksQuantiteReconcilerJob } from "./modules/stocks/application/stocks-reconciler";
 import { createComptaReconcilerJob } from "./modules/ecritures/application/compta-reconciler";
+import { createConnectReconcilerJob } from "./modules/connect/application/connect-reconciler";
 import { contratsVisitesCronPlugin } from "./shared/infra/contrats-visites-cron";
 import { rappelRdvClientCronPlugin } from "./shared/infra/rappel-rdv-client-cron";
 import { analysePhotosCronPlugin } from "./shared/infra/analyse-photos-cron";
@@ -1583,6 +1584,12 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       /** ponytail: dry-run par défaut — compta = légal, observer avant d'armer */
       registry.register(
         createComptaReconcilerJob(getOwnerDbHandle().db, {
+          dryRun: process.env.HEALING_DRYRUN !== "false",
+        }),
+      );
+      /** ponytail: dry-run par défaut — filet webhook Connect, armer après validation e2e */
+      registry.register(
+        createConnectReconcilerJob(getOwnerDbHandle().db, deps.stripePort ?? new StripeAdapter(), {
           dryRun: process.env.HEALING_DRYRUN !== "false",
         }),
       );
