@@ -12,11 +12,12 @@ const EVENTS = [
   "payment_intent.payment_failed",
 ];
 
-const makeSDK = (endpoints: Array<{ id: string; url: string; status: string; enabled_events: string[]; secret?: string }> = []): StripeWebhookSDK => ({
+const makeSDK = (endpoints: Array<{ id: string; url: string; status: string; enabled_events: string[]; connect?: boolean; secret?: string }> = []): StripeWebhookSDK => ({
   webhookEndpoints: {
     list: vi.fn().mockResolvedValue({ data: endpoints }),
     create: vi.fn().mockResolvedValue({ id: "we_new", url: "https://example.com/api/stripe/webhook", secret: "whsec_newSecret" }),
     update: vi.fn().mockResolvedValue({ id: "we_existing" }),
+    del: vi.fn().mockResolvedValue({ id: "we_existing" }),
   },
 });
 
@@ -93,11 +94,12 @@ describe("ensureStripeWebhookEndpoint", () => {
 const CONNECT_EVENTS = ["account.updated", "account.application.deauthorized", "checkout.session.completed", "payment_intent.payment_failed"];
 const CONNECT_URL = "https://example.com/api/stripe/connect-webhook";
 
-const makeConnectSDK = (endpoints: Array<{ id: string; url: string; status: string; enabled_events: string[]; secret?: string }> = []): StripeWebhookSDK => ({
+const makeConnectSDK = (endpoints: Array<{ id: string; url: string; status: string; enabled_events: string[]; connect?: boolean; secret?: string }> = []): StripeWebhookSDK => ({
   webhookEndpoints: {
     list: vi.fn().mockResolvedValue({ data: endpoints }),
     create: vi.fn().mockResolvedValue({ id: "we_connect_new", url: CONNECT_URL, secret: "whsec_connectSecret" }),
     update: vi.fn().mockResolvedValue({ id: "we_connect_existing" }),
+    del: vi.fn().mockResolvedValue({ id: "we_connect_existing" }),
   },
 });
 
@@ -119,17 +121,45 @@ describe("ensureStripeConnectWebhookEndpoint", () => {
     expect(result).toBe("whsec_connectSecret");
   });
 
-  it("retourne null si endpoint Connect existant avec tous les events (idempotent)", async () => {
-    const sdk = makeConnectSDK([{ id: "we_connect_existing", url: CONNECT_URL, status: "enabled", enabled_events: CONNECT_EVENTS }]);
+  it("retourne null si endpoint Connect existant avec connect:true et tous les events (idempotent)", async () => {
+    const sdk = makeConnectSDK([{ id: "we_connect_existing", url: CONNECT_URL, status: "enabled", enabled_events: CONNECT_EVENTS, connect: true }]);
     const result = await ensureStripeConnectWebhookEndpoint("sk_test_key", CONNECT_URL, undefined, () => sdk);
+    expect(sdk.webhookEndpoints.del).not.toHaveBeenCalled();
     expect(sdk.webhookEndpoints.create).not.toHaveBeenCalled();
     expect(result).toBeNull();
   });
 
-  it("met à jour les events manquants sur l'endpoint Connect existant", async () => {
-    const sdk = makeConnectSDK([{ id: "we_connect_existing", url: CONNECT_URL, status: "enabled", enabled_events: ["account.updated"] }]);
+  it("met à jour les events manquants sur l'endpoint Connect existant avec connect:true", async () => {
+    const sdk = makeConnectSDK([{ id: "we_connect_existing", url: CONNECT_URL, status: "enabled", enabled_events: ["account.updated"], connect: true }]);
     const result = await ensureStripeConnectWebhookEndpoint("sk_test_key", CONNECT_URL, undefined, () => sdk);
+    expect(sdk.webhookEndpoints.del).not.toHaveBeenCalled();
     expect(sdk.webhookEndpoints.update).toHaveBeenCalledWith("we_connect_existing", { enabled_events: CONNECT_EVENTS });
     expect(result).toBeNull();
+  });
+
+  it("supprime et recrée avec connect:true si endpoint Connect existant a connect:false", async () => {
+    const sdk = makeConnectSDK([{ id: "we_stale", url: CONNECT_URL, status: "enabled", enabled_events: CONNECT_EVENTS, connect: false }]);
+    const result = await ensureStripeConnectWebhookEndpoint("sk_test_key", CONNECT_URL, undefined, () => sdk);
+    expect(sdk.webhookEndpoints.del).toHaveBeenCalledWith("we_stale");
+    expect(sdk.webhookEndpoints.create).toHaveBeenCalledWith({
+      url: CONNECT_URL,
+      enabled_events: CONNECT_EVENTS,
+      description: "Operioz Connect — auto-setup",
+      connect: true,
+    });
+    expect(result).toBe("whsec_connectSecret");
+  });
+
+  it("supprime et recrée avec connect:true si endpoint Connect existant n'a pas de flag connect", async () => {
+    const sdk = makeConnectSDK([{ id: "we_legacy", url: CONNECT_URL, status: "enabled", enabled_events: CONNECT_EVENTS }]);
+    const result = await ensureStripeConnectWebhookEndpoint("sk_test_key", CONNECT_URL, undefined, () => sdk);
+    expect(sdk.webhookEndpoints.del).toHaveBeenCalledWith("we_legacy");
+    expect(sdk.webhookEndpoints.create).toHaveBeenCalledWith({
+      url: CONNECT_URL,
+      enabled_events: CONNECT_EVENTS,
+      description: "Operioz Connect — auto-setup",
+      connect: true,
+    });
+    expect(result).toBe("whsec_connectSecret");
   });
 });
