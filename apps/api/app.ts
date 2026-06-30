@@ -420,6 +420,8 @@ export interface AppDeps extends ContextDeps {
   readonly contratRepo?: IContratRepository;
   /** Pool DB pour les transactions outbox du module contrats-maintenance (défaut : getDbHandle().db). */
   readonly contratsMaintenanceDb?: DbClient;
+  /** Pool DB pour les transactions outbox events du module signature (défaut : getDbHandle().db). */
+  readonly signaturePublicDb?: DbClient;
   readonly demandeContactRepo?: IDemandeContactRepository;
   /** Pool DB pour les transactions outbox events du module demandes-contact (défaut : getDbHandle().db). */
   readonly demandeContactDb?: DbClient;
@@ -980,7 +982,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(),
       notifications: signatureNotifications,
       email: signatureEmail,
-      eventBus,
+      db: deps.signaturePublicDb ?? signatureDb,
     },
   });
   /*

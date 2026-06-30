@@ -109,4 +109,8 @@ export class SignaturePublicWriterDrizzle implements SignaturePublicWriter {
         .where(and(eq(devisOptions.id, optionId), eq(devisOptions.devisId, devisId)));
     });
   }
+
+  withDb(db: DbClient): SignaturePublicWriterDrizzle {
+    return new SignaturePublicWriterDrizzle(db);
+  }
 }
