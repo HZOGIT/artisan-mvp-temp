@@ -31,6 +31,14 @@ export interface ArtisanProfile {
   readonly assuranceDecennaleNom: string | null;
   readonly assuranceDecennalePolice: string | null;
   readonly assuranceDecennaleGarantie: string | null;
+  readonly stripeConnectAccountId: string | null;
+  readonly stripeConnectChargesEnabled: boolean;
+  readonly stripeConnectPayoutsEnabled: boolean;
+  readonly stripeConnectDetailsSubmitted: boolean;
+  readonly stripeConnectRequirements: unknown | null;
+  readonly stripeConnectStatus: string;
+  readonly stripeConnectConnectedAt: Date | null;
+  readonly stripeConnectUpdatedAt: Date | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }

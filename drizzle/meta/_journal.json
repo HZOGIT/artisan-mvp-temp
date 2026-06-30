@@ -316,6 +316,13 @@
       "when": 1782849600000,
       "tag": "20260630200000_billing-invoices-mentions-legales-fr",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1782853200000,
+      "tag": "20260630210000_artisans-stripe-connect",
+      "breakpoints": true
     }
   ]
 }
