@@ -96,13 +96,14 @@ describe("makeDepensesRecurrentesJob — idempotence scheduler", () => {
   it("premier tick : génère la copie et retourne done", async () => {
     const jobRunRepo = new FakeJobRunRepo();
     const repo = makeRepo();
+    const now = new Date("2026-06-29T08:00:00Z");
 
     const job = makeDepensesRecurrentesJob({
       repo,
       getArtisanIds: async () => [42],
+      clock: () => now,
     });
 
-    const now = new Date("2026-06-29T08:00:00Z");
     const result = await runJob(jobRunRepo, job, now);
 
     expect(result).toBe("done");
@@ -117,13 +118,14 @@ describe("makeDepensesRecurrentesJob — idempotence scheduler", () => {
   it("second tick même jour : skipped (scheduler claim)", async () => {
     const jobRunRepo = new FakeJobRunRepo();
     const repo = makeRepo();
+    const now = new Date("2026-06-29T08:00:00Z");
 
     const job = makeDepensesRecurrentesJob({
       repo,
       getArtisanIds: async () => [42],
+      clock: () => now,
     });
 
-    const now = new Date("2026-06-29T08:00:00Z");
     await runJob(jobRunRepo, job, now);
     const second = await runJob(jobRunRepo, job, now);
 

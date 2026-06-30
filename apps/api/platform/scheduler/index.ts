@@ -6,3 +6,5 @@ export { JobRegistry } from "./job-registry";
 export { JobRunRepositoryDrizzle } from "./job-run-repository-drizzle";
 export { schedulerPlugin } from "./scheduler-plugin";
 export type { SchedulerPluginOptions } from "./scheduler-plugin";
+export { runReconciler } from "./reconciler";
+export type { Anomalie, HealResult, ReconcilerOpts, ReconcilerResult } from "./reconciler";
