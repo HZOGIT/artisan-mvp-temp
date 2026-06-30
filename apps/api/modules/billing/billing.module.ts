@@ -1,10 +1,14 @@
 import type { IBillingRepository } from "./application/billing-repository";
 import type { BillingDeps } from "./application/billing-use-cases";
+import type { PdfPort } from "../../shared/ports/pdf";
+import type { StoragePort } from "../../shared/ports/storage";
 import { createBillingRouter } from "./interface/trpc/billing.router";
 
 export interface BillingModuleDeps {
   readonly repo: IBillingRepository;
   readonly deps: BillingDeps;
+  readonly pdf?: PdfPort;
+  readonly storage?: StoragePort;
 }
 
 export interface BillingModule {
@@ -12,5 +16,10 @@ export interface BillingModule {
 }
 
 export function createBillingModule(moduleDeps: BillingModuleDeps): BillingModule {
-  return { router: createBillingRouter(moduleDeps.deps) };
+  const deps: BillingDeps = {
+    ...moduleDeps.deps,
+    pdf: moduleDeps.pdf,
+    storage: moduleDeps.storage,
+  };
+  return { router: createBillingRouter(deps) };
 }

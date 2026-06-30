@@ -1643,3 +1643,157 @@ export function generateAttestationTvaPDF(data: AttestationTvaInput): Buffer {
 
   return Buffer.from(doc.output("arraybuffer"));
 }
+
+/*
+ * ============================================================================
+ * FACTURE D'ABONNEMENT OPERIOZ → ARTISAN (CGI art. 289)
+ * ============================================================================
+ */
+
+export interface FactureAbonnementData {
+  number: string;
+  date: Date;
+  periodStart: Date;
+  periodEnd: Date;
+  planDescription: string;
+  subtotalCents: number;
+  taxCents: number;
+  totalCents: number;
+  currency: string;
+  sellerName: string;
+  sellerAddress: string;
+  sellerSiret: string;
+  sellerTvaIntracom: string;
+  buyerName: string;
+  buyerAddress: string;
+  buyerSiret: string;
+}
+
+function fmtCents(cents: number, currency = "eur"): string {
+  return new Intl.NumberFormat("fr-FR", { style: "currency", currency: currency.toUpperCase() }).format(cents / 100);
+}
+
+export function generateFactureAbonnementPDF(data: FactureAbonnementData): Buffer {
+  const doc = new jsPDF();
+  registerFonts(doc);
+
+  const primary = COLOR_FACTURE;
+
+  doc.setFillColor(...primary);
+  doc.rect(0, 0, PAGE_W, HEADER_H, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("Roboto", "bold");
+  doc.setFontSize(17);
+  doc.text(data.sellerName, MARGIN, 18);
+  doc.setFont("Roboto", "normal");
+  doc.setFontSize(11);
+  doc.setTextColor(...BAND_SUBTEXT);
+  doc.text(`FACTURE  ·  N° ${data.number}`, MARGIN, 27);
+  doc.setFontSize(9);
+  doc.text(`Date : ${data.date.toLocaleDateString("fr-FR")}`, HEADER_RIGHT_X, 18, { align: "right" });
+  doc.text(`Période : ${data.periodStart.toLocaleDateString("fr-FR")} → ${data.periodEnd.toLocaleDateString("fr-FR")}`, HEADER_RIGHT_X, 25, { align: "right" });
+
+  let y = HEADER_H + 10;
+
+  doc.setFont("Roboto", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(...TEXT_DARK);
+  doc.text("VENDEUR", MARGIN, y);
+  doc.text("CLIENT", PAGE_W / 2 + 5, y);
+
+  y += 5;
+  doc.setFont("Roboto", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...TEXT_BODY);
+
+  const sellerLines = [
+    data.sellerName,
+    data.sellerAddress,
+    `SIRET : ${data.sellerSiret}`,
+    `N° TVA : ${data.sellerTvaIntracom}`,
+  ].filter(Boolean);
+
+  const buyerLines = [
+    data.buyerName,
+    data.buyerAddress,
+    data.buyerSiret ? `SIRET : ${data.buyerSiret}` : null,
+  ].filter(Boolean) as string[];
+
+  sellerLines.forEach((line) => { doc.text(line, MARGIN, y); y += 5; });
+  const buyerStartY = HEADER_H + 15;
+  buyerLines.forEach((line, i) => { doc.text(line, PAGE_W / 2 + 5, buyerStartY + i * 5); });
+
+  y = Math.max(y, buyerStartY + buyerLines.length * 5) + 8;
+
+  doc.setDrawColor(...DIVIDER);
+  doc.setLineWidth(0.3);
+  doc.line(MARGIN, y, PAGE_W - MARGIN, y);
+  y += 6;
+
+  autoTable(doc, {
+    startY: y,
+    head: [["Désignation", "Qté", "PU HT", "TVA", "Montant HT"]],
+    body: [[
+      data.planDescription,
+      "1",
+      fmtCents(data.subtotalCents, data.currency),
+      "20 %",
+      fmtCents(data.subtotalCents, data.currency),
+    ]],
+    headStyles: { fillColor: TABLE_HEAD_BG, textColor: TEXT_DARK, fontStyle: "bold", fontSize: 8 },
+    bodyStyles: { textColor: TEXT_BODY, fontSize: 8 },
+    alternateRowStyles: { fillColor: TABLE_ALT_BG },
+    columnStyles: {
+      0: { cellWidth: "auto" },
+      1: { cellWidth: 15, halign: "center" },
+      2: { cellWidth: 30, halign: "right" },
+      3: { cellWidth: 20, halign: "center" },
+      4: { cellWidth: 30, halign: "right" },
+    },
+    margin: { left: MARGIN, right: MARGIN },
+    theme: "plain",
+  });
+
+  const afterTable = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY ?? y + 15;
+  let ty = afterTable + 8;
+
+  const totalsX = PAGE_W - MARGIN - 70;
+  const totalsValueX = PAGE_W - MARGIN;
+
+  const rows: [string, string][] = [
+    ["Sous-total HT", fmtCents(data.subtotalCents, data.currency)],
+    [`TVA 20 %`, fmtCents(data.taxCents, data.currency)],
+  ];
+
+  doc.setFont("Roboto", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...TEXT_BODY);
+  rows.forEach(([label, value]) => {
+    doc.text(label, totalsX, ty);
+    doc.text(value, totalsValueX, ty, { align: "right" });
+    ty += 6;
+  });
+
+  doc.setDrawColor(...DIVIDER);
+  doc.line(totalsX, ty - 2, totalsValueX, ty - 2);
+
+  doc.setFont("Roboto", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...TEXT_DARK);
+  doc.text("TOTAL TTC", totalsX, ty + 5);
+  doc.text(fmtCents(data.totalCents, data.currency), totalsValueX, ty + 5, { align: "right" });
+
+  ty += 18;
+  doc.setFont("Roboto", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...TEXT_MUTED);
+  doc.text("Paiement par prélèvement automatique. TVA acquittée d'après les débits.", MARGIN, ty);
+  ty += 5;
+  doc.text("Pénalités de retard : 3× taux légal. Indemnité forfaitaire : 40 €.", MARGIN, ty);
+
+  doc.setFontSize(8);
+  doc.setTextColor(...TEXT_MUTED);
+  doc.text(`${data.sellerName} — ${data.sellerSiret} — ${data.sellerTvaIntracom}`, PAGE_W / 2, PAGE_H - 8, { align: "center" });
+
+  return Buffer.from(doc.output("arraybuffer"));
+}

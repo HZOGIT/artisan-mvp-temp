@@ -23,6 +23,7 @@ export function useBillingMaison() {
   const changePlanMut = trpc.billing.changePlan.useMutation({ onSuccess: invalidate });
   const cancelMut = trpc.billing.cancelAtPeriodEnd.useMutation({ onSuccess: invalidate });
   const reactivateMut = trpc.billing.reactivate.useMutation({ onSuccess: invalidate });
+  const downloadInvoiceMut = trpc.billing.downloadInvoice.useMutation();
 
   return {
     billingInfo: infoQ.data,
@@ -51,5 +52,8 @@ export function useBillingMaison() {
 
     reactivate: () => reactivateMut.mutateAsync(undefined),
     isReactivating: reactivateMut.isPending,
+
+    downloadInvoice: (invoiceId: number) => downloadInvoiceMut.mutateAsync({ invoiceId }),
+    isDownloadingInvoice: downloadInvoiceMut.isPending,
   };
 }

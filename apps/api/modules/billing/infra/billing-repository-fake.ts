@@ -390,6 +390,13 @@ export class FakeBillingRepository implements IBillingRepository {
       einvoice_status: null,
       einvoice_pa_message_id: null,
       einvoice_hash: null,
+      seller_name: params.sellerName ?? null,
+      seller_address: params.sellerAddress ?? null,
+      seller_siret: params.sellerSiret ?? null,
+      seller_tva_intracom: params.sellerTvaIntracom ?? null,
+      buyer_name: params.buyerName ?? null,
+      buyer_address: params.buyerAddress ?? null,
+      buyer_siret: params.buyerSiret ?? null,
       due_at: null,
       paid_at: now,
       voided_at: null,
@@ -414,6 +421,19 @@ export class FakeBillingRepository implements IBillingRepository {
     });
 
     return invoice;
+  }
+
+  async findInvoiceById(_ctx: TenantContext, id: number): Promise<BillingInvoice | null> {
+    return this.invoices.find((i) => i.id === id) ?? null;
+  }
+
+  async updateInvoicePdfUrl(id: number, pdfUrl: string): Promise<void> {
+    const inv = this.invoices.find((i) => i.id === id);
+    if (inv) (inv as BillingInvoice & { pdf_url: string | null }).pdf_url = pdfUrl;
+  }
+
+  async findArtisanInfo(_artisanId: number): Promise<{ name: string | null; address: string | null; siret: string | null } | null> {
+    return { name: "Artisan Test", address: "1 rue Test, 75001 Paris", siret: null };
   }
 
   async markWebhookProcessed(stripeEventId: string, _eventType: string, _payload: Record<string, unknown>): Promise<boolean> {

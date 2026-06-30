@@ -3,6 +3,7 @@ import type { BillingPort } from "../../../shared/ports/billing";
 import type { SubscriptionEventNotifier } from "../../subscription/application/subscription-event-notifier";
 import { isDue, isZombie, isStuckProcessing, nextPeriod, nextRetryAt, MAX_DUNNING_ATTEMPTS } from "../domain/billing-cycle";
 import { planById } from "../domain/plan";
+import { OPERIOZ } from "../domain/operioz-config";
 import { subscriptionEmail } from "../../subscription/domain/webhook";
 
 export interface SchedulerDeps {
@@ -165,6 +166,7 @@ export async function chargeOffSessionForCycle(
       const sub = await deps.repo.findSubscriptionById(subscriptionId);
       const interval = resolveInterval(sub?.billing_interval);
       const plan = sub ? planById(sub.plan_id) : undefined;
+      const artisanInfo = await deps.repo.findArtisanInfo(artisanId);
       await deps.repo.createInvoiceForCycle({
         artisanId,
         cycleId,
@@ -172,6 +174,13 @@ export async function chargeOffSessionForCycle(
         taxCents: Math.round(cycle.amount_cents / 6),
         currency: cycle.currency,
         planDescription: `Abonnement ${plan?.name ?? (sub?.plan_id ?? "Operioz")}`,
+        sellerName: OPERIOZ.name,
+        sellerAddress: OPERIOZ.address,
+        sellerSiret: OPERIOZ.siret,
+        sellerTvaIntracom: OPERIOZ.tvaIntracom,
+        buyerName: artisanInfo?.name ?? undefined,
+        buyerAddress: artisanInfo?.address ?? undefined,
+        buyerSiret: artisanInfo?.siret ?? undefined,
       });
       /*
        * Guard symétrique de FIX-CE (webhook) et FIX-CC (zombie recovery) :
@@ -434,6 +443,7 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
         actor: "scheduler",
       });
       const zombiePlan = planById(sub.plan_id);
+      const zombieArtisanInfo = await deps.repo.findArtisanInfo(artisanId);
       await deps.repo.createInvoiceForCycle({
         artisanId,
         cycleId: cycle.id,
@@ -441,6 +451,13 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
         taxCents: Math.round(cycle.amount_cents / 6),
         currency: cycle.currency,
         planDescription: `Abonnement ${zombiePlan?.name ?? sub.plan_id}`,
+        sellerName: OPERIOZ.name,
+        sellerAddress: OPERIOZ.address,
+        sellerSiret: OPERIOZ.siret,
+        sellerTvaIntracom: OPERIOZ.tvaIntracom,
+        buyerName: zombieArtisanInfo?.name ?? undefined,
+        buyerAddress: zombieArtisanInfo?.address ?? undefined,
+        buyerSiret: zombieArtisanInfo?.siret ?? undefined,
       });
       await advanceSubscriptionAfterPayment(deps.repo, cycle.subscription_id, artisanId, cycle, resolveInterval(sub.billing_interval));
     } else if (pi.status === "processing") {

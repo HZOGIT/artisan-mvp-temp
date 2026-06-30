@@ -2,14 +2,20 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IBillingRepository } from "./billing-repository";
 import type { BillingPort } from "../../../shared/ports/billing";
 import type { StripePort } from "../../../shared/ports/stripe";
+import type { PdfPort } from "../../../shared/ports/pdf";
+import type { StoragePort } from "../../../shared/ports/storage";
 import type { BillingPaymentMethod, BillingSubscription, BillingInvoice } from "../../../../../drizzle/schema.pg";
 import { planById } from "../domain/plan";
 import type { BillingInterval } from "../domain/plan";
+import { OPERIOZ } from "../domain/operioz-config";
+import type { FactureAbonnementData } from "../../../shared/pdf/pdf-generator";
 
 export interface BillingDeps {
   readonly repo: IBillingRepository;
   readonly billing: BillingPort;
   readonly stripe: StripePort;
+  readonly pdf?: PdfPort;
+  readonly storage?: StoragePort;
 }
 
 
@@ -431,4 +437,53 @@ export class NotFoundError extends Error {
     super(message);
     this.name = "NotFoundError";
   }
+}
+
+
+export async function downloadSubscriptionInvoice(
+  deps: BillingDeps,
+  ctx: TenantContext,
+  invoiceId: number,
+): Promise<{ url: string }> {
+  const invoice = await deps.repo.findInvoiceById(ctx, invoiceId);
+  if (!invoice) throw new NotFoundError(`Facture ${invoiceId} introuvable`);
+
+  if (invoice.pdf_url) return { url: invoice.pdf_url };
+
+  if (!deps.pdf || !deps.storage) throw new Error("PDF/storage non disponibles");
+
+  const cycle = invoice.billing_cycle_id
+    ? await deps.repo.findCycleById(invoice.billing_cycle_id)
+    : null;
+
+  const pdfData: FactureAbonnementData = {
+    number: invoice.number ?? String(invoice.id),
+    date: invoice.paid_at ?? invoice.created_at,
+    periodStart: cycle?.period_start ?? invoice.created_at,
+    periodEnd: cycle?.period_end ?? invoice.created_at,
+    planDescription: "Abonnement Operioz",
+    subtotalCents: invoice.subtotal_cents,
+    taxCents: invoice.tax_cents,
+    totalCents: invoice.total_cents,
+    currency: invoice.currency,
+    sellerName: invoice.seller_name ?? OPERIOZ.name,
+    sellerAddress: invoice.seller_address ?? OPERIOZ.address,
+    sellerSiret: invoice.seller_siret ?? OPERIOZ.siret,
+    sellerTvaIntracom: invoice.seller_tva_intracom ?? OPERIOZ.tvaIntracom,
+    buyerName: invoice.buyer_name ?? "",
+    buyerAddress: invoice.buyer_address ?? "",
+    buyerSiret: invoice.buyer_siret ?? "",
+  };
+
+  const pdfBuf = await deps.pdf.render("facture-abonnement", pdfData as unknown as Record<string, unknown>);
+  const key = `billing-invoices/${invoice.artisan_id}/${invoice.id}.pdf`;
+  const stored = await deps.storage.upload(key, pdfBuf, {
+    contentType: "application/pdf",
+    artisanId: invoice.artisan_id,
+    filename: `Facture_Operioz_${invoice.number ?? invoice.id}.pdf`,
+    purpose: "billing-invoice-pdf",
+  });
+  const url = await deps.storage.url(stored.storageKey);
+  await deps.repo.updateInvoicePdfUrl(invoice.id, url);
+  return { url };
 }

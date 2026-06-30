@@ -295,6 +295,13 @@
       "when": 1751306400000,
       "tag": "20260630160000_restaurer-modules-actif-defaut",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1751317200000,
+      "tag": "20260630200000_billing-invoices-mentions-legales-fr",
+      "breakpoints": true
     }
   ]
 }

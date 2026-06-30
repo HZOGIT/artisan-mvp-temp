@@ -6,7 +6,9 @@ import {
   generateContratPDF,
   generateInterventionPDF,
   generateAttestationTvaPDF,
+  generateFactureAbonnementPDF,
 } from "./pdf-generator";
+import type { FactureAbonnementData } from "./pdf-generator";
 
 /*
  * Adapter PDF jsPDF INTERNALISÉ dans le new-stack — SEUL adapter PDF (le `LegacyPdfAdapter`/sidecar a été supprimé). Le
@@ -29,6 +31,8 @@ export class JsPdfAdapter implements PdfPort {
         return Promise.resolve(generateInterventionPDF(data as never));
       case "attestation-tva":
         return Promise.resolve(generateAttestationTvaPDF(data as never));
+      case "facture-abonnement":
+        return Promise.resolve(generateFactureAbonnementPDF(data as unknown as FactureAbonnementData));
       default:
         return Promise.reject(new Error(`Template PDF inconnu : ${template}`));
     }
