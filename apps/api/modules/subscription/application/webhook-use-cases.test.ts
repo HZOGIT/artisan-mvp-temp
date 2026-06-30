@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { FakeStripePort } from "../../../shared/ports/stripe-adapter";
 import { FakeWebhookPaymentWriter } from "../infra/webhook-payment-writer-fake";
 import { FakeSubscriptionEventNotifier } from "../infra/subscription-event-notifier-fake";
-import { processStripeWebhook } from "./webhook-use-cases";
+import { processStripeWebhook, buildPaiementConfirmationEmail } from "./webhook-use-cases";
 
 const SIG = "valid-sig";
 const SECRET = "whsec_test";
@@ -281,5 +281,77 @@ describe("processStripeWebhook (fail-closed)", () => {
     const r = await processStripeWebhook(deps, { rawBody: raw(event), signature: SIG });
     expect(r.http).toBe(200);
     expect(paymentWriter.completed).toEqual([{ artisanId: 3, paiementId: 7, factureId: 42, stripePaymentIntentId: "pi_bus" }]);
+  });
+
+  it("OPE-976 — checkout.session.completed : onCheckoutCompletedEmail appelé avec données metadata Stripe", async () => {
+    const { deps, paymentWriter } = build();
+    paymentWriter.seed("tok_email", { paiementId: 30, factureId: 88, artisanId: 11 });
+    const emailCalls: Array<{ artisanId: number; factureId: number; clientId: number; clientEmail: string; clientName: string; factureNumero: string; totalTTC: string }> = [];
+    const event = {
+      id: "evt_email1",
+      type: "checkout.session.completed",
+      data: { object: { payment_intent: "pi_em1", amount_total: 24500, metadata: { token_paiement: "tok_email", facture_id: "88", customer_email: "client@example.com", customer_name: "Alice Dupont", numero_facture: "FAC-2026-001", user_id: "42" } } },
+    };
+    const r = await processStripeWebhook({ ...deps, onCheckoutCompletedEmail: async (d) => { emailCalls.push(d); } }, { rawBody: raw(event), signature: SIG });
+    expect(r.http).toBe(200);
+    expect(emailCalls).toHaveLength(1);
+    expect(emailCalls[0]).toMatchObject({ artisanId: 11, factureId: 88, clientId: 42, clientEmail: "client@example.com", clientName: "Alice Dupont", factureNumero: "FAC-2026-001", totalTTC: "245.00 €" });
+  });
+
+  it("OPE-976 — checkout.session.completed : sans customer_email → onCheckoutCompletedEmail non appelé", async () => {
+    const { deps, paymentWriter } = build();
+    paymentWriter.seed("tok_noemail", { paiementId: 31, factureId: 89, artisanId: 12 });
+    let called = false;
+    const event = {
+      id: "evt_email2",
+      type: "checkout.session.completed",
+      data: { object: { payment_intent: "pi_em2", metadata: { token_paiement: "tok_noemail", facture_id: "89" } } },
+    };
+    await processStripeWebhook({ ...deps, onCheckoutCompletedEmail: async () => { called = true; } }, { rawBody: raw(event), signature: SIG });
+    expect(called).toBe(false);
+  });
+
+  it("OPE-976 — checkout.session.completed : erreur onCheckoutCompletedEmail → 200 + loggée (best-effort)", async () => {
+    const { deps, paymentWriter } = build();
+    paymentWriter.seed("tok_emailerr", { paiementId: 32, factureId: 90, artisanId: 13 });
+    const logged: string[] = [];
+    const fakeLog = { error: (_obj: unknown, msg: string) => { logged.push(msg); }, info: () => {}, warn: () => {}, debug: () => {} };
+    const event = {
+      id: "evt_email3",
+      type: "checkout.session.completed",
+      data: { object: { payment_intent: "pi_em3", metadata: { token_paiement: "tok_emailerr", facture_id: "90", customer_email: "x@x.com", customer_name: "Bob", numero_facture: "FAC-001", user_id: "5" } } },
+    };
+    const r = await processStripeWebhook(
+      { ...deps, log: fakeLog as never, onCheckoutCompletedEmail: async () => { throw new Error("SMTP error"); } },
+      { rawBody: raw(event), signature: SIG },
+    );
+    expect(r.http).toBe(200);
+    expect(logged.some(m => m.includes("Email confirmation client paiement"))).toBe(true);
+  });
+});
+
+describe("buildPaiementConfirmationEmail", () => {
+  it("sujet contient le numéro de facture", () => {
+    const { subject } = buildPaiementConfirmationEmail({ artisanName: "Artisan Test", clientName: "Client A", factureNumero: "FAC-001", totalTTC: "150.00 €" });
+    expect(subject).toContain("FAC-001");
+    expect(subject).toContain("Confirmation");
+  });
+
+  it("body contient nom artisan, nom client, montant", () => {
+    const { body } = buildPaiementConfirmationEmail({ artisanName: "Plomberie Martin", clientName: "Alice Dupont", factureNumero: "FAC-002", totalTTC: "245.00 €" });
+    expect(body).toContain("Plomberie Martin");
+    expect(body).toContain("Alice Dupont");
+    expect(body).toContain("245.00");
+  });
+
+  it("bouton portail présent si portalUrl fourni", () => {
+    const { body } = buildPaiementConfirmationEmail({ artisanName: "A", clientName: "B", factureNumero: "F", totalTTC: "0.00 €", portalUrl: "https://app.test/portail/tok123" });
+    expect(body).toContain("https://app.test/portail/tok123");
+    expect(body).toContain("Consulter ma facture");
+  });
+
+  it("bouton portail absent si portalUrl non fourni", () => {
+    const { body } = buildPaiementConfirmationEmail({ artisanName: "A", clientName: "B", factureNumero: "F", totalTTC: "0.00 €" });
+    expect(body).not.toContain("Consulter ma facture");
   });
 });
