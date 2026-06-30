@@ -50,7 +50,7 @@ export default function ParametresPage() {
     }
   }, []);
 
-  const icalUrl = buildIcalUrl(icalFeed?.path, window.location.origin);
+  const icalUrl = buildIcalUrl(icalFeed?.path, BACKEND_URL);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
