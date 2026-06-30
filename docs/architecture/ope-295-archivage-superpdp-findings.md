@@ -1,17 +1,64 @@
 # OPE-295 — Archivage SuperPDP : Findings
 
-**Date** : 2026-06-27  
-**Investigation** : Capacités d'archivage probant 10 ans SuperPDP  
-**Statut** : À confirmer avec SuperPDP (question support requise)
+**Date** : 2026-06-27 — **VERDICT mis à jour le 2026-06-30 (OPE-899, recherche firecrawl)**
+**Investigation** : Capacités d'archivage probant 10 ans SuperPDP
+**Statut** : ✅ **TRANCHÉ — OUI** (SuperPDP archive 10 ans avec garantie d'intégrité). SAE tiers **non requis**. → proposer la clôture d'OPE-295.
 
 ---
 
-## Synthèse préliminaire
+## ✅ VERDICT (OPE-899 — 2026-06-30) : **OUI**
 
-SuperPDP **ne clarifie PAS explicitement** l'archivage 10 ans dans :
+SuperPDP **fournit bien un archivage 10 ans** des factures électroniques. L'obligation légale de conservation 10 ans **repose sur l'entreprise** (et non sur la PA), et le service d'archivage de SuperPDP la **satisfait**. → **Pas de SAE tiers à intégrer.**
+
+### Preuves sourcées (site officiel superpdp.tech, scrapé le 2026-06-30)
+
+| Élément | Constat | Source |
+|---|---|---|
+| **Archivage 10 ans** | « Archivage. **Conservation des factures pendant 10 ans avec garantie d'intégrité.** » | [/fonctionnalites](https://www.superpdp.tech/fonctionnalites) |
+| **Immatriculation PA (PDP)** | **Définitive obtenue le 22 décembre 2025** (n'était que provisoire dans les findings initiaux) | /fonctionnalites › Certifications |
+| **ISO 27001** | Certification obtenue auprès du **LNE en août 2025** | /fonctionnalites › Certifications |
+| **Peppol** | Certified Service Provider (AP + SMP), février 2025 | /fonctionnalites › Certifications |
+| **FNFE** | Membre du Forum National de la Facture Électronique depuis février 2025 | /fonctionnalites › Certifications |
+| **Hébergement / durabilité** | Données **hébergées en France**, **répliquées 4 fois** dans 2 datacentres géographiquement éloignés ; haute dispo primaire/secondaire | /fonctionnalites › Sécurité |
+| **Clause d'archivage (CGV)** | « Les Données sont **archivées selon les dispositions légales et réglementaires en vigueur** précisées dans nos Conditions Tarifaires. » | [/legal/11](https://www.superpdp.tech/legal/11) |
+| **Formats** | JSON, Factur-X, CII, UBL ; validation AFNOR XP Z12-012 + EN16931 | /fonctionnalites |
+| **Réversibilité / portabilité** | API conforme **AFNOR XP Z12-013** (interopérabilité et portabilité entre PDPs) | /fonctionnalites › API |
+
+### Cadre légal — qui doit archiver ? (clarifié)
+
+- L'**obligation de conservation 10 ans** (Code de commerce ; 6 ans fiscal / 10 ans commercial) **incombe à l'entreprise** émettrice/réceptrice, **pas à la PA**.
+- Une **Plateforme Agréée n'est PAS légalement tenue** de proposer un archivage : « Les plateformes agréées, anciennement PDP, ne sont pas tenues de proposer un service d'archivage. Toutefois, certaines choisissent de fournir un archivage à valeur probante » (Yooz, 2025-09).
+- « Valeur probante » = **authenticité + intégrité + lisibilité + traçabilité**. Les normes (NF Z42-013, RGS, eIDAS) sont **recommandées, non légalement obligatoires** : l'administration fiscale exige l'intégrité et une piste d'audit fiable, pas une certification nominative.
+
+→ **Conclusion** : SuperPDP offrant un archivage 10 ans à intégrité garantie, en tant que PA immatriculée + ISO 27001 + hébergement France redondé, **satisfait l'obligation légale portée par l'artisan**. Archivage PA seule = conforme. **OPE-295 = noop.**
+
+### Nuance résiduelle (non bloquante) — à confirmer auprès de Tristan (SuperPDP)
+
+Le site **n'emploie pas** les termes « valeur probante », « NF Z42-013 », « coffre-fort numérique » ni « horodatage qualifié ». C'est un **écart de libellé/documentation, pas un écart de conformité** (ces labels ne sont pas obligatoires). Questions de confort à poser (réponse non bloquante pour la mise en prod) :
+
+1. L'archivage est-il **conforme NF Z42-013 / adossé à un coffre-fort** (ou équivalent à valeur probante formalisée) ?
+2. **Horodatage qualifié RFC 3161** embarqué dans le Factur-X/PDF-A3 archivé ?
+3. **Modalités de restitution / export** des archives en fin de relation (réversibilité — l'API Z12-013 le couvre-t-elle pour les pièces archivées) ?
+4. **Conditions Tarifaires** : archivage 10 ans inclus dans le prix/facture (0,01 €HT dégressif) ou surcoût ? Taille max de stockage ?
+
+> ⚠️ Point d'attention contractuel (CGV /legal/11) : **plafond de responsabilité** limité au montant payé sur les 12 derniers mois, et le Client est « seul responsable des Données ». À garder en tête pour le risque résiduel, mais cohérent avec le modèle PA (l'obligation légale reste portée par l'entreprise de toute façon).
+
+### Décision
+
+- ✅ **Archivage = délégué à SuperPDP** (PA seule). Documenter dans CLAUDE.md / décision OPE-283.
+- ✅ **Bloquant B3 (prod-readiness OPE-897) levé** : pas de dépendance archivage manquante.
+- ✅ **Section SAE tiers ci-dessous = plan dormant** (fallback uniquement si une réponse Tristan contredisait le verdict). Conservée, non supprimée.
+
+---
+
+## Synthèse préliminaire (historique — pré-verdict, conservé pour trace)
+
+SuperPDP **ne clarifiait PAS explicitement** l'archivage 10 ans dans :
 - Documentation publique (superpdp.tech)
 - Commentaire OPE-283 (decision record)
 - Contrat / SLA disponibles
+
+> Cet état « ambigu » est **levé** par le verdict OUI ci-dessus (la page /fonctionnalites annonce désormais l'archivage 10 ans à intégrité garantie).
 
 ---
 
