@@ -39,7 +39,8 @@ describe("ajusterQuantiteStock (mouvement tracé = unique voie de modif quantit�
       ValidationError,
     );
     expect((await repo.getById(A, s.id))!.quantiteEnStock).toBe("3.00");
-    expect(await getMouvementsStock(repo, A, s.id)).toEqual([]); // aucun mouvement tracé
+    /** 1 mouvement initial existe (création), la sortie échouée n'en ajoute pas. */
+    expect((await getMouvementsStock(repo, A, s.id)).length).toBe(1);
   });
 
   it("deux entrées successives cumulent (anti double-comptage / pas d'écrasement)", async () => {

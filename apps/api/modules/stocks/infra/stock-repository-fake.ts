@@ -68,6 +68,20 @@ export class FakeStockRepository implements IStockRepository {
       updatedAt: now,
     };
     this.store.push(s);
+    const qty = Number(s.quantiteEnStock);
+    if (qty > 0) {
+      this.mouvements.push({
+        id: ++this.mvSeq,
+        stockId: s.id,
+        type: "entree",
+        quantite: qty.toFixed(2),
+        quantiteAvant: "0.00",
+        quantiteApres: qty.toFixed(2),
+        motif: "Stock initial",
+        reference: null,
+        createdAt: now,
+      });
+    }
     return s;
   }
 

@@ -137,6 +137,18 @@ export class StockRepositoryDrizzle implements IStockRepository {
         .insert(stocks)
         .values({ ...input, artisanId: ctx.artisanId } as typeof stocks.$inferInsert)
         .returning();
+      const qty = Number(input.quantiteEnStock ?? "0");
+      if (qty > 0) {
+        await tx.insert(mouvementsStock).values({
+          stockId: row.id,
+          type: "entree",
+          quantite: qty.toFixed(2),
+          quantiteAvant: "0.00",
+          quantiteApres: qty.toFixed(2),
+          motif: "Stock initial",
+          reference: null,
+        });
+      }
       return toStock(row);
     });
   }
