@@ -522,6 +522,29 @@ async function activateExpiredTrials(deps: SchedulerDeps, now: Date): Promise<nu
           payload: { artisanId: sub.artisan_id, planId: sub.plan_id, interval },
           actor: "scheduler",
         });
+        if (deps.notifier) {
+          const appUrl = deps.appUrl ?? "https://www.operioz.com";
+          try {
+            await deps.notifier.notifyArtisan(sub.artisan_id, {
+              type: "erreur",
+              titre: "Période d'essai expirée — ajoutez un moyen de paiement",
+              message: "Votre période d'essai est terminée. Ajoutez un moyen de paiement pour continuer à utiliser Operioz.",
+              lien: "/parametres?tab=abonnement",
+            });
+          } catch { /* best-effort */ }
+          try {
+            await deps.notifier.emailArtisanOwner(
+              sub.artisan_id,
+              "Période d'essai expirée — Operioz",
+              subscriptionEmail({
+                title: "Période d'essai expirée",
+                body: "Votre période d'essai Operioz est terminée. Ajoutez un moyen de paiement pour reprendre l'accès à votre compte.",
+                ctaLabel: "Ajouter un moyen de paiement",
+                ctaUrl: `${appUrl}/parametres?tab=abonnement`,
+              }),
+            );
+          } catch { /* best-effort */ }
+        }
         activated++;
         continue;
       }
