@@ -750,4 +750,58 @@ describe("facturerAcompte / facturerSolde", () => {
     const { reader, repo } = setup();
     await expect(facturerAcompte(repo, reader, B, { devisId: 99, montant: "100" })).rejects.toBeInstanceOf(NotFoundError);
   });
+
+  it("facturerAcompte multi-taux (10%+20%) → N lignes avec taux légaux uniquement, Σ TTC = montant demandé", async () => {
+    const reader = new FakeDevisReader();
+    const repo = new FakeFactureRepository();
+    const devis: DevisReadModel = {
+      id: 42, artisanId: A.artisanId, clientId: 100, numero: "DEV-00042",
+      statut: "accepte", objet: null, referenceClient: null, conditionsPaiement: null, notes: null,
+      totalHT: "10250.00", totalTVA: "1650.00", totalTTC: "11900.00", montantDejaFacture: "0.00",
+    };
+    reader.register(devis, [
+      { ordre: 0, reference: null, designation: "Pose", description: null, quantite: "1.00", unite: "unité", prixUnitaireHT: "4000.00", tauxTVA: "10", remise: "0", tvaCategorieId: "FR_10", montantHT: "4000.00", montantTVA: "400.00", montantTTC: "4400.00", type: "produit" },
+      { ordre: 1, reference: null, designation: "Matériaux", description: null, quantite: "1.00", unite: "unité", prixUnitaireHT: "6250.00", tauxTVA: "20", remise: "0", tvaCategorieId: "FR_20", montantHT: "6250.00", montantTVA: "1250.00", montantTTC: "7500.00", type: "produit" },
+    ]);
+    repo.registerClient(A.artisanId, 100);
+    repo.registerDevis(A.artisanId, 42);
+
+    const acompte = await facturerAcompte(repo, reader, A, { devisId: 42, montant: "2380.00" });
+    const acompteLignes = await repo.listLignes(A, acompte.id);
+
+    expect(acompteLignes.length).toBeGreaterThanOrEqual(1);
+    for (const l of acompteLignes) {
+      expect([0, 2.1, 5.5, 10, 20]).toContain(parseFloat(l.tauxTVA));
+    }
+    expect(Number(acompte.totalTTC)).toBeCloseTo(2380, 0);
+  });
+});
+
+describe("tauxTVA — validation catalogue légal FR", () => {
+  it("ajouterLigneFacture : tauxTVA illégal (16.10) → ValidationError", async () => {
+    const repo = repoWithClient(A, 100);
+    const f = await creerFacture(repo, A, { clientId: 100 });
+    await expect(
+      ajouterLigneFacture(repo, A, f.id, { designation: "L", prixUnitaireHT: "100.00", tauxTVA: "16.10" }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("ajouterLigneFacture : taux légaux (0, 2.1, 5.5, 10, 20) → OK", async () => {
+    const repo = repoWithClient(A, 100);
+    const f = await creerFacture(repo, A, { clientId: 100 });
+    for (const taux of ["0", "2.1", "5.5", "10", "20"]) {
+      await expect(
+        ajouterLigneFacture(repo, A, f.id, { designation: "L", prixUnitaireHT: "10.00", tauxTVA: taux }),
+      ).resolves.toBeDefined();
+    }
+  });
+
+  it("modifierLigneFacture : tauxTVA illégal (7.3) → ValidationError", async () => {
+    const repo = repoWithClient(A, 100);
+    const f = await creerFacture(repo, A, { clientId: 100 });
+    const l = await ajouterLigneFacture(repo, A, f.id, { designation: "L", prixUnitaireHT: "50.00", tauxTVA: "20" });
+    await expect(
+      modifierLigneFacture(repo, A, f.id, l.id, { tauxTVA: "7.3" }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
 });

@@ -39,6 +39,8 @@ export const TVA_CATEGORIES_MAP = Object.fromEntries(
   TVA_CATEGORIES.map((c) => [c.id, c]),
 ) as Record<TvaCategorieId, TvaCategorieDef>;
 
+export const TAUX_TVA_LEGAUX = new Set(TVA_CATEGORIES.map((c) => parseFloat(c.taux)));
+
 export function tauxStringToCategorie(taux: string | number | null | undefined): TvaCategorieId {
   const n = parseFloat(String(taux ?? 0));
   if (n >= 20) return "FR_20";

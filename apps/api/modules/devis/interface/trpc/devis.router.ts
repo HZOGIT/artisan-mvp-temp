@@ -292,7 +292,7 @@ export function createDevisRouter(
           quantite: z.number().default(1),
           unite: z.string().max(20).default("unité"),
           prixUnitaireHT: z.number().default(0),
-          tauxTVA: z.number().min(0).max(100).default(20),
+          tauxTVA: z.number().refine((v) => [0, 2.1, 5.5, 10, 20].includes(v), "Taux TVA hors catalogue légal FR").default(20),
           remise: z.number().min(0).max(100).default(0),
           tvaCategorieId: z.string().max(30).optional(),
         }),

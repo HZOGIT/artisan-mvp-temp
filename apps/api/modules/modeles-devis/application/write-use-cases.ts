@@ -1,4 +1,5 @@
 import { NotFoundError, ValidationError } from "../../../shared/errors";
+import { TAUX_TVA_LEGAUX } from "../../../shared/tva/taux-tva-fr";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IModeleDevisRepository } from "./modele-devis-repository";
 import type { CreateModeleDevisInput, CreateModeleDevisLigneInput, ModeleDevis, ModeleDevisLigne, UpdateModeleDevisInput } from "../domain/modele-devis";
@@ -26,6 +27,9 @@ function assertLigne(l: CreateModeleDevisLigneInput): void {
   assertMontantPositif(l.quantite, "La quantité");
   assertMontantPositif(l.prixUnitaireHT, "Le prix unitaire HT");
   assertPourcentage(l.tauxTVA, "Le taux de TVA");
+  if (l.tauxTVA !== undefined && !TAUX_TVA_LEGAUX.has(parseFloat(l.tauxTVA))) {
+    throw new ValidationError(`Taux TVA ${l.tauxTVA} hors catalogue légal FR (autorisés : 0, 2.1, 5.5, 10, 20)`);
+  }
   assertPourcentage(l.remise, "La remise");
 }
 

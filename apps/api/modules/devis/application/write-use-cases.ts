@@ -1,4 +1,5 @@
 import { ConflictError, NotFoundError, ValidationError } from "../../../shared/errors";
+import { TAUX_TVA_LEGAUX } from "../../../shared/tva/taux-tva-fr";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ArtisanReader } from "../../../shared/readers/contact-readers";
 import { devisCounter } from "../../../shared/observability/business-metrics";
@@ -52,6 +53,13 @@ function assertLigneValide(designation: string | undefined, prixUnitaireHT?: str
   }
 }
 
+function assertTauxTVALegal(tauxTVA: string | null | undefined): void {
+  if (tauxTVA == null) return;
+  if (!TAUX_TVA_LEGAUX.has(parseFloat(tauxTVA))) {
+    throw new ValidationError(`Taux TVA ${tauxTVA} hors catalogue légal FR (autorisés : 0, 2.1, 5.5, 10, 20)`);
+  }
+}
+
 export async function creerDevis(repo: IDevisRepository, ctx: TenantContext, input: CreerDevisInput): Promise<Devis> {
   /** Anti-IDOR-FK : le client doit appartenir au tenant (ne révèle pas l'existence cross-tenant). */
   if (!(await repo.ownsClient(ctx, input.clientId))) throw new NotFoundError("Client introuvable");
@@ -96,6 +104,7 @@ export async function ajouterLigneDevis(
     throw new ConflictError("Ce devis a été accepté par le client et ne peut plus être modifié");
   }
   assertLigneValide(input.designation, input.prixUnitaireHT, input.quantite);
+  assertTauxTVALegal(input.tauxTVA);
   const ligne = await repo.addLigne(ctx, devisId, input);
   if (!ligne) throw new NotFoundError("Devis introuvable");
   return ligne;
@@ -117,6 +126,7 @@ export async function modifierLigneDevis(
   const lignes = await repo.listLignes(ctx, devisId);
   if (!lignes.some((l) => l.id === ligneId)) throw new NotFoundError("Ligne introuvable");
   assertLigneValide(input.designation, input.prixUnitaireHT, input.quantite);
+  assertTauxTVALegal(input.tauxTVA);
   const updated = await repo.updateLigne(ctx, ligneId, input);
   if (!updated) throw new NotFoundError("Ligne introuvable");
   return updated;
