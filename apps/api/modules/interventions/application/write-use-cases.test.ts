@@ -81,12 +81,38 @@ describe("interventions — use-cases d'écriture (create / update)", () => {
     await expect(modifierIntervention(repo, A, i.id, { statut: "planifiee" })).rejects.toBeInstanceOf(ValidationError);
   });
 
-  it("garde de transition : en_cours → terminee OK ; en_cours → planifiee refusé", async () => {
+  it("garde de transition : en_cours → terminee OK (avec technicien) ; en_cours → planifiee refusé", async () => {
     const repo = repoAvecClientA();
-    const i = await creerIntervention(repo, A, base({ statut: "en_cours" }));
+    repo.registerRef(1, "technicien", 42);
+    const i = await creerIntervention(repo, A, base({ statut: "en_cours", technicienId: 42 }));
     const terminee = await modifierIntervention(repo, A, i.id, { statut: "terminee" });
     expect(terminee.statut).toBe("terminee");
+    expect(terminee.dateFin).toBeInstanceOf(Date);
     await expect(modifierIntervention(repo, A, i.id, { statut: "en_cours" })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("terminer sans technicienId → ValidationError", async () => {
+    const repo = repoAvecClientA();
+    const i = await creerIntervention(repo, A, base({ statut: "en_cours" }));
+    await expect(modifierIntervention(repo, A, i.id, { statut: "terminee" })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("terminer : technicienId fourni dans l'input suffit même si absent sur l'intervention", async () => {
+    const repo = repoAvecClientA();
+    repo.registerRef(1, "technicien", 55);
+    const i = await creerIntervention(repo, A, base({ statut: "en_cours" }));
+    const terminee = await modifierIntervention(repo, A, i.id, { statut: "terminee", technicienId: 55 });
+    expect(terminee.statut).toBe("terminee");
+    expect(terminee.technicienId).toBe(55);
+  });
+
+  it("terminer : dateFin explicite fourni dans l'input → conservé (pas d'écrasement auto)", async () => {
+    const repo = repoAvecClientA();
+    repo.registerRef(1, "technicien", 42);
+    const dateFin = new Date("2026-06-15T16:00:00Z");
+    const i = await creerIntervention(repo, A, base({ statut: "en_cours", technicienId: 42 }));
+    const terminee = await modifierIntervention(repo, A, i.id, { statut: "terminee", dateFin });
+    expect(terminee.dateFin).toEqual(dateFin);
   });
 
   it("garde de transition : états terminaux (terminee, annulee) → tout refusé", async () => {
