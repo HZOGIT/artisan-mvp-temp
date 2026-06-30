@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { Client, CreateClientInput, UpdateClientInput } from "../domain/client";
 import type { FactureEncoursLigne } from "./encours";
@@ -10,6 +11,7 @@ import type { FactureEncoursLigne } from "./encours";
  * documents liés (factures/devis/interventions).
  */
 export interface IClientRepository {
+  withDb(db: DbClient): IClientRepository;
   list(ctx: TenantContext): Promise<Client[]>;
   /** null si le client n'appartient pas au tenant. */
   getById(ctx: TenantContext, id: number): Promise<Client | null>;

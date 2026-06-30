@@ -2,6 +2,8 @@ import { z } from "zod";
 import { router, permissionProcedure } from "../../../../interface/trpc/trpc";
 import { SiretSchema } from "../../../../../../packages/contract/validation";
 import { ValidationError } from "../../../../shared/errors";
+import { outboxEvent } from "../../../../shared/events/outbox-event";
+import { withOutbox } from "../../../../shared/events/with-outbox";
 
 /*
  * Procédures gatées par permission (parité legacy) : lecture = `clients.voir`, écriture = `clients.gerer`.
@@ -93,24 +95,34 @@ export function createClientsRouter(deps: ClientsModuleDeps) {
     create: gerer
       .input(createSchema)
       .mutation(async ({ ctx, input }) => {
-        const result = await creerClient(repo, ctx.tenant, input);
-        ctx.log.info({ event: "client_created", clientId: result.id, type: input.type ?? "particulier" }, "Nouveau client créé");
-        return result;
+        return withOutbox(deps.db, repo, async (r, tx) => {
+          const result = await creerClient(r, ctx.tenant, input);
+          ctx.log.info({ event: "client_created", clientId: result.id, type: input.type ?? "particulier" }, "Nouveau client créé");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "client.cree", entityType: "client", entityId: result.id, payload: { nom: result.nom, type: result.type } });
+          return result;
+        });
       }),
 
     update: gerer
       .input(z.object({ id: z.number().int() }).and(updateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { id, ...data } = input;
-        return modifierClient(repo, ctx.tenant, id, data);
+        return withOutbox(deps.db, repo, async (r, tx) => {
+          const result = await modifierClient(r, ctx.tenant, id, data);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "client.modifie", entityType: "client", entityId: id, payload: { nom: data.nom ?? null, type: data.type ?? null } });
+          return result;
+        });
       }),
 
     delete: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        await supprimerClient(repo, ctx.tenant, input.id);
-        ctx.log.warn({ event: "client_deleted", clientId: input.id }, "Client supprimé définitivement");
-        return { success: true };
+        return withOutbox(deps.db, repo, async (r, tx) => {
+          await supprimerClient(r, ctx.tenant, input.id);
+          ctx.log.warn({ event: "client_deleted", clientId: input.id }, "Client supprimé définitivement");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "client.supprime", entityType: "client", entityId: input.id, payload: {} });
+          return { success: true };
+        });
       }),
 
     /**
@@ -120,9 +132,12 @@ export function createClientsRouter(deps: ClientsModuleDeps) {
     anonymiser: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        await anonymiserClient(repo, ctx.tenant, input.id);
-        ctx.log.warn({ event: "client_anonymise", clientId: input.id }, "Client anonymisé (RGPD Art. 17)");
-        return { success: true };
+        return withOutbox(deps.db, repo, async (r, tx) => {
+          await anonymiserClient(r, ctx.tenant, input.id);
+          ctx.log.warn({ event: "client_anonymise", clientId: input.id }, "Client anonymisé (RGPD Art. 17)");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "client.anonymise", entityType: "client", entityId: input.id, payload: {} });
+          return { success: true };
+        });
       }),
 
     /*

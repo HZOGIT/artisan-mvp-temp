@@ -362,6 +362,8 @@ export interface AppDeps extends ContextDeps {
   /** Pool DB pour les transactions outbox du module stocks (défaut : getDbHandle().db). */
   readonly stocksDb?: DbClient;
   readonly clientRepo?: IClientRepository;
+  /** Pool DB pour les transactions outbox events du module clients (défaut : getDbHandle().db). */
+  readonly clientsDb?: DbClient;
   readonly interventionRepo?: IInterventionRepository;
   /** Pool DB pour les transactions outbox events du module interventions (défaut : getDbHandle().db). */
   readonly interventionsDb?: DbClient;
@@ -674,7 +676,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     repository: clientRepo,
     email: emailAdapter,
     optoutRepo: new EmailOptoutRepositoryDrizzle(getDbHandle().db),
-    db: getDbHandle().db,
+    db: deps.clientsDb ?? getDbHandle().db,
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
     unsubscribeSecret: deps.emailUnsubscribeSecret ?? process.env.EMAIL_UNSUBSCRIBE_SECRET ?? process.env.JWT_SECRET ?? "dev-unsubscribe-secret",
   });

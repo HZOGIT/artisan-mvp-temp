@@ -1,3 +1,4 @@
+import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IClientRepository } from "../application/client-repository";
 import type { FactureEncoursLigne } from "../application/encours";
@@ -8,6 +9,11 @@ import { champsFusionnes, type Client, type CreateClientInput, type UpdateClient
  * tenant et les valeurs par défaut PG (`type` → particulier). Aucune fuite cross-tenant.
  */
 export class FakeClientRepository implements IClientRepository {
+  /* ponytail: withDb no-op sur le fake — la DB n'est pas utilisée en mémoire */
+  withDb(_db: DbClient): this {
+    return this;
+  }
+
   private store: Client[] = [];
   private seq = 0;
   /** Nombre de documents liés par clientId (injectable pour tester la garde de suppression). */
