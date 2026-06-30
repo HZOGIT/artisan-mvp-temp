@@ -78,4 +78,30 @@ describe.skipIf(!URL)("connect — startOnboarding + status (L2 — app_tenant)"
     expect(status.status).toBe("active");
     expect(status.chargesEnabled).toBe(true);
   });
+
+  it("getConnectStatus pull live Stripe si DB stale (pending → active, sans webhook)", async () => {
+    await admin.query(
+      `UPDATE artisans SET stripe_connect_account_id=$1, stripe_connect_status='pending',
+       stripe_connect_charges_enabled=false, stripe_connect_connected_at=NULL WHERE id=$2`,
+      ["acct_stale_test", bId],
+    );
+    stripe.retrievableAccounts.set("acct_stale_test", {
+      charges_enabled: true,
+      payouts_enabled: true,
+      details_submitted: true,
+      requirements: null,
+    });
+
+    const result = await getConnectStatus(deps, ctx(bId));
+
+    expect(result.status).toBe("active");
+    expect(result.chargesEnabled).toBe(true);
+
+    const { rows } = await admin.query(
+      `SELECT stripe_connect_status, stripe_connect_charges_enabled FROM artisans WHERE id=$1`,
+      [bId],
+    );
+    expect(rows[0].stripe_connect_status).toBe("active");
+    expect(rows[0].stripe_connect_charges_enabled).toBe(true);
+  });
 });
