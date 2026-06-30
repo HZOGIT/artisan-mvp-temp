@@ -169,7 +169,7 @@ export default function FactureDetailPage() {
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={handleExportPDF}><Download className="h-4 w-4 mr-2" />{t("exportPDF")}</Button>
 
-          <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
+          <Dialog open={isEmailDialogOpen} onOpenChange={(open) => { setIsEmailDialogOpen(open); if (open) { setAttachPdf(true); setEmailMessage(""); setEmailPieceIds([]); } }}>
             <DialogTrigger asChild><Button variant="outline" disabled={!facture.client?.email}><Mail className="h-4 w-4 mr-2" />{dejaEnvoye ? t("renvoyerEmail") : t("envoyerEmail")}</Button></DialogTrigger>
             <DialogContent>
               <DialogHeader>

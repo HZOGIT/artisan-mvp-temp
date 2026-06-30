@@ -612,6 +612,80 @@ async function casDevisConvertIdempotent() {
 }
 await casDevisConvertIdempotent();
 
+// ── CAS OPE-969 — Dialog email facture : checkbox PDF réinitialisée à true à chaque réouverture ──
+// Régression : attachPdf (state React) ne se réinitialisait pas à true quand le dialog se ferme.
+// Scénario : décocher PDF → annuler → rouvrir → la checkbox doit être de nouveau cochée.
+async function casFactureEmailDialogPdfReset() {
+  casesRun++;
+  const tag = 'facture.email-dialog-pdf-reset';
+  const trpcPost = async (proc, input) => ctx.request.post(`${BACKEND}/api/trpc/${proc}?batch=1`, {
+    headers: { 'content-type': 'application/json' },
+    data: { '0': { json: input } },
+  });
+
+  const clients = (await trpcGet('clients.list', null)) ?? [];
+  const clientWithEmail = clients.find((c) => c.email);
+  if (!clientWithEmail) { issues.push({ tag, skipped: 'aucun client avec email disponible' }); return; }
+
+  let factureId = null;
+  const page = await ctx.newPage();
+  try {
+    const rc = await trpcPost('factures.create', { clientId: clientWithEmail.id, objet: `E2E-email-dialog-${Date.now()}` });
+    if (!rc.ok()) { issues.push({ tag, step: 'create', error: `HTTP ${rc.status()}` }); return; }
+    const created = (await rc.json())[0]?.result?.data?.json;
+    if (!created?.id) { issues.push({ tag, step: 'create-id', error: 'id absent' }); return; }
+    factureId = created.id;
+
+    await trpcPost('factures.addLigne', { factureId, designation: 'E2E-ligne', prixUnitaireHT: '100.00' });
+
+    await page.goto(`/factures/${factureId}`, { waitUntil: 'networkidle' });
+
+    const emailBtn = page.getByRole('button', { name: 'Envoyer par email' });
+    if (!await emailBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      issues.push({ tag, error: 'Bouton "Envoyer par email" non visible' }); return;
+    }
+    await emailBtn.click();
+    await page.waitForTimeout(600);
+
+    const dialog = page.getByRole('dialog');
+    if (!await dialog.isVisible({ timeout: 3000 }).catch(() => false)) {
+      issues.push({ tag, error: 'Dialog email non ouvert' }); return;
+    }
+
+    const pdfCheckbox = dialog.locator('input[type="checkbox"]').first();
+    if (!await pdfCheckbox.isChecked({ timeout: 2000 }).catch(() => false)) {
+      issues.push({ tag, step: 'default-checked', error: 'Checkbox PDF non cochée par défaut' });
+    }
+
+    await pdfCheckbox.uncheck();
+    await page.waitForTimeout(200);
+    await page.getByRole('button', { name: 'Annuler' }).click();
+    await page.waitForTimeout(400);
+
+    await emailBtn.click();
+    await page.waitForTimeout(600);
+
+    const dialog2 = page.getByRole('dialog');
+    if (!await dialog2.isVisible({ timeout: 3000 }).catch(() => false)) {
+      issues.push({ tag, step: 'reopen', error: 'Dialog non rouvert' }); return;
+    }
+    const pdfCheckbox2 = dialog2.locator('input[type="checkbox"]').first();
+    const checkedAfterReopen = await pdfCheckbox2.isChecked({ timeout: 2000 }).catch(() => null);
+    if (checkedAfterReopen !== true) {
+      issues.push({ tag, step: 'reset-on-reopen', error: `Checkbox PDF non réinitialisée à true après réouverture (OPE-969), got: ${checkedAfterReopen}` });
+    }
+    await page.getByRole('button', { name: 'Annuler' }).click();
+  } catch (e) {
+    issues.push({ tag, error: String(e).slice(0, 300) });
+  } finally {
+    await page.close();
+    if (factureId !== null) {
+      await trpcPost('factures.delete', { id: factureId }).catch(() => {});
+    }
+  }
+}
+
+await casFactureEmailDialogPdfReset();
 // ── (Ajouter ici les cas factures/contrats et tout futur bug d'intégration front↔tRPC) ─────────────
 
 console.log('=== E2E MUTATIONS RESULT ===');
