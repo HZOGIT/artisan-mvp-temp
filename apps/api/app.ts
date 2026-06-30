@@ -256,6 +256,7 @@ import {
   ClientReaderDrizzle as SharedClientReaderDrizzle,
 } from "./shared/readers/contact-readers-drizzle";
 import { DevisSignatureReaderDrizzle } from "./modules/devis/infra/devis-signature-reader-drizzle";
+import { DevisSignatureCreatorDrizzle } from "./modules/devis/infra/devis-signature-creator-drizzle";
 import type { IDevisRepository } from "./modules/devis/application/devis-repository";
 import { createFacturesModule } from "./modules/factures/factures.module";
 import { FactureRepositoryDrizzle } from "./modules/factures/infra/facture-repository-drizzle";
@@ -781,6 +782,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       email: emailAdapter,
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
       signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db),
+      signatureCreator: new DevisSignatureCreatorDrizzle(getDbHandle().db),
       appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
       modeleEmailRepo,
       piecesJointesRepo: new PiecesJointesRepositoryDrizzle(getDbHandle().db),
@@ -1060,7 +1062,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     buildAssistantWriteHandlersFromRepos(
       { clientRepo, interventionRepo, devisRepo, factureRepo, devisReader: new DevisReaderDrizzle(getDbHandle().db), commandeRepo },
       {
-        devis: { artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db), clientReader: new SharedClientReaderDrizzle(getDbHandle().db), signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db), appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com", pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000), modeleEmailRepo },
+        devis: { artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db), clientReader: new SharedClientReaderDrizzle(getDbHandle().db), signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db), signatureCreator: new DevisSignatureCreatorDrizzle(getDbHandle().db), appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com", pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000), modeleEmailRepo },
         facture: { artisanReader: new ArtisanReaderDrizzle(getDbHandle().db), clientReader: new ClientReaderDrizzle(getDbHandle().db), pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000), modeleEmailRepo },
         relance: { artisanReader: new ArtisanReaderDrizzle(getDbHandle().db), clientReader: new ClientReaderDrizzle(getDbHandle().db), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000), modeleEmailRepo, appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com", portalTokenReader: new PortalAccessRepositoryDrizzle(getDbHandle().db) },
         commande: { repo: commandeRepo, fournisseurRepo, artisanReader: new CommandeArtisanReaderDrizzle(getDbHandle().db), pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
