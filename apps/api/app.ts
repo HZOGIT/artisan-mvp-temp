@@ -575,6 +575,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   app.register(helmet, {
     contentSecurityPolicy: { useDefaults: true, reportOnly: true },
     crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
   });
 
   const backendPublicUrl = deps.backendPublicUrl ?? process.env.BACKEND_PUBLIC_URL ?? deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com";

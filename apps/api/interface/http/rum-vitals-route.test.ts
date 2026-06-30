@@ -75,6 +75,23 @@ describe("registerRumVitalsRoute", () => {
   });
 });
 
+describe("helmet CORP header sur /api/vitals", () => {
+  it("répond cross-origin-resource-policy: cross-origin (sendBeacon cross-origin autorisé)", async () => {
+    const helmet = (await import("@fastify/helmet")).default;
+    const app = Fastify();
+    app.register(helmet, {
+      contentSecurityPolicy: { useDefaults: true, reportOnly: true },
+      crossOriginEmbedderPolicy: false,
+      crossOriginResourcePolicy: { policy: "cross-origin" },
+    });
+    registerRumVitalsRoute(app, { rateLimiter: allow, log: () => {} });
+    await app.ready();
+    const res = await post(app, { name: "LCP", value: 100, rating: "good", id: "test" });
+    expect(res.headers["cross-origin-resource-policy"]).toBe("cross-origin");
+    await app.close();
+  });
+});
+
 describe("sanitizeMetricValue", () => {
   it("arrondit à 3 décimales et rejette les non-finis", () => {
     expect(sanitizeMetricValue(1234.5678)).toBe(1234.568);
