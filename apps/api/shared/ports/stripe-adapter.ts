@@ -162,7 +162,10 @@ export class FakeStripePort implements StripePort {
   }
 
   public sessionStatuses: Map<string, CheckoutSessionStatus> = new Map();
+  /** Si vrai, retourne null pour tout sessionId absent de sessionStatuses (simule Stripe indisponible). */
+  public returnNullForUnknown = false;
   async retrieveCheckoutSession(sessionId: string): Promise<CheckoutSessionStatus | null> {
+    if (this.returnNullForUnknown) return this.sessionStatuses.get(sessionId) ?? null;
     return this.sessionStatuses.get(sessionId) ?? { paymentStatus: "unpaid", paymentIntentId: null, sessionStatus: "open" };
   }
 

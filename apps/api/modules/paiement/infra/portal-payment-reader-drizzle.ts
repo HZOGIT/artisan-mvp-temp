@@ -118,4 +118,15 @@ export class PortalPaymentReaderDrizzle implements PortalPaymentReader {
       return p ? { id: p.id, url: p.url, sessionId: p.sessionId, stripeConnectAccountId: p.stripeConnectAccountId } : null;
     });
   }
+
+  async getPaiementPaye(ctx: TenantContext, factureId: number): Promise<{ id: number } | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [p] = await tx
+        .select({ id: paiementsStripe.id })
+        .from(paiementsStripe)
+        .where(and(eq(paiementsStripe.factureId, factureId), eq(paiementsStripe.artisanId, ctx.artisanId), eq(paiementsStripe.statut, "payee")))
+        .limit(1);
+      return p ? { id: p.id } : null;
+    });
+  }
 }

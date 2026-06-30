@@ -26,6 +26,7 @@ export class FakePortalPaymentReader implements PortalPaymentReader {
   /** Quand vrai, le premier appel à getSessionEnAttente retourne null (simule la race TOCTOU : session pas encore en DB). */
   skipFirstSessionLookup = false;
   private firstSessionLookupDone = false;
+  private paiementsPaye = new Map<string, { id: number }>();
 
   seedCheckout(artisanId: number, factureId: number, f: FactureCheckout): void {
     this.checkouts.set(`${artisanId}:${factureId}`, f);
@@ -44,6 +45,9 @@ export class FakePortalPaymentReader implements PortalPaymentReader {
   }
   seedSessionEnAttente(artisanId: number, factureId: number, session: { id?: number; url: string | null; sessionId?: string | null; stripeConnectAccountId?: string | null; createdAt?: Date }): void {
     this.sessionsEnAttente.set(`${artisanId}:${factureId}`, { id: session.id ?? 0, url: session.url, sessionId: session.sessionId ?? null, stripeConnectAccountId: session.stripeConnectAccountId ?? null, createdAt: session.createdAt ?? new Date() });
+  }
+  seedPaiementPaye(artisanId: number, factureId: number, id = 1): void {
+    this.paiementsPaye.set(`${artisanId}:${factureId}`, { id });
   }
 
   seedAccess(token: string, a: PortalAccess): void {
@@ -79,6 +83,9 @@ export class FakePortalPaymentReader implements PortalPaymentReader {
   }
   async getArtisanConnectAccountId(ctx: TenantContext): Promise<string | null> {
     return this.connectAccountIds.get(ctx.artisanId) ?? "acct_fake_test";
+  }
+  async getPaiementPaye(ctx: TenantContext, factureId: number): Promise<{ id: number } | null> {
+    return this.paiementsPaye.get(`${ctx.artisanId}:${factureId}`) ?? null;
   }
   async getSessionEnAttente(ctx: TenantContext, factureId: number, now: Date): Promise<{ id: number; url: string | null; sessionId: string | null; stripeConnectAccountId: string | null } | null> {
     if (this.skipFirstSessionLookup && !this.firstSessionLookupDone) {
