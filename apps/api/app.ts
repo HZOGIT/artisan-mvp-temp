@@ -188,6 +188,7 @@ import { genererAlertesReconductionContrats } from "./modules/contrats-maintenan
 import { artisans as artisansTable, paOutbox } from "../../drizzle/schema.pg";
 import { makeDepensesRecurrentesJob } from "./modules/depenses/application/depenses-recurrentes-job";
 import { createOutboxBloqueJob, createEventManquantNotificationJob } from "./modules/events/application/events-healing";
+import { createEmailsLogReconcilerJob } from "./modules/emails/application/emails-log-reconciler";
 import { contratsVisitesCronPlugin } from "./shared/infra/contrats-visites-cron";
 import { rappelRdvClientCronPlugin } from "./shared/infra/rappel-rdv-client-cron";
 import { analysePhotosCronPlugin } from "./shared/infra/analyse-photos-cron";
@@ -1544,6 +1545,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
           db: getDbHandle().db,
           ownerDb: getOwnerDbHandle().db,
           dryRun: true,
+        }),
+      );
+      registry.register(
+        createEmailsLogReconcilerJob(getOwnerDbHandle().db, {
+          dryRun: process.env.HEALING_DRYRUN !== "false",
         }),
       );
     },
