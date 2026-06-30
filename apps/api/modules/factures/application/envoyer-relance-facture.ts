@@ -7,6 +7,7 @@ import type { ArtisanReader, ClientReader } from "./contact-readers";
 import type { IFactureRepository } from "./facture-repository";
 import type { IModeleEmailRepository } from "../../modeles-email/application/modele-email-repository";
 import { buildModeleEmail } from "../../modeles-email/domain/render";
+import type { IEmailOptoutRepository } from "../../emails/application/email-optout-repository";
 
 /*
  * Relance d'une facture impayée par email (parité fonctionnelle du legacy `execEnvoyerRelance`) :
@@ -21,6 +22,8 @@ export interface RelanceMailingDeps {
   readonly rateLimiter: RateLimiterPort;
   /** Optionnel : si présent, le modèle `isDefault` du type `rappel_paiement` remplace le gabarit codé en dur. */
   readonly modeleEmailRepo?: IModeleEmailRepository;
+  /** Optionnel : si présent, vérifie l'opt-out RGPD avant envoi. */
+  readonly optoutRepo?: IEmailOptoutRepository;
 }
 
 export interface EnvoyerRelanceInput {
@@ -131,6 +134,10 @@ export async function envoyerRelanceFacture(
   const facture = await repo.getById(ctx, input.factureId);
   if (!facture) throw new NotFoundError("Facture introuvable");
 
+  if (!["envoyee", "en_retard"].includes(facture.statut)) {
+    throw new ValidationError(`Impossible de relancer une facture en statut « ${facture.statut} »`);
+  }
+
   const artisan = await deps.artisanReader.getArtisan(ctx);
   if (!artisan) throw new NotFoundError("Artisan introuvable");
 
@@ -170,6 +177,10 @@ export async function envoyerRelanceFacture(
         niveau,
         customMessage: input.customMessage ?? null,
       });
+
+  if (deps.optoutRepo && await deps.optoutRepo.isOptedOut(client.email)) {
+    return { success: false, message: `Relance non envoyée : ${client.email} a demandé à ne plus recevoir d'emails` };
+  }
 
   await deps.email.send({ to: client.email, subject, body, fromName: artisan.nomEntreprise ?? undefined, replyTo: artisan.email ?? undefined });
 

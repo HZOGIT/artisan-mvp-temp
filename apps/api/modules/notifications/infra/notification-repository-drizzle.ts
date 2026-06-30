@@ -1,4 +1,4 @@
-import { and, desc, eq, ne, lt, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, isNotNull, sql } from "drizzle-orm";
 import { notifications, factures, clients } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
@@ -117,8 +117,7 @@ export class NotificationRepositoryDrizzle implements INotificationRepository {
         .where(
           and(
             eq(factures.artisanId, ctx.artisanId),
-            ne(factures.statut, "payee"),
-            ne(factures.statut, "annulee"),
+            inArray(factures.statut, ["envoyee", "en_retard"]),
             isNotNull(factures.dateEcheance),
             lt(sql`${factures.dateEcheance}::date`, today),
           ),

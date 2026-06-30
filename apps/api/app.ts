@@ -1441,6 +1441,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
             }
             return active;
           },
+          getConfig: (artisanId) => configRelances.deps.repository.get({ artisanId, userId: 0 }),
           makeRelanceDeps: (_artisanId) => ({
             devisRepo,
             relanceRepo: relanceDevisRepo,
@@ -1450,6 +1451,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
             /* ponytail: rate-limiter permissif dédié au job daily (100/h vs 5/10min en API) */
             rateLimiter: new SlidingWindowRateLimiter(100, 60 * 60 * 1000),
             modeleEmailRepo,
+            optoutRepo: new EmailOptoutRepositoryDrizzle(getDbHandle().db),
           }),
         }),
       );

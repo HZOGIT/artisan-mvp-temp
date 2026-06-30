@@ -4,6 +4,7 @@ import { buildRelanceEmail, joursDeRetard, envoyerRelanceFacture, type RelanceMa
 import { FakeEmailPort, FakeRateLimiter } from "../../../shared/ports";
 import { NotFoundError, ValidationError, TooManyRequestsError } from "../../../shared/errors";
 import { expectCrossTenantDenied } from "../../../shared/testing";
+import { EmailOptoutRepositoryFake } from "../../emails/infra/email-optout-repository-fake";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ClientInfo } from "./contact-readers";
 
@@ -23,9 +24,15 @@ function makeDeps(over: Partial<RelanceMailingDeps> & { client?: ClientInfo | nu
   };
 }
 
-async function seedFacture(repo: FakeFactureRepository, ctx: TenantContext, dateEcheance?: Date) {
+async function seedFacture(
+  repo: FakeFactureRepository,
+  ctx: TenantContext,
+  dateEcheance?: Date,
+  statut: "brouillon" | "validee" | "envoyee" | "payee" | "en_retard" | "annulee" = "envoyee",
+) {
   const f = await repo.create(ctx, { clientId: CLIENT.id, numero: "FAC-00001", objet: "Réparation", ...(dateEcheance ? { dateEcheance } : {}) });
   await repo.addLigne(ctx, f.id, { designation: "MO", prixUnitaireHT: "100.00", quantite: "1" });
+  repo.setStatutForTest(f.id, statut);
   return f;
 }
 
@@ -114,7 +121,7 @@ describe("envoyerRelanceFacture", () => {
     expect(res.message).toContain("facture FAC-00001");
     expect(email.sent).toHaveLength(1);
     expect(email.sent[0].attachments ?? []).toHaveLength(0); // pas de PDF
-    expect((await repo.getById(A, f.id))!.statut).toBe("brouillon"); // statut inchangé
+    expect((await repo.getById(A, f.id))!.statut).toBe("envoyee"); /* statut inchangé par la relance */
   });
 
   it("incrémente nombreRelances : 0 → 1, puis 1 → 2, etc.", async () => {
@@ -172,6 +179,39 @@ describe("envoyerRelanceFacture", () => {
     const email = new FakeEmailPort();
     const deps = makeDeps({ email, artisanReader: { getArtisan: async () => null } });
     await expect(envoyerRelanceFacture(repo, deps, A, { factureId: f.id })).rejects.toBeInstanceOf(NotFoundError);
-    expect(email.sent).toHaveLength(0); // garde AVANT l'envoi
+    expect(email.sent).toHaveLength(0); /* garde AVANT l'envoi */
+  });
+
+  it("OPE-794 — facture payée ou annulée → ValidationError, aucun email envoyé", async () => {
+    const repo = new FakeFactureRepository();
+    const email = new FakeEmailPort();
+    const deps = makeDeps({ email });
+
+    const fPayee = await seedFacture(repo, A, undefined, "payee");
+    await expect(envoyerRelanceFacture(repo, deps, A, { factureId: fPayee.id })).rejects.toBeInstanceOf(ValidationError);
+
+    const fAnnulee = await seedFacture(repo, A, undefined, "annulee");
+    await expect(envoyerRelanceFacture(repo, deps, A, { factureId: fAnnulee.id })).rejects.toBeInstanceOf(ValidationError);
+
+    expect(email.sent).toHaveLength(0);
+  });
+
+  it("OPE-794 — brouillon et validee → ValidationError", async () => {
+    const repo = new FakeFactureRepository();
+    const fBrouillon = await seedFacture(repo, A, undefined, "brouillon");
+    await expect(envoyerRelanceFacture(repo, makeDeps(), A, { factureId: fBrouillon.id })).rejects.toBeInstanceOf(ValidationError);
+    const fValidee = await seedFacture(repo, A, undefined, "validee");
+    await expect(envoyerRelanceFacture(repo, makeDeps(), A, { factureId: fValidee.id })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("OPE-798 — client opt-out → relance non envoyée (success:false), aucun email", async () => {
+    const repo = new FakeFactureRepository();
+    const f = await seedFacture(repo, A);
+    const email = new FakeEmailPort();
+    const optoutRepo = new EmailOptoutRepositoryFake();
+    optoutRepo.seed(CLIENT.email!);
+    const res = await envoyerRelanceFacture(repo, makeDeps({ email, optoutRepo }), A, { factureId: f.id });
+    expect(res.success).toBe(false);
+    expect(email.sent).toHaveLength(0);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createRelancesDevisJob } from "./relances-devis-job";
+import { createRelancesDevisJob, type RelancesDevisJobDeps } from "./relances-devis-job";
 import { runJob } from "../../../platform/scheduler/scheduler-runner";
 import { FakeDevisRepository } from "../infra/devis-repository-fake";
 import { FakeRelanceDevisRepository } from "../../relances-devis/infra/relance-devis-repository-fake";
@@ -35,6 +35,15 @@ function makeDeps(overrides: Partial<DevisRelanceDeps> = {}): DevisRelanceDeps {
   };
 }
 
+function defaultJobDeps(overrides: Partial<RelancesDevisJobDeps> = {}): RelancesDevisJobDeps {
+  return {
+    listArtiasnsActifs: async () => [],
+    makeRelanceDeps: () => makeDeps(),
+    getConfig: async () => ({ joursApresEnvoi: 7, joursEntreRelances: 7, nombreMaxRelances: 3, joursEnvoi: "1,2,3,4,5,6,7" }),
+    ...overrides,
+  };
+}
+
 const CTX_A = { artisanId: 1, userId: 0 } as const;
 
 async function seedDevisAncien(devisRepo: FakeDevisRepository, artisanId: number, clientId = 100): Promise<void> {
@@ -49,10 +58,9 @@ describe("relances-devis-job — idempotence scheduler", () => {
     const email = new FakeEmailPort();
     await seedDevisAncien(devisRepo, 1);
 
-    const job = createRelancesDevisJob({
-      listArtiasnsActifs: async () => [1],
-      makeRelanceDeps: () => makeDeps({ devisRepo, email }),
-    });
+    const job = createRelancesDevisJob(
+      defaultJobDeps({ listArtiasnsActifs: async () => [1], makeRelanceDeps: () => makeDeps({ devisRepo, email }) }),
+    );
 
     const repo = new FakeJobRunRepository();
     const now = new Date("2026-06-29T10:00:00Z");
@@ -70,10 +78,7 @@ describe("relances-devis-job — idempotence scheduler", () => {
 
   it("liste vide → aucune relance, job done", async () => {
     const email = new FakeEmailPort();
-    const job = createRelancesDevisJob({
-      listArtiasnsActifs: async () => [],
-      makeRelanceDeps: () => makeDeps({ email }),
-    });
+    const job = createRelancesDevisJob(defaultJobDeps({ makeRelanceDeps: () => makeDeps({ email }) }));
 
     const result = await runJob(new FakeJobRunRepository(), job, new Date("2026-06-29T10:00:00Z"));
     expect(result).toBe("done");
@@ -88,18 +93,20 @@ describe("relances-devis-job — idempotence scheduler", () => {
     const rateLimiterKO = new FakeRateLimiter();
     rateLimiterKO.denyKey("relance-auto:1");
 
-    const job = createRelancesDevisJob({
-      listArtiasnsActifs: async () => [1, 2],
-      makeRelanceDeps: (artisanId) =>
-        artisanId === 1
-          ? makeDeps({ rateLimiter: rateLimiterKO })
-          : makeDeps({
-              devisRepo: devisRepoB,
-              email: emailB,
-              clientReader: { getClient: async () => ({ id: 200, nom: "Martin", prenom: "Paul", email: "paul@client.fr" }) },
-              artisanReader: { getArtisan: async () => ({ id: 2, nomEntreprise: "Elec Test", email: "pro2@test.fr" }) },
-            }),
-    });
+    const job = createRelancesDevisJob(
+      defaultJobDeps({
+        listArtiasnsActifs: async () => [1, 2],
+        makeRelanceDeps: (artisanId) =>
+          artisanId === 1
+            ? makeDeps({ rateLimiter: rateLimiterKO })
+            : makeDeps({
+                devisRepo: devisRepoB,
+                email: emailB,
+                clientReader: { getClient: async () => ({ id: 200, nom: "Martin", prenom: "Paul", email: "paul@client.fr" }) },
+                artisanReader: { getArtisan: async () => ({ id: 2, nomEntreprise: "Elec Test", email: "pro2@test.fr" }) },
+              }),
+      }),
+    );
 
     const result = await runJob(new FakeJobRunRepository(), job, new Date("2026-06-29T10:00:00Z"));
     expect(result).toBe("done");
@@ -108,10 +115,7 @@ describe("relances-devis-job — idempotence scheduler", () => {
   });
 
   it("deux jours différents = deux claims indépendants (pas de skip cross-day)", async () => {
-    const job = createRelancesDevisJob({
-      listArtiasnsActifs: async () => [],
-      makeRelanceDeps: () => makeDeps(),
-    });
+    const job = createRelancesDevisJob(defaultJobDeps());
     const repo = new FakeJobRunRepository();
     const r1 = await runJob(repo, job, new Date("2026-06-28T10:00:00Z"));
     const r2 = await runJob(repo, job, new Date("2026-06-29T10:00:00Z"));
@@ -130,12 +134,34 @@ describe("relances-devis-job — wiring CTX_A", () => {
     devisRepo.setStatutForTest(d.id, "envoye");
     devisRepo.setDateDevisForTest?.(d.id, new Date("2026-06-27T00:00:00Z"));
 
-    const job = createRelancesDevisJob({
-      listArtiasnsActifs: async () => [1],
-      makeRelanceDeps: () => makeDeps({ devisRepo, email, maintenant: () => now }),
-    });
+    const job = createRelancesDevisJob(
+      defaultJobDeps({
+        listArtiasnsActifs: async () => [1],
+        makeRelanceDeps: () => makeDeps({ devisRepo, email, maintenant: () => now }),
+        maintenant: () => now,
+      }),
+    );
 
     await runJob(new FakeJobRunRepository(), job, now);
+    expect(email.sent.length).toBe(0);
+  });
+
+  it("OPE-797 — joursEnvoi non inclus aujourd'hui → job skip l'artisan", async () => {
+    const devisRepo = new FakeDevisRepository();
+    const email = new FakeEmailPort();
+    await seedDevisAncien(devisRepo, 1);
+
+    const dimanche = new Date("2026-06-28T10:00:00Z"); /* dimanche UTC = isoDay 7 */
+    const job = createRelancesDevisJob(
+      defaultJobDeps({
+        listArtiasnsActifs: async () => [1],
+        makeRelanceDeps: () => makeDeps({ devisRepo, email }),
+        getConfig: async () => ({ joursApresEnvoi: 7, joursEntreRelances: 7, nombreMaxRelances: 3, joursEnvoi: "1,2,3,4,5" }),
+        maintenant: () => dimanche,
+      }),
+    );
+
+    await runJob(new FakeJobRunRepository(), job, dimanche);
     expect(email.sent.length).toBe(0);
   });
 });
