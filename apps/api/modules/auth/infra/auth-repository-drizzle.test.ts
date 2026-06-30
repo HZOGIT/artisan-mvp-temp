@@ -183,4 +183,67 @@ describe.skipIf(!URL)("AuthRepositoryDrizzle (PG : users HORS RLS, accès par id
       await admin.query("delete from users where id=$1", [testUserId]);
     }
   });
+
+  it("OPE-817 — bootstrapAccount : initialise le plan comptable PCG (comptes clés présents)", async () => {
+    const testUserId = 9943010;
+    try {
+      await admin.query("delete from users where id=$1", [testUserId]);
+      await admin.query("insert into users (id, email, password, name, role, actif) values ($1,'pcg-bootstrap@t.fr','hash','PCG','artisan',true)", [testUserId]);
+      await repo.bootstrapAccount(testUserId);
+      const artisanRow = (await admin.query<{ id: number }>("select id from artisans where \"userId\"=$1", [testUserId])).rows[0];
+      expect(artisanRow, "artisan créé").toBeDefined();
+
+      const { rows } = await admin.query<{ "numeroCompte": string; type: string }>(
+        "select \"numeroCompte\", type from plan_comptable where \"artisanId\"=$1 order by \"numeroCompte\"",
+        [artisanRow.id],
+      );
+      const numeros = rows.map((r) => r["numeroCompte"]);
+      expect(numeros, "411000 Clients").toContain("411000");
+      expect(numeros, "706000 Prestations").toContain("706000");
+      expect(numeros, "512000 Banque").toContain("512000");
+      expect(numeros, "401000 Fournisseurs").toContain("401000");
+      expect(numeros, "445711 TVA collectée 20%").toContain("445711");
+      expect(numeros, "445660 TVA déductible").toContain("445660");
+      expect(rows.find((r) => r["numeroCompte"] === "411000")?.type).toBe("actif");
+      expect(rows.find((r) => r["numeroCompte"] === "706000")?.type).toBe("produit");
+      expect(rows.find((r) => r["numeroCompte"] === "401000")?.type).toBe("passif");
+    } finally {
+      await admin.query("delete from users where id=$1", [testUserId]);
+    }
+  });
+
+  it("OPE-817 — bootstrapAccount : plan comptable idempotent (re-bootstrap sans doublon)", async () => {
+    const testUserId = 9943011;
+    try {
+      await admin.query("delete from users where id=$1", [testUserId]);
+      await admin.query("insert into users (id, email, password, name, role, actif) values ($1,'pcg-idem@t.fr','hash','PCGIdem','artisan',true)", [testUserId]);
+      await repo.bootstrapAccount(testUserId);
+      await repo.bootstrapAccount(testUserId);
+      const artisanRow = (await admin.query<{ id: number }>("select id from artisans where \"userId\"=$1", [testUserId])).rows[0];
+      const { rows } = await admin.query<{ count: string }>(
+        "select count(*) as count from plan_comptable where \"artisanId\"=$1",
+        [artisanRow.id],
+      );
+      expect(Number(rows[0].count), "pas de doublon après double bootstrap").toBe(13);
+    } finally {
+      await admin.query("delete from users where id=$1", [testUserId]);
+    }
+  });
+
+  it("OPE-817 — createAndBootstrapUser : plan comptable initialisé à l'inscription", async () => {
+    const testEmail = "pcg-register@t.fr";
+    try {
+      await admin.query("delete from users where email=$1", [testEmail]);
+      const created = await repo.createAndBootstrapUser({ email: testEmail, passwordHash: "hash-pcg", name: "NewUser" });
+      const artisanRow = (await admin.query<{ id: number }>("select id from artisans where \"userId\"=$1", [created.id])).rows[0];
+      expect(artisanRow, "artisan créé").toBeDefined();
+      const { rows } = await admin.query<{ count: string }>(
+        "select count(*) as count from plan_comptable where \"artisanId\"=$1",
+        [artisanRow.id],
+      );
+      expect(Number(rows[0].count), "13 comptes PCG insérés").toBe(13);
+    } finally {
+      await admin.query("delete from users where email=$1", [testEmail]);
+    }
+  });
 });
