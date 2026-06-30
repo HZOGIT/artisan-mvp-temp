@@ -61,7 +61,7 @@ function escapeHtml(s: string): string {
 /*
  * Sujet + corps HTML de l'email devis (pur, testable) — parité fonctionnelle du template legacy
  * `generateDevisEmailContent`. `customMessage` éventuel ajouté en bas (échappé).
- * `portalUrl` : lien de signature en ligne (`/portail/<token>`), ajouté si disponible.
+ * `portalUrl` : lien de signature en ligne (`/devis-public/<token>`), ajouté si disponible.
  */
 export function buildDevisEmail(params: {
   artisanName: string;
@@ -151,7 +151,7 @@ export async function envoyerDevisParEmail(
   const dateValidite = devis.dateValidite ? new Date(devis.dateValidite).toLocaleDateString("fr-FR") : null;
 
   const signature = await deps.signatureReader.getByDevisId(ctx, devis.id);
-  const portalUrl = signature ? `${deps.appUrl}/portail/${signature.token}` : null;
+  const portalUrl = signature ? `${deps.appUrl}/devis-public/${signature.token}` : null;
 
   const modele = deps.modeleEmailRepo ? await deps.modeleEmailRepo.getDefaultByType(ctx, "envoi_devis") : null;
   const { subject, body } = modele
