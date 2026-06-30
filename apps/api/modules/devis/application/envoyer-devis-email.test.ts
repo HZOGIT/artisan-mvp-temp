@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { FakeDevisRepository } from "../infra/devis-repository-fake";
-import { envoyerDevisParEmail, buildDevisEmail, type DevisMailingDeps } from "./envoyer-devis-email";
+import { envoyerDevisParEmail, buildDevisEmail, type DevisMailingDeps, type DevisSignatureCreator } from "./envoyer-devis-email";
 import { getDevisDetail } from "./read-use-cases";
 import { FakeEmailPort, FakePdfPort, FakeRateLimiter } from "../../../shared/ports";
 import { NotFoundError, ValidationError, TooManyRequestsError } from "../../../shared/errors";
@@ -8,6 +8,17 @@ import { expectCrossTenantDenied } from "../../../shared/testing";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ClientInfo } from "../../../shared/readers/contact-readers";
 import { FakeModeleEmailRepository } from "../../modeles-email/infra/modele-email-repository-fake";
+
+class FakeDevisSignatureCreator implements DevisSignatureCreator {
+  created: Array<{ devisId: number; token: string }> = [];
+  private nextToken = "tok-fake-generated";
+
+  async create(devisId: number): Promise<{ token: string }> {
+    const token = `${this.nextToken}-${devisId}`;
+    this.created.push({ devisId, token });
+    return { token };
+  }
+}
 
 const A: TenantContext = { artisanId: 1, userId: 10 };
 const B: TenantContext = { artisanId: 2, userId: 20 };
@@ -158,5 +169,40 @@ describe("envoyerDevisParEmail", () => {
     const email = mailing.email as FakeEmailPort;
     expect(email.sent[0].body).toContain("Note spéciale");
     expect(email.sent[0].body).toContain("<p>Corps</p>");
+  });
+
+  it("auto-crée un token quand aucune signature n'existe et l'inclut dans l'email", async () => {
+    const repo = new FakeDevisRepository();
+    const d = await seedDevis(repo, A);
+    const creator = new FakeDevisSignatureCreator();
+    const mailing = makeMailing({ signatureCreator: creator });
+    await envoyerDevisParEmail(repo, mailing, A, { devisId: d.id, attachPdf: false });
+    expect(creator.created).toHaveLength(1);
+    expect(creator.created[0].devisId).toBe(d.id);
+    const { body } = (mailing.email as FakeEmailPort).sent[0];
+    expect(body).toContain(`/devis-public/${creator.created[0].token}`);
+  });
+
+  it("n'appelle pas signatureCreator si un token existe déjà (idempotence)", async () => {
+    const repo = new FakeDevisRepository();
+    const d = await seedDevis(repo, A);
+    const creator = new FakeDevisSignatureCreator();
+    const mailing = makeMailing({
+      signatureReader: { getByDevisId: async () => ({ id: 1, token: "tok-existant", createdAt: new Date() }) },
+      signatureCreator: creator,
+    });
+    await envoyerDevisParEmail(repo, mailing, A, { devisId: d.id, attachPdf: false });
+    expect(creator.created).toHaveLength(0);
+    const { body } = (mailing.email as FakeEmailPort).sent[0];
+    expect(body).toContain("/devis-public/tok-existant");
+  });
+
+  it("envoie l'email sans lien si signatureCreator absent et aucun token existant", async () => {
+    const repo = new FakeDevisRepository();
+    const d = await seedDevis(repo, A);
+    const mailing = makeMailing();
+    await envoyerDevisParEmail(repo, mailing, A, { devisId: d.id, attachPdf: false });
+    const { body } = (mailing.email as FakeEmailPort).sent[0];
+    expect(body).not.toContain("/devis-public/");
   });
 });

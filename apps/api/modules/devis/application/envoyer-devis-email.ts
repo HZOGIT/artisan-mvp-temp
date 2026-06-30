@@ -16,6 +16,15 @@ import type { IEmailLogWriter } from "../../emails/application/email-log-writer"
  * Dépendances de l'envoi d'un devis par email (composition : artisan + client + PDF + email +
  * rate-limit). Tout est injecté (interfaces) → testable sans infra ni legacy.
  */
+/**
+ * Crée un token de signature pour un devis (idempotence assurée par le use-case appelant).
+ * HORS RLS : `signatures_devis` n'a pas d'artisanId — l'anti-IDOR est garanti en amont par
+ * la vérification que le devis appartient bien au tenant avant d'appeler ce creator.
+ */
+export interface DevisSignatureCreator {
+  create(devisId: number): Promise<{ token: string }>;
+}
+
 export interface DevisMailingDeps {
   readonly artisanReader: ArtisanReader;
   readonly clientReader: ClientReader;
@@ -23,6 +32,8 @@ export interface DevisMailingDeps {
   readonly email: EmailPort;
   readonly rateLimiter: RateLimiterPort;
   readonly signatureReader: DevisSignatureReader;
+  /** Si présent, auto-crée un token de signature lors de l'envoi si aucun n'existe encore. */
+  readonly signatureCreator?: DevisSignatureCreator;
   readonly appUrl: string;
   /** Optionnel : si présent, le modèle `isDefault` du type `envoi_devis` remplace le gabarit codé en dur. */
   readonly modeleEmailRepo?: IModeleEmailRepository;
@@ -150,8 +161,13 @@ export async function envoyerDevisParEmail(
   const totalTTC = `${(parseFloat(devis.totalTTC || "0") || 0).toFixed(2)} €`;
   const dateValidite = devis.dateValidite ? new Date(devis.dateValidite).toLocaleDateString("fr-FR") : null;
 
-  const signature = await deps.signatureReader.getByDevisId(ctx, devis.id);
-  const portalUrl = signature ? `${deps.appUrl}/devis-public/${signature.token}` : null;
+  const existingSignature = await deps.signatureReader.getByDevisId(ctx, devis.id);
+  let signatureToken = existingSignature?.token ?? null;
+  if (!signatureToken && deps.signatureCreator) {
+    const created = await deps.signatureCreator.create(devis.id);
+    signatureToken = created.token;
+  }
+  const portalUrl = signatureToken ? `${deps.appUrl}/devis-public/${signatureToken}` : null;
 
   const modele = deps.modeleEmailRepo ? await deps.modeleEmailRepo.getDefaultByType(ctx, "envoi_devis") : null;
   const { subject, body } = modele
