@@ -75,9 +75,14 @@ export default function EinvoicingPage() {
             </div>
           )}
           {!isLoadingStatut && statut?.statutProvisioning !== "done" && statut?.paDisponible !== false && (
-            <Button onClick={handleActivate} disabled={isOnboarding}>
-              {isOnboarding ? t("activation_en_cours") : t("activate")}
-            </Button>
+            <>
+              <Button onClick={handleActivate} disabled={isOnboarding || !oauthStatut?.connecte}>
+                {isOnboarding ? t("activation_en_cours") : t("activate")}
+              </Button>
+              {!oauthStatut?.connecte && (
+                <p className="text-sm text-muted-foreground">{t("connecter_superpdp_avant")}</p>
+              )}
+            </>
           )}
           {statut?.derniereErreur && (
             <p className="text-sm text-destructive">{statut.derniereErreur}</p>
