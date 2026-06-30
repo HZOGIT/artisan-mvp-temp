@@ -4,6 +4,7 @@ import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import { round2 } from "../../../shared/money";
+import { ValidationError } from "../../../shared/errors";
 import { ClientRepositoryDrizzle } from "../../clients/infra/client-repository-drizzle";
 import { DevisRepositoryDrizzle } from "../../devis/infra/devis-repository-drizzle";
 import { FactureRepositoryDrizzle } from "../../factures/infra/facture-repository-drizzle";
@@ -53,6 +54,10 @@ export class ImportErpRepositoryDrizzle implements IImportErpRepository {
 
   async createDevisLight(ctx: TenantContext, data: ImportDevisData): Promise<void> {
     const numero = await this.devisRepo.nextNumero(ctx);
+    const ttcNum = parseFloat(data.totalTTC || "0");
+    /* ponytail: 20% TVA par défaut — le mapping import devis n'expose pas tauxTVA */
+    const totalHT = round2(ttcNum / 1.2).toFixed(2);
+    const totalTVA = round2(ttcNum - parseFloat(totalHT)).toFixed(2);
     await withTenant(this.db, ctx, async (tx) => {
       await tx.insert(devisTable).values({
         artisanId: ctx.artisanId,
@@ -64,12 +69,20 @@ export class ImportErpRepositoryDrizzle implements IImportErpRepository {
         dateDevis: data.dateDevis,
         dateValidite: data.dateValidite,
         totalTTC: data.totalTTC,
+        totalHT,
+        totalTVA,
         notes: data.notes ?? null,
       });
     });
   }
 
   async createFactureLight(ctx: TenantContext, data: ImportFactureData): Promise<void> {
+    const lignes = data.lignes ?? [];
+    if (lignes.length === 0 && parseFloat(data.totalTTC || "0") > 0) {
+      throw new ValidationError("Une facture importée avec un totalTTC > 0 doit comporter au moins une ligne");
+    }
+    const totalHT = round2(lignes.reduce((s, l) => s + (parseFloat(l.montantHT) || 0), 0)).toFixed(2);
+    const totalTVA = round2(lignes.reduce((s, l) => s + (parseFloat(l.montantTVA) || 0), 0)).toFixed(2);
     /*
      * Préserve le numéro LÉGAL d'origine s'il est fourni (facture historique d'un autre logiciel) ;
      * sinon génère un numéro serveur (parité création normale).
@@ -87,26 +100,26 @@ export class ImportErpRepositoryDrizzle implements IImportErpRepository {
         datePaiement: data.datePaiement ?? null,
         modePaiement: data.modePaiement ?? null,
         totalTTC: data.totalTTC,
+        totalHT,
+        totalTVA,
       }).returning();
-      if (data.lignes && data.lignes.length > 0) {
-        for (const ligne of data.lignes) {
-          const montantTTC = round2(parseFloat(ligne.montantHT) + parseFloat(ligne.montantTVA)).toFixed(2);
-          await tx.insert(facturesLignesTable).values({
-            factureId: facture.id,
-            ordre: 0,
-            designation: ligne.designation,
-            description: null,
-            quantite: ligne.quantite,
-            unite: "unité",
-            prixUnitaireHT: ligne.prixUnitaireHT,
-            tauxTVA: ligne.tauxTVA,
-            tvaCategorieId: ligne.tvaCategorieId ?? null,
-            montantHT: ligne.montantHT,
-            montantTVA: ligne.montantTVA,
-            montantTTC,
-            type: "produit",
-          });
-        }
+      for (const ligne of lignes) {
+        const montantTTC = round2(parseFloat(ligne.montantHT) + parseFloat(ligne.montantTVA)).toFixed(2);
+        await tx.insert(facturesLignesTable).values({
+          factureId: facture.id,
+          ordre: 0,
+          designation: ligne.designation,
+          description: null,
+          quantite: ligne.quantite,
+          unite: "unité",
+          prixUnitaireHT: ligne.prixUnitaireHT,
+          tauxTVA: ligne.tauxTVA,
+          tvaCategorieId: ligne.tvaCategorieId ?? null,
+          montantHT: ligne.montantHT,
+          montantTVA: ligne.montantTVA,
+          montantTTC,
+          type: "produit",
+        });
       }
     });
   }
