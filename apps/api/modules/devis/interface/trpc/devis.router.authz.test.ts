@@ -110,7 +110,7 @@ describe.skipIf(!URL)("devis.router — gate de permission (authz OPE-789)", () 
     expect(res.statusCode).toBe(403);
   });
 
-  it("membre avec devis.creer → create/update/delete/envoyer/accepter 200 ou erreur métier ≠ 403", async () => {
+  it("membre avec devis.creer → create/update/envoyer/accepter 200 ou erreur métier ≠ 403", async () => {
     await admin.query('insert into permissions_utilisateur ("userId",permission,autorise) values ($1,$2,true)', [MEMBER, "devis.creer"]);
     const tok = await jwt(MEMBER);
 
@@ -124,8 +124,20 @@ describe.skipIf(!URL)("devis.router — gate de permission (authz OPE-789)", () 
     /** accepter nécessite statut envoye — on force via admin pour tester le gate */
     await admin.query("update devis set statut='envoye' where id=$1", [id]);
     expect((await mut(server, "devis.accepter", { id }, tok)).statusCode).not.toBe(403);
+  });
 
-    const idToDelete = ((await mut(server, "devis.create", { clientId }, tok)).json() as { result: { data: { id: number } } }).result.data.id;
-    expect((await mut(server, "devis.delete", { id: idToDelete }, tok)).statusCode).toBe(200);
+  it("membre avec devis.creer SANS devis.supprimer → delete 403", async () => {
+    const tokOwner = await jwt(OWNER);
+    const id = ((await mut(server, "devis.create", { clientId }, tokOwner)).json() as { result: { data: { id: number } } }).result.data.id;
+    const res = await mut(server, "devis.delete", { id }, await jwt(MEMBER));
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("membre avec devis.supprimer → delete 200", async () => {
+    await admin.query('insert into permissions_utilisateur ("userId",permission,autorise) values ($1,$2,true) on conflict do nothing', [MEMBER, "devis.supprimer"]);
+    const tokOwner = await jwt(OWNER);
+    const id = ((await mut(server, "devis.create", { clientId }, tokOwner)).json() as { result: { data: { id: number } } }).result.data.id;
+    const res = await mut(server, "devis.delete", { id }, await jwt(MEMBER));
+    expect(res.statusCode).toBe(200);
   });
 });

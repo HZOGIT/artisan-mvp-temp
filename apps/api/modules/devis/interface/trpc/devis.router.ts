@@ -10,6 +10,7 @@ import { withOutbox } from "../../../../shared/events/with-outbox";
 import { signaturesDevis } from "../../../../../../drizzle/schema.pg";
 /** Permissions (parité legacy) : actions sur lignes/envoi/duplication = `devis.creer` ; conversion en facture = `factures.creer`. */
 const devisCreer = permissionProcedure("devis.creer");
+const devisSupprimer = permissionProcedure("devis.supprimer");
 const facturesCreer = permissionProcedure("factures.creer");
 import type { IDevisRepository } from "../../application/devis-repository";
 import { listDevis, getDevisDetail, listLignesDevis } from "../../application/read-use-cases";
@@ -164,7 +165,7 @@ export function createDevisRouter(
         });
       }),
 
-    delete: devisCreer
+    delete: devisSupprimer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         return withOutbox(db, repo, async (r, tx) => {
