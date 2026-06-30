@@ -299,71 +299,78 @@
     {
       "idx": 42,
       "version": "7",
+      "when": 1782829957000,
+      "tag": "20260630143237_lien-paiement-text",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
       "when": 1782831600000,
       "tag": "20260630150000_historique-revisions-prix",
       "breakpoints": true
     },
     {
-      "idx": 43,
+      "idx": 44,
+      "version": "7",
+      "when": 1782831850000,
+      "tag": "20260630150410_paiements-stripe-add-expire-statut",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
       "version": "7",
       "when": 1782835200000,
       "tag": "20260630160000_restaurer-modules-actif-defaut",
       "breakpoints": true
     },
     {
-      "idx": 44,
+      "idx": 46,
+      "version": "7",
+      "when": 1782847620000,
+      "tag": "20260630192700_backfill-permissions-artisans-sans-permissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1782847728000,
+      "tag": "20260630192848_backfill-billing-artisans-fenetre-rls",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
       "version": "7",
       "when": 1782849600000,
       "tag": "20260630200000_billing-invoices-mentions-legales-fr",
       "breakpoints": true
     },
     {
-      "idx": 45,
+      "idx": 49,
+      "version": "7",
+      "when": 1782850924000,
+      "tag": "20260630202204_rls-active-sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
       "version": "7",
       "when": 1782853200000,
       "tag": "20260630210000_artisans-stripe-connect",
       "breakpoints": true
     },
     {
-      "idx": 46,
+      "idx": 51,
       "version": "7",
       "when": 1782864000000,
       "tag": "20260701000000_add-connect-snapshot-to-paiements-stripe",
       "breakpoints": true
     },
     {
-      "idx": 47,
+      "idx": 52,
       "version": "7",
-      "when": 1782829957168,
-      "tag": "20260630143237_lien-paiement-text",
-      "breakpoints": true
-    },
-    {
-      "idx": 48,
-      "version": "7",
-      "when": 1782831850385,
-      "tag": "20260630150410_paiements-stripe-add-expire-statut",
-      "breakpoints": true
-    },
-    {
-      "idx": 49,
-      "version": "7",
-      "when": 1782847620160,
-      "tag": "20260630192700_backfill-permissions-artisans-sans-permissions",
-      "breakpoints": true
-    },
-    {
-      "idx": 50,
-      "version": "7",
-      "when": 1782847728702,
-      "tag": "20260630192848_backfill-billing-artisans-fenetre-rls",
-      "breakpoints": true
-    },
-    {
-      "idx": 51,
-      "version": "7",
-      "when": 1782850924845,
-      "tag": "20260630202204_rls-active-sessions",
+      "when": 1782852044745,
+      "tag": "20260630204044_rls-tables-enfants",
       "breakpoints": true
     }
   ]
