@@ -189,3 +189,81 @@ describe.skipIf(!URL)("revision-indexation-job — intégration PG", () => {
     expect(parseFloat(rows[0].montantHT)).toBeCloseTo(520, 1);
   });
 });
+
+/** Plage d'ids distincte pour les tests outbox (évite collision avec ART 9947001). */
+const ART_OUTBOX = 9947002;
+
+describe.skipIf(!URL)("revision-indexation-job — outbox atomicité (L2)", () => {
+  const admin2 = new Pool({ connectionString: URL });
+  const app2 = createDbClient(APP_URL!);
+  const drizzleRepo2 = new ContratRepositoryDrizzle(app2.db);
+  let outboxContratId = 0;
+
+  const cleanup2 = async () => {
+    await admin2.query('delete from event_outbox where "artisanId" = $1', [ART_OUTBOX]);
+    await admin2.query('delete from contrats_maintenance where "artisanId" = $1', [ART_OUTBOX]);
+    await admin2.query('delete from clients where "artisanId" = $1', [ART_OUTBOX]);
+  };
+
+  beforeAll(async () => {
+    await cleanup2();
+    const { rows: [client] } = await admin2.query<{ id: number }>(
+      'insert into clients ("artisanId", nom) values ($1, $2) returning id',
+      [ART_OUTBOX, "Client Outbox Job"],
+    );
+    const { rows: [contrat] } = await admin2.query<{ id: number }>(
+      `insert into contrats_maintenance
+         ("artisanId","clientId",titre,"montantHT",periodicite,"dateDebut","tauxIndexationAnnuel",reference,statut,type)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id`,
+      [ART_OUTBOX, client.id, "Contrat Outbox Job", "400.00", "annuel", new Date("2025-06-30"), "5", "CTR-OBX-001", "actif", "entretien"],
+    );
+    outboxContratId = contrat.id;
+  });
+
+  afterAll(async () => {
+    await cleanup2();
+    await app2.close();
+    await admin2.end();
+  });
+
+  it("job avec db → révision + event outbox co-écrits (atomicité)", async () => {
+    const outboxBefore = Number(
+      (await admin2.query("select count(*) from event_outbox where action='contrat.prix_revise' and \"artisanId\"=$1", [ART_OUTBOX])).rows[0].count,
+    );
+    const job = createRevisionIndexationJob({
+      listArtisanIds: async () => [ART_OUTBOX],
+      contratRepo: drizzleRepo2,
+      getToday: () => new Date("2026-06-30T10:00:00Z"),
+      db: app2.db,
+    });
+    const result = await runJob(new FakeJobRunRepository(), job, new Date("2026-06-30T10:00:00Z"));
+    expect(result).toBe("done");
+
+    const row = (await admin2.query(
+      "select * from event_outbox where action='contrat.prix_revise' and \"entityId\"=$1",
+      [outboxContratId],
+    )).rows[0];
+    expect(row).toBeDefined();
+    expect(row.artisanId).toBe(ART_OUTBOX);
+    expect(row.entityType).toBe("contrat");
+    expect((row.payload as { ancienMontantHT?: string }).ancienMontantHT).toBe("400.00");
+    expect(Number((await admin2.query("select count(*) from event_outbox where action='contrat.prix_revise' and \"artisanId\"=$1", [ART_OUTBOX])).rows[0].count)).toBe(outboxBefore + 1);
+  });
+
+  it("2e passage job → 0 event outbox supplémentaire (garde SQL idempotente)", async () => {
+    const outboxBefore = Number(
+      (await admin2.query("select count(*) from event_outbox where action='contrat.prix_revise' and \"artisanId\"=$1", [ART_OUTBOX])).rows[0].count,
+    );
+    const job = createRevisionIndexationJob({
+      listArtisanIds: async () => [ART_OUTBOX],
+      contratRepo: drizzleRepo2,
+      getToday: () => new Date("2026-06-30T11:00:00Z"),
+      db: app2.db,
+    });
+    await runJob(new FakeJobRunRepository(), job, new Date("2026-06-30T11:00:00Z"));
+    const outboxAfter = Number(
+      (await admin2.query("select count(*) from event_outbox where action='contrat.prix_revise' and \"artisanId\"=$1", [ART_OUTBOX])).rows[0].count,
+    );
+    expect(outboxAfter).toBe(outboxBefore);
+  });
+});

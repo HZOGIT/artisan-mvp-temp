@@ -3,6 +3,9 @@ import type { JobDefinition } from "../../../platform/scheduler/scheduler-types"
 import { reviserPrixContrat } from "./revision-use-cases";
 import { ConflictError, ValidationError } from "../../../shared/errors";
 import type { IContratRepository } from "./contrat-repository";
+import type { DbClient } from "../../../shared/db";
+import { withOutbox } from "../../../shared/events/with-outbox";
+import { outboxEvent } from "../../../shared/events/outbox-event";
 
 export interface RevisionIndexationJobDeps {
   /** Renvoie tous les artisanIds actifs (table artisans, hors RLS). */
@@ -10,6 +13,8 @@ export interface RevisionIndexationJobDeps {
   readonly contratRepo: IContratRepository;
   /** Injectable pour les tests — évite le mocking global de Date. */
   readonly getToday?: () => Date;
+  /** DB client pour l'atomicité outbox (optionnel — sans lui, pas d'event). */
+  readonly db?: DbClient;
 }
 
 function anniversaireAtteint(dateDebut: Date, today: Date): boolean {
@@ -39,7 +44,10 @@ export function createRevisionIndexationJob(deps: RevisionIndexationJobDeps): Jo
           if (!c.tauxIndexationAnnuel || parseFloat(c.tauxIndexationAnnuel) <= 0) continue;
           if (!anniversaireAtteint(c.dateDebut, today)) continue;
           try {
-            await reviserPrixContrat(deps.contratRepo, ctx, c.id);
+            await withOutbox(deps.db, deps.contratRepo, async (r, tx) => {
+              const result = await reviserPrixContrat(r, ctx, c.id);
+              if (tx) await outboxEvent(tx, ctx, { action: "contrat.prix_revise", entityType: "contrat", entityId: c.id, payload: { ancienMontantHT: result.ancienMontantHT, nouveauMontantHT: result.nouveauMontantHT, tauxIndexation: result.contrat.tauxIndexationAnnuel, dateDerniereRevision: result.contrat.dateDerniereRevision, declencheur: "job" } });
+            });
           } catch (e) {
             if (e instanceof ConflictError || e instanceof ValidationError) continue;
             throw e;

@@ -1506,6 +1506,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
             return rows.map((r) => r.id);
           },
           contratRepo,
+          db: deps.contratsMaintenanceDb ?? getDbHandle().db,
         }),
       );
     },
