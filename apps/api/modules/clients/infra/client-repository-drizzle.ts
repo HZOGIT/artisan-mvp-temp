@@ -58,6 +58,10 @@ function toClient(r: ClientRow): Client {
 export class ClientRepositoryDrizzle implements IClientRepository {
   constructor(private readonly db: DbClient) {}
 
+  withDb(db: DbClient): ClientRepositoryDrizzle {
+    return new ClientRepositoryDrizzle(db);
+  }
+
   list(ctx: TenantContext): Promise<Client[]> {
     return withTenant(this.db, ctx, async (tx) => {
       const rows = await tx
