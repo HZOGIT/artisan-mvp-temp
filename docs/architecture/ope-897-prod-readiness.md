@@ -142,15 +142,28 @@ vérifier qu'ils ne sont pas migrés vers la prod (base prod vierge) + smoke d'u
 - [ ] **Frontend** : `VITE_STRIPE_PUBLISHABLE_KEY` `pk_live_…` → **build-time** sur le projet **CF
       Pages PROD** : `wrangler pages secret put VITE_STRIPE_PUBLISHABLE_KEY --project-name <projet-prod>`
       (sinon la clé est vide dans le bundle, cf. `CLAUDE.md`).
-- [ ] **Webhook signing secret (procédure 2 temps, fail-closed)** :
-      1. Au **1er boot prod** avec `sk_live_`, `stripe-webhook-setup.ts` crée l'endpoint LIVE
-         (pointant l'URL backend prod) et **logue le signing secret** (`whsec_…`).
-      2. **Capter** ce secret, le poser en `STRIPE_WEBHOOK_SECRET` (env prod), **redéployer**.
-      3. Aux boots suivants l'endpoint existe → setup renvoie `null` → `STRIPE_WEBHOOK_SECRET` en env
-         **doit** être présent (sinon vérif signature KO). ⚠️ Ne PAS oublier l'étape 2, sinon
-         webhooks rejetés.
-- [ ] Vérifier que les **7 events** sont activés (checkout.session.completed, customer.subscription.*,
-      payment_intent.succeeded/failed — cf. `stripe-webhook-setup.ts`).
+- [ ] **Deux webhooks — bootstrap 2 temps, FAIL-CLOSED** (les deux sont obligatoires) :
+
+      `stripe-webhook-setup.ts` s'exécute dans le hook `onReady` (`app.ts`) et crée les deux endpoints
+      de façon **idempotente** : si l'endpoint existe déjà → renvoie `null` → pas de throw.
+      Si un **nouvel** endpoint est créé et que le secret env correspondant ne correspond pas → **throw**
+      (l'app refuse de démarrer).
+
+      **Endpoint 1 — `/api/stripe/webhook` → `STRIPE_WEBHOOK_SECRET`**
+      - 7 events : `checkout.session.completed`, `customer.subscription.{created,updated,deleted,trial_will_end}`,
+        `payment_intent.{succeeded,payment_failed}`
+      - 1er boot → endpoint créé → secret logué en `warn` (`whsec_…`) → throw si `STRIPE_WEBHOOK_SECRET` absent/différent.
+      - Capter le secret dans les logs → poser en `STRIPE_WEBHOOK_SECRET` (env serveur prod, **jamais `.env.production` commité**) → redéployer.
+
+      **Endpoint 2 — `/api/stripe/connect-webhook` → `STRIPE_CONNECT_WEBHOOK_SECRET`** (`connect=true`)
+      - 2 events : `account.updated`, `account.application.deauthorized`
+      - Même procédure : 1er boot → endpoint créé avec flag `connect=true` → secret logué → throw si `STRIPE_CONNECT_WEBHOOK_SECRET` absent/différent.
+      - Capter → poser en `STRIPE_CONNECT_WEBHOOK_SECRET` → redéployer.
+
+      Précédent staging : endpoint Connect créé manuellement via API Stripe Dashboard + secret posé dans `.env.staging`.
+      En prod : le bootstrap auto gère les deux de la même façon.
+
+      ⚠️ Les deux throws sont indépendants — si l'un des secrets manque, l'app ne démarre pas.
 - [ ] **Smoke paiement live réel** (carte réelle faible montant ou Stripe live test) → facture passe
       `payée`, puis vérifier la réconciliation (poller 300s) sur un paiement non-webhook.
 
@@ -241,7 +254,7 @@ vérifier qu'ils ne sont pas migrés vers la prod (base prod vierge) + smoke d'u
 2. Trancher B3 (archivage) + B4 (AHV billing) — décision humaine tracée.
 3. Provisionner infra prod : DB (2 rôles/URLs + backups testés), CF Pages prod, CF Tunnel,
    DNS, secrets (B3/B4/B6/B7).
-4. 1er boot prod → capter `STRIPE_WEBHOOK_SECRET` → poser en env → redéployer (B1).
+4. 1er boot prod → capter **`STRIPE_WEBHOOK_SECRET`** ET **`STRIPE_CONNECT_WEBHOOK_SECRET`** dans les logs → poser les deux en env prod → redéployer (B1).
 5. Smokes : `/health`, auth, **paiement live réel**, long-lot tRPC via edge, portail public.
 6. Sweep + mutations e2e contre prod → `issues: 0`.
 7. Bascule DNS / annonce.

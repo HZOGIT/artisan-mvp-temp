@@ -179,6 +179,23 @@ wrangler pages secret put VITE_STRIPE_PUBLISHABLE_KEY --project-name artisan-sta
 
 Variables runtime → fichier `.env` sur le serveur ou variables d'env Docker (jamais dans `.env.production`).
 
+#### Bootstrap webhooks Stripe (une fois par env — procédure 2 temps, fail-closed)
+
+Deux endpoints s'auto-configurent au démarrage (`onReady`, `app.ts`) via `stripe-webhook-setup.ts` :
+
+| Endpoint | Secret env | Events |
+|---|---|---|
+| `/api/stripe/webhook` | `STRIPE_WEBHOOK_SECRET` | 7 events billing (`checkout.session.completed`, `customer.subscription.*`, `payment_intent.*`) |
+| `/api/stripe/connect-webhook` | `STRIPE_CONNECT_WEBHOOK_SECRET` | `account.updated`, `account.application.deauthorized` (flag `connect=true`) |
+
+**Procédure par endpoint (identique pour les deux)** :
+1. **1er boot** : le bootstrap crée l'endpoint et logue le signing secret (`whsec_…`) en `warn`. L'app **throw** si ce secret n'est pas déjà posé en env — elle refuse de démarrer.
+2. **Capter** le secret dans les logs → le poser en env serveur (`.env` / `.env.staging` — **jamais dans `.env.production` commité**) → **redéployer**.
+3. **Boots suivants** : l'endpoint existe → renvoie `null` → pas de throw. ✅
+
+⚠️ Les deux secrets sont indépendants — si l'un manque, l'app ne démarre pas.
+Précédent staging : endpoint Connect créé via l'API Stripe Dashboard + `STRIPE_CONNECT_WEBHOOK_SECRET` posé dans `.env.staging`.
+
 ## Règle commentaires
 
 **`//` interdit dans tout le code TypeScript** (règle ESLint `local/comments-jsdoc-only` active sur `apps/api/**` et `apps/web/src/**`).
