@@ -21,6 +21,11 @@ export interface SchedulerDeps {
   readonly pdf?: PdfPort;
   readonly emailLogWriter?: IEmailLogWriter;
   readonly logger?: { error(obj: Record<string, unknown>, msg: string): void; warn(obj: Record<string, unknown>, msg: string): void };
+  /**
+   * Mode observabilité : log les cycles échus sans déclencher de facturation.
+   * Armé via BILLING_OBSERVE_ONLY=false une fois le backlog évalué par l'humain.
+   */
+  readonly observeOnly?: boolean;
 }
 
 const TICK_BATCH_SIZE = 200;
@@ -757,6 +762,15 @@ async function processDueCancellations(deps: SchedulerDeps, now: Date): Promise<
  * puis prélève tous les cycles échus.
  */
 export async function runSchedulerTick(deps: SchedulerDeps): Promise<{ charged: number; zombiesRecovered: number; cancelled: number; trialsActivated: number }> {
+  if (deps.observeOnly) {
+    const due = await deps.repo.findSubscriptionsWithDueCycles(new Date(), TICK_BATCH_SIZE);
+    deps.logger?.warn(
+      { event: "billing_observe_only", dueCount: due.length, cycleIds: due.map(d => d.cycle.id) },
+      `[OBSERVE_ONLY] ${due.length} cycle(s) échus détectés — facturation non armée. Poser BILLING_OBSERVE_ONLY=false pour démarrer.`,
+    );
+    return { charged: 0, zombiesRecovered: 0, cancelled: 0, trialsActivated: 0 };
+  }
+
   const zombiesRecovered = await recoverZombies(deps);
   const trialsActivated = await activateExpiredTrials(deps, new Date());
 
