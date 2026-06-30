@@ -1217,6 +1217,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   }, getDbHandle().db);
 
   const billingRepo = new BillingRepositoryDrizzle(getDbHandle().db);
+  /* ponytail: pool owner — billing_payment_methods est RLS-FORCE ; app_tenant sans tenant = 0 ligne (no-op silencieux) */
+  const billingOwnerRepo = new BillingRepositoryDrizzle(getOwnerDbHandle().db);
   const billingStorage = deps.storage ?? new OvhS3Adapter(getDbHandle().db);
   const billing = createBillingModule({
     repo: billingRepo,
@@ -1420,14 +1422,15 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   /** Scheduler billing maison — `POST /internal/billing/tick` sécurisé par x-scheduler-secret. */
   const billingNotifier = new SubscriptionEventNotifierDrizzle(getDbHandle().db, emailAdapter);
   const billingSchedulerDeps = {
-    repo: billingRepo,
+    repo: billingOwnerRepo,
     billing: new BillingAdapter(),
     notifier: billingNotifier,
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
-    db: getDbHandle().db,
+    db: getOwnerDbHandle().db,
     pdf: new JsPdfAdapter(),
     emailLogWriter: sharedEmailLogWriter,
     logger: app.log,
+    observeOnly: process.env.BILLING_OBSERVE_ONLY !== "false",
   };
 
   registerBillingSchedulerRoute(app, { ...billingSchedulerDeps, secret: process.env.SCHEDULER_SECRET ?? "" });
