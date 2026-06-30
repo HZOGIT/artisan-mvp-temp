@@ -6,7 +6,7 @@ import { ResendEmailAdapter } from "./resend-email-adapter";
 describe("ResendEmailAdapter (EmailPort, mode simulation hors RESEND_API_KEY)", () => {
   const adapter = new ResendEmailAdapter();
   it("message valide en dev → résout (simulé)", async () => {
-    await expect(adapter.send({ to: "client@example.com", subject: "Devis", body: "<p>Bonjour</p>" })).resolves.toBeUndefined();
+    await expect(adapter.send({ to: "client@example.com", subject: "Devis", body: "<p>Bonjour</p>" })).resolves.toBeNull();
   });
   it("paramètres manquants → throw", async () => {
     await expect(adapter.send({ to: "", subject: "x", body: "y" })).rejects.toThrow(/manquants/);

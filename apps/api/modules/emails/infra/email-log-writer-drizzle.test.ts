@@ -90,6 +90,21 @@ describe.skipIf(!URL)("EmailLogWriterDrizzle (PG, update par resendId + isolatio
     expect(row?.statut).toBe("sent");
   });
 
+  it("create() — enregistre le resendId quand fourni (régression OPE-990)", async () => {
+    const rid = "resend-test-ope990";
+    await writer.create({ artisanId: A, destinataire: "resend@t.fr", sujet: "Facture Resend", type: "envoi_facture", resendId: rid, entiteType: "facture", entiteId: 9002 });
+    const rows = await reader.list({ artisanId: A, userId: 0 }, { entiteType: "facture" });
+    const row = rows.find((r) => r.destinataire === "resend@t.fr");
+    expect(row?.resendId).toBe(rid);
+  });
+
+  it("create() — resendId null quand non fourni", async () => {
+    await writer.create({ artisanId: A, destinataire: "noresend@t.fr", sujet: "Facture sans resend", type: "envoi_facture" });
+    const rows = await reader.list({ artisanId: A, userId: 0 }, {});
+    const row = rows.find((r) => r.destinataire === "noresend@t.fr");
+    expect(row?.resendId).toBeNull();
+  });
+
   it("create() — isolation RLS : ligne créée pour A invisible depuis B", async () => {
     const rowsB = await reader.list({ artisanId: B, userId: 0 }, {});
     expect(rowsB.some((r) => r.destinataire === "new@t.fr")).toBe(false);

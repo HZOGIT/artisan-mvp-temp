@@ -26,7 +26,7 @@ export interface SoumettreDemandeIADeps {
   readonly trackLlm?: LlmUsageTracker;
   readonly rateLimiter: { check(key: string): Promise<boolean> };
   readonly notifications: { creer(ctx: TenantContext, input: { type: "info"; titre: string; message: string; lien: string }): Promise<unknown> };
-  readonly email: { send(message: { to: string; subject: string; body: string }): Promise<void> };
+  readonly email: { send(message: { to: string; subject: string; body: string }): Promise<string | null> };
 }
 
 function safeHtml(s: string): string {

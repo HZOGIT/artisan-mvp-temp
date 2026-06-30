@@ -106,7 +106,7 @@ export interface DemanderModificationDeps {
   readonly access: Pick<IPortalAccessRepository, "resolveByToken">;
   readonly artisanReader: { getArtisanPublic(artisanId: number): Promise<{ email: string | null } | null> };
   readonly clients: { getById(ctx: TenantContext, id: number): Promise<{ nom: string; prenom: string | null; email: string | null } | null> };
-  readonly email: { send(message: { to: string; subject: string; body: string }): Promise<void> };
+  readonly email: { send(message: { to: string; subject: string; body: string }): Promise<string | null> };
   readonly rateLimiter: { check(key: string): Promise<boolean> };
 }
 

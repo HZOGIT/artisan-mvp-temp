@@ -201,10 +201,10 @@ export async function envoyerRelanceFacture(
     return { success: false, message: `Relance non envoyée : ${client.email} a demandé à ne plus recevoir d'emails` };
   }
 
-  await deps.email.send({ to: client.email, subject, body, fromName: artisan.nomEntreprise ?? undefined, replyTo: artisan.email ?? undefined });
+  const resendId = await deps.email.send({ to: client.email, subject, body, fromName: artisan.nomEntreprise ?? undefined, replyTo: artisan.email ?? undefined });
 
   if (deps.emailLogWriter) {
-    await deps.emailLogWriter.create({ artisanId: ctx.artisanId, destinataire: client.email, sujet: subject, type: "relance_facture", entiteType: "facture", entiteId: input.factureId }).catch(() => { /* ponytail: best-effort — emailLogWriter non-critique */ });
+    await deps.emailLogWriter.create({ artisanId: ctx.artisanId, destinataire: client.email, sujet: subject, type: "relance_facture", resendId: resendId ?? null, entiteType: "facture", entiteId: input.factureId }).catch(() => { /* ponytail: best-effort — emailLogWriter non-critique */ });
   }
 
   /** Incrémenter le compteur de relances après envoi réussi. */

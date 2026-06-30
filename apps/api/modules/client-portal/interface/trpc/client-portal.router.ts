@@ -31,7 +31,7 @@ export interface ClientPortalRouterDeps {
   readonly notifications: { creer(ctx: TenantContext, input: { type: "info"; titre: string; message: string; lien: string }): Promise<unknown> };
   readonly artisanReader: { getArtisanPublic(artisanId: number): Promise<{ email: string | null } | null> };
   readonly artisanInfoReader: ArtisanReader;
-  readonly email: { send(message: { to: string; subject: string; body: string }): Promise<void> };
+  readonly email: { send(message: { to: string; subject: string; body: string }): Promise<string | null> };
   readonly rateLimiter: { check(key: string): Promise<boolean> };
   readonly llm: LlmPort;
   readonly trackLlm?: LlmUsageTracker;

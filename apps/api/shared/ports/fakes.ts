@@ -23,12 +23,13 @@ export class FakeEmailPort implements EmailPort {
   failOnce(): void {
     this.failNext = true;
   }
-  async send(message: EmailMessage): Promise<void> {
+  async send(message: EmailMessage): Promise<string | null> {
     if (this.failNext) {
       this.failNext = false;
       throw new Error("envoi email simulé en échec");
     }
     this.sent.push(message);
+    return null;
   }
 }
 

@@ -14,7 +14,7 @@ function tokenScope(artisanId: number): TenantContext {
 export interface ClientPortalAdminDeps {
   readonly access: IPortalAccessRepository;
   readonly clients: { getById(ctx: TenantContext, id: number): Promise<{ id: number; nom: string; prenom: string | null; email: string | null } | null> };
-  readonly email: { send(message: { to: string; subject: string; body: string; fromName?: string; replyTo?: string }): Promise<void> };
+  readonly email: { send(message: { to: string; subject: string; body: string; fromName?: string; replyTo?: string }): Promise<string | null> };
   readonly rateLimiter: { check(key: string): Promise<boolean> };
   /** Générateur de token (injecté pour la testabilité) — défaut : UUID v4. */
   readonly genToken?: () => string;

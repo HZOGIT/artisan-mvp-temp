@@ -28,6 +28,7 @@ export class EmailLogWriterDrizzle implements IEmailLogWriter {
       destinataire: entry.destinataire,
       sujet: entry.sujet,
       type: entry.type,
+      resendId: entry.resendId ?? null,
       statut: entry.statut ?? "sent",
       entiteType: entry.entiteType ?? null,
       entiteId: entry.entiteId ?? null,
