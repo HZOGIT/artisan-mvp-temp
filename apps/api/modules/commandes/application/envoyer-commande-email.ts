@@ -6,6 +6,7 @@ import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { ICommandeRepository } from "./commande-repository";
 import type { IFournisseurRepository } from "../../fournisseurs/application/fournisseur-repository";
 import type { ArtisanReader } from "./artisan-reader";
+import type { IEmailLogWriter } from "../../emails/application/email-log-writer";
 
 /*
  * Dépendances de l'envoi d'un bon de commande par email (composition : commande + fournisseur +
@@ -18,6 +19,7 @@ export interface CommandeMailingDeps {
   readonly pdf: PdfPort;
   readonly email: EmailPort;
   readonly rateLimiter: RateLimiterPort;
+  readonly emailLogWriter?: IEmailLogWriter;
 }
 
 export interface EnvoiResult {
@@ -100,6 +102,10 @@ export async function envoyerCommandeParEmail(
     body,
     attachments: [{ filename: `bon-commande-${commande.numero || commande.id}.pdf`, content: pdf, contentType: "application/pdf" }],
   });
+
+  if (deps.emailLogWriter) {
+    await deps.emailLogWriter.create({ artisanId: ctx.artisanId, destinataire: destinataireEmail, sujet: subject, type: "envoi_commande", entiteType: "commande", entiteId: commande.id }).catch(() => {});
+  }
 
   await deps.repo.updateStatut(ctx, commande.id, "envoyee");
   return { success: true, message: `Bon de commande ${numero} envoyé à ${destinataireEmail}` };

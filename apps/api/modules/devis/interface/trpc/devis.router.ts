@@ -127,6 +127,7 @@ export function createDevisRouter(
     email: mailing.email,
     rateLimiter: mailing.rateLimiter,
     modeleEmailRepo: mailing.modeleEmailRepo,
+    emailLogWriter: mailing.emailLogWriter,
   };
   const nonSignesDeps = { devisRepo: repo, clientReader: mailing.clientReader, signatureReader };
   return router({
@@ -313,7 +314,12 @@ export function createDevisRouter(
     /** ── Relances de devis (email + journal append-only) ────────────────────────────────────────── */
     envoyerRelance: protectedProcedure
       .input(z.object({ devisId: z.number().int(), message: z.string().max(5000).optional() }))
-      .mutation(({ ctx, input }) => envoyerRelanceDevis(relanceDeps, ctx.tenant, input)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await envoyerRelanceDevis(relanceDeps, ctx.tenant, input);
+        const tx = db;
+        if (tx) await outboxEvent(tx, ctx.tenant, { action: "devis.relance_envoyee", entityType: "devis", entityId: input.devisId, payload: {} }).catch(() => {});
+        return result;
+      }),
 
     envoyerRelancesAutomatiques: protectedProcedure
       .input(z.object({ joursMinimum: z.number().int().min(0).optional(), joursEntreRelances: z.number().int().min(0).optional() }))
@@ -362,11 +368,15 @@ export function createDevisRouter(
         }),
       )
       .mutation(({ ctx, input }) =>
-        envoyerDevisParEmail(repo, mailing, ctx.tenant, {
-          devisId: input.devisId,
-          customMessage: input.customMessage,
-          attachPdf: input.attachPdf,
-          pieceJointeIds: input.pieceJointeIds,
+        withOutbox(db, repo, async (r, tx) => {
+          const result = await envoyerDevisParEmail(r, mailing, ctx.tenant, {
+            devisId: input.devisId,
+            customMessage: input.customMessage,
+            attachPdf: input.attachPdf,
+            pieceJointeIds: input.pieceJointeIds,
+          });
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "devis.email_envoye", entityType: "devis", entityId: input.devisId, payload: {} });
+          return result;
         }),
       ),
   });

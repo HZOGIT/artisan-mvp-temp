@@ -1,6 +1,7 @@
 import type { SignatureDeps } from "./application/use-cases";
 import type { SignaturePublicDeps } from "./application/public-use-cases";
 import { createSignatureRouter } from "./interface/trpc/signature.router";
+import type { DbClient } from "../../shared/db";
 
 /*
  * Wiring DI du module signature : assemble le routeur tRPC à partir des dépendances du domaine.
@@ -12,6 +13,7 @@ import { createSignatureRouter } from "./interface/trpc/signature.router";
 export interface SignatureModuleDeps {
   readonly protectedDeps: SignatureDeps;
   readonly publicDeps: SignaturePublicDeps;
+  readonly db?: DbClient;
 }
 
 export interface SignatureModule {
@@ -20,5 +22,5 @@ export interface SignatureModule {
 }
 
 export function createSignatureModule(deps: SignatureModuleDeps): SignatureModule {
-  return { deps, router: createSignatureRouter(deps.protectedDeps, deps.publicDeps) };
+  return { deps, router: createSignatureRouter(deps.protectedDeps, deps.publicDeps, deps.db) };
 }

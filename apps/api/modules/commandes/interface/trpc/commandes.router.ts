@@ -206,7 +206,13 @@ export function createCommandesRouter(
      */
     sendEmail: protectedProcedure
       .input(z.object({ id: z.number().int() }))
-      .mutation(({ ctx, input }) => envoyerCommandeParEmail(mailing, ctx.tenant, input.id)),
+      .mutation(({ ctx, input }) =>
+        withOutbox(db, mailing.repo, async (r, tx) => {
+          const result = await envoyerCommandeParEmail({ ...mailing, repo: r }, ctx.tenant, input.id);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "commande.email_envoye", entityType: "commande", entityId: input.id, payload: {} });
+          return result;
+        }),
+      ),
 
     /*
      * Proposition IA de lignes de commande à partir d'un devis accepté (LECTURE SEULE, non persistée).

@@ -528,6 +528,14 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   /** Adapter email partagé — enqueue dans email_outbox, le drainer envoie via Resend avec retry. */
   const emailAdapter = deps.emailPort ?? new EmailOutboxAdapter(getDbHandle().db, app.log as unknown as AppLogger);
 
+  const _databaseUrlForEmailLog = process.env.DATABASE_URL;
+  let sharedEmailLogWriter: IEmailLogWriter | undefined = deps.emailLogWriter;
+  if (!sharedEmailLogWriter && _databaseUrlForEmailLog) {
+    const _emailLogAdminHandle = createDbClient(_databaseUrlForEmailLog, 2);
+    sharedEmailLogWriter = new EmailLogWriterDrizzle(_emailLogAdminHandle.db);
+    app.addHook("onClose", () => _emailLogAdminHandle.close());
+  }
+
   /** Adapter push web (VAPID). No-op silencieux si VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY absents. */
   const pushAdapter = deps.pushPort ?? new WebPushAdapter(getDbHandle().db);
 
@@ -653,6 +661,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       pdf: new JsPdfAdapter(),
       email: emailAdapter,
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
+      emailLogWriter: sharedEmailLogWriter,
     },
     /*
      * Proposition IA de lignes de commande depuis un devis accepté (lecture seule) : devis + stock +
@@ -756,6 +765,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       modeleEmailRepo,
       piecesJointesRepo: new PiecesJointesRepositoryDrizzle(getDbHandle().db),
       storage: deps.storage ?? new OvhS3Adapter(getDbHandle().db),
+      emailLogWriter: sharedEmailLogWriter,
     },
     /*
      * convertToFacture : délègue au domaine factures (devis accepté → facture brouillon). Partage
@@ -800,6 +810,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       storage: facturesStorage,
       db: deps.facturesDb ?? getDbHandle().db,
       piecesJointesRepo: new PiecesJointesRepositoryDrizzle(getDbHandle().db),
+      emailLogWriter: sharedEmailLogWriter,
     },
     push: pushAdapter,
     outboxInTx: (artisanId, factureId, tx) =>
@@ -975,6 +986,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       email: signatureEmail,
       notifications: signatureNotifications,
       appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+      emailLogWriter: sharedEmailLogWriter,
     },
     publicDeps: {
       reader: new SignaturePublicReaderDrizzle(signatureDb),
@@ -984,6 +996,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       email: signatureEmail,
       db: deps.signaturePublicDb ?? signatureDb,
     },
+    db: signatureDb,
   });
   /*
    * Conseils IA (tableau de bord) — 1ère slice du chantier assistant/IA. Lecture seule, NON
@@ -1309,16 +1322,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   const resendSecret = deps.resendWebhookSecret ?? process.env.RESEND_WEBHOOK_SECRET;
   if (resendSecret) {
-    const databaseUrl = process.env.DATABASE_URL;
-    let emailLogWriter = deps.emailLogWriter;
-    if (!emailLogWriter && databaseUrl) {
-      const adminHandle = createDbClient(databaseUrl, 2);
-      emailLogWriter = new EmailLogWriterDrizzle(adminHandle.db);
-      app.addHook("onClose", () => adminHandle.close());
-    }
     registerResendWebhookRoute(app, {
       resendWebhookSecret: resendSecret,
-      emailLogWriter,
+      emailLogWriter: sharedEmailLogWriter,
       notificationRepo,
     });
   }

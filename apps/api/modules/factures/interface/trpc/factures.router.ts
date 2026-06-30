@@ -372,11 +372,15 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
         }),
       )
       .mutation(({ ctx, input }) =>
-        envoyerFactureParEmail(repo, mailing, ctx.tenant, {
-          factureId: input.factureId,
-          customMessage: input.customMessage,
-          attachPdf: input.attachPdf,
-          pieceJointeIds: input.pieceJointeIds,
+        withOutbox(db, repo, async (r, tx) => {
+          const result = await envoyerFactureParEmail(r, mailing, ctx.tenant, {
+            factureId: input.factureId,
+            customMessage: input.customMessage,
+            attachPdf: input.attachPdf,
+            pieceJointeIds: input.pieceJointeIds,
+          });
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "facture.email_envoye", entityType: "facture", entityId: input.factureId, payload: {} });
+          return result;
         }),
       ),
 

@@ -8,6 +8,7 @@ import type { IRelanceDevisRepository } from "../../relances-devis/application/r
 import type { IModeleEmailRepository } from "../../modeles-email/application/modele-email-repository";
 import { buildModeleEmail } from "../../modeles-email/domain/render";
 import type { IEmailOptoutRepository } from "../../emails/application/email-optout-repository";
+import type { IEmailLogWriter } from "../../emails/application/email-log-writer";
 
 /*
  * Dépendances des relances de devis (composition : devis + relances + client/artisan + email +
@@ -25,6 +26,7 @@ export interface DevisRelanceDeps {
   readonly modeleEmailRepo?: IModeleEmailRepository;
   /** Optionnel : si présent, vérifie l'opt-out RGPD avant envoi. */
   readonly optoutRepo?: IEmailOptoutRepository;
+  readonly emailLogWriter?: IEmailLogWriter;
 }
 
 function escapeHtml(s: string): string {
@@ -71,6 +73,9 @@ async function envoyerEtEnregistrer(
   let ok = true;
   try {
     await deps.email.send({ to: client.email, subject: emailContent.subject, body: emailContent.body, fromName: emailContent.fromName, replyTo: emailContent.replyTo });
+    if (deps.emailLogWriter) {
+      await deps.emailLogWriter.create({ artisanId: ctx.artisanId, destinataire: client.email, sujet: emailContent.subject, type: "relance_devis", entiteType: "devis", entiteId: devisId }).catch(() => {});
+    }
   } catch {
     ok = false;
   }
