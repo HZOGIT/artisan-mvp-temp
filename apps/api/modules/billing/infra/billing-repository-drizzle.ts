@@ -9,6 +9,8 @@ import {
   billingInvoiceSequences,
   billingEvents,
   billingWebhookEvents,
+  artisanModules,
+  modules,
 } from "../../../../../drizzle/schema.pg";
 import type { BillingPaymentMethod, BillingSubscription, BillingCycle, BillingInvoice, BillingEvent, BillingChargeAttempt } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
@@ -205,6 +207,18 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
       .where(eq(billingSubscriptions.artisan_id, ctx.artisanId));
   }
 
+  async deactivateLockedModules(artisanId: number, planId: string): Promise<void> {
+    /** billing planId → plans gating hors-portée à désactiver. */
+    const abovePlans: string[] = planId === "enterprise" ? [] : planId === "pro" ? ["entreprise"] : ["pro", "entreprise"];
+    if (abovePlans.length === 0) return;
+    const slugs = await this.db.select({ slug: modules.slug }).from(modules).where(inArray(modules.plan_minimum, abovePlans));
+    if (slugs.length === 0) return;
+    await withTenant(this.db, { artisanId, userId: 0 }, (tx) =>
+      tx.update(artisanModules)
+        .set({ actif: false })
+        .where(and(eq(artisanModules.artisan_id, artisanId), inArray(artisanModules.module_slug, slugs.map((r) => r.slug)))),
+    );
+  }
 
   async findPendingCycle(subscriptionId: number): Promise<BillingCycle | null> {
     const [row] = await this.db

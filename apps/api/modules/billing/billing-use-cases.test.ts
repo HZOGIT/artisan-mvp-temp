@@ -751,6 +751,20 @@ describe("changePlan", () => {
     const evts = deps.repo.events.filter(e => e.event_type === "subscription.plan_changed");
     expect(evts).toHaveLength(0);
   });
+
+  it("downgrade pro → starter : deactivateLockedModules appelé avec planId=starter", async () => {
+    const deps = makeDeps();
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "pro", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+
+    await changePlan(deps, A, "starter");
+
+    expect(deps.repo.deactivateLockedModulesCalls).toHaveLength(1);
+    expect(deps.repo.deactivateLockedModulesCalls[0]).toMatchObject({ artisanId: A.artisanId, planId: "starter" });
+  });
 });
 
 

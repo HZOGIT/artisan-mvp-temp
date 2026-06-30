@@ -1347,8 +1347,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   registerBillingSchedulerRoute(app, { ...billingSchedulerDeps, secret: process.env.SCHEDULER_SECRET ?? "" });
 
-  /** Cron billing maison — tick toutes les heures, lock pg_advisory_xact pour éviter les doublons multi-réplica. */
-  app.register(billingCronPlugin, { schedulerDeps: billingSchedulerDeps, db: getDbHandle().db, dbUrl: getDbHandle().pool.options.connectionString ?? "", onCritical: (msg) => app.log.fatal({ event: "billing_tick_critical" }, msg) });
+  /** Cron billing maison — tick toutes les 10 min, lock pg_advisory_xact pour éviter les doublons multi-réplica. */
+  app.register(billingCronPlugin, { schedulerDeps: billingSchedulerDeps, db: getDbHandle().db, dbUrl: getDbHandle().pool.options.connectionString ?? "", onCritical: (msg) => app.log.fatal({ event: "billing_tick_critical" }, msg), intervalMinutes: 10 });
 
   /** Drainer email outbox — toutes les 2 min, envoie les emails pending via Resend avec retries. */
   app.register(emailOutboxDrainerPlugin, { db: getDbHandle().db, sender: resendAdapter });

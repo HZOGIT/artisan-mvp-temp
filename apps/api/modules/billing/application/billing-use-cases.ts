@@ -202,6 +202,7 @@ export async function changePlan(
 
   const oldPlan = planById(sub.plan_id);
   await deps.repo.updateSubscriptionPlan(ctx, newPlanId);
+  await deps.repo.deactivateLockedModules(ctx.artisanId, newPlanId);
 
   const pendingCycle = await deps.repo.findPendingCycle(sub.id);
   if (pendingCycle) {

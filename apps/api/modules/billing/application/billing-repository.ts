@@ -101,6 +101,8 @@ export interface IBillingRepository {
   updateSubscriptionPaymentMethod(ctx: TenantContext, paymentMethodId: number): Promise<void>;
   updateSubscriptionPlan(ctx: TenantContext, planId: string): Promise<void>;
   updateCancelAt(ctx: TenantContext, cancelAt: Date | null): Promise<void>;
+  /** Passe actif=false sur les artisan_modules hors plan lors d'un downgrade ou d'une suspension. planId = billing naming : starter|pro|enterprise. */
+  deactivateLockedModules(artisanId: number, planId: string): Promise<void>;
 
   /** Cycles */
   findPendingCycle(subscriptionId: number): Promise<BillingCycle | null>;

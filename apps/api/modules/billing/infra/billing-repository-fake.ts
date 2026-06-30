@@ -49,6 +49,8 @@ export class FakeBillingRepository implements IBillingRepository {
   /** Injecte une erreur dans le prochain appel appendEvent (test robustesse des catch blocks). */
   public simulateAppendEventError: Error | null = null;
   public activeUserCount = 1;
+  /** Appels à deactivateLockedModules — pour assertions dans les tests. */
+  public deactivateLockedModulesCalls: { artisanId: number; planId: string }[] = [];
 
   private now() { return new Date(); }
 
@@ -199,6 +201,10 @@ export class FakeBillingRepository implements IBillingRepository {
     this.subs = this.subs.map(s =>
       s.artisan_id === ctx.artisanId ? { ...s, cancel_at: cancelAt, updated_at: this.now() } : s
     );
+  }
+
+  async deactivateLockedModules(artisanId: number, planId: string): Promise<void> {
+    this.deactivateLockedModulesCalls.push({ artisanId, planId });
   }
 
   async findPendingCycle(subscriptionId: number): Promise<Cycle | null> {

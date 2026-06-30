@@ -6,12 +6,13 @@ const PLAN_ORDER: Record<string, number> = { essentiel: 0, pro: 1, entreprise: 2
 
 /**
  * Résout le plan de gating depuis l'abonnement réel (source de vérité = billing_subscriptions).
- * Trial actif → accès entreprise complet ; pas d'abonnement ou trial expiré → essentiel.
+ * Trial actif → accès entreprise complet ; past_due/canceled/trial expiré → essentiel.
  */
 export function resolveGatingPlan(sub: SubscriptionRow | null, now: Date = new Date()): string {
   if (!sub) return "essentiel";
-  if (sub.status === "trialing" && sub.trialEndsAt !== null && sub.trialEndsAt > now) {
-    return "entreprise";
+  if (sub.status === "past_due" || sub.status === "canceled") return "essentiel";
+  if (sub.status === "trialing") {
+    return sub.trialEndsAt !== null && sub.trialEndsAt > now ? "entreprise" : "essentiel";
   }
   switch (sub.plan) {
     case "enterprise": return "entreprise";
