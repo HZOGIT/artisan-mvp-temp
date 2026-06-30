@@ -1,4 +1,4 @@
-import { and, eq, notExists, lt } from "drizzle-orm";
+import { and, eq, notExists, lt, gte } from "drizzle-orm";
 import { eventOutbox, eventLog, notifications } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import type { JobDefinition } from "../../../platform/scheduler";
@@ -6,6 +6,15 @@ import { runReconciler, hourlyKey } from "../../../platform/scheduler";
 import type { Anomalie, HealResult } from "../../../platform/scheduler";
 
 const STABLE_DELAY_MS = 5 * 60 * 1000;
+
+/**
+ * Borne basse pour la détection d'events manquants : seules les notifications
+ * créées APRÈS ce timestamp sont inspectées. Les notifications antérieures
+ * appartiennent au backlog historique (marquées lues avant que markAsRead soit
+ * atomisé avec withOutbox) — aucun rétroactif, exclure évite une croissance
+ * infinie du compteur healing.events.notification-manquant.
+ */
+const NOTIF_LUE_HEAL_CUTOFF = new Date("2026-06-30T14:25:52.000Z");
 
 interface OutboxBloqueDetails {
   outboxId: number;
@@ -129,6 +138,7 @@ export function createEventManquantNotificationJob(opts: {
             .where(
               and(
                 eq(notifications.lu, true),
+                gte(notifications.createdAt, NOTIF_LUE_HEAL_CUTOFF),
                 lt(notifications.createdAt, stableCutoff),
                 notExists(
                   ownerDb
