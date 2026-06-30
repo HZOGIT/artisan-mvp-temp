@@ -1065,12 +1065,13 @@ describe("FIX-V — normalizeStatus : mapping statuts Stripe legacy → state ma
     expect(normalizeStatus("incomplete_expired")).toBe("canceled");
   });
 
-  it("incomplete / null / inconnu → active (paiement initial en cours ou statut inconnu)", async () => {
+  it("incomplete / paused / null / inconnu → past_due (fail-closed : accès restreint, jamais active)", async () => {
     const { normalizeStatus } = await import("./application/billing-migration");
-    expect(normalizeStatus("incomplete")).toBe("active");
-    expect(normalizeStatus(null)).toBe("active");
-    expect(normalizeStatus("paused")).toBe("active");
-    expect(normalizeStatus(undefined)).toBe("active");
+    expect(normalizeStatus("incomplete")).toBe("past_due");
+    expect(normalizeStatus("paused")).toBe("past_due");
+    expect(normalizeStatus(null)).toBe("past_due");
+    expect(normalizeStatus(undefined)).toBe("past_due");
+    expect(normalizeStatus("unknown_future_stripe_status")).toBe("past_due");
   });
 });
 
