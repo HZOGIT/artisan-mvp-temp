@@ -125,14 +125,14 @@ describe("factures — invariants métier (synthèse)", () => {
     await expect(creerAvoir(repo, A, id, { lignes: [{ designation: "Trop", quantite: "1", prixUnitaireHT: "10", tauxTVA: "20" }] })).rejects.toBeInstanceOf(ConflictError);
   });
 
-  it("INV-9 : conversion devis→facture — devis accepté requis + anti-doublon", async () => {
+  it("INV-9 : conversion devis→facture — devis envoye|accepte requis + anti-doublon", async () => {
     const repo = repoWithClient();
+    const readerBrouillon = new FakeDevisReader();
+    readerBrouillon.register(devisAccepte({ statut: "brouillon" }), []);
+    await expect(convertirDevisEnFacture(repo, readerBrouillon, A, 7)).rejects.toBeInstanceOf(ConflictError); // brouillon bloqué
     const reader = new FakeDevisReader();
     reader.register(devisAccepte({ statut: "envoye" }), []);
-    await expect(convertirDevisEnFacture(repo, reader, A, 7)).rejects.toBeInstanceOf(ConflictError); // non accepté
-    const reader2 = new FakeDevisReader();
-    reader2.register(devisAccepte(), []);
-    await convertirDevisEnFacture(repo, reader2, A, 7);
-    await expect(convertirDevisEnFacture(repo, reader2, A, 7)).rejects.toBeInstanceOf(ConflictError); // doublon
+    await convertirDevisEnFacture(repo, reader, A, 7); // envoye autorisé (OPE-927)
+    await expect(convertirDevisEnFacture(repo, reader, A, 7)).rejects.toBeInstanceOf(ConflictError); // doublon
   });
 });

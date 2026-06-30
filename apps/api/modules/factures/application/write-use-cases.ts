@@ -403,10 +403,10 @@ export async function creerAvoir(
 }
 
 /*
- * Convertit un devis ACCEPTÉ en facture (parité legacy `createFactureFromDevis`, **durci**).
- * ⚠️ Invariants : devis du tenant (anti-IDOR-FK → NotFound) ; **devis `accepte`** sinon Conflict
- * (on ne facture qu'un devis accepté — le legacy ne le vérifiait pas) ; **anti-doublon** : un
- * devis déjà facturé → Conflict (le legacy autorisait des conversions multiples). Lignes copiées
+ * Convertit un devis en facture (parité legacy `createFactureFromDevis`).
+ * ⚠️ Invariants : devis du tenant (anti-IDOR-FK → NotFound) ; **devis `accepte` ou `envoye`**
+ * sinon Conflict (brouillon/refusé/expiré non convertibles) ; **anti-doublon** : un devis déjà
+ * facturé → Conflict (le legacy autorisait des conversions multiples). Lignes copiées
  * (montants du devis), totaux recalculés des lignes côté infra, statut facture `brouillon`.
  */
 export async function convertirDevisEnFacture(
@@ -417,8 +417,8 @@ export async function convertirDevisEnFacture(
 ): Promise<Facture> {
   const devis = await devisReader.getDevis(ctx, devisId);
   if (!devis) throw new NotFoundError("Devis introuvable");
-  if (devis.statut !== "accepte") {
-    throw new ConflictError("Seul un devis accepté peut être converti en facture");
+  if (devis.statut !== "accepte" && devis.statut !== "envoye") {
+    throw new ConflictError("Seul un devis envoyé ou accepté peut être converti en facture");
   }
   if (await factureRepo.existsForDevis(ctx, devisId)) {
     throw new ConflictError("Ce devis a déjà été converti en facture");
