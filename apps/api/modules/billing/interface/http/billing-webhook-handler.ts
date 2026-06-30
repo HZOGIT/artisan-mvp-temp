@@ -1,9 +1,12 @@
 import type { IBillingRepository } from "../../application/billing-repository";
+import type { DbClient } from "../../../../shared/db";
 import { nextPeriod, nextRetryAt, MAX_DUNNING_ATTEMPTS } from "../../domain/billing-cycle";
 import { planById } from "../../domain/plan";
+import { withOutbox } from "../../../../shared/events/with-outbox";
 
 export interface BillingWebhookDeps {
   readonly repo: IBillingRepository;
+  readonly db?: DbClient;
 }
 
 export async function handleBillingWebhookEvent(
@@ -59,32 +62,33 @@ export async function handleBillingWebhookEvent(
         if (sub.status !== "canceled") {
           const interval = sub.billing_interval === "yearly" ? "yearly" : "monthly";
           const { start, end } = nextPeriod(cycle.period_end, interval);
+          const plan = planById(sub.plan_id);
           /*
            * Cycle créé AVANT updateSubscriptionPeriod (même pattern que activateExpiredTrials).
            * Si updateSubscriptionPeriod échoue après createCycle, le scheduler retrouve
            * le cycle pending au tick suivant et le charge → auto-healing.
            */
-          const existing = await deps.repo.findPendingCycleForPeriod(sub.id, start);
-          if (!existing) {
-            const plan = planById(sub.plan_id);
-            const amountCents = plan ? plan.amountCentsByInterval[interval] : cycle.amount_cents;
-            await deps.repo.createCycle({ subscriptionId: sub.id, periodStart: start, periodEnd: end, amountCents, currency: cycle.currency });
-          }
-          await deps.repo.updateSubscriptionPeriod(sub.id, "active", cycle.period_end, end);
-          await deps.repo.appendEvent({
-            entityType: "billing_subscription",
-            entityId: sub.id,
-            eventType: "subscription.period_advanced",
-            payload: { via: "webhook", artisanId, nextPeriodStart: start.toISOString(), nextPeriodEnd: end.toISOString() },
-            actor: "stripe_webhook",
-          });
-          const plan = planById(sub.plan_id);
-          await deps.repo.emitOutboxEvent({
-            artisanId,
-            action: "abonnement.paiement_reussi",
-            entityType: "abonnement",
-            entityId: sub.id,
-            payload: { planId: sub.plan_id, montantCents: plan ? plan.amountCentsByInterval[interval] : cycle.amount_cents, periode: { debut: cycle.period_end.toISOString(), fin: end.toISOString() } },
+          await withOutbox(deps.db, deps.repo, async (r, _tx) => {
+            const existing = await r.findPendingCycleForPeriod(sub.id, start);
+            if (!existing) {
+              const amountCents = plan ? plan.amountCentsByInterval[interval] : cycle.amount_cents;
+              await r.createCycle({ subscriptionId: sub.id, periodStart: start, periodEnd: end, amountCents, currency: cycle.currency });
+            }
+            await r.updateSubscriptionPeriod(sub.id, "active", cycle.period_end, end);
+            await r.appendEvent({
+              entityType: "billing_subscription",
+              entityId: sub.id,
+              eventType: "subscription.period_advanced",
+              payload: { via: "webhook", artisanId: sub.artisan_id, nextPeriodStart: start.toISOString(), nextPeriodEnd: end.toISOString() },
+              actor: "stripe_webhook",
+            });
+            await r.emitOutboxEvent({
+              artisanId: sub.artisan_id,
+              action: "abonnement.paiement_reussi",
+              entityType: "abonnement",
+              entityId: sub.id,
+              payload: { planId: sub.plan_id, montantCents: plan ? plan.amountCentsByInterval[interval] : cycle.amount_cents, periode: { debut: cycle.period_end.toISOString(), fin: end.toISOString() } },
+            });
           });
         }
       }
@@ -136,12 +140,15 @@ export async function handleBillingWebhookEvent(
      * (résurrection involontaire + notification de suspension d'un abo déjà annulé).
      */
     if (!isFinalAttempt && artisanId !== null) {
-      await deps.repo.emitOutboxEvent({
-        artisanId,
-        action: "abonnement.paiement_echoue",
-        entityType: "abonnement",
-        entityId: attempt.cycle_id,
-        payload: { tentativeNo: attemptCount, prochainEssaiAt: retryAt?.toISOString() ?? null },
+      const aid = artisanId;
+      await withOutbox(deps.db, deps.repo, async (r, _tx) => {
+        await r.emitOutboxEvent({
+          artisanId: aid,
+          action: "abonnement.paiement_echoue",
+          entityType: "abonnement",
+          entityId: attempt.cycle_id,
+          payload: { tentativeNo: attemptCount, prochainEssaiAt: retryAt?.toISOString() ?? null },
+        });
       });
     }
     if (isFinalAttempt && cycle && sub && sub.status !== "canceled") {

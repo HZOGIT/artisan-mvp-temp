@@ -317,7 +317,7 @@ export function createDevisRouter(
       .mutation(async ({ ctx, input }) => {
         const result = await envoyerRelanceDevis(relanceDeps, ctx.tenant, input);
         const tx = db;
-        if (tx) await outboxEvent(tx, ctx.tenant, { action: "devis.relance_envoyee", entityType: "devis", entityId: input.devisId, payload: {} }).catch(() => {});
+        if (tx) await outboxEvent(tx, ctx.tenant, { action: "devis.relance_envoyee", entityType: "devis", entityId: input.devisId, payload: {} });
         return result;
       }),
 

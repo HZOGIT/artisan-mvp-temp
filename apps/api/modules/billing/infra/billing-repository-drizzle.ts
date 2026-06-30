@@ -575,13 +575,16 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
   }
 
   async emitOutboxEvent(params: EmitOutboxEventParams): Promise<void> {
-    /* ponytail: billing n'a pas de tx englobant — best-effort comme appendEvent */
     const tx = this.db;
     await outboxEvent(
       tx,
       { artisanId: params.artisanId, userId: params.userId ?? 0 },
       { action: params.action, entityType: params.entityType, entityId: params.entityId, payload: params.payload },
     );
+  }
+
+  withDb(db: DbClient): IBillingRepository {
+    return new BillingRepositoryDrizzle(db);
   }
 
   async countActiveUsers(ctx: TenantContext): Promise<number> {
