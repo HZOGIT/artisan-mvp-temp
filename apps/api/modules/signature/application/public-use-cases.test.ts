@@ -254,6 +254,16 @@ describe("signDevis (public)", () => {
     expect(email.sent[0].subject).toContain("accepté et signé");
   });
 
+  it("envoie email de confirmation au client signataire après signature (GAP-G OPE-979)", async () => {
+    const { deps, email } = build({ res: resolution(), view });
+    await signDevis(deps, signPayload);
+    const clientEmail = email.sent.find((m) => m.to === "jean@test.com");
+    expect(clientEmail).toBeDefined();
+    expect(clientEmail?.subject).toContain("DEV-1");
+    expect(clientEmail?.subject).toContain("Confirmation");
+    expect(clientEmail?.body).toContain("Toiture Pro");
+  });
+
   it("notification/email best-effort : pas de vue → signature OK quand même", async () => {
     const { deps, email } = build({ res: resolution() }); // pas de seedView
     const out = await signDevis(deps, signPayload);

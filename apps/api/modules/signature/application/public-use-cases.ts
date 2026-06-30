@@ -5,8 +5,9 @@ import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { TenantContext } from "../../../shared/tenant";
 import { signatureCounter } from "../../../shared/observability/business-metrics";
 import type { Signature } from "../domain/signature";
-import { buildSignedDevisArtisanEmail, buildRefusedDevisArtisanEmail } from "../domain/signature";
+import { buildSignedDevisArtisanEmail, buildRefusedDevisArtisanEmail, buildSignedDevisClientEmail } from "../domain/signature";
 import type { SignaturePublicReader, SignatureDevisView } from "./signature-public-reader";
+import type { IEmailLogWriter } from "../../emails/application/email-log-writer";
 import type { SignaturePublicWriter } from "./signature-public-writer";
 import type { SignatureNotificationWriter } from "./signature-repository";
 import type { DbClient } from "../../../shared/db";
@@ -23,6 +24,8 @@ export interface SignaturePublicDeps {
   readonly maintenant?: () => Date;
   /** Pool DB pour l'atomicité outbox (withOutbox) — undefined = dégradé sans outbox. */
   readonly db?: DbClient;
+  /** Journalisation emails (best-effort). */
+  readonly emailLogWriter?: IEmailLogWriter;
 }
 
 const clientFullName = (client: { prenom: string | null; nom: string } | null): string =>
@@ -221,6 +224,19 @@ export async function signDevis(
       });
       /* ponytail: double-send temporaire — workers pg-boss prendront le relais */
       await deps.email.send({ to: view.artisan.email, subject, body });
+    }
+    if (input.signataireEmail) {
+      const { subject, body } = buildSignedDevisClientEmail({
+        artisanName: view.artisan?.nomEntreprise ?? "",
+        clientName: input.signataireName,
+        devisNumero: view.devis.numero,
+        devisObjet: view.devis.objet ?? null,
+        totalTTC: parseFloat(view.devis.totalTTC) || 0,
+      });
+      await deps.email.send({ to: input.signataireEmail, subject, body });
+      if (deps.emailLogWriter) {
+        await deps.emailLogWriter.create({ artisanId: ctx.artisanId, destinataire: input.signataireEmail, sujet: subject, type: "devis_signe_client", entiteType: "devis", entiteId: resolution.devisId }).catch(() => { /* ponytail: best-effort — emailLogWriter non-critique */ });
+      }
     }
   });
 
