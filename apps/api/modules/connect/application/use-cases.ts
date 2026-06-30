@@ -31,7 +31,7 @@ export async function startOnboarding(deps: ConnectDeps, ctx: TenantContext): Pr
   const link = await deps.stripe.createAccountLink({
     accountId,
     refreshUrl: `${deps.appUrl}/api/paiement/connect/refresh?artisanId=${ctx.artisanId}`,
-    returnUrl: `${deps.appUrl}/parametres?tab=paiements&connect=return`,
+    returnUrl: `${deps.appUrl}/paiements?connect=return`,
   });
   return { url: link.url };
 }

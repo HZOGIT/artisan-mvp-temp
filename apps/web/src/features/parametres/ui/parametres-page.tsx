@@ -1,19 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { Settings, FileText, Bell, Save, Palette, Upload, Trash2, Image, Globe, ExternalLink, Download, Shield, CreditCard, CheckCircle, AlertCircle, Clock } from "lucide-react";
+import { Settings, FileText, Bell, Save, Palette, Upload, Trash2, Image, Globe, ExternalLink, Download, Shield } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Label } from "@/shared/ui/label";
 import { Textarea } from "@/shared/ui/textarea";
 import { Switch } from "@/shared/ui/switch";
-import { Badge } from "@/shared/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 import { BACKEND_URL, apiUrl } from "@/shared/backend-url";
 import { useParametres } from "../application/use-parametres";
-import { useConnect } from "../application/use-connect";
-import { navigate, useSearch } from "@/shared/router/navigation";
 import {
   parametresToForm, formToUpdateInput, buildIcalUrl, demandeStatutClass, FORM_DEFAULTS,
   applyVitrineToForm, formToVitrineInput,
@@ -28,12 +24,6 @@ export default function ParametresPage() {
     parametres, artisan, icalFeed, demandes, vitrineSettings, isLoading, refetchArtisan,
     updateParametres, updateProfile, updateVitrine, regenerateIcal, updateDemandeStatut, convertirDemande,
   } = useParametres();
-  const { connectStatus, startOnboarding } = useConnect();
-
-  const search = useSearch();
-  const searchParams = new URLSearchParams(search);
-  const activeTab = searchParams.get("tab") ?? "general";
-
   const [formData, setFormData] = useState<ParametresForm>(FORM_DEFAULTS);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -57,10 +47,6 @@ export default function ParametresPage() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("success") === "1" || params.get("canceled") === "1") {
       window.location.replace(`/abonnement?${params.toString()}`);
-    }
-    if (params.get("connect") === "return") {
-      toast.info(t("connectRetourStripe"));
-      navigate("/parametres?tab=paiements", { replace: true });
     }
   }, []);
 
@@ -122,15 +108,6 @@ export default function ParametresPage() {
     );
   }
 
-  const connectBadge = () => {
-    const s = connectStatus.data?.status;
-    if (s === "active") return <Badge className="bg-green-100 text-green-800">{t("connectActif")}</Badge>;
-    if (s === "pending") return <Badge className="bg-yellow-100 text-yellow-800">{t("connectEnCours")}</Badge>;
-    if (s === "restricted") return <Badge className="bg-orange-100 text-orange-800">{t("connectRestreint")}</Badge>;
-    if (s === "deauthorized") return <Badge variant="destructive">{t("connectDeconnecte")}</Badge>;
-    return null;
-  };
-
   return (
     <div className="space-y-6">
       <div>
@@ -138,89 +115,7 @@ export default function ParametresPage() {
         <p className="text-muted-foreground mt-1">{t("subtitle")}</p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => navigate(`/parametres?tab=${v}`)}>
-        <TabsList>
-          <TabsTrigger value="general"><Settings className="h-4 w-4 mr-1.5" />{t("tabGeneral")}</TabsTrigger>
-          <TabsTrigger value="paiements"><CreditCard className="h-4 w-4 mr-1.5" />{t("tabPaiements")}</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="paiements" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                {t("connectTitre")}
-                {connectBadge()}
-              </CardTitle>
-              <CardDescription>{t("connectDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {connectStatus.isLoading ? (
-                <div className="animate-pulse h-8 bg-muted rounded" />
-              ) : connectStatus.data?.status === "active" ? (
-                <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg border border-green-200">
-                  <CheckCircle className="h-6 w-6 text-green-600 flex-shrink-0" />
-                  <div>
-                    <p className="font-medium text-green-800">{t("connectActifMsg")}</p>
-                    <p className="text-sm text-green-700">{t("connectActifDetail")}</p>
-                  </div>
-                </div>
-              ) : connectStatus.data?.status === "pending" || connectStatus.data?.status === "restricted" ? (
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center gap-3 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                    <Clock className="h-6 w-6 text-yellow-600 flex-shrink-0" />
-                    <div>
-                      <p className="font-medium text-yellow-800">{t("connectIncompletMsg")}</p>
-                      <p className="text-sm text-yellow-700">{t("connectIncompletDetail")}</p>
-                    </div>
-                  </div>
-                  <Button
-                    onClick={() => startOnboarding.mutate(undefined, {
-                      onSuccess: (d) => { window.location.href = d.url; },
-                      onError: (e) => toast.error(e.message),
-                    })}
-                    disabled={startOnboarding.isPending}
-                  >
-                    {startOnboarding.isPending ? t("connectChargement") : t("connectCompleter")}
-                  </Button>
-                </div>
-              ) : connectStatus.data?.status === "deauthorized" ? (
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center gap-3 p-4 bg-red-50 rounded-lg border border-red-200">
-                    <AlertCircle className="h-6 w-6 text-red-600 flex-shrink-0" />
-                    <p className="font-medium text-red-800">{t("connectDeconnecteMsg")}</p>
-                  </div>
-                  <Button
-                    onClick={() => startOnboarding.mutate(undefined, {
-                      onSuccess: (d) => { window.location.href = d.url; },
-                      onError: (e) => toast.error(e.message),
-                    })}
-                    disabled={startOnboarding.isPending}
-                  >
-                    {startOnboarding.isPending ? t("connectChargement") : t("connectReconnecter")}
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-4">
-                  <p className="text-sm text-muted-foreground">{t("connectNonConnecteDetail")}</p>
-                  <Button
-                    onClick={() => startOnboarding.mutate(undefined, {
-                      onSuccess: (d) => { window.location.href = d.url; },
-                      onError: (e) => toast.error(e.message),
-                    })}
-                    disabled={startOnboarding.isPending}
-                  >
-                    {startOnboarding.isPending ? t("connectChargement") : t("connectCTA")}
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="general">
-          <div>
-          <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5" />{t("perso")}</CardTitle>
@@ -492,9 +387,6 @@ export default function ParametresPage() {
               )}
             </CardContent>
           </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
     </div>
   );
 }

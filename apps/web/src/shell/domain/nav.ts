@@ -79,6 +79,7 @@ export const NAV_GROUPS: NavGroup[] = [
   ] },
   { id: "parametres", title: "Paramètres", icon: Settings, color: "slate", items: [
     { icon: CreditCard, label: "Abonnement", path: "/abonnement" },
+    { icon: CreditCard, label: "Paiements en ligne", path: "/paiements" },
     { icon: Zap, label: "Facturation électronique", path: "/facturation-electronique" },
     { icon: BookOpen, label: "Guide d'utilisation", path: "/documentation" },
     { icon: HelpCircle, label: "Support", path: "/support" },
@@ -105,7 +106,7 @@ export const pathPermissionMap: Record<string, string> = {
   "/chantiers": "chantiers.voir", "/planification": "interventions.gerer", "/articles": "articles.voir",
   "/stocks": "articles.voir", "/rapport-commande": "exports.voir", "/commandes": "articles.voir",
   "/fournisseurs": "articles.voir", "/rapports": "exports.voir", "/comptabilite": "comptabilite.voir",
-  "/previsions": "comptabilite.voir", "/parametres": "parametres.voir", "/abonnement": "parametres.voir", "/ma-vitrine": "vitrine.gerer",
+  "/previsions": "comptabilite.voir", "/parametres": "parametres.voir", "/abonnement": "parametres.voir", "/paiements": "parametres.voir", "/ma-vitrine": "vitrine.gerer",
   "/modeles-email": "parametres.voir", "/modeles-email-transactionnels": "parametres.voir",
   "/facturation-electronique": "parametres.voir",
   "/utilisateurs": "utilisateurs.gerer", "/profil": "", "/assistant": "", "/notifications": "",
