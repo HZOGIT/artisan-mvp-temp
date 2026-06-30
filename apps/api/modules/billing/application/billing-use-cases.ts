@@ -11,6 +11,7 @@ import type { BillingInterval } from "../domain/plan";
 import { OPERIOZ } from "../domain/operioz-config";
 import type { FactureAbonnementData } from "../../../shared/pdf/pdf-generator";
 import { withOutbox } from "../../../shared/events/with-outbox";
+import { mapPlan, normalizeStatus } from "./billing-migration";
 
 export interface BillingDeps {
   readonly repo: IBillingRepository;
@@ -448,6 +449,35 @@ export class NotFoundError extends Error {
     super(message);
     this.name = "NotFoundError";
   }
+}
+
+
+/**
+ * Synchronise un abonnement Stripe (customer.subscription.updated/created/deleted).
+ * Émet abonnement.stripe_sync (updated/created) ou abonnement.expire (deleted/canceled)
+ * de façon atomique avec la mise à jour de statut (withOutbox, même transaction).
+ * Ignoré si la sub n'est pas en billing_mode='stripe'.
+ */
+export async function syncSubscriptionFromStripe(
+  deps: Pick<BillingDeps, "repo" | "db">,
+  artisanId: number,
+  priceId: string | null,
+  stripeStatus: string,
+): Promise<void> {
+  const ctx = { artisanId, userId: 0 };
+  const existing = await deps.repo.findSubscription(ctx);
+  if (!existing || existing.billing_mode !== "stripe") return;
+  const planId = mapPlan(priceId, null);
+  const status = normalizeStatus(stripeStatus);
+  await withOutbox(deps.db, deps.repo, async (r) => {
+    await r.updateSubscriptionPlan(ctx, planId);
+    await r.updateSubscriptionStatus(ctx, status);
+    if (stripeStatus === "canceled") {
+      await r.emitOutboxEvent({ artisanId, action: "abonnement.expire", entityType: "abonnement", entityId: artisanId, payload: {} });
+    } else {
+      await r.emitOutboxEvent({ artisanId, action: "abonnement.stripe_sync", entityType: "abonnement", entityId: artisanId, payload: { planId, statut: status, stripeStatus } });
+    }
+  });
 }
 
 

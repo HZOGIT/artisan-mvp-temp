@@ -114,9 +114,8 @@ import { createSubscriptionModule } from "./modules/subscription/subscription.mo
 import { createBillingModule } from "./modules/billing/billing.module";
 import { buildEinvoicingModule } from "./modules/einvoicing/einvoicing.module";
 import { BillingRepositoryDrizzle } from "./modules/billing/infra/billing-repository-drizzle";
-import type { IBillingRepository } from "./modules/billing/application/billing-repository";
 import { BillingAdapter } from "./shared/ports/billing-adapter";
-import { mapPlan, normalizeStatus } from "./modules/billing/application/billing-migration";
+import { syncSubscriptionFromStripe } from "./modules/billing/application/billing-use-cases";
 import { createPlatformAdminModule } from "./modules/platform-admin/platform-admin.module";
 import { SubscriptionReaderDrizzle } from "./modules/subscription/infra/subscription-reader-drizzle";
 import type { ISubscriptionRepository } from "./modules/subscription/application/subscription-reader";
@@ -180,7 +179,6 @@ import { paInboundPollerPlugin } from "./shared/infra/pa-inbound-poller";
 import { paReconciliationPollerPlugin } from "./shared/infra/pa-reconciliation-poller";
 import { portalPaymentReconciliationPollerPlugin } from "./shared/infra/portal-payment-reconciliation-poller";
 import { eventOutboxDrainerPlugin } from "./shared/events/outbox-drainer";
-import { withOutbox } from "./shared/events/with-outbox";
 import { geoPurgeCronPlugin } from "./shared/infra/geo-purge-cron";
 import { rgpdCronPlugin } from "./shared/infra/rgpd-cron";
 import { retentionPurgeCronPlugin } from "./shared/infra/retention-purge-cron";
@@ -1333,20 +1331,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
     onBillingWebhookEvent: (eventType, piId, fc, fm, stripeEventId) =>
       handleBillingWebhookEvent({ repo: billingRepo, db: getDbHandle().db }, eventType, piId, fc, fm, stripeEventId),
-    onSubscriptionWebhookEvent: async (artisanId, priceId, stripeStatus) => {
-      const ctx = { artisanId, userId: 0 };
-      const existing = await billingRepo.findSubscription(ctx);
-      if (!existing || existing.billing_mode !== "stripe") return;
-      const planId = mapPlan(priceId, null);
-      const status = normalizeStatus(stripeStatus);
-      await withOutbox(getDbHandle().db, billingRepo as IBillingRepository, async (r) => {
-        await r.updateSubscriptionPlan(ctx, planId);
-        await r.updateSubscriptionStatus(ctx, status);
-        if (stripeStatus === "canceled") {
-          await r.emitOutboxEvent({ artisanId, action: "abonnement.expire", entityType: "abonnement", entityId: artisanId, payload: {} });
-        }
-      });
-    },
+    onSubscriptionWebhookEvent: (artisanId, priceId, stripeStatus) =>
+      syncSubscriptionFromStripe({ repo: billingRepo, db: getDbHandle().db }, artisanId, priceId, stripeStatus),
     markWebhookProcessed: (eventId, eventType) => billingRepo.markWebhookProcessed(eventId, eventType, {}),
     genererEcrituresFacture: async (artisanId: number, factureId: number) => {
       await compta.genererEcrituresVente({ artisanId, userId: 0 }, factureId);

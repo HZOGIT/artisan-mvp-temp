@@ -7,6 +7,7 @@ import {
   changePlan,
   cancelAtPeriodEnd,
   reactivateSubscription,
+  syncSubscriptionFromStripe,
 } from "./application/billing-use-cases";
 import {
   runSchedulerTick,
@@ -214,6 +215,51 @@ describe("abonnement.paiement_echoue (OPE-867, webhook only)", () => {
     expect(ev).toBeDefined();
     expect(ev!.artisanId).toBe(A.artisanId);
     expect((ev!.payload as Record<string, unknown>)["tentativeNo"]).toBe(1);
+  });
+});
+
+describe("abonnement.stripe_sync (OPE-937, webhook subscription.updated/created)", () => {
+  it("émet l'event outbox pour customer.subscription.updated (stripe_sync)", async () => {
+    const repo = makeRepo();
+    await repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "stripe",
+      status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+
+    await syncSubscriptionFromStripe({ repo }, A.artisanId, "price_pro_monthly", "active");
+
+    const ev = repo.outboxEvents.find(e => e.action === "abonnement.stripe_sync");
+    expect(ev).toBeDefined();
+    expect(ev!.artisanId).toBe(A.artisanId);
+    expect(ev!.payload).toMatchObject({ planId: "pro", statut: "active", stripeStatus: "active" });
+  });
+
+  it("émet abonnement.expire (canceled), pas abonnement.stripe_sync", async () => {
+    const repo = makeRepo();
+    await repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "stripe",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+
+    await syncSubscriptionFromStripe({ repo }, A.artisanId, null, "canceled");
+
+    expect(repo.outboxEvents.find(e => e.action === "abonnement.expire")).toBeDefined();
+    expect(repo.outboxEvents.find(e => e.action === "abonnement.stripe_sync")).toBeUndefined();
+  });
+
+  it("ignore si billing_mode != 'stripe'", async () => {
+    const repo = makeRepo();
+    await repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+
+    await syncSubscriptionFromStripe({ repo }, A.artisanId, "price_pro_monthly", "active");
+
+    expect(repo.outboxEvents).toHaveLength(0);
   });
 });
 
