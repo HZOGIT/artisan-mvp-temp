@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { FakeClientRepository } from "../infra/client-repository-fake";
-import { creerClient, modifierClient, supprimerClient, fusionnerClients } from "./write-use-cases";
+import { creerClient, modifierClient, supprimerClient, fusionnerClients, anonymiserClient } from "./write-use-cases";
 import { ConflictError, NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 
@@ -84,6 +84,40 @@ describe("clients — suppression avec garde d'intégrité référentielle", () 
     const c = await creerClient(repo, A, { nom: "Secret" });
     await expect(supprimerClient(repo, B, c.id)).rejects.toBeInstanceOf(NotFoundError);
     expect(await repo.getById(A, c.id)).not.toBeNull();
+  });
+});
+
+describe("clients — anonymisation RGPD Art. 17 (use-case)", () => {
+  it("anonymiserClient : PII effacées, enregistrement conservé (ancre documents légaux)", async () => {
+    const repo = new FakeClientRepository();
+    const c = await creerClient(repo, A, { nom: "Dupont", prenom: "Jean", email: "j@d.fr", telephone: "0600000001" });
+    await anonymiserClient(repo, A, c.id);
+    const apres = await repo.getById(A, c.id);
+    expect(apres).not.toBeNull();
+    expect(apres?.nom).toBe("[CLIENT ANONYMISÉ]");
+    expect(apres?.prenom).toBeNull();
+    expect(apres?.email).toBeNull();
+    expect(apres?.telephone).toBeNull();
+  });
+
+  it("anonymiserClient : client d'un autre tenant → NotFoundError (PII non révélées)", async () => {
+    const repo = new FakeClientRepository();
+    const c = await creerClient(repo, A, { nom: "Secret", email: "s@a.fr" });
+    await expect(anonymiserClient(repo, B, c.id)).rejects.toBeInstanceOf(NotFoundError);
+    expect((await repo.getById(A, c.id))?.email).toBe("s@a.fr");
+  });
+
+  it("anonymiserClient : client inexistant → NotFoundError", async () => {
+    const repo = new FakeClientRepository();
+    await expect(anonymiserClient(repo, A, 99999)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("anonymiserClient : fonctionne même si des documents sont liés (distinct de la suppression)", async () => {
+    const repo = new FakeClientRepository();
+    const c = await creerClient(repo, A, { nom: "Référencé", email: "r@a.fr" });
+    repo.setDocumentsLies(c.id, 5);
+    await expect(anonymiserClient(repo, A, c.id)).resolves.toBeUndefined();
+    expect((await repo.getById(A, c.id))?.nom).toBe("[CLIENT ANONYMISÉ]");
   });
 });
 

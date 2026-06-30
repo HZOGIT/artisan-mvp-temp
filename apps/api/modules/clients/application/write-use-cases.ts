@@ -58,6 +58,16 @@ export async function supprimerClient(repo: IClientRepository, ctx: TenantContex
   if (!ok) throw new NotFoundError("Client introuvable");
 }
 
+/**
+ * RGPD Art. 17 — droit à l'effacement. Anonymise les PII du client (nom/email/tel/adresse…)
+ * tout en conservant la ligne comme ancre des documents légaux (factures conservées 10 ans).
+ * Distinct de la suppression : utilisable même si des documents sont liés au client.
+ */
+export async function anonymiserClient(repo: IClientRepository, ctx: TenantContext, id: number): Promise<void> {
+  const ok = await repo.anonymiser(ctx, id);
+  if (!ok) throw new NotFoundError("Client introuvable");
+}
+
 /*
  * Fusionne un doublon dans un client survivant (déduplication CRM). Tout l'historique du doublon
  * (devis/factures/interventions/chantiers/contrats/avis/rdv/conversations…) est réaffecté au

@@ -17,7 +17,7 @@ import {
   getEncoursClient,
   getEncoursMap,
 } from "../../application/read-use-cases";
-import { creerClient, modifierClient, supprimerClient, fusionnerClients } from "../../application/write-use-cases";
+import { creerClient, modifierClient, supprimerClient, fusionnerClients, anonymiserClient } from "../../application/write-use-cases";
 import { importerClients } from "../../application/import-use-cases";
 import { envoyerMessageClients } from "../../application/email-use-cases";
 
@@ -110,6 +110,18 @@ export function createClientsRouter(deps: ClientsModuleDeps) {
       .mutation(async ({ ctx, input }) => {
         await supprimerClient(repo, ctx.tenant, input.id);
         ctx.log.warn({ event: "client_deleted", clientId: input.id }, "Client supprimé définitivement");
+        return { success: true };
+      }),
+
+    /**
+     * RGPD Art. 17 — droit à l'effacement. Anonymise les PII du client (nom/email/tel/adresse…)
+     * sans supprimer la ligne ni les documents légaux liés (factures conservées 10 ans).
+     */
+    anonymiser: gerer
+      .input(z.object({ id: z.number().int() }))
+      .mutation(async ({ ctx, input }) => {
+        await anonymiserClient(repo, ctx.tenant, input.id);
+        ctx.log.warn({ event: "client_anonymise", clientId: input.id }, "Client anonymisé (RGPD Art. 17)");
         return { success: true };
       }),
 

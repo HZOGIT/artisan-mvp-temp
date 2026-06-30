@@ -122,6 +122,34 @@ export class ClientRepositoryDrizzle implements IClientRepository {
     });
   }
 
+  anonymiser(ctx: TenantContext, id: number): Promise<boolean> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const updated = await tx
+        .update(clients)
+        .set({
+          nom: "[CLIENT ANONYMISÉ]",
+          prenom: null,
+          email: null,
+          telephone: null,
+          adresse: null,
+          codePostal: null,
+          ville: null,
+          adresseFacturation: null,
+          codePostalFacturation: null,
+          villeFacturation: null,
+          raisonSociale: null,
+          siret: null,
+          numeroTVA: null,
+          etiquettes: null,
+          notes: null,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(clients.id, id), eq(clients.artisanId, ctx.artisanId)))
+        .returning({ id: clients.id });
+      return updated.length > 0;
+    });
+  }
+
   countDocumentsLies(ctx: TenantContext, clientId: number): Promise<number> {
     return withTenant(this.db, ctx, async (tx) => {
       const a = ctx.artisanId;

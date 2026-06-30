@@ -40,6 +40,7 @@ describe("clients.module", () => {
     const module = createClientsModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
     expect(procedures).toEqual([
+      "anonymiser",
       "create",
       "delete",
       "envoyerMessage",
