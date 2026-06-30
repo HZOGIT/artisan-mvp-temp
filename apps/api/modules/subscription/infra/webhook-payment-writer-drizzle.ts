@@ -79,6 +79,7 @@ export class WebhookPaymentWriterDrizzle implements WebhookPaymentWriter {
         .update(paiementsStripe)
         .set({ statut: "echouee" })
         .where(and(eq(paiementsStripe.id, input.paiementId), eq(paiementsStripe.artisanId, input.artisanId)));
+      await outboxEvent(tx, ctx, { action: "paiement.echoue", entityType: "paiement", entityId: input.paiementId, payload: { paiementId: input.paiementId } });
     });
   }
 }
