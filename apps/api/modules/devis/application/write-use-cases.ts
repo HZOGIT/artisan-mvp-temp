@@ -68,6 +68,9 @@ export async function modifierDevis(
 ): Promise<Devis> {
   const devis = await getDevisOwned(repo, ctx, id);
   assertModifiable(devis);
+  if (await repo.signatureAccepteeParClient(ctx, id)) {
+    throw new ConflictError("Ce devis a été accepté par le client et ne peut plus être modifié");
+  }
   const updated = await repo.update(ctx, id, input);
   if (!updated) throw new NotFoundError("Devis introuvable");
   return updated;
@@ -89,6 +92,9 @@ export async function ajouterLigneDevis(
 ): Promise<DevisLigne> {
   const devis = await getDevisOwned(repo, ctx, devisId);
   assertModifiable(devis);
+  if (await repo.signatureAccepteeParClient(ctx, devisId)) {
+    throw new ConflictError("Ce devis a été accepté par le client et ne peut plus être modifié");
+  }
   assertLigneValide(input.designation, input.prixUnitaireHT, input.quantite);
   const ligne = await repo.addLigne(ctx, devisId, input);
   if (!ligne) throw new NotFoundError("Devis introuvable");
@@ -104,6 +110,9 @@ export async function modifierLigneDevis(
 ): Promise<DevisLigne> {
   const devis = await getDevisOwned(repo, ctx, devisId);
   assertModifiable(devis);
+  if (await repo.signatureAccepteeParClient(ctx, devisId)) {
+    throw new ConflictError("Ce devis a été accepté par le client et ne peut plus être modifié");
+  }
   /** La ligne doit relever de CE devis (lie l'autorisation au devis modifiable vérifié). */
   const lignes = await repo.listLignes(ctx, devisId);
   if (!lignes.some((l) => l.id === ligneId)) throw new NotFoundError("Ligne introuvable");
@@ -136,6 +145,14 @@ export async function changerStatutDevis(
   const devis = await getDevisOwned(repo, ctx, id);
   /** idempotent */
   if (devis.statut === cible) return devis;
+  /**
+   * Verrou signature : si le client a signé (signature.statut='accepte'), seule la transition
+   * vers 'accepte' est autorisée (réconciliation de désynchronisation). Bloquer refuse/expire
+   * sur un devis signé empêche toute incohérence signature↔devis.
+   */
+  if (cible !== "accepte" && await repo.signatureAccepteeParClient(ctx, id)) {
+    throw new ConflictError("Ce devis a été accepté par le client et ne peut plus être refusé ou expiré");
+  }
   if (!TRANSITIONS[devis.statut].includes(cible)) {
     throw new ConflictError(`Transition de statut invalide : ${devis.statut} → ${cible}`);
   }
@@ -165,6 +182,9 @@ export async function supprimerLigneDevis(
 ): Promise<void> {
   const devis = await getDevisOwned(repo, ctx, devisId);
   assertModifiable(devis);
+  if (await repo.signatureAccepteeParClient(ctx, devisId)) {
+    throw new ConflictError("Ce devis a été accepté par le client et ne peut plus être modifié");
+  }
   const lignes = await repo.listLignes(ctx, devisId);
   if (!lignes.some((l) => l.id === ligneId)) throw new NotFoundError("Ligne introuvable");
   const ok = await repo.deleteLigne(ctx, ligneId);

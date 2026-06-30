@@ -75,6 +75,13 @@ export interface IDevisRepository {
   /** false si la ligne ne relève pas d'un devis du tenant. */
   deleteLigne(ctx: TenantContext, ligneId: number): Promise<boolean>;
 
+  /**
+   * True si le devis possède une signature acceptée par le client (`signatures_devis.statut='accepte'`).
+   * Utilisé par les use-cases d'écriture pour bloquer toute mutation sur un devis signé par le client,
+   * quelle que soit la valeur de `devis.statut` (protection contre les désynchronisations).
+   */
+  signatureAccepteeParClient(ctx: TenantContext, devisId: number): Promise<boolean>;
+
   /** Retourne une nouvelle instance du repo utilisant `db` (pool ou tx Drizzle) — pour l'atomicité outbox. */
   withDb(db: DbClient): IDevisRepository;
 }

@@ -164,4 +164,18 @@ describe.skipIf(!URL)("DevisRepositoryDrizzle (PG, RLS + scope tenant + lignes)"
     expect(l?.montantHT).toBe("40.00"); /* 50 × 0.8 */
     expect(l?.montantTTC).toBe("48.00"); /* 40 × 1.2 */
   });
+
+  it("signatureAccepteeParClient : true si signatures_devis.statut=accepte, false sinon, false hors tenant", async () => {
+    const d = await repo.create(ctx(A), { clientId: clientA, numero: "DEV-SIG-GUARD" });
+    expect(await repo.signatureAccepteeParClient(ctx(A), d.id)).toBe(false);
+
+    const sfx = Date.now();
+    await admin.query(
+      `insert into signatures_devis ("devisId", token, "expiresAt", statut) values ($1, $2, now() + interval '30 days', 'accepte')`,
+      [d.id, `tok-sig-${sfx}`],
+    );
+
+    expect(await repo.signatureAccepteeParClient(ctx(A), d.id)).toBe(true);
+    expect(await repo.signatureAccepteeParClient(ctx(B), d.id)).toBe(false);
+  });
 });

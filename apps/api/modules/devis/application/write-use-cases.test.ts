@@ -193,4 +193,43 @@ describe("devis — use-cases d'écriture", () => {
     const d = await creerDevis(repo, A, { clientId: 100 });
     await expectCrossTenantDenied(() => dupliquerDevis(repo, B, d.id));
   });
+
+  describe("VERROU SIGNATURE : devis signé par le client (signature.statut=accepte)", () => {
+    it("modifier un devis brouillon avec signature acceptée → Conflict", async () => {
+      const repo = repoWithClient(A, 100);
+      const d = await creerDevis(repo, A, { clientId: 100 });
+      repo.registerSignatureAccepteeForTest(d.id);
+      await expect(modifierDevis(repo, A, d.id, { objet: "x" })).rejects.toBeInstanceOf(ConflictError);
+    });
+
+    it("ajouter/modifier/supprimer ligne sur devis brouillon avec signature acceptée → Conflict", async () => {
+      const repo = repoWithClient(A, 100);
+      const d = await creerDevis(repo, A, { clientId: 100 });
+      const l = await ajouterLigneDevis(repo, A, d.id, { designation: "Pose", prixUnitaireHT: "100.00", quantite: "1" });
+      repo.registerSignatureAccepteeForTest(d.id);
+      await expect(ajouterLigneDevis(repo, A, d.id, { designation: "Extra", prixUnitaireHT: "50.00" })).rejects.toBeInstanceOf(ConflictError);
+      await expect(modifierLigneDevis(repo, A, d.id, l.id, { quantite: "2" })).rejects.toBeInstanceOf(ConflictError);
+      await expect(supprimerLigneDevis(repo, A, d.id, l.id)).rejects.toBeInstanceOf(ConflictError);
+    });
+
+    it("changerStatut vers refuse/expire sur devis avec signature acceptée → Conflict", async () => {
+      const repo = repoWithClient(A, 100);
+      const d = await creerDevis(repo, A, { clientId: 100 });
+      await ajouterLigneDevis(repo, A, d.id, { designation: "Pose", prixUnitaireHT: "100.00", quantite: "1" });
+      repo.setStatutForTest(d.id, "envoye");
+      repo.registerSignatureAccepteeForTest(d.id);
+      await expect(changerStatutDevis(repo, A, d.id, "refuse")).rejects.toBeInstanceOf(ConflictError);
+      await expect(changerStatutDevis(repo, A, d.id, "expire")).rejects.toBeInstanceOf(ConflictError);
+    });
+
+    it("changerStatut vers accepte sur devis envoye avec signature acceptée → OK (réconciliation)", async () => {
+      const repo = repoWithClient(A, 100);
+      const d = await creerDevis(repo, A, { clientId: 100 });
+      await ajouterLigneDevis(repo, A, d.id, { designation: "Pose", prixUnitaireHT: "100.00", quantite: "1" });
+      repo.setStatutForTest(d.id, "envoye");
+      repo.registerSignatureAccepteeForTest(d.id);
+      const result = await changerStatutDevis(repo, A, d.id, "accepte");
+      expect(result.statut).toBe("accepte");
+    });
+  });
 });
