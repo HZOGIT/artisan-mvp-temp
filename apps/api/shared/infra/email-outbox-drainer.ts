@@ -36,6 +36,7 @@ export async function drainEmailEntry(
       body: entry.html,
       fromName: entry.fromName ?? undefined,
       replyTo: entry.replyTo ?? undefined,
+      idempotencyKey: `email-outbox-${entry.id}`,
     };
     await sender.send(message);
     await update(entry.id, { statut: "sent", traiteeAt: new Date() });

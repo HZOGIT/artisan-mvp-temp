@@ -26,6 +26,13 @@ describe("drainEmailEntry", () => {
     expect(updates[0]?.set.traiteeAt).toBeInstanceOf(Date);
   });
 
+  it("idempotencyKey = `email-outbox-<id>` transmise au sender (anti-régression OPE-811)", async () => {
+    const received: import("../ports/email").EmailMessage[] = [];
+    const fakeSender = { send: async (m: import("../ports/email").EmailMessage) => { received.push(m); } };
+    await drainEmailEntry(fakeEntry({ id: 42 }), fakeSender, async () => {});
+    expect(received[0]?.idempotencyKey).toBe("email-outbox-42");
+  });
+
   it("erreur transitoire → tentatives++ ; dead si MAX_TENTATIVES atteint", async () => {
     const updates: Array<Record<string, unknown>> = [];
     const fakeSender = { send: async () => { throw new Error("Resend 503"); } };

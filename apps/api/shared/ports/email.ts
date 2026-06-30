@@ -30,6 +30,12 @@ export interface EmailMessage {
    * Absente sur les emails transactionnels (facture, devis, relance…).
    */
   readonly unsubscribeUrl?: string;
+  /**
+   * Clé d'idempotence envoyée à Resend comme header `Idempotency-Key`.
+   * Utilisée par l'email-outbox-drainer pour éviter les doubles envois sur retry post-crash.
+   * Format recommandé : `email-outbox-<id>`.
+   */
+  readonly idempotencyKey?: string;
 }
 
 export interface EmailPort {
