@@ -5,6 +5,8 @@ import type { DbClient, DbHandle } from "../../../shared/db";
 import { runEmailsLogReconciler } from "./emails-log-reconciler";
 import type { Anomalie } from "../../../platform/scheduler/reconciler";
 
+const APP_DB_URL = process.env.APP_DATABASE_URL;
+
 const DB_URL = process.env.DATABASE_URL;
 const ARTISAN_ID = 9939001;
 const FACTURE_ID = 7770001;
@@ -111,6 +113,25 @@ describe.skipIf(!DB_URL)("emails-log reconciler — L2", () => {
     );
     expect(outboxRows.rows).toHaveLength(1);
     expect(outboxRows.rows[0].payload).toMatchObject({ dryRun: true, invariant: "log-manquant" });
+  });
+
+  it("rls-guard: app_tenant voit 0 emails_log sans app.tenant (démontre le besoin d'ownerDb)", async () => {
+    if (!APP_DB_URL) return;
+    await admin.query(
+      `INSERT INTO emails_log ("artisanId", destinataire, sujet, type, statut, "entiteType", "entiteId")
+       VALUES ($1, 'x@x.com', 'Test', 'envoi_facture', 'sent', 'facture', $2)`,
+      [ARTISAN_ID, FACTURE_ID],
+    );
+    const appPool = new Pool({ connectionString: APP_DB_URL });
+    try {
+      const result = await appPool.query(
+        `SELECT id FROM emails_log WHERE "artisanId" = $1`,
+        [ARTISAN_ID],
+      );
+      expect(result.rows).toHaveLength(0);
+    } finally {
+      await appPool.end();
+    }
   });
 
   it("seuil dépassé → onSeuilDepasse appelé, rien réparé", async () => {

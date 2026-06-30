@@ -19,29 +19,36 @@ export interface EmailsLogReconcilerOpts {
   readonly onSeuilDepasse?: (anomalies: ReadonlyArray<Anomalie>) => Promise<void>;
 }
 
+/**
+ * @param ownerDb Connexion owner/admin (artisan_user) obligatoire.
+ * emails_log a FORCE RLS : app_tenant voit 0 lignes sans app.tenant défini,
+ * ce qui rendrait detect() toujours positif (faux-positifs) et verify() aveugle.
+ */
 export function createEmailsLogReconcilerJob(
-  db: DbClient,
+  ownerDb: DbClient,
   opts: EmailsLogReconcilerOpts = {},
 ): JobDefinition {
   return {
     name: "heal:emails-log",
     periodKey: dailyKey,
-    run: async () => runEmailsLogReconciler(db, opts),
+    run: async () => runEmailsLogReconciler(ownerDb, opts),
   };
 }
 
-/** Exported pour les tests. */
+/**
+ * @param ownerDb Connexion owner/admin (artisan_user) — voir createEmailsLogReconcilerJob.
+ */
 export async function runEmailsLogReconciler(
-  db: DbClient,
+  ownerDb: DbClient,
   opts: EmailsLogReconcilerOpts = {},
 ): Promise<void> {
   const stableBefore = new Date(Date.now() - STABLE_MIN * 60_000);
   const windowStart = new Date(Date.now() - WINDOW_DAYS * 86_400_000);
 
   await runReconciler<EmailGapDetails>(
-    db,
+    ownerDb,
     async () => {
-      const result = await db.execute<{
+      const result = await ownerDb.execute<{
         artisanId: number;
         entityType: string;
         entityId: number;

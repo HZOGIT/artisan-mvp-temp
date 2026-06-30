@@ -1548,7 +1548,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
         }),
       );
       registry.register(
-        createEmailsLogReconcilerJob(getDbHandle().db, {
+        createEmailsLogReconcilerJob(getOwnerDbHandle().db, {
           dryRun: process.env.HEALING_DRYRUN !== "false",
         }),
       );
