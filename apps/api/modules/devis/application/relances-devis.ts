@@ -7,6 +7,7 @@ import type { IDevisRepository } from "./devis-repository";
 import type { IRelanceDevisRepository } from "../../relances-devis/application/relance-devis-repository";
 import type { IModeleEmailRepository } from "../../modeles-email/application/modele-email-repository";
 import { buildModeleEmail } from "../../modeles-email/domain/render";
+import type { IEmailOptoutRepository } from "../../emails/application/email-optout-repository";
 
 /*
  * Dépendances des relances de devis (composition : devis + relances + client/artisan + email +
@@ -22,6 +23,8 @@ export interface DevisRelanceDeps {
   readonly maintenant?: () => Date;
   /** Optionnel : si présent, le modèle `isDefault` du type `relance_devis` remplace le gabarit codé en dur. */
   readonly modeleEmailRepo?: IModeleEmailRepository;
+  /** Optionnel : si présent, vérifie l'opt-out RGPD avant envoi. */
+  readonly optoutRepo?: IEmailOptoutRepository;
 }
 
 function escapeHtml(s: string): string {
@@ -105,6 +108,10 @@ export async function envoyerRelanceDevis(
     throw new TooManyRequestsError("Trop de relances envoyées. Réessayez dans quelques minutes.");
   }
 
+  if (deps.optoutRepo && await deps.optoutRepo.isOptedOut(client.email)) {
+    return { success: false, message: `Relance non envoyée : ${client.email} a demandé à ne plus recevoir d'emails` };
+  }
+
   const artisan = await deps.artisanReader.getArtisan(ctx);
   const artisanName = artisan?.nomEntreprise || "Votre artisan";
   const message = input.message || messageParDefaut(devis.numero, artisanName);
@@ -128,13 +135,14 @@ export async function envoyerRelanceDevis(
 export async function envoyerRelancesAutomatiques(
   deps: DevisRelanceDeps,
   ctx: TenantContext,
-  input: { joursMinimum?: number; joursEntreRelances?: number } = {},
+  input: { joursMinimum?: number; joursEntreRelances?: number; nombreMaxRelances?: number } = {},
 ): Promise<{ success: boolean; relancesEnvoyees: number }> {
   if (!(await deps.rateLimiter.check(`relance-auto:${ctx.artisanId}`))) {
     throw new TooManyRequestsError("Trop de relances en masse. Réessayez dans quelques minutes.");
   }
   const joursMinimum = input.joursMinimum ?? 7;
   const joursEntreRelances = input.joursEntreRelances ?? 7;
+  const nombreMaxRelances = input.nombreMaxRelances ?? Infinity;
   const now = (deps.maintenant ?? (() => new Date()))();
   const jours = (d: Date): number => Math.floor((now.getTime() - d.getTime()) / 86_400_000);
 
@@ -148,10 +156,12 @@ export async function envoyerRelancesAutomatiques(
     if (d.statut !== "envoye") continue;
     if (jours(d.dateDevis) < joursMinimum) continue;
     const relances = await deps.relanceRepo.listByDevis(ctx, d.id);
+    if (relances.length >= nombreMaxRelances) continue;
     const derniere = relances.reduce<Date | null>((max, r) => (!max || r.createdAt > max ? r.createdAt : max), null);
     if (derniere && jours(derniere) < joursEntreRelances) continue;
     const client = await deps.clientReader.getClient(ctx, d.clientId);
     if (!client || !client.email) continue;
+    if (deps.optoutRepo && await deps.optoutRepo.isOptedOut(client.email)) continue;
     const message = messageParDefaut(d.numero, artisanName, clientNom(client));
     const emailContent = modele
       ? buildModeleEmail(

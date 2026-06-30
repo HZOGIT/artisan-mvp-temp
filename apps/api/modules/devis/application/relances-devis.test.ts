@@ -5,6 +5,7 @@ import { envoyerRelanceDevis, envoyerRelancesAutomatiques, type DevisRelanceDeps
 import { FakeEmailPort, FakeRateLimiter } from "../../../shared/ports";
 import { NotFoundError, ValidationError, TooManyRequestsError } from "../../../shared/errors";
 import { expectCrossTenantDenied } from "../../../shared/testing";
+import { EmailOptoutRepositoryFake } from "../../emails/infra/email-optout-repository-fake";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ClientInfo } from "../../../shared/readers/contact-readers";
 
@@ -117,5 +118,36 @@ describe("envoyerRelancesAutomatiques", () => {
     const limiter = new FakeRateLimiter();
     limiter.denyKey("relance-auto:1");
     await expect(envoyerRelancesAutomatiques(makeDeps({ rateLimiter: limiter }), A)).rejects.toBeInstanceOf(TooManyRequestsError);
+  });
+
+  it("OPE-797 — nombreMaxRelances respecté : pas de relance au-delà du plafond", async () => {
+    const devisRepo = new FakeDevisRepository();
+    const relanceRepo = new FakeRelanceDevisRepository();
+    const now = new Date("2026-06-14T00:00:00Z");
+    const d = await seedDevis(devisRepo, A, "envoye", new Date("2026-05-01T00:00:00Z"));
+    const deps = makeDeps({ devisRepo, relanceRepo, maintenant: () => now });
+
+    const r1 = await envoyerRelancesAutomatiques(deps, A, { joursMinimum: 1, joursEntreRelances: 0, nombreMaxRelances: 1 });
+    expect(r1.relancesEnvoyees).toBe(1);
+
+    const r2 = await envoyerRelancesAutomatiques(deps, A, { joursMinimum: 1, joursEntreRelances: 0, nombreMaxRelances: 1 });
+    expect(r2.relancesEnvoyees).toBe(0);
+
+    expect(await relanceRepo.listByDevis(A, d.id)).toHaveLength(1);
+  });
+
+  it("OPE-798 — client opt-out ignoré par l'auto-relance (continue, aucun email)", async () => {
+    const devisRepo = new FakeDevisRepository();
+    const relanceRepo = new FakeRelanceDevisRepository();
+    const now = new Date("2026-06-14T00:00:00Z");
+    await seedDevis(devisRepo, A, "envoye", new Date("2026-05-01T00:00:00Z"));
+    const optoutRepo = new EmailOptoutRepositoryFake();
+    optoutRepo.seed(CLIENT.email!);
+    const email = new FakeEmailPort();
+    const deps = makeDeps({ devisRepo, relanceRepo, email, maintenant: () => now, optoutRepo });
+
+    const res = await envoyerRelancesAutomatiques(deps, A, { joursMinimum: 1, joursEntreRelances: 0 });
+    expect(res.relancesEnvoyees).toBe(0);
+    expect(email.sent).toHaveLength(0);
   });
 });
