@@ -78,6 +78,8 @@ for item in (data.get("data") or []):
     iid = item.get("id", "")
     rel = ((item.get("relationships") or {}).get("monitor", {}).get("data") or {})
     mid = rel.get("id", "")
+    if attrs.get("resolved_at"):
+        continue
     name = monitors.get(mid) or attrs.get("name") or mid or iid
     started = attrs.get("started_at") or "N/A"
     cause = attrs.get("cause") or "N/A"
@@ -94,7 +96,7 @@ _tick() {
   local response
   response="$(curl -sf -m 15 \
     -H "Authorization: Bearer $key" \
-    "$UPTIME_API/incidents?status=started&per_page=25&include=monitor" 2>/dev/null)" || {
+    "$UPTIME_API/incidents?per_page=25&include=monitor" 2>/dev/null)" || {
     _log "WARN: API BetterStack Uptime unreachable — skip"
     return 0
   }
@@ -214,6 +216,24 @@ case "${1:-}" in
       echo "OK  _api_key reads from config file"
     else
       echo "FAIL _api_key from file returned '$result'" >&2; local_fail=1
+    fi
+
+    # T7: _parse_py outputs open incident (resolved_at null)
+    inc_open='{"data":[{"id":"inc-open","attributes":{"started_at":"2026-01-01T00:00:00Z","cause":"timeout","resolved_at":null},"relationships":{"monitor":{"data":{"id":"m1"}}}}],"included":[{"id":"m1","type":"monitor","attributes":{"pronounceable_name":"Backend"}}]}'
+    parsed_open="$(echo "$inc_open" | python3 -c "$_parse_py" 2>/dev/null)"
+    if [[ "$parsed_open" == inc-open* ]]; then
+      echo "OK  _parse_py outputs open incident"
+    else
+      echo "FAIL _parse_py did not output open incident: '$parsed_open'" >&2; local_fail=1
+    fi
+
+    # T8: _parse_py skips resolved incident (resolved_at set)
+    inc_resolved='{"data":[{"id":"inc-resolved","attributes":{"started_at":"2026-01-01T00:00:00Z","cause":"timeout","resolved_at":"2026-01-01T01:00:00Z"},"relationships":{"monitor":{"data":{"id":"m1"}}}}],"included":[{"id":"m1","type":"monitor","attributes":{"pronounceable_name":"Backend"}}]}'
+    parsed_resolved="$(echo "$inc_resolved" | python3 -c "$_parse_py" 2>/dev/null)"
+    if [[ -z "$parsed_resolved" ]]; then
+      echo "OK  _parse_py skips resolved incident"
+    else
+      echo "FAIL _parse_py output resolved incident: '$parsed_resolved'" >&2; local_fail=1
     fi
 
     [[ "$local_fail" -eq 0 ]] && echo "=== all tests passed ===" || { echo "=== FAILED ===" >&2; exit 1; }
