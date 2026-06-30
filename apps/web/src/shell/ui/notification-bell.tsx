@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import { useLocation } from "@/shared/router/navigation";
 import { Bell } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
-import { ScrollArea } from "@/shared/ui/scroll-area";
 import { trpc } from "@/shared/trpc";
 import type { RouterOutputs } from "@/shared/trpc";
 import { formatRelativeDate } from "../domain/nav";
@@ -39,12 +38,12 @@ export function NotificationBell() {
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-0">
-        <div className="flex items-center justify-between px-4 py-3 border-b">
+      <PopoverContent align="end" className="w-80 p-0 flex flex-col max-h-[min(480px,80vh)]">
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-popover shrink-0">
           <span className="font-semibold text-sm">{t("notifications")}</span>
           {unreadCount > 0 && <button onClick={() => markAllAsRead.mutate()} className="text-xs text-primary hover:underline">{t("toutMarquerLu")}</button>}
         </div>
-        <ScrollArea className="max-h-80">
+        <div className="flex-1 min-h-0 overflow-y-auto bg-popover">
           {notifications.length === 0 ? (
             <div className="p-6 text-center text-sm text-muted-foreground">{t("aucuneNotif")}</div>
           ) : (
@@ -52,7 +51,7 @@ export function NotificationBell() {
               {notifications.map((notif) => {
                 const { Icon, color } = notifTypeMeta(notif.type);
                 return (
-                  <button key={notif.id} onClick={() => handleClick(notif)} className={`w-full text-left px-4 py-3 hover:bg-accent/50 transition-colors border-b last:border-b-0 ${!notif.lu ? "bg-primary/5" : ""}`}>
+                  <button key={notif.id} onClick={() => handleClick(notif)} className={`w-full text-left px-4 py-3 hover:bg-accent transition-colors border-b last:border-b-0 bg-popover ${!notif.lu ? "bg-accent/40" : ""}`}>
                     <div className="flex gap-3">
                       <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${color}`} />
                       <div className="flex-1 min-w-0">
@@ -69,8 +68,8 @@ export function NotificationBell() {
               })}
             </div>
           )}
-        </ScrollArea>
-        <div className="border-t px-4 py-2">
+        </div>
+        <div className="border-t px-4 py-2 bg-popover shrink-0">
           <button onClick={() => { setOpen(false); setLocation("/notifications"); }} className="text-xs text-primary hover:underline w-full text-center">{t("voirToutesNotifs")}</button>
         </div>
       </PopoverContent>
