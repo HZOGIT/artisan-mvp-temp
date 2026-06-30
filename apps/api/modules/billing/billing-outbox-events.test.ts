@@ -218,6 +218,54 @@ describe("abonnement.paiement_echoue (OPE-867, webhook only)", () => {
   });
 });
 
+describe("abonnement.suspendu_definitif (OPE-939, webhook isFinalAttempt)", () => {
+  it("émet l'event outbox lors de la suspension finale via webhook", async () => {
+    const repo = makeRepo();
+    const sub = await repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: new Date("2026-06-01"), currentPeriodEnd: new Date("2026-07-01"),
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"),
+      amountCents: 2900, currency: "eur",
+    });
+    await repo.updateCycleStatus(cycle.id, { status: "pending", attemptCount: MAX_DUNNING_ATTEMPTS });
+    await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: MAX_DUNNING_ATTEMPTS, idempotencyKey: "k_final" });
+    await repo.updateChargeAttempt(repo.chargeAttempts[0]!.id, { status: "initiated", stripePaymentIntentId: "pi_final_1" });
+
+    await handleBillingWebhookEvent({ repo }, "payment_intent.payment_failed", "pi_final_1", null, null, "evt_final");
+
+    const ev = repo.outboxEvents.find(e => e.action === "abonnement.suspendu_definitif");
+    expect(ev).toBeDefined();
+    expect(ev!.artisanId).toBe(A.artisanId);
+    expect((ev!.payload as Record<string, unknown>)["reason"]).toBe("max_dunning_attempts");
+    expect((ev!.payload as Record<string, unknown>)["tentativeNo"]).toBe(MAX_DUNNING_ATTEMPTS);
+    const updatedSub = repo.subs.find(s => s.id === sub.id)!;
+    expect(updatedSub.status).toBe("past_due");
+  });
+
+  it("n'émet pas l'event si la sub est déjà canceled", async () => {
+    const repo = makeRepo();
+    const sub = await repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "canceled", currentPeriodStart: new Date("2026-06-01"), currentPeriodEnd: new Date("2026-07-01"),
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id, periodStart: new Date("2026-06-01"), periodEnd: new Date("2026-07-01"),
+      amountCents: 2900, currency: "eur",
+    });
+    await repo.updateCycleStatus(cycle.id, { status: "pending", attemptCount: MAX_DUNNING_ATTEMPTS });
+    await repo.createChargeAttempt({ cycleId: cycle.id, attemptNo: MAX_DUNNING_ATTEMPTS, idempotencyKey: "k_final_c" });
+    await repo.updateChargeAttempt(repo.chargeAttempts[0]!.id, { status: "initiated", stripePaymentIntentId: "pi_final_c" });
+
+    await handleBillingWebhookEvent({ repo }, "payment_intent.payment_failed", "pi_final_c", null, null, "evt_final_c");
+
+    expect(repo.outboxEvents.find(e => e.action === "abonnement.suspendu_definitif")).toBeUndefined();
+  });
+});
+
 describe("abonnement.stripe_sync (OPE-937, webhook subscription.updated/created)", () => {
   it("émet l'event outbox pour customer.subscription.updated (stripe_sync)", async () => {
     const repo = makeRepo();

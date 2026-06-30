@@ -152,12 +152,23 @@ export async function handleBillingWebhookEvent(
       });
     }
     if (isFinalAttempt && cycle && sub && sub.status !== "canceled") {
-      await deps.repo.updateSubscriptionStatus({ artisanId: sub.artisan_id, userId: 0 }, "past_due");
+      const aid = sub.artisan_id;
+      const sid = sub.id;
+      await withOutbox(deps.db, deps.repo, async (r, _tx) => {
+        await r.updateSubscriptionStatus({ artisanId: aid, userId: 0 }, "past_due");
+        await r.emitOutboxEvent({
+          artisanId: aid,
+          action: "abonnement.suspendu_definitif",
+          entityType: "abonnement",
+          entityId: sid,
+          payload: { reason: "max_dunning_attempts", tentativeNo: attemptCount, via: "webhook" },
+        });
+      });
       await deps.repo.appendEvent({
         entityType: "billing_subscription",
-        entityId: sub.id,
+        entityId: sid,
         eventType: "subscription.suspended",
-        payload: { artisanId: sub.artisan_id, reason: "max_dunning_attempts", via: "webhook" },
+        payload: { artisanId: aid, reason: "max_dunning_attempts", via: "webhook" },
         actor: "stripe_webhook",
       });
     }
