@@ -63,6 +63,18 @@ describe.skipIf(!URL)("PortalPaymentWriterDrizzle (RLS écriture paiements_strip
     ).rejects.toBeInstanceOf(ConflictError);
   });
 
+  it("statut en_attente est dans le domaine PaiementStatut (payee|echouee|remboursee|en_attente)", async () => {
+    const { rows } = await admin.query('select statut from paiements_stripe where "factureId"=$1', [factureA]);
+    const validesDomaine = new Set(["en_attente", "payee", "echouee", "remboursee"]);
+    expect(validesDomaine.has(rows[0].statut)).toBe(true);
+  });
+
+  it("statut hors-domaine rejeté par le type ENUM (contrainte PG)", async () => {
+    await expect(
+      admin.query('insert into paiements_stripe ("factureId","artisanId",montant,"tokenPaiement",statut) values ($1,$2,$3,$4,$5::paiement_statut)', [factureA, artisanA, "1.00", "tok-invalide", "complete"]),
+    ).rejects.toThrow();
+  });
+
   it("isolation RLS : l'artisan B ne voit PAS le paiement de A ; A le voit", async () => {
     const seenByB = await withTenant(app.db, ctx(artisanB), (tx) =>
       tx.select().from(paiementsStripe).where(eq(paiementsStripe.factureId, factureA)),

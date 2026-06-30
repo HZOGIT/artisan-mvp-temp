@@ -48,7 +48,7 @@ describe.skipIf(!URL)("WebhookPaymentWriterDrizzle (paiement par token sous RLS)
     expect(await writer.resolvePaiement("token-inexistant-zzzzzzzzzzzz")).toBeNull();
   });
 
-  it("completeCheckout : facture→payée (montantPaye=TTC, carte) + paiement→complete + notif", async () => {
+  it("completeCheckout : facture→payée (montantPaye=TTC, carte) + paiement→payee + notif", async () => {
     await writer.completeCheckout({ artisanId, paiementId, factureId, stripePaymentIntentId: "pi_test_1" });
 
     const fac = (await admin.query("select statut, \"montantPaye\", \"modePaiement\" from factures where id=$1", [factureId])).rows[0];
@@ -57,7 +57,7 @@ describe.skipIf(!URL)("WebhookPaymentWriterDrizzle (paiement par token sous RLS)
     expect(fac.modePaiement).toBe("carte");
 
     const pay = (await admin.query("select statut, \"stripePaymentIntentId\" from paiements_stripe where id=$1", [paiementId])).rows[0];
-    expect(pay.statut).toBe("complete");
+    expect(pay.statut).toBe("payee");
     expect(pay.stripePaymentIntentId).toBe("pi_test_1");
 
     const notif = (await admin.query("select type, message from notifications where \"artisanId\"=$1 order by id desc limit 1", [artisanId])).rows[0];
@@ -66,9 +66,9 @@ describe.skipIf(!URL)("WebhookPaymentWriterDrizzle (paiement par token sous RLS)
     expect(notif.message).toContain("Jean Dupont");
   });
 
-  it("failPaiement : paiement→echoue", async () => {
+  it("failPaiement : paiement→echouee", async () => {
     await writer.failPaiement({ artisanId, paiementId });
     const pay = (await admin.query("select statut from paiements_stripe where id=$1", [paiementId])).rows[0];
-    expect(pay.statut).toBe("echoue");
+    expect(pay.statut).toBe("echouee");
   });
 });

@@ -248,7 +248,7 @@
       "breakpoints": true
     },
     {
-"idx": 35,
+      "idx": 35,
       "version": "7",
       "when": 1782784965259,
       "tag": "20260630020245_add-demandes-contact-consentement",
@@ -259,6 +259,13 @@
       "version": "7",
       "when": 1751286000000,
       "tag": "20260630110000_seed-plan-comptable",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1751292000000,
+      "tag": "20260630120000_normaliser-statut-paiement",
       "breakpoints": true
     }
   ]
