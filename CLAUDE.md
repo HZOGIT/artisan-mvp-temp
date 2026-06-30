@@ -201,6 +201,35 @@ tsc -p tsconfig.api.json --noEmit   # backend seul
 tsc -p tsconfig.web.json --noEmit   # frontend seul (strict)
 ```
 
+## Events de domaine — règle atomique obligatoire
+
+**Toute émission d'event de domaine / outbox est TOUJOURS atomique avec le changement d'état.**
+
+Règle DURE :
+- `withOutbox` dans la MÊME transaction que la mutation métier → soit les deux persistent, soit aucun.
+- **JAMAIS** best-effort : `this.db` hors-tx, `.catch(() => {})` qui avale, `emitEvent` asynchrone découplé.
+- **JAMAIS** `SCREAMING_SNAKE_CASE` — convention FR minuscule (ex. `"notification.lue"`, `"facture.envoyée"`).
+
+Best-effort toléré **uniquement** pour les side-effects non-métier **explicitement optionnels** (email transactionnel, stats, anti-flood) — jamais pour un event qu'un consommateur attend.
+
+> Self-healing (`docs/architecture/ope-879-self-healing-proposal.md`) = filet de sécurité, **pas une excuse** pour émettre en best-effort. Un healing event récurrent sur le même invariant = bug à corriger à la source.
+
+Pattern obligatoire (`apps/api/shared/events/with-outbox.ts`) :
+
+```typescript
+return withOutbox(db, repo, async (r, tx) => {
+  await mutationMetier(r, ...);
+  if (tx) await outboxEvent(tx, ctx.tenant, { action: "module.verbe", entityType: "...", entityId: ..., payload: { ... } });
+  return result;
+});
+```
+
+Test d'atomicité L2 obligatoire (`*.outbox.test.ts`) : vérifier que l'event est co-écrit dans `event_outbox` avec la mutation.
+
+> 📖 Template complet + exemples → `docs/architecture/events-domaine-atomique.md`
+
+---
+
 ## Provisionner la base (schéma + RLS)
 
 > 📖 **Détail complet** (générer une migration, RLS en SQL custom, squash en préservant les données,
