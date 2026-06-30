@@ -288,6 +288,13 @@
       "when": 1751302800000,
       "tag": "20260630150000_historique-revisions-prix",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1751306400000,
+      "tag": "20260630160000_restaurer-modules-actif-defaut",
+      "breakpoints": true
     }
   ]
 }

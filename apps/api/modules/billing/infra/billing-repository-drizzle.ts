@@ -220,6 +220,18 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
     );
   }
 
+  async reactivateDefaultModulesForPlan(artisanId: number, planId: string): Promise<void> {
+    const validMins: string[] = planId === "enterprise" ? ["essentiel", "pro", "entreprise"] : planId === "pro" ? ["essentiel", "pro"] : ["essentiel"];
+    const defaults = await this.db.select({ slug: modules.slug }).from(modules)
+      .where(and(eq(modules.actif_par_defaut, true), inArray(modules.plan_minimum, validMins)));
+    if (defaults.length === 0) return;
+    await withTenant(this.db, { artisanId, userId: 0 }, (tx) =>
+      tx.insert(artisanModules)
+        .values(defaults.map((d) => ({ artisan_id: artisanId, module_slug: d.slug, actif: true })))
+        .onConflictDoUpdate({ target: [artisanModules.artisan_id, artisanModules.module_slug], set: { actif: true } }),
+    );
+  }
+
   async findPendingCycle(subscriptionId: number): Promise<BillingCycle | null> {
     const [row] = await this.db
       .select()

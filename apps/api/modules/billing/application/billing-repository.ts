@@ -103,6 +103,8 @@ export interface IBillingRepository {
   updateCancelAt(ctx: TenantContext, cancelAt: Date | null): Promise<void>;
   /** Passe actif=false sur les artisan_modules hors plan lors d'un downgrade ou d'une suspension. planId = billing naming : starter|pro|enterprise. */
   deactivateLockedModules(artisanId: number, planId: string): Promise<void>;
+  /** Passe actif=true sur les artisan_modules actif_par_defaut compatibles avec le plan — utilisé lors d'un upgrade pour restaurer les modules par défaut du nouveau plan. */
+  reactivateDefaultModulesForPlan(artisanId: number, planId: string): Promise<void>;
 
   /** Cycles */
   findPendingCycle(subscriptionId: number): Promise<BillingCycle | null>;
