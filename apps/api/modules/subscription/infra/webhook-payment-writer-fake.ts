@@ -13,8 +13,9 @@ export class FakeWebhookPaymentWriter implements WebhookPaymentWriter {
   async resolvePaiement(token: string): Promise<PaiementResolu | null> {
     return this.byToken.get(token) ?? null;
   }
-  async completeCheckout(input: { artisanId: number; paiementId: number; factureId: number; stripePaymentIntentId: string; stripeChargeId?: string | null }): Promise<void> {
+  async completeCheckout(input: { artisanId: number; paiementId: number; factureId: number; stripePaymentIntentId: string; stripeChargeId?: string | null }): Promise<{ transitioned: boolean }> {
     this.completed.push(input);
+    return { transitioned: true };
   }
   async failPaiement(input: { artisanId: number; paiementId: number }): Promise<void> {
     this.failed.push(input);

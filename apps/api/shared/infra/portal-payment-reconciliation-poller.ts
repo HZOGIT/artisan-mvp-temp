@@ -15,6 +15,8 @@ export interface PortalPaymentReconciliationPollerOptions {
   readonly writer: WebhookPaymentWriter;
   readonly dbUrl: string;
   readonly genererEcritures?: (artisanId: number, factureId: number) => Promise<void>;
+  /** Best-effort email de confirmation paiement au client. Même callback que le webhook Connect. */
+  readonly onEmailConfirmation?: (artisanId: number, factureId: number) => Promise<void>;
 }
 
 export interface OrphanedPayment {
@@ -27,7 +29,8 @@ export interface OrphanedPayment {
   readonly stripeConnectAccountId: string | null;
 }
 
-export type ReconcileOutcome = "reconciled" | "not-paid" | "no-session" | "no-token";
+/** "already-paid" : Stripe confirme payé mais completeCheckout n'a pas transitionné (webhook a gagné la course). */
+export type ReconcileOutcome = "reconciled" | "not-paid" | "no-session" | "no-token" | "already-paid";
 
 /**
  * Réconcilie un paiement en attente : interroge Stripe et appelle completeCheckout si payé.
@@ -44,14 +47,14 @@ export async function reconcileOrphanedPayment(
   if (!session) return "no-session";
   if (session.paymentStatus !== "paid") return "not-paid";
 
-  await writer.completeCheckout({
+  const { transitioned } = await writer.completeCheckout({
     artisanId: payment.artisanId,
     paiementId: payment.id,
     factureId: payment.factureId,
     stripePaymentIntentId: session.paymentIntentId ?? "",
   });
 
-  return "reconciled";
+  return transitioned ? "reconciled" : "already-paid";
 }
 
 export const portalPaymentReconciliationPollerPlugin = fp(
@@ -92,6 +95,14 @@ export const portalPaymentReconciliationPollerPlugin = fp(
                       app.log.error(
                         { event: "portal_payment_ecritures_error", factureId: payment.factureId, artisanId: payment.artisanId, error: err instanceof Error ? err.message : String(err) },
                         "Erreur genererEcritures après réconciliation portail (best-effort compta)",
+                      );
+                    });
+                  }
+                  if (opts.onEmailConfirmation) {
+                    await opts.onEmailConfirmation(payment.artisanId, payment.factureId).catch((err: unknown) => {
+                      app.log.error(
+                        { event: "portal_payment_email_confirmation_error", factureId: payment.factureId, artisanId: payment.artisanId, error: err instanceof Error ? err.message : String(err) },
+                        "Email confirmation paiement portail échoué (best-effort)",
                       );
                     });
                   }

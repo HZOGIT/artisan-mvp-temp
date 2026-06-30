@@ -3,12 +3,12 @@ import metrics from "fastify-metrics";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import { randomUUID } from "node:crypto";
-import { sql } from "drizzle-orm";
+import { sql, eq, and } from "drizzle-orm";
 import { buildFastifyLoggerConfig } from "./shared/ports/logger-fastify";
 import { fastifyTRPCPlugin } from "@trpc/server/adapters/fastify";
 import { createAppRouter } from "./interface/trpc/router";
 import { makeCreateContext, type ContextDeps } from "./interface/trpc/context";
-import { getDbHandle, getOwnerDbHandle, createDbClient, type DbClient } from "./shared/db";
+import { getDbHandle, getOwnerDbHandle, createDbClient, withTenant, type DbClient } from "./shared/db";
 import { DrizzleTenantResolver } from "./shared/tenant/drizzle-tenant-resolver";
 import { DrizzleUserRoleReader } from "./shared/tenant/role-reader";
 import { DrizzlePermissionsReader } from "./shared/tenant/permissions-reader";
@@ -190,7 +190,7 @@ import { creerNotificationsDepuisEvents } from "./modules/notifications/applicat
 import { genererAlertesStock } from "./modules/stocks/application/alertes-use-cases";
 import { genererAlertesRetardLivraison } from "./modules/commandes/application/alertes-retard-use-cases";
 import { genererAlertesReconductionContrats } from "./modules/contrats-maintenance/application/alertes-reconduction-use-cases";
-import { artisans as artisansTable, paOutbox } from "../../drizzle/schema.pg";
+import { artisans as artisansTable, paOutbox, factures as facturesTable, clients as clientsTable } from "../../drizzle/schema.pg";
 import { makeDepensesRecurrentesJob } from "./modules/depenses/application/depenses-recurrentes-job";
 import { createOutboxBloqueJob, createEventManquantNotificationJob } from "./modules/events/application/events-healing";
 import { createEmailsLogReconcilerJob } from "./modules/emails/application/emails-log-reconciler";
@@ -1445,6 +1445,26 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       await compta.genererEcrituresVente({ artisanId, userId: 0 }, factureId);
       await compta.genererEcrituresEncaissement({ artisanId, userId: 0 }, factureId);
       await compta.validerEcritures({ artisanId, userId: 0 }, factureId);
+    },
+    onEmailConfirmation: async (artisanId: number, factureId: number) => {
+      const ctx = { artisanId, userId: 0 };
+      const factureData = await withTenant(getDbHandle().db, ctx, async (tx) => {
+        const [f] = await tx.select({ numero: facturesTable.numero, totalTTC: facturesTable.totalTTC, clientId: facturesTable.clientId })
+          .from(facturesTable).where(and(eq(facturesTable.id, factureId), eq(facturesTable.artisanId, artisanId))).limit(1);
+        if (!f) return null;
+        const [c] = await tx.select({ email: clientsTable.email, nom: clientsTable.nom, prenom: clientsTable.prenom })
+          .from(clientsTable).where(and(eq(clientsTable.id, f.clientId), eq(clientsTable.artisanId, artisanId))).limit(1);
+        if (!c?.email) return null;
+        return {
+          clientId: f.clientId,
+          clientEmail: c.email,
+          clientName: `${c.prenom ?? ""} ${c.nom ?? ""}`.trim() || "Client",
+          factureNumero: f.numero ?? "",
+          totalTTC: `${Number(f.totalTTC ?? 0).toFixed(2)} €`,
+        };
+      });
+      if (!factureData) return;
+      await onCheckoutCompletedEmail({ artisanId, factureId, ...factureData });
     },
   });
   /** Poller expiration paiements portail — toutes les 10 min, marque 'expire' les sessions Stripe abandonnées/expirées. Débloque les retries. ⚠️ ownerDbUrl requis (paiements_stripe FORCE RLS). */

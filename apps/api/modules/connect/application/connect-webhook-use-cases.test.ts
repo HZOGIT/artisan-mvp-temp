@@ -37,7 +37,7 @@ function makePaymentWriter(): WebhookPaymentWriter & {
 } {
   return {
     resolvePaiement: vi.fn().mockResolvedValue({ paiementId: 1, factureId: 42, artisanId: 7 }),
-    completeCheckout: vi.fn().mockResolvedValue(undefined),
+    completeCheckout: vi.fn().mockResolvedValue({ transitioned: true }),
     failPaiement: vi.fn().mockResolvedValue(undefined),
   };
 }
@@ -187,6 +187,16 @@ describe("processConnectWebhook", () => {
       expect(result.http).toBe(200);
       expect(emailCalls).toHaveLength(1);
       expect(emailCalls[0]).toMatchObject({ artisanId: 7, factureId: 42, clientId: 77, clientEmail: "client@connect.com", clientName: "Charlie Martin", factureNumero: "FAC-2026-099", totalTTC: "180.00 €" });
+    });
+
+    it("OPE-991 — transitioned=false (doublon webhook+poller) → email NON envoyé", async () => {
+      const paymentWriter = makePaymentWriter();
+      paymentWriter.completeCheckout.mockResolvedValueOnce({ transitioned: false });
+      const emailCalls: unknown[] = [];
+      const session = { payment_intent: "pi_dedup", amount_total: 5000, metadata: { token_paiement: "tok_dedup", facture_id: "99", customer_email: "dup@test.com", customer_name: "Dup", numero_facture: "FAC-DUP", user_id: "1" } };
+      const event: StripeWebhookEvent = { id: "evt_dedup", type: "checkout.session.completed", account: "acct_1", data: { object: session } };
+      await processConnectWebhook({ ...makeDeps(event, { paymentWriter }), onCheckoutCompletedEmail: async (d) => { emailCalls.push(d); } }, { rawBody: RAW, signature: SIG });
+      expect(emailCalls).toHaveLength(0);
     });
 
     it("OPE-976 — erreur onCheckoutCompletedEmail → 200 + loggée (best-effort)", async () => {

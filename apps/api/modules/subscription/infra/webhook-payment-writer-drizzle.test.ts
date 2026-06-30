@@ -48,8 +48,9 @@ describe.skipIf(!URL)("WebhookPaymentWriterDrizzle (paiement par token sous RLS)
     expect(await writer.resolvePaiement("token-inexistant-zzzzzzzzzzzz")).toBeNull();
   });
 
-  it("completeCheckout : facture→payée (montantPaye=TTC, carte) + paiement→payee + notif", async () => {
-    await writer.completeCheckout({ artisanId, paiementId, factureId, stripePaymentIntentId: "pi_test_1" });
+  it("completeCheckout : facture→payée (montantPaye=TTC, carte) + paiement→payee + notif + transitioned=true", async () => {
+    const { transitioned } = await writer.completeCheckout({ artisanId, paiementId, factureId, stripePaymentIntentId: "pi_test_1" });
+    expect(transitioned).toBe(true);
 
     const fac = (await admin.query("select statut, \"montantPaye\", \"modePaiement\" from factures where id=$1", [factureId])).rows[0];
     expect(fac.statut).toBe("payee");
@@ -64,6 +65,14 @@ describe.skipIf(!URL)("WebhookPaymentWriterDrizzle (paiement par token sous RLS)
     expect(notif.type).toBe("succes");
     expect(notif.message).toContain("FAC-PAY-1");
     expect(notif.message).toContain("Jean Dupont");
+  });
+
+  it("OPE-991 — completeCheckout idempotent : doublon (paiement déjà payee) → transitioned=false, aucune notif supplémentaire", async () => {
+    const notifCount = Number((await admin.query("select count(*) from notifications where \"artisanId\"=$1", [artisanId])).rows[0].count);
+    const { transitioned } = await writer.completeCheckout({ artisanId, paiementId, factureId, stripePaymentIntentId: "pi_test_doublon" });
+    expect(transitioned).toBe(false);
+    const notifCountAfter = Number((await admin.query("select count(*) from notifications where \"artisanId\"=$1", [artisanId])).rows[0].count);
+    expect(notifCountAfter).toBe(notifCount);
   });
 
   it("failPaiement : paiement→echouee", async () => {
