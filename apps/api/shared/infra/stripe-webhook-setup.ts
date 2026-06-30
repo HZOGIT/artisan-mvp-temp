@@ -26,7 +26,6 @@ type StripeWebhookEndpoints = {
       url: string;
       status: string;
       enabled_events: string[];
-      connect?: boolean;
       secret?: string;
     }>;
   }>;
@@ -36,7 +35,6 @@ type StripeWebhookEndpoints = {
     secret?: string;
   }>;
   update(id: string, params: { enabled_events: string[] }): Promise<{ id: string }>;
-  del(id: string): Promise<{ id: string }>;
 };
 
 export type StripeWebhookSDK = { webhookEndpoints: StripeWebhookEndpoints };
@@ -163,23 +161,15 @@ export async function ensureStripeConnectWebhookEndpoint(
   const existing = list.data.find((w) => w.url === connectWebhookUrl);
 
   if (existing) {
-    if (existing.connect !== true) {
-      await withStripeRetry(() => sdk.webhookEndpoints.del(existing.id));
-      log?.warn(
-        { event: "stripe_connect_webhook_recreate", id: existing.id, url: connectWebhookUrl },
-        `Endpoint Connect trouvé sans connect:true (id=${existing.id}) — supprimé. Recréation avec connect:true.`,
-      );
+    const missing = events.filter((e) => !existing.enabled_events.includes(e));
+    const hasAll = existing.enabled_events.includes("*") || missing.length === 0;
+    if (!hasAll) {
+      await withStripeRetry(() => sdk.webhookEndpoints.update(existing.id, { enabled_events: events }));
+      log?.info({ event: "stripe_connect_webhook_updated", id: existing.id, url: connectWebhookUrl, added: missing }, `Webhook Connect mis à jour (${missing.join(", ")} ajouté)`);
     } else {
-      const missing = events.filter((e) => !existing.enabled_events.includes(e));
-      const hasAll = existing.enabled_events.includes("*") || missing.length === 0;
-      if (!hasAll) {
-        await withStripeRetry(() => sdk.webhookEndpoints.update(existing.id, { enabled_events: events }));
-        log?.info({ event: "stripe_connect_webhook_updated", id: existing.id, url: connectWebhookUrl, added: missing }, `Webhook Connect mis à jour (${missing.join(", ")} ajouté)`);
-      } else {
-        log?.info({ event: "stripe_connect_webhook_ok", id: existing.id, url: connectWebhookUrl }, "Webhook Connect déjà configuré");
-      }
-      return null;
+      log?.info({ event: "stripe_connect_webhook_ok", id: existing.id, url: connectWebhookUrl }, "Webhook Connect déjà configuré");
     }
+    return null;
   }
 
   const created = await withStripeRetry(() =>
