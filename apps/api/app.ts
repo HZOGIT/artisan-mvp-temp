@@ -187,6 +187,7 @@ import { genererAlertesRetardLivraison } from "./modules/commandes/application/a
 import { genererAlertesReconductionContrats } from "./modules/contrats-maintenance/application/alertes-reconduction-use-cases";
 import { artisans as artisansTable, paOutbox } from "../../drizzle/schema.pg";
 import { makeDepensesRecurrentesJob } from "./modules/depenses/application/depenses-recurrentes-job";
+import { createOutboxBloqueJob, createEventManquantNotificationJob } from "./modules/events/application/events-healing";
 import { contratsVisitesCronPlugin } from "./shared/infra/contrats-visites-cron";
 import { rappelRdvClientCronPlugin } from "./shared/infra/rappel-rdv-client-cron";
 import { analysePhotosCronPlugin } from "./shared/infra/analyse-photos-cron";
@@ -1532,6 +1533,17 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
           },
           contratRepo,
           db: deps.contratsMaintenanceDb ?? getDbHandle().db,
+        }),
+      );
+      /** ponytail: dry-run par défaut — observer les healing events avant d'armer (§3.3 proposal) */
+      registry.register(
+        createOutboxBloqueJob({ db: getDbHandle().db, dryRun: true }),
+      );
+      registry.register(
+        createEventManquantNotificationJob({
+          db: getDbHandle().db,
+          ownerDb: getOwnerDbHandle().db,
+          dryRun: true,
         }),
       );
     },
