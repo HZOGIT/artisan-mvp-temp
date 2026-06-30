@@ -53,7 +53,7 @@ describe("reviserPrixContrat (L1 — fake repo)", () => {
     const contrat = await repo.create(ctx, { clientId: 10, titre: "T", montantHT: "300.00", periodicite: "annuel", dateDebut: new Date(), tauxIndexationAnnuel: "2" }, "CTR-00001");
     const lastYear = new Date();
     lastYear.setFullYear(lastYear.getFullYear() - 1);
-    await repo.reviserPrix(ctx, contrat.id, "300.00", lastYear);
+    await repo.reviserPrix(ctx, contrat.id, "300.00", "300.00", "2", lastYear);
     const result = await reviserPrixContrat(repo, ctx, contrat.id);
     expect(result.nouveauMontantHT).toBe("306.00");
   });

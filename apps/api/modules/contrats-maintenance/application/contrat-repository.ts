@@ -8,6 +8,7 @@ import type {
   ContratIntervention,
   CreateContratInterventionInput,
   UpdateContratInterventionInput,
+  RevisionPrix,
 } from "../domain/contrat";
 
 /*
@@ -85,10 +86,12 @@ export interface IContratRepository {
   /** Horodate l'envoi de l'alerte Chatel (idempotent — IS NULL filtré en amont). */
   markAlertReconductionSent(ctx: TenantContext, id: number): Promise<void>;
   /**
-   * Met à jour `montantHT` + `dateDerniereRevision` atomiquement (révision d'indexation).
-   * null si hors tenant.
+   * Met à jour `montantHT` + `dateDerniereRevision` et insère atomiquement une entrée dans
+   * `historique_revisions_prix`. null si hors tenant ou révision déjà appliquée cette année.
    */
-  reviserPrix(ctx: TenantContext, id: number, nouveauMontantHT: string, dateDerniereRevision: Date): Promise<Contrat | null>;
+  reviserPrix(ctx: TenantContext, id: number, ancienMontantHT: string, nouveauMontantHT: string, tauxApplique: string, dateDerniereRevision: Date, declencheur?: string): Promise<Contrat | null>;
+  /** Retourne l'historique des révisions de prix d'un contrat (du plus récent au plus ancien). */
+  getHistoriqueRevisions(ctx: TenantContext, contratId: number): Promise<RevisionPrix[]>;
   /** Retourne un repo lié à un client DB spécifique (pour `withOutbox`). */
   withDb(db: DbClient): IContratRepository;
 }

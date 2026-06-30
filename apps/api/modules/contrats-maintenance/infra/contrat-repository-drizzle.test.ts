@@ -111,37 +111,43 @@ describe.skipIf(!URL)("ContratRepositoryDrizzle (PG, RLS + état machine + anti-
     expect((await repo.listAFacturer(ctx(B))).some((x) => x.artisanId === A)).toBe(false);
   });
 
-  it("reviserPrix : met à jour montantHT + dateDerniereRevision ; isolation RLS cross-tenant", async () => {
+  it("reviserPrix : met à jour montantHT + dateDerniereRevision + crée ligne historique ; isolation RLS", async () => {
     const c = await repo.create(ctx(A), { ...base(), montantHT: "300.00" }, await repo.nextReference(ctx(A)));
     const dateRevision = new Date("2026-01-15T00:00:00Z");
-    const updated = await repo.reviserPrix(ctx(A), c.id, "306.00", dateRevision);
+    const updated = await repo.reviserPrix(ctx(A), c.id, "300.00", "306.00", "2.00", dateRevision);
     expect(updated?.montantHT).toBe("306.00");
     expect(updated?.dateDerniereRevision?.toISOString()).toBe(dateRevision.toISOString());
-    // isolation cross-tenant : B ne peut pas réviser le contrat de A
-    expect(await repo.reviserPrix(ctx(B), c.id, "999.00", new Date())).toBeNull();
-    // le contrat de A est intact
+    const hist = await repo.getHistoriqueRevisions(ctx(A), c.id);
+    expect(hist).toHaveLength(1);
+    expect(hist[0].ancienMontantHT).toBe("300.00");
+    expect(hist[0].nouveauMontantHT).toBe("306.00");
+    expect(hist[0].tauxApplique).toBe("2.00");
+    expect(hist[0].declencheur).toBe("manuel");
+    /* isolation cross-tenant : B ne voit pas l'historique de A */
+    expect(await repo.getHistoriqueRevisions(ctx(B), c.id)).toHaveLength(0);
+    expect(await repo.reviserPrix(ctx(B), c.id, "306.00", "999.00", "2.00", new Date())).toBeNull();
     expect((await repo.getById(ctx(A), c.id))?.montantHT).toBe("306.00");
   });
 
-  it("reviserPrix : garde annuelle atomique — même année → null (idempotence SQL)", async () => {
+  it("reviserPrix : garde annuelle atomique — même année → null, aucune ligne historique supplémentaire", async () => {
     const c = await repo.create(ctx(A), { ...base(), montantHT: "200.00" }, await repo.nextReference(ctx(A)));
-    const first = await repo.reviserPrix(ctx(A), c.id, "204.00", new Date());
+    const first = await repo.reviserPrix(ctx(A), c.id, "200.00", "204.00", "2.00", new Date());
     expect(first?.montantHT).toBe("204.00");
-    // 2e appel dans la même année → la garde WHERE bloque
-    const second = await repo.reviserPrix(ctx(A), c.id, "210.00", new Date());
+    const second = await repo.reviserPrix(ctx(A), c.id, "204.00", "210.00", "2.00", new Date());
     expect(second).toBeNull();
     expect((await repo.getById(ctx(A), c.id))?.montantHT).toBe("204.00");
+    expect(await repo.getHistoriqueRevisions(ctx(A), c.id)).toHaveLength(1);
   });
 
   it("reviserPrix : concurrence — 2 appels parallèles → exactement 1 succès, 1 null", async () => {
     const c = await repo.create(ctx(A), { ...base(), montantHT: "500.00" }, await repo.nextReference(ctx(A)));
     const [r1, r2] = await Promise.all([
-      repo.reviserPrix(ctx(A), c.id, "510.00", new Date()),
-      repo.reviserPrix(ctx(A), c.id, "510.00", new Date()),
+      repo.reviserPrix(ctx(A), c.id, "500.00", "510.00", "2.00", new Date()),
+      repo.reviserPrix(ctx(A), c.id, "500.00", "510.00", "2.00", new Date()),
     ]);
     const successes = [r1, r2].filter((r) => r !== null).length;
     expect(successes).toBe(1);
-    // le montant final est bien 510.00 (une seule indexation appliquée)
     expect((await repo.getById(ctx(A), c.id))?.montantHT).toBe("510.00");
+    expect(await repo.getHistoriqueRevisions(ctx(A), c.id)).toHaveLength(1);
   });
 });

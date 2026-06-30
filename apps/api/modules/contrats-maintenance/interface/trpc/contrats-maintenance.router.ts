@@ -182,10 +182,18 @@ export function createContratsMaintenanceRouter(repo: IContratRepository, factur
     reviserPrix: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await reviserPrixContrat(repo, ctx.tenant, input.id);
-        ctx.log.info({ event: "contrat_prix_revise", contratId: input.id, ancienMontant: result.ancienMontantHT, nouveauMontant: result.nouveauMontantHT }, "Révision indexation annuelle du prix contrat");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await reviserPrixContrat(r, ctx.tenant, input.id);
+          ctx.log.info({ event: "contrat_prix_revise", contratId: input.id, ancienMontant: result.ancienMontantHT, nouveauMontant: result.nouveauMontantHT }, "Révision indexation annuelle du prix contrat");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "contrat.prix_revise", entityType: "contrat", entityId: input.id, payload: { ancienMontantHT: result.ancienMontantHT, nouveauMontantHT: result.nouveauMontantHT, tauxIndexation: result.contrat.tauxIndexationAnnuel, dateDerniereRevision: result.contrat.dateDerniereRevision } });
+          return result;
+        });
       }),
+
+    /** Historique des révisions de prix d'un contrat (du plus récent au plus ancien). */
+    getHistoriqueRevisions: voir
+      .input(z.object({ contratId: z.number().int() }))
+      .query(({ ctx, input }) => repo.getHistoriqueRevisions(ctx.tenant, input.contratId)),
 
     /** ── Sous-ressource interventions du contrat (ownership via contrat parent ; anti-IDOR id↔contrat) ── */
     getInterventions: voir

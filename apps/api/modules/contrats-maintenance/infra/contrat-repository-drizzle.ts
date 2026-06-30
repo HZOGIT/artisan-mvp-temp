@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, gte, isNull, lte, sql } from "drizzle-orm";
-import { contratsMaintenance, clients, interventionsContrat, facturesRecurrentes } from "../../../../../drizzle/schema.pg";
+import { contratsMaintenance, clients, interventionsContrat, facturesRecurrentes, historiqueRevisionsPrix } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
@@ -15,10 +15,26 @@ import type {
   ContratInterventionStatut,
   CreateContratInterventionInput,
   UpdateContratInterventionInput,
+  RevisionPrix,
 } from "../domain/contrat";
 
 type ContratRow = typeof contratsMaintenance.$inferSelect;
 type InterventionRow = typeof interventionsContrat.$inferSelect;
+type RevisionRow = typeof historiqueRevisionsPrix.$inferSelect;
+
+function toRevision(r: RevisionRow): RevisionPrix {
+  return {
+    id: r.id,
+    contratId: r.contratId,
+    artisanId: r.artisanId,
+    ancienMontantHT: r.ancienMontantHT,
+    nouveauMontantHT: r.nouveauMontantHT,
+    tauxApplique: r.tauxApplique,
+    dateRevision: r.dateRevision,
+    declencheur: r.declencheur,
+    createdAt: r.createdAt,
+  };
+}
 
 function toIntervention(r: InterventionRow): ContratIntervention {
   return {
@@ -344,7 +360,7 @@ export class ContratRepositoryDrizzle implements IContratRepository {
     });
   }
 
-  reviserPrix(ctx: TenantContext, id: number, nouveauMontantHT: string, dateDerniereRevision: Date): Promise<Contrat | null> {
+  reviserPrix(ctx: TenantContext, id: number, ancienMontantHT: string, nouveauMontantHT: string, tauxApplique: string, dateDerniereRevision: Date, declencheur = "manuel"): Promise<Contrat | null> {
     return withTenant(this.db, ctx, async (tx) => {
       const [row] = await tx
         .update(contratsMaintenance)
@@ -357,7 +373,28 @@ export class ContratRepositoryDrizzle implements IContratRepository {
           ),
         )
         .returning();
-      return row ? toContrat(row) : null;
+      if (!row) return null;
+      await tx.insert(historiqueRevisionsPrix).values({
+        contratId: id,
+        artisanId: ctx.artisanId,
+        ancienMontantHT,
+        nouveauMontantHT,
+        tauxApplique,
+        dateRevision: dateDerniereRevision,
+        declencheur,
+      });
+      return toContrat(row);
+    });
+  }
+
+  getHistoriqueRevisions(ctx: TenantContext, contratId: number): Promise<RevisionPrix[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(historiqueRevisionsPrix)
+        .where(and(eq(historiqueRevisionsPrix.contratId, contratId), eq(historiqueRevisionsPrix.artisanId, ctx.artisanId)))
+        .orderBy(desc(historiqueRevisionsPrix.dateRevision));
+      return rows.map(toRevision);
     });
   }
 

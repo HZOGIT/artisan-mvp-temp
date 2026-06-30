@@ -81,6 +81,24 @@ describe.skipIf(!URL)("contrats.outbox atomicité (L2 — Drizzle + PG local)", 
     expect(after).toBe(before + 1);
   });
 
+  it("reviserPrix — ligne historique + event outbox co-écrits dans la même transaction", async () => {
+    const tA = await token(UA);
+    const contratRes = await callMutation(server, "contrats.create", { clientId: clientA, titre: "Contrat Rev", montantHT: "300.00", periodicite: "annuel", dateDebut: DATE, tauxIndexationAnnuel: "2" }, tA);
+    expect(contratRes.statusCode).toBe(200);
+    const contratId = contratRes.json().result.data.id as number;
+    const outboxBefore = Number((await admin.query("select count(*) from event_outbox where action='contrat.prix_revise'")).rows[0].count);
+    const histBefore = Number((await admin.query('select count(*) from historique_revisions_prix where "contratId"=$1', [contratId])).rows[0].count);
+    const res = await callMutation(server, "contrats.reviserPrix", { id: contratId }, tA);
+    expect(res.statusCode).toBe(200);
+    const outboxRow = (await admin.query("select * from event_outbox where action='contrat.prix_revise' and \"entityId\"=$1", [contratId])).rows[0];
+    expect(outboxRow).toBeDefined();
+    expect(outboxRow.artisanId).toBe(artisanA);
+    expect((outboxRow.payload as { ancienMontantHT?: string }).ancienMontantHT).toBe("300.00");
+    const histAfter = Number((await admin.query('select count(*) from historique_revisions_prix where "contratId"=$1', [contratId])).rows[0].count);
+    expect(histAfter).toBe(histBefore + 1);
+    expect(Number((await admin.query("select count(*) from event_outbox where action='contrat.prix_revise'")).rows[0].count)).toBe(outboxBefore + 1);
+  });
+
   it("outbox atomicité — rollback: throw après write contrat → 0 contrat ET 0 event_outbox persistés", async () => {
     const ctx = { artisanId: artisanA, userId: UA, role: "artisan" as const, isOwner: true, franchiseTVA: false };
     const repo = new ContratRepositoryDrizzle(app.db);

@@ -281,6 +281,13 @@
       "when": 1751299200000,
       "tag": "20260630140000_backfill-mouvements-stock-initiaux",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1751302800000,
+      "tag": "20260630150000_historique-revisions-prix",
+      "breakpoints": true
     }
   ]
 }
