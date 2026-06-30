@@ -1018,6 +1018,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       notifications: signatureNotifications,
       email: signatureEmail,
       db: deps.signaturePublicDb ?? signatureDb,
+      emailLogWriter: sharedEmailLogWriter,
     },
     db: signatureDb,
   });

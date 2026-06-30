@@ -141,3 +141,37 @@ export function buildRefusedDevisArtisanEmail(input: {
     body: `<p>Bonjour,</p><p>Le devis <strong>${escapeHtml(input.devisNumero)}</strong> a été <strong style="color:red">refusé</strong> par ${escapeHtml(clientName)}.</p>${motif}<p>Connectez-vous à votre espace pour plus de détails.</p><p style="color:#9ca3af;font-size:12px;">Operioz</p>`,
   };
 }
+
+/** Email client « accusé de réception — devis signé ». */
+export function buildSignedDevisClientEmail(input: {
+  artisanName: string;
+  clientName: string;
+  devisNumero: string;
+  devisObjet: string | null;
+  totalTTC: number;
+}): { subject: string; body: string } {
+  const artisanName = input.artisanName || "Votre artisan";
+  const clientName = input.clientName || "Client";
+  const totalTTC = formatEuro(input.totalTTC);
+  const subject = `Confirmation de signature — Devis ${input.devisNumero}`;
+  const objetFragment = input.devisObjet ? ` pour <em>${escapeHtml(input.devisObjet)}</em>` : "";
+  const body = `<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 0;">
+<tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+<tr><td style="background-color:#1e40af;padding:28px 40px;text-align:center;">
+<h1 style="margin:0;color:#ffffff;font-size:22px;">${escapeHtml(artisanName)}</h1>
+</td></tr>
+<tr><td style="padding:36px 40px 16px 40px;">
+<p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;">Bonjour ${escapeHtml(clientName)},</p>
+<p style="margin:0 0 24px 0;font-size:15px;color:#374151;">Nous confirmons que vous avez bien signé le devis <strong>${escapeHtml(input.devisNumero)}</strong>${objetFragment} d'un montant de <strong>${totalTTC}</strong>.</p>
+<p style="margin:0 0 24px 0;font-size:15px;color:#374151;">Votre artisan a été informé et vous contactera prochainement pour la suite.</p>
+</td></tr>
+<tr><td style="background-color:#f9fafb;padding:20px 40px;border-top:1px solid #e5e7eb;text-align:center;">
+<p style="margin:0;font-size:12px;color:#9ca3af;">Ce message a été envoyé automatiquement depuis Operioz</p>
+</td></tr>
+</table></td></tr></table></body></html>`;
+  return { subject, body };
+}
