@@ -17,6 +17,9 @@ export class FakeArtisanRepository implements IArtisanRepository {
       codeAPE: null, formeJuridique: null, capitalSocial: null, villeRCS: null, numeroRM: null,
       logo: null, slug: null, metier: null, plan: null, onboardingCompleted: null, franchiseTVA: false,
       assuranceDecennaleNom: null, assuranceDecennalePolice: null, assuranceDecennaleGarantie: null,
+      stripeConnectAccountId: null, stripeConnectChargesEnabled: false, stripeConnectPayoutsEnabled: false,
+      stripeConnectDetailsSubmitted: false, stripeConnectRequirements: null, stripeConnectStatus: "none",
+      stripeConnectConnectedAt: null, stripeConnectUpdatedAt: null,
       createdAt: now, updatedAt: now, ...over,
     };
     this.profiles = this.profiles.filter((x) => x.id !== p.id).concat(p);

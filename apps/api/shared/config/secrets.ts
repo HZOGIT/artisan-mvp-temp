@@ -41,3 +41,7 @@ export async function hydrateSecrets(): Promise<void> {
 export function getSecret(key: string): string | undefined {
   return secretCache[key] ?? process.env[key];
 }
+
+/** Signing secret dédié de l'endpoint webhook Connect (connect=true). */
+export const getStripeConnectWebhookSecret = (): string | undefined =>
+  getSecret("STRIPE_CONNECT_WEBHOOK_SECRET");

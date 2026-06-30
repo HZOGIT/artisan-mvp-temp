@@ -9,6 +9,7 @@ import {
   boolean,
   numeric,
   unique,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { delaiPaiementTypeEnum } from "./factures";
 
@@ -46,6 +47,14 @@ export const artisans = pgTable("artisans", {
   assuranceDecennaleGarantie: varchar("assuranceDecennaleGarantie", { length: 255 }),
   isActive: boolean("is_active").notNull().default(true),
   pendingDeletionAt: timestamp("pendingDeletionAt"),
+  stripeConnectAccountId: varchar("stripe_connect_account_id", { length: 255 }),
+  stripeConnectChargesEnabled: boolean("stripe_connect_charges_enabled").notNull().default(false),
+  stripeConnectPayoutsEnabled: boolean("stripe_connect_payouts_enabled").notNull().default(false),
+  stripeConnectDetailsSubmitted: boolean("stripe_connect_details_submitted").notNull().default(false),
+  stripeConnectRequirements: jsonb("stripe_connect_requirements"),
+  stripeConnectStatus: varchar("stripe_connect_status", { length: 20 }).notNull().default("none"),
+  stripeConnectConnectedAt: timestamp("stripe_connect_connected_at"),
+  stripeConnectUpdatedAt: timestamp("stripe_connect_updated_at"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
 });
