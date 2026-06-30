@@ -27,6 +27,7 @@ describe("notes-de-frais.module", () => {
     const module = createNotesDeFraisModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
     expect(procedures).toEqual([
+      "ajouterDepense",
       "approuver",
       "create",
       "delete",
@@ -34,6 +35,7 @@ describe("notes-de-frais.module", () => {
       "list",
       "payer",
       "rejeter",
+      "retirerDepense",
       "soumettre",
       "update",
     ]);

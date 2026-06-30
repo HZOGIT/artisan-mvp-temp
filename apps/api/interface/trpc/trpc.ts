@@ -124,6 +124,14 @@ const requirePlatformStaff = t.middleware(({ ctx, next }) => {
   return next();
 });
 
+/** Exige que l'utilisateur courant soit le propriétaire du compte artisan (isOwner). */
+const requireOwner = t.middleware(({ ctx, next }) => {
+  if (!ctx.tenant?.isOwner) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Réservé au propriétaire du compte" });
+  }
+  return next();
+});
+
 /*
  * Procédure PUBLIQUE (surface portail/vitrine par token — pas de tenant) : mapping des erreurs de
  * domaine (NotFound→404, Validation→400…) mais SANS exigence de tenant. Le scoping est porté par la
@@ -133,6 +141,9 @@ export const publicProcedure = t.procedure.use(logProcedureTiming).use(mapDomain
 
 /** Procédure protégée : mapping erreurs domaine + exigence de tenant. */
 export const protectedProcedure = t.procedure.use(logProcedureTiming).use(mapDomainErrors).use(requireTenant);
+
+/** Procédure OWNER-ONLY : tenant requis + propriétaire du compte (rejette les collaborateurs). */
+export const ownerProcedure = t.procedure.use(logProcedureTiming).use(mapDomainErrors).use(requireTenant).use(requireOwner);
 
 /** Procédure ADMIN : mapping erreurs domaine + exigence du rôle admin (peut avoir un tenant). */
 export const adminProcedure = t.procedure.use(logProcedureTiming).use(mapDomainErrors).use(requireAdmin);
