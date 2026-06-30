@@ -116,15 +116,18 @@ filtrées/triées, partiels), **CHECK** (statuts, invariants), **FK `ON DELETE`*
 
 **Collision de migrations résolue par Option D** (cf. `docs/architecture/migration-runner-option-d.md` §7) :
 les noms de fichiers sont **horodatés** (`YYYYMMDDHHMMSS_<nom>.sql`) → uniques par construction → **pas de
-rebase ni de régénération nécessaire pour l'ordre**. Si `_journal.json` présente un conflit textuel au merge,
-résolution triviale : garder les deux entrées (un entrée par migration) → `_journal.json` est cosmétique au
-runtime, le runner applique les migrations **par nom de fichier**.
+rebase ni de régénération nécessaire pour l'ordre**. `_journal.json` est recanoniculisé **automatiquement**
+par le merge driver `drizzle-journal` au merge/rebase (union + réindex idx) — **ne jamais résoudre le
+journal à la main, ne jamais `git add drizzle/meta/_journal.json` manuellement**.
+Le driver est enregistré via `pnpm install` (`prepare`) ; si absent :
+`git config merge.drizzle-journal.driver "node scripts/drizzle/canonicalize-journal.mjs merge %O %A %B"`.
+**Vérif avant PR** : `pnpm db:verify-journal`. En cas de désync : `node scripts/drizzle/canonicalize-journal.mjs rebuild drizzle`.
 
 **`git add` pour une migration — chemins explicites uniquement (jamais `git add drizzle/`) :**
 ```bash
 git -C /tmp/wt-__SESSION_NAME__ add drizzle/<YYYYMMDDHHMMSS>_<nom>.sql
 git -C /tmp/wt-__SESSION_NAME__ add drizzle/meta/<YYYYMMDDHHMMSS>_<nom>_snapshot.json
-git -C /tmp/wt-__SESSION_NAME__ add drizzle/meta/_journal.json
+# NE PAS ajouter _journal.json — le merge driver le gère automatiquement
 ```
 `git add drizzle/` emporterait les snapshots réécrit par drizzle-kit sur les migrations existantes (stowaway) si la restauration ci-dessus a été oubliée.
 

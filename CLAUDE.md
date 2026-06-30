@@ -246,7 +246,9 @@ Une base neuve n'a besoin d'aucun script manuel.
 > (cosmétique / traçabilité), mais le runner ne le lit que lors de la **bascule unique** depuis une BDD
 > gérée par Drizzle (critère `folderMillis` ≤ max `created_at` du ledger Drizzle, cf.
 > `docs/architecture/migration-runner-option-d.md` §7). Après bascule, tout se pilote par les noms de
-> fichiers horodatés.
+> fichiers horodatés. Les conflits git sur `_journal.json` sont résolus **automatiquement** par le merge
+> driver `drizzle-journal` (union + réindex idx, enregistré via `prepare`/`pnpm install`) — **ne jamais
+> résoudre le journal à la main ni `git add _journal.json` manuellement**.
 
 **Deux rôles, deux URLs** (nommées par rôle, jamais croisées) :
 - `DATABASE_URL` = `artisan_user` (owner) → provision au boot (migrations + grants). Connexion **éphémère**.
@@ -257,7 +259,7 @@ Une base neuve n'a besoin d'aucun script manuel.
   **indicatif** — le migrateur **DOIT le relire ligne par ligne et appliquer nos conventions manquantes**
   (RLS, index, CHECK, FK `ON DELETE`, sûreté sur données existantes) avant de committer. drizzle-kit oublie
   **systématiquement** la RLS et la plupart des index/contraintes. Une migration générée non relue/complétée
-  = à rejeter. (Checklist : skill `migrations` §2.) **Jamais** de `.sql` à la main — `drizzle-kit generate` crée le fichier horodaté, `_journal.json` et le snapshot atomiquement.
+  = à rejeter. (Checklist : skill `migrations` §2.) **Jamais** de `.sql` à la main — `drizzle-kit generate` crée le fichier horodaté, `_journal.json` et le snapshot atomiquement. Conflits de merge sur `_journal.json` → gérés par le merge driver `drizzle-journal` (automatique). Vérif avant PR : `pnpm db:verify-journal`.
 - **Migration custom** (ce que drizzle-kit ne génère PAS : RLS, CHECK, index partiels `WHERE`, triggers,
   self-ref FK) : `drizzle-kit generate --custom --name=<nom>` puis remplir le SQL. RLS tenant :
   `node scripts/rls/generate-tenant-rls.mjs`. RLS public-token : SQL canonique dans la skill.
