@@ -128,6 +128,8 @@ export function createDevisRouter(
     rateLimiter: mailing.rateLimiter,
     modeleEmailRepo: mailing.modeleEmailRepo,
     emailLogWriter: mailing.emailLogWriter,
+    signatureReader,
+    appUrl: mailing.appUrl,
   };
   const nonSignesDeps = { devisRepo: repo, clientReader: mailing.clientReader, signatureReader };
   return router({

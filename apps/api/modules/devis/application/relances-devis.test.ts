@@ -8,6 +8,7 @@ import { expectCrossTenantDenied } from "../../../shared/testing";
 import { EmailOptoutRepositoryFake } from "../../emails/infra/email-optout-repository-fake";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ClientInfo } from "../../../shared/readers/contact-readers";
+import type { DevisSignatureReader } from "./devis-signature-reader";
 
 const A: TenantContext = { artisanId: 1, userId: 10 };
 const B: TenantContext = { artisanId: 2, userId: 20 };
@@ -78,6 +79,42 @@ describe("envoyerRelanceDevis", () => {
     const limiter = new FakeRateLimiter();
     limiter.denyKey("relance:1");
     await expect(envoyerRelanceDevis(makeDeps({ devisRepo, rateLimiter: limiter }), A, { devisId: d.id })).rejects.toBeInstanceOf(TooManyRequestsError);
+  });
+});
+
+describe("OPE-977 — lien de signature dans la relance de devis", () => {
+  const TOKEN = "tok-abc123";
+  const fakeSignatureReader = (token: string | null): DevisSignatureReader => ({
+    getByDevisId: async () => token ? { id: 1, token, createdAt: new Date() } : null,
+  });
+
+  it("relance manuelle : lien /devis-public/<token> présent si signature existe", async () => {
+    const devisRepo = new FakeDevisRepository();
+    const email = new FakeEmailPort();
+    const d = await seedDevis(devisRepo, A, "envoye");
+    const deps = makeDeps({ devisRepo, email, signatureReader: fakeSignatureReader(TOKEN), appUrl: "https://staging.operioz.com" });
+    await envoyerRelanceDevis(deps, A, { devisId: d.id });
+    expect(email.sent[0].body).toContain(`https://staging.operioz.com/devis-public/${TOKEN}`);
+    expect(email.sent[0].body).toContain("Consulter et signer en ligne");
+  });
+
+  it("relance manuelle : pas de lien si aucune signature", async () => {
+    const devisRepo = new FakeDevisRepository();
+    const email = new FakeEmailPort();
+    const d = await seedDevis(devisRepo, A, "envoye");
+    const deps = makeDeps({ devisRepo, email, signatureReader: fakeSignatureReader(null), appUrl: "https://staging.operioz.com" });
+    await envoyerRelanceDevis(deps, A, { devisId: d.id });
+    expect(email.sent[0].body).not.toContain("/devis-public/");
+  });
+
+  it("relance automatique : lien /devis-public/<token> présent si signature existe", async () => {
+    const devisRepo = new FakeDevisRepository();
+    const email = new FakeEmailPort();
+    const now = new Date("2026-06-14T00:00:00Z");
+    await seedDevis(devisRepo, A, "envoye", new Date("2026-05-05T00:00:00Z"));
+    const deps = makeDeps({ devisRepo, email, maintenant: () => now, signatureReader: fakeSignatureReader(TOKEN), appUrl: "https://staging.operioz.com" });
+    await envoyerRelancesAutomatiques(deps, A, { joursMinimum: 7, joursEntreRelances: 7 });
+    expect(email.sent[0].body).toContain(`https://staging.operioz.com/devis-public/${TOKEN}`);
   });
 });
 
