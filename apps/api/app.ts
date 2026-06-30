@@ -1394,7 +1394,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
         const rows = await getDbHandle().db.select({ id: artisansTable.id }).from(artisansTable);
         let alertsCreated = 0;
         for (const { id: artisanId } of rows) {
-          const r = await genererAlertesStock(stockRepo, notificationRepo, { artisanId, userId: 0 }).catch(() => ({ alertsCreated: 0 }));
+          const r = await genererAlertesStock(stockRepo, notificationRepo, { artisanId, userId: 0 }, getDbHandle().db).catch(() => ({ alertsCreated: 0 }));
           alertsCreated += r.alertsCreated;
         }
         return { alertsCreated };
