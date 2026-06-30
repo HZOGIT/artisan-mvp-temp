@@ -89,6 +89,24 @@ describe("createInvoiceCheckout (public par token portail)", () => {
     expect((await createInvoiceCheckout(deps, { factureId: 43, token: "tok", origin: "https://o.test" })).kind).toBe("bad-request");
   });
 
+  it("OPE-780 — session en_attente récente (< 24h) → bad-request (anti double-encaissement)", async () => {
+    const { reader, deps } = build();
+    seedFacturePayable(reader);
+    reader.seedSessionEnAttente(7, 42, { url: "https://checkout.stripe.test/existing", createdAt: new Date(NOW.getTime() - 1 * 60 * 60 * 1000) });
+    const out = await createInvoiceCheckout(deps, { factureId: 42, token: "tok", origin: "https://o.test" });
+    expect(out.kind).toBe("bad-request");
+    if (out.kind === "bad-request") expect(out.message).toContain("en cours");
+  });
+
+  it("OPE-780 — session en_attente périmée (> 24h, Stripe expiré) → nouvelle session autorisée", async () => {
+    const { reader, writer, deps } = build();
+    seedFacturePayable(reader);
+    reader.seedSessionEnAttente(7, 42, { url: "https://checkout.stripe.test/old", createdAt: new Date(NOW.getTime() - 25 * 60 * 60 * 1000) });
+    const out = await createInvoiceCheckout(deps, { factureId: 42, token: "tok", origin: "https://o.test" });
+    expect(out.kind).toBe("ok");
+    expect(writer.created).toHaveLength(1);
+  });
+
   it("succès : crée la session Stripe (mode payment) + la ligne paiement en_attente", async () => {
     const { reader, writer, stripe, deps } = build();
     seedFacturePayable(reader);

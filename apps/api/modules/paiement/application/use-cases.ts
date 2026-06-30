@@ -92,6 +92,9 @@ export async function createInvoiceCheckout(
   if (facture.statut === "payee") return { kind: "bad-request", message: "Cette facture est déjà payée" };
   if (facture.statut === "brouillon" || facture.statut === "annulee") return { kind: "bad-request", message: "Cette facture n'est pas payable en ligne" };
 
+  const sessionExistante = await deps.reader.getSessionEnAttente(ctx, input.factureId, now);
+  if (sessionExistante) return { kind: "bad-request", message: "Un paiement est déjà en cours pour cette facture. Veuillez patienter ou contacter votre artisan." };
+
   const client = await deps.reader.getClientContact(ctx, access.clientId);
   const artisanNom = await deps.reader.getArtisanNom(ctx);
   if (!client) return { kind: "not-found" };
