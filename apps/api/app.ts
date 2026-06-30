@@ -177,6 +177,7 @@ import { paReconciliationPollerPlugin } from "./shared/infra/pa-reconciliation-p
 import { eventOutboxDrainerPlugin } from "./shared/events/outbox-drainer";
 import { geoPurgeCronPlugin } from "./shared/infra/geo-purge-cron";
 import { rgpdCronPlugin } from "./shared/infra/rgpd-cron";
+import { retentionPurgeCronPlugin } from "./shared/infra/retention-purge-cron";
 import { notificationsCronPlugin } from "./shared/infra/notifications-cron";
 import { genererRappelsFacturesEnRetard } from "./modules/notifications/application/derived-use-cases";
 import { genererAlertesStock } from "./modules/stocks/application/alertes-use-cases";
@@ -1361,6 +1362,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   /** Cron RGPD Art. 17 — purge définitive des comptes en attente de suppression depuis > 30j. */
   app.register(rgpdCronPlugin, { db: getDbHandle().db });
+
+  /** Cron RGPD Art. 5(1)(e) — rétention limitée multi-tables (prospects, sessions, events, devices, LLM payloads). */
+  app.register(retentionPurgeCronPlugin, { db: getDbHandle().db });
 
   /*
    * Cron notifications — tick toutes les heures : rappels factures en retard (idempotent)
