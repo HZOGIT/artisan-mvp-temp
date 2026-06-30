@@ -32,6 +32,8 @@ export interface ArtisanPortalInfo {
   readonly ville: string | null;
   readonly siret: string | null;
   readonly logo: string | null;
+  /** Vrai si l'artisan a un compte Stripe Connect actif (charges_enabled). Gating paiement portail. */
+  readonly paiementEnLigneActif: boolean;
 }
 
 export interface PortalAccessStatus {

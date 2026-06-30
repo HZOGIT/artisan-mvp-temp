@@ -88,6 +88,8 @@ export async function createInvoiceCheckout(
   if (!access) return { kind: "forbidden" };
 
   const ctx: TenantContext = { artisanId: access.artisanId, userId: 0 };
+  const chargesEnabled = await deps.reader.getArtisanChargesEnabled(ctx);
+  if (!chargesEnabled) return { kind: "bad-request", message: "Le paiement en ligne n'est pas encore activé par l'artisan" };
   const facture = await deps.reader.getFactureCheckout(ctx, input.factureId);
   if (!facture || facture.clientId !== access.clientId) return { kind: "not-found" };
   if (facture.statut === "payee") return { kind: "bad-request", message: "Cette facture est déjà payée" };

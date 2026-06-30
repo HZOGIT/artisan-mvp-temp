@@ -98,6 +98,15 @@ describe("createInvoiceCheckout (public par token portail)", () => {
     if (out.kind === "bad-request") expect(out.message).toContain("en cours");
   });
 
+  it("OPE-903 — artisan sans charges_enabled → bad-request (gating Connect)", async () => {
+    const { reader, deps } = build();
+    reader.seedArtisanChargesEnabled(7, false);
+    seedFacturePayable(reader);
+    const out = await createInvoiceCheckout(deps, { factureId: 42, token: "tok", origin: "https://o.test" });
+    expect(out.kind).toBe("bad-request");
+    if (out.kind === "bad-request") expect(out.message).toContain("pas encore activé");
+  });
+
   it("OPE-780 — session en_attente périmée (> 24h, Stripe expiré) → nouvelle session autorisée", async () => {
     const { reader, writer, deps } = build();
     seedFacturePayable(reader);

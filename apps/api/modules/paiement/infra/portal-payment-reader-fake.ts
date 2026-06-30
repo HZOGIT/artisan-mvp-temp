@@ -20,6 +20,8 @@ export class FakePortalPaymentReader implements PortalPaymentReader {
   private contacts = new Map<string, ClientContact>();
   private artisanNoms = new Map<number, string>();
   private sessionsEnAttente = new Map<string, { url: string | null; sessionId: string | null; createdAt: Date }>();
+  /** Par défaut true pour ne pas casser les tests existants (Connect non concerné). */
+  private artisanChargesEnabled = new Map<number, boolean>();
   /** Quand vrai, le premier appel à getSessionEnAttente retourne null (simule la race TOCTOU : session pas encore en DB). */
   skipFirstSessionLookup = false;
   private firstSessionLookupDone = false;
@@ -32,6 +34,9 @@ export class FakePortalPaymentReader implements PortalPaymentReader {
   }
   seedArtisanNom(artisanId: number, nom: string): void {
     this.artisanNoms.set(artisanId, nom);
+  }
+  seedArtisanChargesEnabled(artisanId: number, enabled: boolean): void {
+    this.artisanChargesEnabled.set(artisanId, enabled);
   }
   seedSessionEnAttente(artisanId: number, factureId: number, session: { url: string | null; sessionId?: string | null; createdAt?: Date }): void {
     this.sessionsEnAttente.set(`${artisanId}:${factureId}`, { url: session.url, sessionId: session.sessionId ?? null, createdAt: session.createdAt ?? new Date() });
@@ -64,6 +69,9 @@ export class FakePortalPaymentReader implements PortalPaymentReader {
   }
   async getArtisanNom(ctx: TenantContext): Promise<string | null> {
     return this.artisanNoms.get(ctx.artisanId) ?? null;
+  }
+  async getArtisanChargesEnabled(ctx: TenantContext): Promise<boolean> {
+    return this.artisanChargesEnabled.get(ctx.artisanId) ?? true;
   }
   async getSessionEnAttente(ctx: TenantContext, factureId: number, now: Date): Promise<{ url: string | null; sessionId: string | null } | null> {
     if (this.skipFirstSessionLookup && !this.firstSessionLookupDone) {
