@@ -30,6 +30,7 @@ export interface Devis {
   dateDevis?: string | Date;
   dateValidite?: string | Date | null;
   referenceClient?: string | null;
+  objet?: string | null;
   totalHT?: number | string | null;
   totalTVA?: number | string | null;
   totalTTC?: number | string | null;

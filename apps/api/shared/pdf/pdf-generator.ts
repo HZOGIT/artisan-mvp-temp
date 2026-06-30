@@ -579,9 +579,20 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
 
   const blocksEndY = renderInfoBlocks(doc, primary, buildArtisanBlock(artisan), buildClientBlock(client));
 
+  let tableStartYD = blocksEndY + 8;
+  if (devis.objet) {
+    doc.setFont("Roboto", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(...TEXT_DARK);
+    const objetLines = doc.splitTextToSize(String(devis.objet), PAGE_W - 2 * MARGIN) as string[];
+    doc.text(objetLines, MARGIN, tableStartYD);
+    tableStartYD += objetLines.length * 6 + 4;
+    doc.setFont("Roboto", "normal");
+  }
+
   /** Tableau des lignes */
   const hasRemiseD = devis.lignes.some((l) => Number(l.remise) > 0);
-  const colSpanD = hasRemiseD ? 5 : 4;
+  const colSpanD = hasRemiseD ? 6 : 5;
   const sousTotauxD = pdfSousTotauxMap(devis.lignes);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tableData: any[] = [];
@@ -599,7 +610,7 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
       const quantite = Number(ligne.quantite) || 0;
       const prixUnitaire = Number(ligne.prixUnitaireHT) || 0;
       const montantHT = ligne.montantHT != null ? Number(ligne.montantHT) : prixUnitaire * quantite;
-      const row: (string | number)[] = [ligne.designation ?? "", quantite.toString(), `${prixUnitaire.toFixed(2)} €`];
+      const row: (string | number)[] = [ligne.designation ?? "", quantite.toString(), ligne.unite || "unité", `${prixUnitaire.toFixed(2)} €`];
       if (hasRemiseD) row.push(Number(ligne.remise) > 0 ? `${Number(ligne.remise).toFixed(0)}%` : "");
       row.push(`${montantHT.toFixed(2)} €`);
       tableData.push(row);
@@ -615,16 +626,16 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   });
 
   const headD = hasRemiseD
-    ? [["Désignation", "Quantité", "P.U. HT", "Rem.%", "Total HT"]]
-    : [["Désignation", "Quantité", "P.U. HT", "Total HT"]];
+    ? [["Désignation", "Quantité", "Unité", "P.U. HT", "Rem.%", "Total HT"]]
+    : [["Désignation", "Quantité", "Unité", "P.U. HT", "Total HT"]];
   autoTable(doc, {
     head: headD,
     body: tableData,
-    startY: blocksEndY + 8,
+    startY: tableStartYD,
     ...TABLE_THEME,
     columnStyles: hasRemiseD
-      ? { 0: { halign: "left" }, 1: { halign: "center", cellWidth: 25 }, 2: { halign: "right", cellWidth: 25 }, 3: { halign: "center", cellWidth: 18 }, 4: { halign: "right", cellWidth: 25 } }
-      : { 0: { halign: "left" }, 1: { halign: "center", cellWidth: 25 }, 2: { halign: "right", cellWidth: 30 }, 3: { halign: "right", cellWidth: 30 } },
+      ? { 0: { halign: "left" }, 1: { halign: "center", cellWidth: 22 }, 2: { halign: "center", cellWidth: 18 }, 3: { halign: "right", cellWidth: 22 }, 4: { halign: "center", cellWidth: 15 }, 5: { halign: "right", cellWidth: 22 } }
+      : { 0: { halign: "left" }, 1: { halign: "center", cellWidth: 22 }, 2: { halign: "center", cellWidth: 18 }, 3: { halign: "right", cellWidth: 26 }, 4: { halign: "right", cellWidth: 26 } },
     margin: { left: MARGIN, right: MARGIN },
   });
 
@@ -651,6 +662,9 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
           .map(([taux, montant]) => ({ label: `TVA (${taux}%)`, value: `${montant.toFixed(2)} €` }))
       : [{ label: tvaParTaux.size === 1 ? `TVA (${Array.from(tvaParTaux.keys())[0]}%)` : "TVA", value: `${tva.toFixed(2)} €` }];
 
+  const displayedTTCD = tvaParTaux.size > 1
+    ? sousTotal + Array.from(tvaParTaux.values()).reduce((s, v) => s + v, 0)
+    : totalTTC;
   const totalsStartY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
   const totalsEndY = renderTotalsBox(
     doc,
@@ -658,7 +672,7 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
     totalsStartY,
     [{ label: "Sous-total HT", value: `${sousTotal.toFixed(2)} €` }, ...tvaRows],
     "TOTAL TTC",
-    `${totalTTC.toFixed(2)} €`,
+    `${displayedTTCD.toFixed(2)} €`,
   );
 
   /** Pied de page */
@@ -685,6 +699,10 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
         .filter((m): m is string => !!m),
     ),
   );
+  const mention293B = TVA_CATEGORIES_MAP["FR_FRANCHISE" as TvaCategorieId]?.mentionLegale;
+  if (artisan.franchiseTVA === true && mention293B && !tvaDevisMentions.includes(mention293B)) {
+    tvaDevisMentions.push(mention293B);
+  }
   let devisMentionY = Math.max(totalsEndY + 23, 291);
   if (tvaDevisMentions.length > 0) {
     doc.setFontSize(8);
@@ -785,9 +803,20 @@ export async function generateFacturePDF(data: PDFFactureData): Promise<Buffer> 
 
   const blocksEndY = renderInfoBlocks(doc, primary, buildArtisanBlock(artisan), buildClientBlock(client));
 
+  let tableStartYF = blocksEndY + 8;
+  if (facture.objet && !isAvoir) {
+    doc.setFont("Roboto", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(...TEXT_DARK);
+    const objetFLines = doc.splitTextToSize(String(facture.objet), PAGE_W - 2 * MARGIN) as string[];
+    doc.text(objetFLines, MARGIN, tableStartYF);
+    tableStartYF += objetFLines.length * 6 + 4;
+    doc.setFont("Roboto", "normal");
+  }
+
   /** Tableau des lignes */
   const hasRemiseF = facture.lignes.some((l) => Number(l.remise) > 0);
-  const colSpanF = hasRemiseF ? 5 : 4;
+  const colSpanF = hasRemiseF ? 6 : 5;
   const sousTotauxF = pdfSousTotauxMap(facture.lignes);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tableData: any[] = [];
@@ -805,7 +834,7 @@ export async function generateFacturePDF(data: PDFFactureData): Promise<Buffer> 
       const quantite = Number(ligne.quantite) || 0;
       const prixUnitaire = Number(ligne.prixUnitaireHT) || 0;
       const montantHT = ligne.montantHT != null ? Number(ligne.montantHT) : prixUnitaire * quantite;
-      const row: (string | number)[] = [ligne.designation ?? "", quantite.toString(), `${prixUnitaire.toFixed(2)} €`];
+      const row: (string | number)[] = [ligne.designation ?? "", quantite.toString(), ligne.unite || "unité", `${prixUnitaire.toFixed(2)} €`];
       if (hasRemiseF) row.push(Number(ligne.remise) > 0 ? `${Number(ligne.remise).toFixed(0)}%` : "");
       row.push(`${montantHT.toFixed(2)} €`);
       tableData.push(row);
@@ -821,16 +850,16 @@ export async function generateFacturePDF(data: PDFFactureData): Promise<Buffer> 
   });
 
   const headF = hasRemiseF
-    ? [["Désignation", "Quantité", "P.U. HT", "Rem.%", "Total HT"]]
-    : [["Désignation", "Quantité", "P.U. HT", "Total HT"]];
+    ? [["Désignation", "Quantité", "Unité", "P.U. HT", "Rem.%", "Total HT"]]
+    : [["Désignation", "Quantité", "Unité", "P.U. HT", "Total HT"]];
   autoTable(doc, {
     head: headF,
     body: tableData,
-    startY: blocksEndY + 8,
+    startY: tableStartYF,
     ...TABLE_THEME,
     columnStyles: hasRemiseF
-      ? { 0: { halign: "left" }, 1: { halign: "center", cellWidth: 25 }, 2: { halign: "right", cellWidth: 25 }, 3: { halign: "center", cellWidth: 18 }, 4: { halign: "right", cellWidth: 25 } }
-      : { 0: { halign: "left" }, 1: { halign: "center", cellWidth: 25 }, 2: { halign: "right", cellWidth: 30 }, 3: { halign: "right", cellWidth: 30 } },
+      ? { 0: { halign: "left" }, 1: { halign: "center", cellWidth: 22 }, 2: { halign: "center", cellWidth: 18 }, 3: { halign: "right", cellWidth: 22 }, 4: { halign: "center", cellWidth: 15 }, 5: { halign: "right", cellWidth: 22 } }
+      : { 0: { halign: "left" }, 1: { halign: "center", cellWidth: 22 }, 2: { halign: "center", cellWidth: 18 }, 3: { halign: "right", cellWidth: 26 }, 4: { halign: "right", cellWidth: 26 } },
     margin: { left: MARGIN, right: MARGIN },
   });
 
@@ -859,6 +888,11 @@ export async function generateFacturePDF(data: PDFFactureData): Promise<Buffer> 
           .map(([taux, montant]) => ({ label: `TVA (${taux}%)`, value: `${montant.toFixed(2)} €` }))
       : [{ label: tvaParTauxF.size === 1 ? `TVA (${Array.from(tvaParTauxF.keys())[0]}%)` : "TVA", value: `${tva.toFixed(2)} €` }];
 
+  const displayedTTCF = isAutoliquidation
+    ? sousTotal
+    : tvaParTauxF.size > 1
+      ? sousTotal + Array.from(tvaParTauxF.values()).reduce((s, v) => s + v, 0)
+      : totalTTC;
   const totalsStartY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
   const totalsEndY = renderTotalsBox(
     doc,
@@ -866,7 +900,7 @@ export async function generateFacturePDF(data: PDFFactureData): Promise<Buffer> 
     totalsStartY,
     [{ label: "Sous-total HT", value: `${sousTotal.toFixed(2)} €` }, ...tvaRowsF],
     isAutoliquidation ? "TOTAL HT" : "TOTAL TTC",
-    `${(isAutoliquidation ? sousTotal : totalTTC).toFixed(2)} €`,
+    `${displayedTTCF.toFixed(2)} €`,
   );
 
   /** Statut */
@@ -987,6 +1021,10 @@ export async function generateFacturePDF(data: PDFFactureData): Promise<Buffer> 
         .filter((m): m is string => !!m),
     ),
   );
+  const mention293BF = TVA_CATEGORIES_MAP["FR_FRANCHISE" as TvaCategorieId]?.mentionLegale;
+  if (artisan.franchiseTVA === true && mention293BF && !tvaFactureMentions.includes(mention293BF)) {
+    tvaFactureMentions.push(mention293BF);
+  }
   if (tvaFactureMentions.length > 0) {
     doc.setFontSize(8);
     doc.setFont("Roboto", "bold");
