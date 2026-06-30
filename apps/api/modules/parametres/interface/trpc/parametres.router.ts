@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import { router, protectedProcedure, permissionProcedure } from "../../../../interface/trpc/trpc";
 import type { DbClient } from "../../../../shared/db";
 import { outboxEvent } from "../../../../shared/events/outbox-event";
 import { withOutbox } from "../../../../shared/events/with-outbox";
@@ -46,7 +46,7 @@ export function createParametresRouter(repo: IParametresRepository, db?: DbClien
   return router({
     get: protectedProcedure.query(({ ctx }) => getParametres(repo, ctx.tenant)),
 
-    update: protectedProcedure
+    update: permissionProcedure("parametres.modifier")
       .input(updateSchema)
       .mutation(async ({ ctx, input }) => {
         const champsModifies = Object.keys(input).filter((k) => input[k as keyof typeof input] !== undefined);
