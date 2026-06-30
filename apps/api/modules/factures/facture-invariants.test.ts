@@ -125,14 +125,19 @@ describe("factures — invariants métier (synthèse)", () => {
     await expect(creerAvoir(repo, A, id, { lignes: [{ designation: "Trop", quantite: "1", prixUnitaireHT: "10", tauxTVA: "20" }] })).rejects.toBeInstanceOf(ConflictError);
   });
 
-  it("INV-9 : conversion devis→facture — devis envoye|accepte requis + anti-doublon", async () => {
+  it("INV-9 : conversion devis→facture — devis envoye|accepte requis + anti-doublon non-brouillon", async () => {
     const repo = repoWithClient();
     const readerBrouillon = new FakeDevisReader();
     readerBrouillon.register(devisAccepte({ statut: "brouillon" }), []);
     await expect(convertirDevisEnFacture(repo, readerBrouillon, A, 7)).rejects.toBeInstanceOf(ConflictError); // brouillon bloqué
     const reader = new FakeDevisReader();
     reader.register(devisAccepte({ statut: "envoye" }), []);
-    await convertirDevisEnFacture(repo, reader, A, 7); // envoye autorisé (OPE-927)
-    await expect(convertirDevisEnFacture(repo, reader, A, 7)).rejects.toBeInstanceOf(ConflictError); // doublon
+    const f = await convertirDevisEnFacture(repo, reader, A, 7); // envoye autorisé (OPE-927)
+    /* idempotent : brouillon existant → retourné sans doublon (OPE-960) */
+    const f2 = await convertirDevisEnFacture(repo, reader, A, 7);
+    expect(f2.id).toBe(f.id);
+    /* non-brouillon existant → ConflictError (doublon bloqué) */
+    repo.setStatutForTest(f.id, "envoyee");
+    await expect(convertirDevisEnFacture(repo, reader, A, 7)).rejects.toBeInstanceOf(ConflictError);
   });
 });

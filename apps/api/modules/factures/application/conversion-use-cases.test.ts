@@ -88,10 +88,19 @@ describe("factures — conversion devis→facture", () => {
     await expect(convertirDevisEnFacture(repo, reader, A, 7)).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it("anti-doublon : un devis déjà converti → Conflict", async () => {
+  it("idempotence : brouillon existant → retourné sans créer de doublon (OPE-960)", async () => {
     const { repo, reader } = setup();
     reader.register(devisAccepte(), [ligne()]);
-    await convertirDevisEnFacture(repo, reader, A, 7); // 1ère conversion OK
+    const f1 = await convertirDevisEnFacture(repo, reader, A, 7);
+    const f2 = await convertirDevisEnFacture(repo, reader, A, 7);
+    expect(f2.id).toBe(f1.id);
+  });
+
+  it("anti-doublon : facture déjà émise (non brouillon) → Conflict", async () => {
+    const { repo, reader } = setup();
+    reader.register(devisAccepte(), [ligne()]);
+    const f1 = await convertirDevisEnFacture(repo, reader, A, 7);
+    repo.setStatutForTest(f1.id, "envoyee");
     await expect(convertirDevisEnFacture(repo, reader, A, 7)).rejects.toBeInstanceOf(ConflictError);
   });
 

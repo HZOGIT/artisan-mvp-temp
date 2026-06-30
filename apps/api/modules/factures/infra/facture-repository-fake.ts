@@ -415,6 +415,12 @@ export class FakeFactureRepository implements IFactureRepository {
     );
   }
 
+  async findForDevis(ctx: TenantContext, devisId: number): Promise<Facture | null> {
+    return this.factureStore.find(
+      (f) => f.artisanId === ctx.artisanId && f.devisId === devisId && f.typeDocument === "facture" && !f.estAcompte,
+    ) ?? null;
+  }
+
   async listAcomptes(ctx: TenantContext, devisId: number): Promise<Facture[]> {
     return this.factureStore.filter(
       (f) => f.artisanId === ctx.artisanId && f.devisId === devisId && f.typeDocument === "facture" && f.estAcompte,

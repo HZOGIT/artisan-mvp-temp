@@ -79,6 +79,11 @@ export interface IFactureRepository {
    * ne sont pas comptés — plusieurs acomptes peuvent coexister avant le solde.
    */
   existsForDevis(ctx: TenantContext, devisId: number): Promise<boolean>;
+  /**
+   * Retourne la facture de solde (typeDocument='facture', estAcompte=false) liée à ce devis, ou null.
+   * Scopé tenant. Utilisé par la conversion devis→facture (idempotence : brouillon existant retourné).
+   */
+  findForDevis(ctx: TenantContext, devisId: number): Promise<Facture | null>;
   /** Acomptes (estAcompte=true, typeDocument='facture') liés à un devis, scopés tenant. */
   listAcomptes(ctx: TenantContext, devisId: number): Promise<Facture[]>;
   /*

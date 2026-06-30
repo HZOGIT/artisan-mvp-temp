@@ -574,6 +574,44 @@ async function casConnectDirectChargeFact() {
 }
 
 await casConnectDirectChargeFact();
+
+// ── CAS OPE-960 — Conversion devis→facture idempotente (brouillon existant retourné) ───────────────
+// Régression : devis/34 (statut=envoye) avait déjà une facture brouillon liée → ConflictError.
+// Fix : si brouillon existant → retourner au lieu de lancer Conflict (idempotence).
+async function casDevisConvertIdempotent() {
+  casesRun++;
+  const tag = 'devis.convertToFacture-idempotent-OPE-960';
+  const trpcPost = async (proc, input) => ctx.request.post(`${BACKEND}/api/trpc/${proc}?batch=1`, {
+    headers: { 'content-type': 'application/json' },
+    data: { '0': { json: input } },
+  });
+  try {
+    /* Déclencheur réel : devis 34 (envoye, brouillon existant) → doit retourner sans erreur */
+    const r = await trpcPost('devis.convertToFacture', { devisId: 34 });
+    const body = await r.json();
+    const result = body[0]?.result?.data?.json;
+    const err = body[0]?.error;
+    if (err) {
+      issues.push({ tag, error: `tRPC error: ${JSON.stringify(err)}` });
+      return;
+    }
+    if (!result?.id) {
+      issues.push({ tag, error: `pas de facture retournée, got: ${JSON.stringify(body).slice(0, 200)}` });
+      return;
+    }
+    /* Assert persistance : la facture existe bien (fetch) */
+    const facture = await trpcGet('factures.getById', { id: result.id });
+    if (!facture) {
+      issues.push({ tag, error: `facture id=${result.id} introuvable après conversion` });
+      return;
+    }
+    console.log(`[${tag}] ✓ devis 34 → facture ${result.id} (statut=${facture.statut}) — idempotent OK`);
+  } catch (e) {
+    issues.push({ tag, error: String(e).slice(0, 300) });
+  }
+}
+await casDevisConvertIdempotent();
+
 // ── (Ajouter ici les cas factures/contrats et tout futur bug d'intégration front↔tRPC) ─────────────
 
 console.log('=== E2E MUTATIONS RESULT ===');
