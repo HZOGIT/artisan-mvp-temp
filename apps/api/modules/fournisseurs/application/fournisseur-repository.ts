@@ -24,6 +24,8 @@ export interface IFournisseurRepository {
    * Lectures sans oracle : [] si l'article/fournisseur n'appartient pas au tenant.
    */
   listAssociationsArticle(ctx: TenantContext, articleId: number): Promise<ArticleFournisseur[]>;
+  /** Batch : toutes les associations pour une liste d'articles — 1 seule requête (anti-N+1). */
+  listAssociationsByArticleIds(ctx: TenantContext, articleIds: number[]): Promise<ArticleFournisseur[]>;
   listAssociationsFournisseur(ctx: TenantContext, fournisseurId: number): Promise<ArticleFournisseur[]>;
   /** null si l'article OU le fournisseur n'appartient pas au tenant (anti-IDOR sur les 2 FK). */
   ajouterAssociation(ctx: TenantContext, input: AjouterAssociationInput): Promise<ArticleFournisseur | null>;

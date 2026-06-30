@@ -49,11 +49,20 @@ export async function genererRapportCommande(
   const fournisseurs = await fournisseurRepo.list(ctx);
   const fournisseursById = new Map(fournisseurs.map((f) => [f.id, f]));
 
+  const articleIds = stocksBas.map((s) => s.articleId).filter((id): id is number => id != null);
+  const allAssocs = articleIds.length ? await fournisseurRepo.listAssociationsByArticleIds(ctx, articleIds) : [];
+  const assocsByArticleId = new Map<number, typeof allAssocs>();
+  for (const a of allAssocs) {
+    const bucket = assocsByArticleId.get(a.articleId) ?? [];
+    bucket.push(a);
+    assocsByArticleId.set(a.articleId, bucket);
+  }
+
   /** Regroupement par fournisseur (clé 0 = aucun fournisseur lié), ordre de 1ère apparition. */
   const grouped = new Map<number, { fournisseur: Fournisseur | null; lignes: RapportLigne[] }>();
 
   for (const stock of stocksBas) {
-    const assocs = stock.articleId != null ? await fournisseurRepo.listAssociationsArticle(ctx, stock.articleId) : [];
+    const assocs = stock.articleId != null ? (assocsByArticleId.get(stock.articleId) ?? []) : [];
     const af = assocs[0] ?? null;
     const fournisseurId = af ? af.fournisseurId : 0;
     const fournisseur = fournisseurId ? (fournisseursById.get(fournisseurId) ?? null) : null;
