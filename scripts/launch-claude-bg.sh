@@ -108,6 +108,10 @@ if $USE_WORKTREE; then
   ( cd "$WORKTREE_PATH" && pnpm install --prefer-offline ) \
     || { echo "ERROR: pnpm install in worktree failed." >&2; exit 1; }
 
+  echo "Registering drizzle-journal git merge driver in worktree..."
+  git -C "$WORKTREE_PATH" config merge.drizzle-journal.driver \
+    "node scripts/drizzle/canonicalize-journal.mjs merge %O %A %B"
+
   # Create and provision an isolated test database for this worktree.
   TEST_DB_SUFFIX="$(echo "$SESSION_NAME" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '_' | sed 's/_*$//;s/^_*//' | cut -c1-54)"
   TEST_DB="ope_test_${TEST_DB_SUFFIX}"

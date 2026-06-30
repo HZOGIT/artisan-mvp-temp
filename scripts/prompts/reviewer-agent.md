@@ -121,6 +121,11 @@ $BIN/eslint -c eslint.api.config.mjs --concurrency=auto apps/api      # si apps/
 $BIN/eslint -c eslint.web.config.mjs --concurrency=auto apps/web/src  # si apps/web touché
 # Lint : seuls les ERRORS bloquent. Le repo a ~1000+ warnings pré-existants (normal, non bloquant).
 
+# Gate journal Drizzle — vérifie 1:1 journal↔.sql si drizzle/ touché par la PR
+if git -C "$WT" diff --name-only origin/staging HEAD | grep -q '^drizzle/'; then
+  node "$WT/scripts/drizzle/canonicalize-journal.mjs" verify "$WT/drizzle"
+fi
+
 # Tests (gate L1/L2/L3). La base de test est isolée par worktree (.env.test.local) :
 TEST_DB_URL="$(grep ^DATABASE_URL= "$WT/.env.test.local" 2>/dev/null | cut -d= -f2-)"
 TEST_DB_APP_URL="$(grep ^APP_DATABASE_URL= "$WT/.env.test.local" 2>/dev/null | cut -d= -f2-)"

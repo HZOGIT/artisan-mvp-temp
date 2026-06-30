@@ -16,11 +16,12 @@
     "test:web": "vitest run -c vitest.web.config.ts",
     "test:parallel": "concurrently -n api,web --kill-others-on-fail \"pnpm test:unit:api\" \"pnpm test:web\"",
     "db:generate": "drizzle-kit generate",
+    "db:verify-journal": "node scripts/drizzle/canonicalize-journal.mjs verify drizzle",
     "lint:web": "eslint -c eslint.web.config.mjs --concurrency=auto --cache --cache-strategy=content --cache-location node_modules/.cache/eslint/web/ apps/web/src",
     "lint:api": "eslint -c eslint.api.config.mjs --concurrency=auto --cache --cache-strategy=content --cache-location node_modules/.cache/eslint/api/ apps/api",
     "lint:parallel": "concurrently -n api,web --kill-others-on-fail \"pnpm lint:api\" \"pnpm lint:web\"",
     "test:unit:api": "vitest run -c vitest.unit.api.config.ts",
-    "prepare": "husky"
+    "prepare": "husky && (git config merge.drizzle-journal.driver 'node scripts/drizzle/canonicalize-journal.mjs merge %O %A %B' 2>/dev/null; true)"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",

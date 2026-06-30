@@ -5,301 +5,315 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1782659680253,
+      "when": 1782659680000,
       "tag": "20260628151440_baseline",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1782664810521,
+      "when": 1782664810000,
       "tag": "20260628164010_reglements",
       "breakpoints": true
     },
     {
       "idx": 2,
       "version": "7",
-      "when": 1782664887503,
+      "when": 1782664887000,
       "tag": "20260628164127_rls-tenant-isolation",
       "breakpoints": true
     },
     {
       "idx": 3,
       "version": "7",
-      "when": 1782666568927,
+      "when": 1782666568000,
       "tag": "20260628170928_superpdp-tokens",
       "breakpoints": true
     },
     {
       "idx": 4,
       "version": "7",
-      "when": 1782669582259,
+      "when": 1782669582000,
       "tag": "20260628175942_attestations-tva",
       "breakpoints": true
     },
     {
       "idx": 5,
       "version": "7",
-      "when": 1782669587356,
+      "when": 1782669587000,
       "tag": "20260628175947_seed-tva-categories",
       "breakpoints": true
     },
     {
       "idx": 6,
       "version": "7",
-      "when": 1782671050384,
+      "when": 1782671050000,
       "tag": "20260628182410_facture-id-transaction",
       "breakpoints": true
     },
     {
       "idx": 7,
       "version": "7",
-      "when": 1782671468532,
+      "when": 1782671468000,
       "tag": "20260628183108_email-optouts",
       "breakpoints": true
     },
     {
       "idx": 8,
       "version": "7",
-      "when": 1782673794760,
+      "when": 1782673794000,
       "tag": "20260628190954_regime-tva-exigibilite",
       "breakpoints": true
     },
     {
       "idx": 9,
       "version": "7",
-      "when": 1782674209963,
+      "when": 1782674209000,
       "tag": "20260628191649_indemnite-km-taux-depense-id",
       "breakpoints": true
     },
     {
       "idx": 10,
       "version": "7",
-      "when": 1782676750878,
+      "when": 1782676750000,
       "tag": "20260628195910_devis-montant-deja-facture",
       "breakpoints": true
     },
     {
       "idx": 11,
       "version": "7",
-      "when": 1782678225909,
+      "when": 1782678225000,
       "tag": "20260628202345_rappel-rdv-client",
       "breakpoints": true
     },
     {
       "idx": 12,
       "version": "7",
-      "when": 1782678888888,
+      "when": 1782678524000,
       "tag": "20260628202844_coeff-deductibilite-tva",
       "breakpoints": true
     },
     {
       "idx": 13,
       "version": "7",
-      "when": 1782680373739,
+      "when": 1782680373000,
       "tag": "20260628205933_clients-archived-at",
       "breakpoints": true
     },
     {
       "idx": 14,
       "version": "7",
-      "when": 1782681338139,
+      "when": 1782681338000,
       "tag": "20260628211538_regime-tva-facture",
       "breakpoints": true
     },
     {
       "idx": 15,
       "version": "7",
-      "when": 1782681668605,
+      "when": 1782681668000,
       "tag": "20260628212108_contrats-indexation-annuelle",
       "breakpoints": true
     },
     {
       "idx": 16,
       "version": "7",
-      "when": 1782681948953,
+      "when": 1782681948000,
       "tag": "20260628212548_modeles-devis-defaults",
       "breakpoints": true
     },
     {
       "idx": 17,
       "version": "7",
-      "when": 1782729709452,
+      "when": 1782729709000,
       "tag": "20260629104149_add-pdf-file-id-to-factures",
       "breakpoints": true
     },
     {
       "idx": 18,
       "version": "7",
-      "when": 1782731916190,
-      "tag": "20260629111836_avis-demande-auto",
+      "when": 1782730775000,
+      "tag": "20260629105935_inventaires-physiques",
       "breakpoints": true
     },
     {
       "idx": 19,
       "version": "7",
-      "when": 1782730775482,
-      "tag": "20260629105935_inventaires-physiques",
+      "when": 1782731285000,
+      "tag": "20260629110805_soldes-conges-periode-reference",
       "breakpoints": true
     },
     {
       "idx": 20,
       "version": "7",
-      "when": 1782731285284,
-      "tag": "20260629110805_soldes-conges-periode-reference",
+      "when": 1782731916000,
+      "tag": "20260629111836_avis-demande-auto",
       "breakpoints": true
     },
     {
       "idx": 21,
       "version": "7",
-      "when": 1782738122823,
-      "tag": "20260629130202_scheduler-job-runs",
+      "when": 1782734949000,
+      "tag": "20260629120909_pieces-jointes",
       "breakpoints": true
     },
     {
       "idx": 22,
       "version": "7",
-      "when": 1751201987,
+      "when": 1782737987000,
       "tag": "20260629125947_date-verrouillage-compta",
       "breakpoints": true
     },
     {
       "idx": 23,
       "version": "7",
-      "when": 1782741996762,
-      "tag": "20260629140636_facture-acompte",
+      "when": 1782738122000,
+      "tag": "20260629130202_scheduler-job-runs",
       "breakpoints": true
     },
     {
       "idx": 24,
       "version": "7",
-      "when": 1751230893000,
-      "tag": "20260629201453_signature-statut-annulee",
+      "when": 1782741996000,
+      "tag": "20260629140636_facture-acompte",
       "breakpoints": true
     },
     {
       "idx": 25,
       "version": "7",
-      "when": 1751233290000,
-      "tag": "20260629211450_indexes-core",
+      "when": 1782751746000,
+      "tag": "20260629164906_permissions-utilisateur-unique-constraint",
       "breakpoints": true
     },
     {
       "idx": 26,
       "version": "7",
-      "when": 1782768689294,
-      "tag": "20260629213129_rls-child-tables",
+      "when": 1782764093000,
+      "tag": "20260629201453_signature-statut-annulee",
       "breakpoints": true
     },
     {
       "idx": 27,
       "version": "7",
-      "when": 1751233590000,
-      "tag": "20260629215000_indexes-devis-options",
+      "when": 1782767690000,
+      "tag": "20260629211450_indexes-core",
       "breakpoints": true
     },
     {
       "idx": 28,
       "version": "7",
-      "when": 1751234400000,
-      "tag": "20260629220000_idx-positions-techniciens-id-ts",
+      "when": 1782768689000,
+      "tag": "20260629213129_rls-child-tables",
       "breakpoints": true
     },
     {
       "idx": 29,
       "version": "7",
-      "when": 20260629215256,
-      "tag": "20260629215256_indexes-secondary",
+      "when": 1782769800000,
+      "tag": "20260629215000_indexes-devis-options",
       "breakpoints": true
     },
     {
       "idx": 30,
       "version": "7",
-      "when": 1782770212805,
-      "tag": "20260629215652_rdv-index-artisan-statut",
+      "when": 1782769976000,
+      "tag": "20260629215256_indexes-secondary",
       "breakpoints": true
     },
     {
       "idx": 31,
       "version": "7",
-      "when": 1782771630444,
-      "tag": "20260629222008_rls-disable-permissions-utilisateur",
+      "when": 1782770212000,
+      "tag": "20260629215652_rdv-index-artisan-statut",
       "breakpoints": true
     },
     {
       "idx": 32,
       "version": "7",
-      "when": 1751240580000,
-      "tag": "20260629223000_fk-ecritures-factureid",
+      "when": 1782770400000,
+      "tag": "20260629220000_idx-positions-techniciens-id-ts",
       "breakpoints": true
     },
     {
       "idx": 33,
       "version": "7",
-      "when": 1751247540000,
-      "tag": "20260629235900_add_ecriturenum_persiste",
+      "when": 1782771608000,
+      "tag": "20260629222008_rls-disable-permissions-utilisateur",
       "breakpoints": true
     },
     {
       "idx": 34,
       "version": "7",
-      "when": 1751277600000,
-      "tag": "20260630100000_paiements-stripe-unique-en-attente",
+      "when": 1782772200000,
+      "tag": "20260629223000_fk-ecritures-factureid",
       "breakpoints": true
     },
     {
       "idx": 35,
       "version": "7",
-      "when": 1782784965259,
-      "tag": "20260630020245_add-demandes-contact-consentement",
+      "when": 1782777540000,
+      "tag": "20260629235900_add_ecriturenum_persiste",
       "breakpoints": true
     },
     {
       "idx": 36,
       "version": "7",
-      "when": 1751286000000,
-      "tag": "20260630110000_seed-plan-comptable",
+      "when": 1782784965000,
+      "tag": "20260630020245_add-demandes-contact-consentement",
       "breakpoints": true
     },
     {
       "idx": 37,
       "version": "7",
-      "when": 1751292000000,
-      "tag": "20260630120000_normaliser-statut-paiement",
+      "when": 1782813600000,
+      "tag": "20260630100000_paiements-stripe-unique-en-attente",
       "breakpoints": true
     },
     {
       "idx": 38,
       "version": "7",
-      "when": 1751295600000,
-      "tag": "20260630130000_stock-check-non-negatif-fk-mouvements",
+      "when": 1782817200000,
+      "tag": "20260630110000_seed-plan-comptable",
       "breakpoints": true
     },
     {
       "idx": 39,
       "version": "7",
-      "when": 1751299200000,
-      "tag": "20260630140000_backfill-mouvements-stock-initiaux",
+      "when": 1782820800000,
+      "tag": "20260630120000_normaliser-statut-paiement",
       "breakpoints": true
     },
     {
       "idx": 40,
       "version": "7",
-      "when": 1751302800000,
-      "tag": "20260630150000_historique-revisions-prix",
+      "when": 1782824400000,
+      "tag": "20260630130000_stock-check-non-negatif-fk-mouvements",
       "breakpoints": true
     },
     {
       "idx": 41,
       "version": "7",
-      "when": 1751306400000,
-      "tag": "20260630160000_restaurer-modules-actif-defaut",
+      "when": 1782828000000,
+      "tag": "20260630140000_backfill-mouvements-stock-initiaux",
       "breakpoints": true
     },
     {
       "idx": 42,
       "version": "7",
-      "when": 1751317200000,
+      "when": 1782831600000,
+      "tag": "20260630150000_historique-revisions-prix",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1782835200000,
+      "tag": "20260630160000_restaurer-modules-actif-defaut",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1782849600000,
       "tag": "20260630200000_billing-invoices-mentions-legales-fr",
       "breakpoints": true
     }
