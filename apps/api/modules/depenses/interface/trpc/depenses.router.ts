@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import { router, protectedProcedure, permissionProcedure } from "../../../../interface/trpc/trpc";
 import type { DbClient } from "../../../../shared/db";
 import { outboxEvent } from "../../../../shared/events/outbox-event";
 import { withOutbox } from "../../../../shared/events/with-outbox";
@@ -147,6 +147,9 @@ export function createDepensesRouter(
   lockDateReader?: { getLockDate(ctx: TenantContext): Promise<string | null> },
   comptaAchat?: IDepenseComptaPort,
 ) {
+  const approuverNdf = permissionProcedure("notes_frais.approuver");
+  const compta = permissionProcedure("comptabilite.voir");
+
   return router({
     list: protectedProcedure.query(({ ctx }) => listDepenses(repo, ctx.tenant)),
 
@@ -404,7 +407,7 @@ export function createDepensesRouter(
      * (porté par le use-case). Transition `soumise→approuvee|rejetee` (sinon 409), idempotent,
      * hors tenant → 404. `rejeterNoteFrais` exige un commentaire (motif).
      */
-    approuverNoteFrais: protectedProcedure
+    approuverNoteFrais: approuverNdf
       .input(z.object({ id: z.number().int(), commentaire: z.string().max(2000).nullish() }))
       .mutation(async ({ ctx, input }) => {
         const result = await approuverNoteDeFrais(noteRepo, ctx.tenant, input.id, input.commentaire ?? undefined);
@@ -412,7 +415,7 @@ export function createDepensesRouter(
         return result;
       }),
 
-    rejeterNoteFrais: protectedProcedure
+    rejeterNoteFrais: approuverNdf
       .input(z.object({ id: z.number().int(), commentaire: z.string().min(1).max(2000) }))
       .mutation(async ({ ctx, input }) => {
         const result = await rejeterNoteDeFrais(noteRepo, ctx.tenant, input.id, input.commentaire);
@@ -458,7 +461,7 @@ export function createDepensesRouter(
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => ignorerTransaction(transactionRepo, ctx.tenant, input.id)),
 
-    importReleve: protectedProcedure
+    importReleve: compta
       .input(z.object({
         nomFichier: z.string().max(255),
         contenuCsv: z.string().max(5_000_000, "Fichier trop volumineux (max ~5 Mo)"),
@@ -490,12 +493,12 @@ export function createDepensesRouter(
       .query(({ ctx }) => getSuggestionsRapprochement({ transactionRepo, lettreur: factureLettreur }, ctx.tenant)),
 
     /** ⚠️ Idempotent : si déjà rapproché à la même facture → success immédiat. */
-    rapprocher: protectedProcedure
+    rapprocher: compta
       .input(z.object({ transactionId: z.number().int(), factureId: z.number().int() }))
       .mutation(({ ctx, input }) => rapprocher({ transactionRepo, lettreur: factureLettreur }, ctx.tenant, input)),
 
     /** ── Export FEC achats (format AFNOR ; débit=crédit par construction) — lecture seule ────────── */
-    exportFecAchats: protectedProcedure
+    exportFecAchats: compta
       .input(z.object({ dateDebut: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date AAAA-MM-JJ"), dateFin: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date AAAA-MM-JJ") }))
       .mutation(({ ctx, input }) => exportFecAchats(fecReader, ctx.tenant, input.dateDebut, input.dateFin)),
 
