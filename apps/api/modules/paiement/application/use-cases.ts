@@ -98,6 +98,9 @@ export async function createInvoiceCheckout(
   if (facture.statut === "payee") return { kind: "bad-request", message: "Cette facture est déjà payée" };
   if (facture.statut === "brouillon" || facture.statut === "annulee") return { kind: "bad-request", message: "Cette facture n'est pas payable en ligne" };
 
+  const paiementPaye = await deps.reader.getPaiementPaye(ctx, input.factureId);
+  if (paiementPaye) return { kind: "bad-request", message: "Cette facture est déjà payée" };
+
   const sessionExistante = await deps.reader.getSessionEnAttente(ctx, input.factureId, now);
   if (sessionExistante) {
     if (!sessionExistante.sessionId) {
@@ -107,7 +110,7 @@ export async function createInvoiceCheckout(
     if (stripeStatus?.sessionStatus === "open") {
       return { kind: "ok", url: sessionExistante.url, sessionId: sessionExistante.sessionId };
     }
-    if (stripeStatus?.sessionStatus === "complete") {
+    if (stripeStatus?.sessionStatus === "complete" || !stripeStatus) {
       return { kind: "bad-request", message: "Le paiement est en cours de validation — la facture sera marquée payée dans quelques instants." };
     }
     await deps.writer.expirePaiement(ctx, sessionExistante.id);
@@ -152,7 +155,7 @@ export async function createInvoiceCheckout(
     if (existante?.sessionId) {
       const status = await deps.stripe.retrieveCheckoutSession(existante.sessionId, existante.stripeConnectAccountId ?? undefined);
       if (status?.sessionStatus === "open") return { kind: "ok", url: existante.url, sessionId: existante.sessionId };
-      if (status?.sessionStatus === "complete") {
+      if (status?.sessionStatus === "complete" || !status) {
         return { kind: "bad-request", message: "Le paiement est en cours de validation — la facture sera marquée payée dans quelques instants." };
       }
       await deps.writer.expirePaiement(ctx, existante.id);

@@ -136,6 +136,28 @@ describe("createInvoiceCheckout (public par token portail)", () => {
     expect(writer.created).toHaveLength(0);
   });
 
+  it("OPE-1002 — paiement payé en DB mais facture pas encore mise à jour → bad-request (doublon impossible)", async () => {
+    const { reader, writer, deps } = build();
+    seedFacturePayable(reader);
+    reader.seedPaiementPaye(7, 42, 24);
+    const out = await createInvoiceCheckout(deps, { factureId: 42, token: "tok", origin: "https://o.test" });
+    expect(out.kind).toBe("bad-request");
+    expect(writer.created).toHaveLength(0);
+    expect(writer.expired).toHaveLength(0);
+  });
+
+  it("OPE-1002 — session Stripe null (API indisponible) → ne pas expirer, bad-request safe", async () => {
+    const { reader, writer, stripe, deps } = build();
+    seedFacturePayable(reader);
+    reader.seedSessionEnAttente(7, 42, { id: 13, url: "https://checkout.stripe.test/pending", sessionId: "cs_unknown", stripeConnectAccountId: "acct_test", createdAt: new Date(NOW.getTime() - 30 * 60 * 1000) });
+    stripe.sessionStatuses.clear();
+    stripe.returnNullForUnknown = true;
+    const out = await createInvoiceCheckout(deps, { factureId: 42, token: "tok", origin: "https://o.test" });
+    expect(out.kind).toBe("bad-request");
+    expect(writer.expired).toHaveLength(0);
+    expect(writer.created).toHaveLength(0);
+  });
+
   it("OPE-903 — artisan sans charges_enabled → bad-request (gating Connect)", async () => {
     const { reader, deps } = build();
     reader.seedArtisanChargesEnabled(7, false);
