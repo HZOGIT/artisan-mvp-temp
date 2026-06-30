@@ -29,7 +29,7 @@ function makeDeps(over: Partial<UtilisateurDeps> = {}): { deps: UtilisateurDeps;
 }
 
 describe("utilisateurs use-cases", () => {
-  it("list : owner ∪ collaborateurs du tenant", async () => {
+  it("list : owner ∪ collaborateurs du tenant ; isOwner correct", async () => {
     const { deps, repo } = makeDeps();
     repo.setOwner(A, 100);
     repo.seedUser({ id: 100, role: "artisan", artisanId: null }); // owner (rattaché via artisans.userId)
@@ -37,6 +37,8 @@ describe("utilisateurs use-cases", () => {
     repo.seedUser({ id: 200, role: "technicien", artisanId: B }); // autre tenant
     const list = await listUtilisateurs(deps, ctx(A));
     expect(list.map((u) => u.id).sort()).toEqual([100, 101]);
+    expect(list.find((u) => u.id === 100)?.isOwner).toBe(true);
+    expect(list.find((u) => u.id === 101)?.isOwner).toBe(false);
   });
 
   it("invite : email unique → hash MDP temp + création + seed perms du rôle + email envoyé", async () => {

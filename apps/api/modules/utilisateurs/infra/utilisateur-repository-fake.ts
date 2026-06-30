@@ -51,7 +51,7 @@ export class FakeUtilisateurRepository implements IUtilisateurRepository {
     const owner = this.owners.get(ctx.artisanId) ?? null;
     return this.users
       .filter((u) => u.artisanId === ctx.artisanId || u.id === owner)
-      .map((u) => ({ id: u.id, name: u.name, prenom: u.prenom, email: u.email, role: u.role, actif: u.actif, lastSignedIn: u.lastSignedIn, createdAt: u.createdAt }));
+      .map((u) => ({ id: u.id, name: u.name, prenom: u.prenom, email: u.email, role: u.role, actif: u.actif, isOwner: u.id === owner, lastSignedIn: u.lastSignedIn, createdAt: u.createdAt }));
   }
 
   async emailExists(email: string): Promise<boolean> {

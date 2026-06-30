@@ -46,8 +46,10 @@ describe.skipIf(!URL)("UtilisateurRepositoryDrizzle (PG, tables HORS RLS → sco
   });
 
   it("list : owner + collaborateurs de A uniquement (B exclu)", async () => {
-    const ids = (await repo.list(ctx(A))).map((u) => u.id).sort((a, b) => a - b);
-    expect(ids).toEqual([OWNER_A, COLLAB_A].sort((a, b) => a - b));
+    const rows = await repo.list(ctx(A));
+    expect(rows.map((u) => u.id).sort((a, b) => a - b)).toEqual([OWNER_A, COLLAB_A].sort((a, b) => a - b));
+    expect(rows.find((u) => u.id === OWNER_A)?.isOwner).toBe(true);
+    expect(rows.find((u) => u.id === COLLAB_A)?.isOwner).toBe(false);
   });
 
   it("anti-IDOR : A ne peut PAS modifier le collaborateur de B (hors-RLS → scope explicite)", async () => {

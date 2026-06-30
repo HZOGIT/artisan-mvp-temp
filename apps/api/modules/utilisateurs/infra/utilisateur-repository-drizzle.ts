@@ -29,7 +29,7 @@ export class UtilisateurRepositoryDrizzle implements IUtilisateurRepository {
       .select({ id: users.id, name: users.name, prenom: users.prenom, email: users.email, role: users.role, actif: users.actif, lastSignedIn: users.lastSignedIn, createdAt: users.createdAt })
       .from(users)
       .where(cond);
-    return rows.map((u) => ({ id: u.id, name: u.name ?? null, prenom: u.prenom ?? null, email: u.email ?? null, role: u.role, actif: u.actif, lastSignedIn: u.lastSignedIn ?? null, createdAt: u.createdAt }));
+    return rows.map((u) => ({ id: u.id, name: u.name ?? null, prenom: u.prenom ?? null, email: u.email ?? null, role: u.role, actif: u.actif, isOwner: u.id === owner, lastSignedIn: u.lastSignedIn ?? null, createdAt: u.createdAt }));
   }
 
   async emailExists(email: string): Promise<boolean> {

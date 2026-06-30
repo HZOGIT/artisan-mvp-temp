@@ -25,6 +25,8 @@ const roleBadgeColor: Record<string, string> = {
   technicien: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
 };
 
+const ownerBadgeClass = "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200";
+
 const matrixRows = buildMatrixRows();
 
 export default function UtilisateursPage() {
@@ -174,13 +176,18 @@ export default function UtilisateursPage() {
             <TableBody>
               {utilisateurs.map((u) => {
                 const isCurrentUser = u.id === currentUser?.id;
-                const isAdmin = u.role === "admin";
+                const isOwner = u.isOwner;
                 return (
                   <TableRow key={u.id}>
                     <TableCell className="font-medium">{fullName(u) || "—"}</TableCell>
                     <TableCell>{u.email}</TableCell>
                     <TableCell>
-                      {isAdmin || isCurrentUser ? (
+                      {isOwner ? (
+                        <div className="flex flex-wrap gap-1">
+                          {t_roleBadge(u.role)}
+                          <Badge className={ownerBadgeClass} variant="secondary">{t("proprietaire")}</Badge>
+                        </div>
+                      ) : isCurrentUser ? (
                         t_roleBadge(u.role)
                       ) : (
                         <Select value={u.role} onValueChange={(v) => updateRole.mutate({ userId: u.id, role: v as InvitableRole }, { onSuccess: () => toast.success(t("toastRoleModifie")), onError: (e) => toast.error(e.message) })}>
@@ -194,7 +201,7 @@ export default function UtilisateursPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {isAdmin || isCurrentUser ? (
+                      {isOwner || isCurrentUser ? (
                         <Badge variant="outline" className="text-green-600">{t("actif")}</Badge>
                       ) : (
                         <Switch checked={u.actif} onCheckedChange={(v) => toggleActif.mutate({ userId: u.id, actif: v }, { onSuccess: () => toast.success(t("toastStatutModifie")), onError: (e) => toast.error(e.message) })} />
@@ -204,8 +211,8 @@ export default function UtilisateursPage() {
                       {u.lastSignedIn ? new Date(u.lastSignedIn).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }) : "—"}
                     </TableCell>
                     <TableCell>
-                      {isAdmin ? (
-                        <span className="text-xs text-muted-foreground">{t("proprietaire")}</span>
+                      {isOwner ? (
+                        <span className="text-xs text-muted-foreground">{t("proprietaireTousDroits")}</span>
                       ) : (
                         <Button variant="outline" size="sm" onClick={() => openPermissions(u)} className="gap-1.5">
                           <Settings2 className="h-4 w-4" />

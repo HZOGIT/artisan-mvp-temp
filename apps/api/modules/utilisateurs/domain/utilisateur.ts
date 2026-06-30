@@ -12,6 +12,8 @@ export interface UtilisateurListItem {
   readonly email: string | null;
   readonly role: string;
   readonly actif: boolean;
+  /** Vrai si l'utilisateur est le propriétaire du compte artisan (bypass toutes permissions). */
+  readonly isOwner: boolean;
   readonly lastSignedIn: Date | null;
   readonly createdAt: Date;
 }
