@@ -1010,6 +1010,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       notifications: signatureNotifications,
       appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
       emailLogWriter: sharedEmailLogWriter,
+      pdf: new JsPdfAdapter(),
+      artisanReader: new SharedArtisanReaderDrizzle(signatureDb),
+      clientReader: new SharedClientReaderDrizzle(signatureDb),
+      lignesReader: devisRepo,
+      logger: app.log,
     },
     publicDeps: {
       reader: new SignaturePublicReaderDrizzle(signatureDb),

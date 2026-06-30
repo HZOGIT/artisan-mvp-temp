@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type { TenantContext } from "../../../shared/tenant";
 import type { EmailMessage, EmailPort } from "../../../shared/ports/email";
+import type { PdfPort } from "../../../shared/ports/pdf";
+import type { ArtisanInfo, ArtisanReader, ClientInfo, ClientReader } from "../../../shared/readers/contact-readers";
 import { NotFoundError } from "../../../shared/errors";
 import {
   FakeSignatureRepository,
@@ -18,6 +20,25 @@ class CapturingEmail implements EmailPort {
   }
 }
 
+class FakePdf implements PdfPort {
+  public rendered: Array<{ template: string }> = [];
+  private readonly fail: boolean;
+  constructor(opts?: { fail?: boolean }) { this.fail = opts?.fail ?? false; }
+  async render(template: string): Promise<Buffer> {
+    if (this.fail) throw new Error("PDF failure");
+    this.rendered.push({ template });
+    return Buffer.from("PDF");
+  }
+}
+
+class FakeArtisanRdr implements ArtisanReader {
+  async getArtisan(): Promise<ArtisanInfo> { return { id: 99, nomEntreprise: "Toiture Pro", email: "pro@example.com", adresse: "1 rue Test" }; }
+}
+
+class FakeClientRdr implements ClientReader {
+  async getClient(_ctx: TenantContext, clientId: number): Promise<ClientInfo> { return { id: clientId, nom: "Dupont", prenom: "Jean", email: "client@example.com" }; }
+}
+
 const ctx = (artisanId: number): TenantContext => ({ artisanId, userId: 1 });
 
 const devisContext = (overrides: Partial<SignatureDevisContext> = {}): SignatureDevisContext => ({
@@ -27,12 +48,14 @@ const devisContext = (overrides: Partial<SignatureDevisContext> = {}): Signature
   ...overrides,
 });
 
-function build(seedCtx?: SignatureDevisContext) {
+function build(seedCtx?: SignatureDevisContext, opts?: { withPdf?: boolean; pdfFail?: boolean }) {
   const repo = new FakeSignatureRepository();
   const contextReader = new FakeSignatureContextReader();
   const email = new CapturingEmail();
   const notifications = new FakeSignatureNotificationWriter();
+  const pdf = opts?.withPdf ? new FakePdf({ fail: opts?.pdfFail }) : undefined;
   if (seedCtx) contextReader.seed(1, seedCtx);
+  const lignesReader = { listLignes: async () => [] };
   const deps: SignatureDeps = {
     repo,
     contextReader,
@@ -40,8 +63,9 @@ function build(seedCtx?: SignatureDevisContext) {
     notifications,
     appUrl: "https://app.test",
     maintenant: () => new Date("2026-06-15T12:00:00Z"),
+    ...(opts?.withPdf ? { pdf, artisanReader: new FakeArtisanRdr(), clientReader: new FakeClientRdr(), lignesReader } : {}),
   };
-  return { deps, repo, contextReader, email, notifications };
+  return { deps, repo, contextReader, email, notifications, pdf };
 }
 
 describe("signature use-cases", () => {
@@ -100,6 +124,27 @@ describe("signature use-cases", () => {
       const sig = await createSignatureLink(deps, ctx(1), 10);
       expect(sig.token).toHaveLength(64);
       expect(email.sent).toHaveLength(0);
+    });
+
+    it("joint le PDF du devis quand les deps pdf sont présentes", async () => {
+      const { deps, email, pdf } = build(devisContext(), { withPdf: true });
+      await createSignatureLink(deps, ctx(1), 10);
+      expect(email.sent).toHaveLength(1);
+      expect(email.sent[0].attachments).toHaveLength(1);
+      expect(email.sent[0].attachments![0].filename).toBe("Devis_DEV-2026-001.pdf");
+      expect(email.sent[0].attachments![0].contentType).toBe("application/pdf");
+      expect(pdf!.rendered).toHaveLength(1);
+      expect(pdf!.rendered[0].template).toBe("devis");
+    });
+
+    it("envoie l'email sans PJ si la génération PDF échoue (best-effort)", async () => {
+      const warns: unknown[] = [];
+      const { deps, email } = build(devisContext(), { withPdf: true, pdfFail: true });
+      (deps as Record<string, unknown>).logger = { warn: (obj: unknown) => warns.push(obj) };
+      await createSignatureLink(deps, ctx(1), 10);
+      expect(email.sent).toHaveLength(1);
+      expect(email.sent[0].attachments).toBeUndefined();
+      expect(warns).toHaveLength(1);
     });
   });
 });
