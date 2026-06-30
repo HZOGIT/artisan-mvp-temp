@@ -3,12 +3,14 @@ import type { JobDefinition } from "../../../platform/scheduler/scheduler-types"
 import { autoGenererFacturesContrats } from "./auto-facturation-use-cases";
 import type { IContratRepository } from "./contrat-repository";
 import type { ContratFactureGenerator } from "./contrat-facture-generator";
+import type { DbClient } from "../../../shared/db";
 
 export interface FacturesRecurrentesJobDeps {
   /** Renvoie tous les artisanIds actifs (table artisans, hors RLS). */
   readonly listArtisanIds: () => Promise<number[]>;
   readonly contratRepo: IContratRepository;
   readonly factureGen: ContratFactureGenerator;
+  readonly db?: DbClient;
 }
 
 /**
@@ -23,7 +25,7 @@ export function createFacturesRecurrentesJob(deps: FacturesRecurrentesJobDeps): 
     periodKey: dailyKey,
     async run() {
       const artisanIds = await deps.listArtisanIds();
-      await autoGenererFacturesContrats(deps.contratRepo, deps.factureGen, artisanIds, new Date());
+      await autoGenererFacturesContrats(deps.contratRepo, deps.factureGen, artisanIds, new Date(), deps.db);
     },
   };
 }
