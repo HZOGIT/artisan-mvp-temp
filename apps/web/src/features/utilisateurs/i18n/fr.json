@@ -27,6 +27,7 @@
   "colActions": "Actions",
   "actif": "Actif",
   "proprietaire": "Propriétaire",
+  "proprietaireTousDroits": "Propriétaire — tous les droits",
   "permissions": "Permissions",
   "aucunUtilisateur": "Aucun utilisateur trouvé",
   "matriceTitre": "Permissions par rôle (défauts)",
