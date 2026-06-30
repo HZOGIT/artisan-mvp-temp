@@ -26,8 +26,7 @@ export class FacturesContratFactureGenerator implements ContratFactureGenerator 
       tauxTVA: input.tauxTVA,
       tvaCategorieId: input.tvaCategorieId,
     });
-    const numero = await this.factureRepo.nextNumero(ctx);
-    await this.factureRepo.assignNumero(ctx, facture.id, numero);
+    const numero = await this.factureRepo.nextNumeroAndAssign(ctx, facture.id);
     /** Émission directe (pas d'écritures FEC ici — parité legacy `updateFacture(statut:"envoyee")`). */
     await this.factureRepo.setStatut(ctx, facture.id, "envoyee");
     return { id: facture.id, numero };

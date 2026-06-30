@@ -227,6 +227,20 @@ describe.skipIf(!URL)("FactureRepositoryDrizzle (PG, RLS + scope tenant + lignes
     expect((await repo.getById(ctx(A), f.id))?.montantPaye).toBe("120.00");
   });
 
+  it("nextNumeroAndAssign : atomique — 2 factures concurrentes obtiennent des numéros distincts et consécutifs (anti-trou FEC)", async () => {
+    const f1 = await repo.create(ctx(A), { clientId: clientA, numero: null });
+    const f2 = await repo.create(ctx(A), { clientId: clientA, numero: null });
+    const [n1, n2] = await Promise.all([
+      repo.nextNumeroAndAssign(ctx(A), f1.id),
+      repo.nextNumeroAndAssign(ctx(A), f2.id),
+    ]);
+    expect(n1).not.toBe(n2);
+    const nums = [n1, n2].map((n) => parseInt(n.match(/-(\d+)$/)![1], 10)).sort((a, b) => a - b);
+    expect(nums[1] - nums[0]).toBe(1);
+    expect((await repo.getById(ctx(A), f1.id))?.numero).toBe(n1);
+    expect((await repo.getById(ctx(A), f2.id))?.numero).toBe(n2);
+  });
+
   it("setPdfFile : pose pdfFileId + pdfStorageKey ; lecture cohérente ; cross-tenant ignoré (OPE-687)", async () => {
     await admin.query("insert into files (id,storage_key,mime_type,size_bytes,sha256,purpose,bucket) values ($1,$2,'application/pdf',1000,'abc','facture-pdf','test')", [99_000_001, "factures/test/99000001.pdf"]);
     try {
