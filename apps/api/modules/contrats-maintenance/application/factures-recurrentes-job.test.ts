@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Pool } from "pg";
 import { createDbClient } from "../../../shared/db";
 import { createFacturesRecurrentesJob } from "./factures-recurrentes-job";
+import { autoGenererFacturesContrats } from "./auto-facturation-use-cases";
 import { runJob } from "../../../platform/scheduler/scheduler-runner";
 import { FakeContratRepository } from "../infra/contrat-repository-fake";
 import { ContratRepositoryDrizzle } from "../infra/contrat-repository-drizzle";
@@ -172,5 +173,34 @@ describe.skipIf(!URL)("factures-recurrentes-job — intégration PG (anti-double
       [contratId],
     );
     expect(Number(rows[0].count)).toBe(1);
+  });
+
+  it("event outbox contrat.facture_recurrente_generee émis atomiquement avec la facturation récurrente", async () => {
+    await admin.query('delete from event_outbox where "artisanId" = $1 and action = $2', [ART, "contrat.facture_recurrente_generee"]);
+    const { rows: [newClient] } = await admin.query<{ id: number }>(
+      'insert into clients ("artisanId", nom) values ($1, $2) returning id',
+      [ART, "Client Outbox Recur"],
+    );
+    const { rows: [contratOutbox] } = await admin.query<{ id: number }>(
+      `insert into contrats_maintenance
+         ("artisanId","clientId",titre,"montantHT",periodicite,"dateDebut","prochainFacturation",reference,statut,type)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id`,
+      [ART, newClient.id, "Contrat Outbox", "150.00", "mensuel", new Date("2026-01-01"), new Date("2026-01-15"), "CTR-OUTBOX-001", "actif", "entretien"],
+    );
+
+    const gen = new FakeFactureGen();
+    await autoGenererFacturesContrats(drizzleRepo, gen, [ART], new Date("2026-06-29T10:00:00Z"), app.db);
+
+    const { rows } = await admin.query(
+      'select * from event_outbox where "artisanId"=$1 and action=$2 and "entityId"=$3',
+      [ART, "contrat.facture_recurrente_generee", contratOutbox.id],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].entityType).toBe("contrat");
+    expect((rows[0].payload as { factureId?: number }).factureId).toBeTypeOf("number");
+
+    await admin.query('delete from factures_recurrentes where "contratId"=$1', [contratOutbox.id]);
+    await admin.query('delete from contrats_maintenance where id=$1', [contratOutbox.id]);
+    await admin.query('delete from clients where id=$1', [newClient.id]);
   });
 });

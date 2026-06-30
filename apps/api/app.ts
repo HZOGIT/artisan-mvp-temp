@@ -1507,6 +1507,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
           },
           contratRepo,
           factureGen: new FacturesContratFactureGenerator(factureRepo),
+          db: deps.contratsMaintenanceDb ?? getDbHandle().db,
         }),
       );
       registry.register(
