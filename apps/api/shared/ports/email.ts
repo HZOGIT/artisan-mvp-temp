@@ -39,5 +39,6 @@ export interface EmailMessage {
 }
 
 export interface EmailPort {
-  send(message: EmailMessage): Promise<void>;
+  /** Retourne l'identifiant Resend de l'email envoyé, ou null si simulé/non disponible. */
+  send(message: EmailMessage): Promise<string | null>;
 }

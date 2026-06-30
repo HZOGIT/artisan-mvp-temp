@@ -3,6 +3,7 @@ export interface CreateEmailLogEntry {
   readonly destinataire: string;
   readonly sujet: string;
   readonly type: string;
+  readonly resendId?: string | null;
   readonly entiteType?: string | null;
   readonly entiteId?: number | null;
   readonly statut?: string;

@@ -6,7 +6,7 @@ import { emailOutbox } from "../../../../drizzle/schema.pg";
 export class EmailOutboxAdapter implements EmailPort {
   constructor(private readonly db: DbClient, private readonly log: AppLogger) {}
 
-  async send(message: EmailMessage): Promise<void> {
+  async send(message: EmailMessage): Promise<string | null> {
     await this.db.insert(emailOutbox).values({
       toEmail: message.to,
       subject: message.subject,
@@ -16,5 +16,6 @@ export class EmailOutboxAdapter implements EmailPort {
       attachments: message.attachments ? (message.attachments as unknown as Record<string, unknown>[]) : null,
     });
     this.log.info({ event: "email_queued", subject: message.subject }, "Email mis en file outbox");
+    return null;
   }
 }

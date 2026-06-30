@@ -213,10 +213,10 @@ export async function envoyerDevisParEmail(
     }
   }
 
-  await deps.email.send({ to: destinataireEmail, subject, body, ...(attachments.length ? { attachments } : {}), fromName: artisan.nomEntreprise ?? undefined, replyTo: artisan.email ?? undefined });
+  const resendId = await deps.email.send({ to: destinataireEmail, subject, body, ...(attachments.length ? { attachments } : {}), fromName: artisan.nomEntreprise ?? undefined, replyTo: artisan.email ?? undefined });
 
   if (deps.emailLogWriter) {
-    await deps.emailLogWriter.create({ artisanId: ctx.artisanId, destinataire: destinataireEmail, sujet: subject, type: "envoi_devis", entiteType: "devis", entiteId: devis.id }).catch(() => { /* ponytail: best-effort — emailLogWriter non-critique */ });
+    await deps.emailLogWriter.create({ artisanId: ctx.artisanId, destinataire: destinataireEmail, sujet: subject, type: "envoi_devis", resendId: resendId ?? null, entiteType: "devis", entiteId: devis.id }).catch(() => { /* ponytail: best-effort — emailLogWriter non-critique */ });
   }
 
   /** Envoi réussi : passage `envoye` depuis brouillon uniquement (ne régresse pas un devis émis/signé). */

@@ -38,7 +38,7 @@ export class ResendEmailAdapter implements EmailPort {
     }
   }
 
-  async send(message: EmailMessage): Promise<void> {
+  async send(message: EmailMessage): Promise<string | null> {
     const { to, subject, body } = message;
     if (!to || !subject || !body) throw new Error("Paramètres d'email manquants");
     if (!EMAIL_RE.test(to)) throw new Error("Adresse email invalide");
@@ -48,7 +48,7 @@ export class ResendEmailAdapter implements EmailPort {
         throw new Error("Service email non configuré");
       }
       this.log.warn({ event: "email_simulated", to: maskEmail(to), subject }, "Email simulé (Resend non configuré)");
-      return;
+      return null;
     }
     const options: Parameters<typeof this.resend.emails.send>[0] = {
       from: message.fromName ? `${sanitizeCRLF(message.fromName)} <noreply@operioz.com>` : this.emailFrom,
@@ -68,11 +68,12 @@ export class ResendEmailAdapter implements EmailPort {
     if (message.attachments?.length) {
       options.attachments = message.attachments.map((a) => ({ filename: a.filename, content: a.content }));
     }
-    const { error } = await this.resend.emails.send(options);
+    const { data, error } = await this.resend.emails.send(options);
     if (error) {
       this.log.error({ event: "email_send_error", to: maskEmail(to), subject, error: error.message }, "Échec envoi email");
       throw new Error(`Échec envoi email : ${error.message}`);
     }
     this.log.info({ event: "email_sent", to: maskEmail(to), subject }, "Email envoyé");
+    return data?.id ?? null;
   }
 }

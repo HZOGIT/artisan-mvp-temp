@@ -60,7 +60,7 @@ export interface SubmitContactInput {
 export interface SubmitContactDeps {
   readonly reader: Pick<IVitrinePublicReader, "getArtisanBySlug" | "getVitrineParams">;
   readonly rateLimiter: { check(key: string): Promise<boolean> };
-  readonly email: { send(message: { to: string; subject: string; body: string }): Promise<void> };
+  readonly email: { send(message: { to: string; subject: string; body: string }): Promise<string | null> };
   readonly notifications: { creer(ctx: TenantContext, input: { type: "info"; titre: string; message: string; lien: string }): Promise<unknown> };
   readonly leads: LeadRepo;
 }
