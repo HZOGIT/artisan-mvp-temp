@@ -189,7 +189,7 @@ async function handleCheckoutCompleted(deps: StripeWebhookDeps, session: Record<
   if (!token || !metadata.facture_id) return;
   const resolved = await deps.paymentWriter.resolvePaiement(token);
   if (!resolved) return;
-  await deps.paymentWriter.completeCheckout({
+  const { transitioned } = await deps.paymentWriter.completeCheckout({
     artisanId: resolved.artisanId,
     paiementId: resolved.paiementId,
     factureId: resolved.factureId,
@@ -208,7 +208,7 @@ async function handleCheckoutCompleted(deps: StripeWebhookDeps, session: Record<
   } catch { /* best-effort */ }
 
   const clientEmail = typeof metadata.customer_email === "string" && metadata.customer_email ? metadata.customer_email : null;
-  if (clientEmail && deps.onCheckoutCompletedEmail) {
+  if (clientEmail && deps.onCheckoutCompletedEmail && transitioned) {
     const clientId = typeof metadata.user_id === "string" ? Number(metadata.user_id) : 0;
     const clientName = typeof metadata.customer_name === "string" ? metadata.customer_name : "";
     const factureNumero = typeof metadata.numero_facture === "string" ? metadata.numero_facture : "";

@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { paiementsStripe, factures, clients, notifications } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withPublicToken, withTenant } from "../../../shared/db";
@@ -27,21 +27,23 @@ export class WebhookPaymentWriterDrizzle implements WebhookPaymentWriter {
     });
   }
 
-  completeCheckout(input: { artisanId: number; paiementId: number; factureId: number; stripePaymentIntentId: string; stripeChargeId?: string | null }): Promise<void> {
+  completeCheckout(input: { artisanId: number; paiementId: number; factureId: number; stripePaymentIntentId: string; stripeChargeId?: string | null }): Promise<{ transitioned: boolean }> {
     const ctx: TenantContext = { artisanId: input.artisanId, userId: 0 };
     return withTenant(this.db, ctx, async (tx) => {
       const now = new Date();
-      await tx
+      const updated = await tx
         .update(paiementsStripe)
         .set({ statut: "payee", stripePaymentIntentId: input.stripePaymentIntentId, paidAt: now, ...(input.stripeChargeId != null ? { stripeChargeId: input.stripeChargeId } : {}) })
-        .where(and(eq(paiementsStripe.id, input.paiementId), eq(paiementsStripe.artisanId, input.artisanId)));
+        .where(and(eq(paiementsStripe.id, input.paiementId), eq(paiementsStripe.artisanId, input.artisanId), ne(paiementsStripe.statut, "payee")))
+        .returning({ id: paiementsStripe.id });
+      if (!updated.length) return { transitioned: false };
 
       const [facture] = await tx
         .select({ numero: factures.numero, clientId: factures.clientId, totalTTC: factures.totalTTC })
         .from(factures)
         .where(and(eq(factures.id, input.factureId), eq(factures.artisanId, input.artisanId)))
         .limit(1);
-      if (!facture) return;
+      if (!facture) return { transitioned: true };
 
       await tx
         .update(factures)
@@ -69,6 +71,7 @@ export class WebhookPaymentWriterDrizzle implements WebhookPaymentWriter {
         lien: `/factures/${input.factureId}`,
       });
       await outboxEvent(tx, ctx, { action: "facture.payee", entityType: "facture", entityId: input.factureId, payload: { factureId: input.factureId } });
+      return { transitioned: true };
     });
   }
 

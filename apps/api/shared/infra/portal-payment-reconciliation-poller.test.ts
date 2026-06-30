@@ -15,7 +15,7 @@ const makePayment = (overrides: Partial<OrphanedPayment> = {}): OrphanedPayment 
 
 const makeWriter = (): WebhookPaymentWriter => ({
   resolvePaiement: vi.fn(),
-  completeCheckout: vi.fn(),
+  completeCheckout: vi.fn().mockResolvedValue({ transitioned: true }),
   failPaiement: vi.fn(),
 });
 
