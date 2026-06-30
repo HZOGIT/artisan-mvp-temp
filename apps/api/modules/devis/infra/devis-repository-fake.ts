@@ -26,6 +26,8 @@ export class FakeDevisRepository implements IDevisRepository {
   private ownedClients = new Set<string>();
   /** Noms clients pour listAcceptesAvecClient : clé `${artisanId}:${clientId}`. */
   private clientNames = new Map<string, { nom: string; prenom?: string }>();
+  /** Devis IDs ayant une signature acceptée (injectable via registerSignatureAccepteeForTest). */
+  private acceptedSignatureDevisIds = new Set<number>();
 
   /** Aide de test : déclare qu'un client appartient au tenant (pour valider ownsClient/anti-IDOR). */
   registerClient(artisanId: number, clientId: number): void {
@@ -43,6 +45,11 @@ export class FakeDevisRepository implements IDevisRepository {
    */
   setStatutForTest(id: number, statut: Devis["statut"]): void {
     this.devisStore = this.devisStore.map((d) => (d.id === id ? { ...d, statut } : d));
+  }
+
+  /** Aide de test : marque un devis comme ayant une signature client acceptée. */
+  registerSignatureAccepteeForTest(devisId: number): void {
+    this.acceptedSignatureDevisIds.add(devisId);
   }
 
   /** Aide de test : force la date du devis (ancienneté — relances automatiques). */
@@ -228,6 +235,10 @@ export class FakeDevisRepository implements IDevisRepository {
     this.lignesStore = this.lignesStore.filter((l) => l.id !== ligneId);
     this.recalculerTotaux(ligne.devisId);
     return true;
+  }
+
+  async signatureAccepteeParClient(_ctx: TenantContext, devisId: number): Promise<boolean> {
+    return this.acceptedSignatureDevisIds.has(devisId);
   }
 
   withDb(_db: unknown): FakeDevisRepository {

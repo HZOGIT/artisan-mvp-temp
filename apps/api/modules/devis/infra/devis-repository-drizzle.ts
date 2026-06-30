@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
-import { devis, devisLignes, clients, parametresArtisan } from "../../../../../drizzle/schema.pg";
+import { devis, devisLignes, clients, parametresArtisan, signaturesDevis } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
@@ -360,6 +360,17 @@ export class DevisRepositoryDrizzle implements IDevisRepository {
       .update(devis)
       .set({ totalHT: totaux.totalHT, totalTVA: totaux.totalTVA, totalTTC: totaux.totalTTC, updatedAt: new Date() })
       .where(eq(devis.id, devisId));
+  }
+
+  signatureAccepteeParClient(ctx: TenantContext, devisId: number): Promise<boolean> {
+    return withTenant(this.db, ctx, async (tx) => {
+      if (!(await this.ownsDevis(tx, ctx, devisId))) return false;
+      const [row] = await tx
+        .select({ n: sql<number>`count(*)::int` })
+        .from(signaturesDevis)
+        .where(and(eq(signaturesDevis.devisId, devisId), eq(signaturesDevis.statut, "accepte")));
+      return (row?.n ?? 0) > 0;
+    });
   }
 
   /** Le devis appartient-il au tenant ? (RLS + filtre artisanId) */
