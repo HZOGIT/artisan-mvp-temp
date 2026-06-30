@@ -1363,8 +1363,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   /** Cron RGPD Art. 17 — purge définitive des comptes en attente de suppression depuis > 30j. */
   app.register(rgpdCronPlugin, { db: getDbHandle().db });
 
-  /** Cron RGPD Art. 5(1)(e) — rétention limitée multi-tables (prospects, sessions, events, devices, LLM payloads). */
-  app.register(retentionPurgeCronPlugin, { db: getDbHandle().db });
+  /** Cron RGPD Art. 5(1)(e) — rétention limitée multi-tables (prospects, sessions, events, devices, LLM payloads). Owner handle requis : plusieurs tables ont FORCE ROW LEVEL SECURITY, app_tenant sans contexte tenant renverrait 0 lignes. */
+  app.register(retentionPurgeCronPlugin, { db: getOwnerDbHandle().db });
 
   /*
    * Cron notifications — tick toutes les heures : rappels factures en retard (idempotent)

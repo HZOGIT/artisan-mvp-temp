@@ -3,14 +3,15 @@ import { Pool } from "pg";
 import { createDbClient } from "../db";
 import { runRetentionPurge } from "./retention-purge-cron";
 
-const URL = process.env.DATABASE_URL;
+const OWNER_URL = process.env.DATABASE_URL;
+const APP_URL = process.env.APP_DATABASE_URL;
 
 const ARTISAN_ID = 9_981_002;
 const USER_ID = 9_981_002;
 
-describe.skipIf(!URL)("runRetentionPurge — anti-régression RGPD Art. 5(1)(e) (PG)", () => {
-  const admin = new Pool({ connectionString: URL });
-  const { db, close } = createDbClient(URL!);
+describe.skipIf(!OWNER_URL)("runRetentionPurge — anti-régression RGPD Art. 5(1)(e) (PG)", () => {
+  const admin = new Pool({ connectionString: OWNER_URL });
+  const { db: ownerDb, close: closeOwner } = createDbClient(OWNER_URL!);
 
   const cleanup = async () => {
     await admin.query(`DELETE FROM demandes_contact WHERE "artisanId" = $1`, [ARTISAN_ID]);
@@ -21,11 +22,11 @@ describe.skipIf(!URL)("runRetentionPurge — anti-régression RGPD Art. 5(1)(e) 
   beforeAll(cleanup);
   afterAll(async () => {
     await cleanup();
-    await close();
+    await closeOwner();
     await admin.end();
   });
 
-  it("supprime les prospects non convertis expirés (> 3 ans) et conserve les récents", async () => {
+  it("supprime les prospects non convertis expirés (> 3 ans) via rôle owner (RLS bypass)", async () => {
     const oldDate = new Date(Date.now() - 4 * 365 * 24 * 3600 * 1000);
     const recentDate = new Date(Date.now() - 30 * 24 * 3600 * 1000);
 
@@ -45,7 +46,7 @@ describe.skipIf(!URL)("runRetentionPurge — anti-régression RGPD Art. 5(1)(e) 
       [ARTISAN_ID, oldDate],
     );
 
-    await runRetentionPurge(db);
+    await runRetentionPurge(ownerDb);
 
     const { rows } = await admin.query(
       `SELECT nom FROM demandes_contact WHERE "artisanId" = $1 ORDER BY nom`,
@@ -72,14 +73,13 @@ describe.skipIf(!URL)("runRetentionPurge — anti-régression RGPD Art. 5(1)(e) 
       [recent],
     );
 
-    await runRetentionPurge(db);
+    await runRetentionPurge(ownerDb);
 
     const { rows } = await admin.query(
       `SELECT subject, html FROM email_outbox WHERE to_email = 'purge-test@example.com' ORDER BY subject`,
     );
     const old_row = rows.find((r: { subject: string }) => r.subject === "Old");
     const recent_row = rows.find((r: { subject: string }) => r.subject === "Recent");
-
     expect(old_row?.html).toBe("");
     expect(recent_row?.html).toBe("<p>PII récente</p>");
   });
@@ -99,7 +99,7 @@ describe.skipIf(!URL)("runRetentionPurge — anti-régression RGPD Art. 5(1)(e) 
       [USER_ID, ARTISAN_ID, recentActivity],
     );
 
-    await runRetentionPurge(db);
+    await runRetentionPurge(ownerDb);
 
     const { rows } = await admin.query(
       `SELECT device_fingerprint FROM devices WHERE artisan_id = $1`,
@@ -110,7 +110,30 @@ describe.skipIf(!URL)("runRetentionPurge — anti-régression RGPD Art. 5(1)(e) 
     expect(fps).toContain("fp-recent-test");
   });
 
-  it("est idempotent — deuxième run sans erreur, même résultat", async () => {
-    await expect(runRetentionPurge(db)).resolves.toBeUndefined();
+  it("est idempotent — deuxième run sans erreur ni suppression excessive", async () => {
+    await expect(runRetentionPurge(ownerDb)).resolves.toBeUndefined();
+  });
+
+  it.skipIf(!APP_URL)("app_tenant sans contexte tenant : ne purge PAS les tables RLS (anti-régression false-green)", async () => {
+    const oldDate = new Date(Date.now() - 4 * 365 * 24 * 3600 * 1000);
+    await admin.query(
+      `INSERT INTO demandes_contact ("artisanId", nom, email, statut, "createdAt", "updatedAt")
+       VALUES ($1, 'RLS Test Prospect', 'rls@example.com', 'perdu', $2, $2)`,
+      [ARTISAN_ID, oldDate],
+    );
+
+    const { db: appTenantDb, close: closeApp } = createDbClient(APP_URL!);
+    try {
+      await runRetentionPurge(appTenantDb);
+    } finally {
+      await closeApp();
+    }
+
+    const { rows } = await admin.query(
+      `SELECT nom FROM demandes_contact WHERE "artisanId" = $1 AND nom = 'RLS Test Prospect'`,
+      [ARTISAN_ID],
+    );
+    expect(rows).toHaveLength(1);
+    await admin.query(`DELETE FROM demandes_contact WHERE "artisanId" = $1 AND nom = 'RLS Test Prospect'`, [ARTISAN_ID]);
   });
 });
