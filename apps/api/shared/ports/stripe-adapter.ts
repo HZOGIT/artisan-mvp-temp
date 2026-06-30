@@ -1,11 +1,16 @@
-import type { CreateCustomerParams, CreateInvoiceCheckoutParams, StripePort, StripeWebhookEvent } from "./stripe";
+import type { CheckoutSessionStatus, CreateCustomerParams, CreateInvoiceCheckoutParams, StripePort, StripeWebhookEvent } from "./stripe";
 import { getSecret } from "../config/secrets";
 
 const STRIPE_MODULE = "stripe";
 
 type StripeSDK = {
   customers: { create(p: unknown): Promise<{ id: string }> };
-  checkout: { sessions: { create(p: unknown): Promise<{ id: string; url: string | null }> } };
+  checkout: {
+    sessions: {
+      create(p: unknown): Promise<{ id: string; url: string | null }>;
+      retrieve(id: string): Promise<{ payment_status: string; payment_intent: string | { id: string } | null }>;
+    };
+  };
   webhooks: { constructEvent(payload: Buffer, signature: string, secret: string): StripeWebhookEvent };
 };
 
@@ -29,6 +34,19 @@ export class StripeAdapter implements StripePort {
   async createCustomer(p: CreateCustomerParams): Promise<{ id: string }> {
     const s = await this.sdk();
     return s.customers.create({ email: p.email || undefined, name: p.name, metadata: p.metadata });
+  }
+
+  async retrieveCheckoutSession(sessionId: string): Promise<CheckoutSessionStatus | null> {
+    try {
+      const s = await this.sdk();
+      const session = await s.checkout.sessions.retrieve(sessionId);
+      const piId = typeof session.payment_intent === "string"
+        ? session.payment_intent
+        : (session.payment_intent as { id: string } | null)?.id ?? null;
+      return { paymentStatus: session.payment_status, paymentIntentId: piId };
+    } catch {
+      return null;
+    }
   }
 
   async createInvoiceCheckout(p: CreateInvoiceCheckoutParams): Promise<{ url: string | null; sessionId: string }> {
@@ -86,5 +104,10 @@ export class FakeStripePort implements StripePort {
     this.invoiceCheckouts.push(p);
     const id = `cs_invoice_${++this.seq}`;
     return { url: `https://checkout.stripe.test/${id}`, sessionId: id };
+  }
+
+  public sessionStatuses: Map<string, CheckoutSessionStatus> = new Map();
+  async retrieveCheckoutSession(sessionId: string): Promise<CheckoutSessionStatus | null> {
+    return this.sessionStatuses.get(sessionId) ?? { paymentStatus: "unpaid", paymentIntentId: null };
   }
 }

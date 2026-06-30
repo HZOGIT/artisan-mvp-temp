@@ -24,8 +24,14 @@ export interface CreateInvoiceCheckoutParams {
   readonly portalToken: string;
 }
 
+export interface CheckoutSessionStatus {
+  readonly paymentStatus: string;
+  readonly paymentIntentId: string | null;
+}
+
 export interface StripePort {
   constructEvent(rawBody: Buffer, signature: string, secret: string): Promise<StripeWebhookEvent>;
   createCustomer(params: CreateCustomerParams): Promise<{ id: string }>;
   createInvoiceCheckout(params: CreateInvoiceCheckoutParams): Promise<{ url: string | null; sessionId: string }>;
+  retrieveCheckoutSession(sessionId: string): Promise<CheckoutSessionStatus | null>;
 }

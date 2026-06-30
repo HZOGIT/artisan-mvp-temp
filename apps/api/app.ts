@@ -175,6 +175,7 @@ import { createRevisionIndexationJob } from "./modules/contrats-maintenance/appl
 import { paOutboxDrainerPlugin } from "./shared/infra/pa-outbox-drainer";
 import { paInboundPollerPlugin } from "./shared/infra/pa-inbound-poller";
 import { paReconciliationPollerPlugin } from "./shared/infra/pa-reconciliation-poller";
+import { portalPaymentReconciliationPollerPlugin } from "./shared/infra/portal-payment-reconciliation-poller";
 import { eventOutboxDrainerPlugin } from "./shared/events/outbox-drainer";
 import { geoPurgeCronPlugin } from "./shared/infra/geo-purge-cron";
 import { rgpdCronPlugin } from "./shared/infra/rgpd-cron";
@@ -1372,6 +1373,16 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   app.register(paInboundPollerPlugin, { pa: einvoicing.pa, db: getDbHandle().db, dbUrl: getDbHandle().pool.options.connectionString ?? "" });
   /** Poller PA réconciliation — toutes les heures, rattrape les statuts manqués (SLA < 24h réglementaire). */
   app.register(paReconciliationPollerPlugin, { pa: einvoicing.pa, db: getDbHandle().db, dbUrl: getDbHandle().pool.options.connectionString ?? "" });
+  /** Poller paiements portail orphelins — toutes les 5 min, rattrape les sessions Stripe payées non réconciliées par webhook. */
+  app.register(portalPaymentReconciliationPollerPlugin, {
+    stripe: deps.stripePort ?? new StripeAdapter(),
+    writer: new WebhookPaymentWriterDrizzle(getDbHandle().db),
+    dbUrl: getDbHandle().pool.options.connectionString ?? "",
+    genererEcritures: async (artisanId: number, factureId: number) => {
+      await compta.genererEcrituresVente({ artisanId, userId: 0 }, factureId);
+      await compta.genererEcrituresEncaissement({ artisanId, userId: 0 }, factureId);
+    },
+  });
   app.register(eventOutboxDrainerPlugin, { db: getDbHandle().db });
 
   /** Cron CNIL — purge des positions GPS expirées toutes les 6 h (rétention 8 h par position). */
@@ -1749,11 +1760,17 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   /** Expose le routeur racine assemblé (introspection : garde-fou de cohérence des domaines montés). */
   app.decorate("appRouter", appRouter);
 
-  /** Auto-setup webhook Stripe au démarrage (idempotent — skip si endpoint déjà présent). */
+  /** Auto-setup webhook Stripe au démarrage (idempotent — skip si endpoint déjà présent). Fail-closed si clé présente mais Stripe refuse. */
   app.addHook("onReady", async () => {
     const appUrl = deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com";
     const webhookUrl = `${appUrl}/api/stripe/webhook`;
-    await ensureStripeWebhookEndpoint(process.env.STRIPE_SECRET_KEY ?? "", webhookUrl, app.log as unknown as AppLogger);
+    const newSecret = await ensureStripeWebhookEndpoint(process.env.STRIPE_SECRET_KEY ?? "", webhookUrl, app.log as unknown as AppLogger);
+    if (newSecret) {
+      const envSecret = deps.stripeWebhookSecret ?? process.env.STRIPE_WEBHOOK_SECRET ?? "";
+      if (newSecret !== envSecret) {
+        throw new Error(`Webhook Stripe créé avec un nouveau secret. Mettez à jour STRIPE_WEBHOOK_SECRET puis relancez le déploiement. Secret : ${newSecret}`);
+      }
+    }
   });
 
   return app;
