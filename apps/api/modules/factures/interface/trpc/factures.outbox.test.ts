@@ -33,18 +33,78 @@ describe.skipIf(!URL)("factures.outbox atomicité (L2 — Drizzle + PG local)", 
   const app = createDbClient(APP_URL!);
   let artisanA = 0;
   let clientA = 0;
+  let factureEnvoyeeId = 0;
+  let factureEnvoyee2Id = 0;
+  let factureEnvoyee3Id = 0;
+  let devisConvertirId = 0;
+  let devisAcompteId = 0;
+  let devisSoldeId = 0;
+  let devisSituationId = 0;
   let server: ReturnType<typeof buildApp>;
 
   beforeAll(async () => {
     await admin.query('delete from event_outbox where "artisanId" in (select id from artisans where "userId"=$1)', [UA]);
+    await admin.query('delete from reglements where "factureId" in (select id from factures where "artisanId" in (select id from artisans where "userId"=$1))', [UA]);
     await admin.query('delete from factures_lignes where "factureId" in (select id from factures where "artisanId" in (select id from artisans where "userId"=$1))', [UA]);
     await admin.query('delete from factures where "artisanId" in (select id from artisans where "userId"=$1)', [UA]);
+    await admin.query('delete from devis_lignes where "devisId" in (select id from devis where "artisanId" in (select id from artisans where "userId"=$1))', [UA]);
+    await admin.query('delete from devis where "artisanId" in (select id from artisans where "userId"=$1)', [UA]);
     await admin.query('delete from clients where "artisanId" in (select id from artisans where "userId"=$1)', [UA]);
     await admin.query('delete from artisans where "userId"=$1', [UA]);
     await admin.query("delete from users where id=$1", [UA]);
     await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [UA, `u${UA}@t.fr`]);
     artisanA = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UA])).rows[0].id;
     clientA = (await admin.query('insert into clients ("artisanId", nom) values ($1,$2) returning id', [artisanA, "Client Outbox"])).rows[0].id;
+
+    factureEnvoyeeId = (await admin.query(
+      'insert into factures ("artisanId","clientId",statut,"typeDocument","totalTTC","totalHT") values ($1,$2,\'envoyee\',\'facture\',\'1000.00\',\'833.33\') returning id',
+      [artisanA, clientA],
+    )).rows[0].id;
+    factureEnvoyee2Id = (await admin.query(
+      'insert into factures ("artisanId","clientId",statut,"typeDocument","totalTTC","totalHT") values ($1,$2,\'envoyee\',\'facture\',\'1000.00\',\'833.33\') returning id',
+      [artisanA, clientA],
+    )).rows[0].id;
+    factureEnvoyee3Id = (await admin.query(
+      'insert into factures ("artisanId","clientId",statut,"typeDocument","totalTTC","totalHT") values ($1,$2,\'envoyee\',\'facture\',\'1000.00\',\'833.33\') returning id',
+      [artisanA, clientA],
+    )).rows[0].id;
+
+    devisConvertirId = (await admin.query(
+      'insert into devis ("artisanId","clientId",numero,statut,"totalTTC","totalHT") values ($1,$2,\'DEV-C-001\',\'accepte\',\'120.00\',\'100.00\') returning id',
+      [artisanA, clientA],
+    )).rows[0].id;
+    await admin.query(
+      'insert into devis_lignes ("devisId",designation,"prixUnitaireHT",quantite,"montantHT","montantTTC","montantTVA") values ($1,\'Prestation\',\'100.00\',\'1.00\',\'100.00\',\'120.00\',\'20.00\')',
+      [devisConvertirId],
+    );
+
+    devisAcompteId = (await admin.query(
+      'insert into devis ("artisanId","clientId",numero,statut,"totalTTC","totalHT") values ($1,$2,\'DEV-A-001\',\'accepte\',\'120.00\',\'100.00\') returning id',
+      [artisanA, clientA],
+    )).rows[0].id;
+    await admin.query(
+      'insert into devis_lignes ("devisId",designation,"prixUnitaireHT",quantite,"montantHT","montantTTC","montantTVA") values ($1,\'Prestation\',\'100.00\',\'1.00\',\'100.00\',\'120.00\',\'20.00\')',
+      [devisAcompteId],
+    );
+
+    devisSoldeId = (await admin.query(
+      'insert into devis ("artisanId","clientId",numero,statut,"totalTTC","totalHT") values ($1,$2,\'DEV-S-001\',\'accepte\',\'120.00\',\'100.00\') returning id',
+      [artisanA, clientA],
+    )).rows[0].id;
+    await admin.query(
+      'insert into devis_lignes ("devisId",designation,"prixUnitaireHT",quantite,"montantHT","montantTTC","montantTVA") values ($1,\'Prestation\',\'100.00\',\'1.00\',\'100.00\',\'120.00\',\'20.00\')',
+      [devisSoldeId],
+    );
+
+    devisSituationId = (await admin.query(
+      'insert into devis ("artisanId","clientId",numero,statut,"totalTTC","totalHT") values ($1,$2,\'DEV-SIT-001\',\'accepte\',\'120.00\',\'100.00\') returning id',
+      [artisanA, clientA],
+    )).rows[0].id;
+    await admin.query(
+      'insert into devis_lignes ("devisId",designation,"prixUnitaireHT",quantite,"montantHT","montantTTC","montantTVA") values ($1,\'Prestation\',\'100.00\',\'1.00\',\'100.00\',\'120.00\',\'20.00\')',
+      [devisSituationId],
+    );
+
     const repo = new FactureRepositoryDrizzle(app.db);
     server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(app.db), factureRepo: repo, facturesDb: app.db });
   });
@@ -52,8 +112,11 @@ describe.skipIf(!URL)("factures.outbox atomicité (L2 — Drizzle + PG local)", 
   afterAll(async () => {
     await server.close();
     await admin.query('delete from event_outbox where "artisanId"=$1', [artisanA]);
+    await admin.query('delete from reglements where "factureId" in (select id from factures where "artisanId"=$1)', [artisanA]);
     await admin.query('delete from factures_lignes where "factureId" in (select id from factures where "artisanId"=$1)', [artisanA]);
     await admin.query('delete from factures where "artisanId"=$1', [artisanA]);
+    await admin.query('delete from devis_lignes where "devisId" in (select id from devis where "artisanId"=$1)', [artisanA]);
+    await admin.query('delete from devis where "artisanId"=$1', [artisanA]);
     await admin.query('delete from clients where "artisanId"=$1', [artisanA]);
     await admin.query('delete from artisans where "userId"=$1', [UA]);
     await admin.query("delete from users where id=$1", [UA]);
@@ -97,5 +160,123 @@ describe.skipIf(!URL)("factures.outbox atomicité (L2 — Drizzle + PG local)", 
     const outboxAfter = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
     expect(facturesAfter).toBe(facturesBefore);
     expect(outboxAfter).toBe(outboxBefore);
+  });
+
+  it("outbox atomicité — delete → facture.supprimee co-écrit dans event_outbox", async () => {
+    const tA = await token(UA);
+    const res = await callMutation(server, "factures.create", { clientId: clientA }, tA);
+    expect(res.statusCode).toBe(200);
+    const factureId = res.json().result.data.id as number;
+    const before = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+    const delRes = await callMutation(server, "factures.delete", { id: factureId }, tA);
+    expect(delRes.statusCode).toBe(200);
+    const row = (await admin.query("select * from event_outbox where \"entityId\"=$1 and action='facture.supprimee'", [factureId])).rows[0];
+    expect(row).toBeDefined();
+    expect(row.entityType).toBe("facture");
+    const after = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+    expect(after).toBe(before + 1);
+  });
+
+  it("outbox atomicité — marquerEnRetard → facture.en_retard co-écrit dans event_outbox", async () => {
+    const tA = await token(UA);
+    const before = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+    const res = await callMutation(server, "factures.marquerEnRetard", { id: factureEnvoyeeId }, tA);
+    expect(res.statusCode).toBe(200);
+    const row = (await admin.query("select * from event_outbox where \"entityId\"=$1 and action='facture.en_retard'", [factureEnvoyeeId])).rows[0];
+    expect(row).toBeDefined();
+    expect(row.entityType).toBe("facture");
+    const after = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+    expect(after).toBe(before + 1);
+  });
+
+  it("outbox atomicité — convertirDepuisDevis → devis.converti_en_facture co-écrit dans event_outbox", async () => {
+    const tA = await token(UA);
+    const before = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+    const res = await callMutation(server, "factures.convertirDepuisDevis", { devisId: devisConvertirId }, tA);
+    expect(res.statusCode).toBe(200);
+    const factureId = res.json().result.data.id as number;
+    const row = (await admin.query("select * from event_outbox where \"entityId\"=$1 and action='devis.converti_en_facture'", [devisConvertirId])).rows[0];
+    expect(row).toBeDefined();
+    expect(row.entityType).toBe("devis");
+    expect((row.payload as { factureId?: number }).factureId).toBe(factureId);
+    const after = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+    expect(after).toBe(before + 1);
+  });
+
+  it("outbox atomicité — facturerAcompte → facture.acompte_creee co-écrit dans event_outbox", async () => {
+    const tA = await token(UA);
+    const before = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+    const res = await callMutation(server, "factures.facturerAcompte", { devisId: devisAcompteId, montant: "60.00" }, tA);
+    expect(res.statusCode).toBe(200);
+    const factureId = res.json().result.data.id as number;
+    const row = (await admin.query("select * from event_outbox where \"entityId\"=$1 and action='facture.acompte_creee'", [factureId])).rows[0];
+    expect(row).toBeDefined();
+    expect(row.entityType).toBe("facture");
+    expect((row.payload as { devisId?: number }).devisId).toBe(devisAcompteId);
+    const after = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+    expect(after).toBe(before + 1);
+  });
+
+  it("outbox atomicité — facturerSolde → facture.solde_creee co-écrit dans event_outbox", async () => {
+    const tA = await token(UA);
+    const before = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+    const res = await callMutation(server, "factures.facturerSolde", { devisId: devisSoldeId }, tA);
+    expect(res.statusCode).toBe(200);
+    const factureId = res.json().result.data.id as number;
+    const row = (await admin.query("select * from event_outbox where \"entityId\"=$1 and action='facture.solde_creee'", [factureId])).rows[0];
+    expect(row).toBeDefined();
+    expect(row.entityType).toBe("facture");
+    expect((row.payload as { devisId?: number }).devisId).toBe(devisSoldeId);
+    const after = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+    expect(after).toBe(before + 1);
+  });
+
+  it("outbox atomicité — facturerSituation → facture.situation_facturee co-écrit dans event_outbox", async () => {
+    const tA = await token(UA);
+    const before = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+    const res = await callMutation(server, "factures.facturerSituation", { devisId: devisSituationId, pourcentageCumule: 50 }, tA);
+    expect(res.statusCode).toBe(200);
+    const factureId = res.json().result.data.id as number;
+    const row = (await admin.query("select * from event_outbox where \"entityId\"=$1 and action='facture.situation_facturee'", [factureId])).rows[0];
+    expect(row).toBeDefined();
+    expect(row.entityType).toBe("facture");
+    expect((row.payload as { devisId?: number }).devisId).toBe(devisSituationId);
+    const after = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+    expect(after).toBe(before + 1);
+  });
+
+  it("outbox atomicité — creerAvoir → facture.avoir_creee co-écrit dans event_outbox", async () => {
+    const tA = await token(UA);
+    const before = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+    const res = await callMutation(server, "factures.creerAvoir", {
+      factureOrigineId: factureEnvoyee2Id,
+      lignes: [{ designation: "Remboursement", quantite: "1.00", prixUnitaireHT: "50.00" }],
+    }, tA);
+    expect(res.statusCode).toBe(200);
+    const avoirId = res.json().result.data.id as number;
+    const row = (await admin.query("select * from event_outbox where \"entityId\"=$1 and action='facture.avoir_creee'", [avoirId])).rows[0];
+    expect(row).toBeDefined();
+    expect(row.entityType).toBe("facture");
+    expect((row.payload as { factureOrigineId?: number }).factureOrigineId).toBe(factureEnvoyee2Id);
+    const after = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+    expect(after).toBe(before + 1);
+  });
+
+  it("outbox atomicité — ajouterReglement → facture.reglement_ajoute co-écrit dans event_outbox", async () => {
+    const tA = await token(UA);
+    const before = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+    const res = await callMutation(server, "factures.ajouterReglement", {
+      factureId: factureEnvoyee3Id,
+      montant: "50.00",
+      date: "2026-01-15",
+      mode: "virement",
+    }, tA);
+    expect(res.statusCode).toBe(200);
+    const row = (await admin.query("select * from event_outbox where \"entityId\"=$1 and action='facture.reglement_ajoute'", [factureEnvoyee3Id])).rows[0];
+    expect(row).toBeDefined();
+    expect(row.entityType).toBe("facture");
+    expect((row.payload as { montant?: string }).montant).toBe("50.00");
+    const after = Number((await admin.query("select count(*) from event_outbox")).rows[0].count);
+    expect(after).toBe(before + 1);
   });
 });

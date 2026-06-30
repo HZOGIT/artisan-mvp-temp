@@ -193,8 +193,11 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
     delete: facturesSupprimer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        await supprimerFacture(repo, ctx.tenant, input.id);
-        return { success: true };
+        return withOutbox(db, repo, async (r, tx) => {
+          await supprimerFacture(r, ctx.tenant, input.id);
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "facture.supprimee", entityType: "facture", entityId: input.id, payload: {} });
+          return { success: true };
+        });
       }),
 
     addLigne: facturesCreer
@@ -253,15 +256,24 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
 
     marquerEnRetard: facturesCreer
       .input(z.object({ id: z.number().int() }))
-      .mutation(({ ctx, input }) => changerStatutFacture(repo, ctx.tenant, input.id, "en_retard")),
+      .mutation(({ ctx, input }) =>
+        withOutbox(db, repo, async (r, tx) => {
+          const result = await changerStatutFacture(r, ctx.tenant, input.id, "en_retard");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "facture.en_retard", entityType: "facture", entityId: input.id, payload: {} });
+          return result;
+        })
+      ),
 
     /** Convertir un devis accepté en facture (cross-domaine : lit le devis via le reader injecté). */
     convertirDepuisDevis: facturesCreer
       .input(z.object({ devisId: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await convertirDevisEnFacture(repo, devisReader, ctx.tenant, input.devisId);
-        ctx.log.info({ event: "facture_depuis_devis", factureId: result.id, devisId: input.devisId }, "Devis converti en facture");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await convertirDevisEnFacture(r, devisReader, ctx.tenant, input.devisId);
+          ctx.log.info({ event: "facture_depuis_devis", factureId: result.id, devisId: input.devisId }, "Devis converti en facture");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "devis.converti_en_facture", entityType: "devis", entityId: input.devisId, payload: { factureId: result.id } });
+          return result;
+        });
       }),
 
     /** Créer une facture d'acompte (estAcompte=true) depuis un devis accepté (montant fixe TTC). */
@@ -271,18 +283,24 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
         montant: decimal,
       }))
       .mutation(async ({ ctx, input }) => {
-        const result = await facturerAcompte(repo, devisReader, ctx.tenant, input);
-        ctx.log.info({ event: "acompte_facture", factureId: result.id, devisId: input.devisId, montant: input.montant }, "Facture d'acompte créée");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await facturerAcompte(r, devisReader, ctx.tenant, input);
+          ctx.log.info({ event: "acompte_facture", factureId: result.id, devisId: input.devisId, montant: input.montant }, "Facture d'acompte créée");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "facture.acompte_creee", entityType: "facture", entityId: result.id, payload: { devisId: input.devisId, montant: input.montant } });
+          return result;
+        });
       }),
 
     /** Créer la facture de solde (lignes devis + déductions acomptes) depuis un devis accepté. */
     facturerSolde: facturesCreer
       .input(z.object({ devisId: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await facturerSolde(repo, devisReader, ctx.tenant, input);
-        ctx.log.info({ event: "solde_facture", factureId: result.id, devisId: input.devisId }, "Facture de solde créée");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await facturerSolde(r, devisReader, ctx.tenant, input);
+          ctx.log.info({ event: "solde_facture", factureId: result.id, devisId: input.devisId }, "Facture de solde créée");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "facture.solde_creee", entityType: "facture", entityId: result.id, payload: { devisId: input.devisId } });
+          return result;
+        });
       }),
 
     /** Facturer une situation de travaux sur un devis accepté (avancement partiel). */
@@ -292,21 +310,32 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
         pourcentageCumule: z.number().min(0.01).max(100),
       }))
       .mutation(async ({ ctx, input }) => {
-        const result = await facturerSituation(repo, devisReader, ctx.tenant, input);
-        ctx.log.info({ event: "situation_facturee", factureId: result.id, devisId: input.devisId, pourcentage: input.pourcentageCumule }, "Situation de travaux facturée");
-        return result;
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await facturerSituation(r, devisReader, ctx.tenant, input);
+          ctx.log.info({ event: "situation_facturee", factureId: result.id, devisId: input.devisId, pourcentage: input.pourcentageCumule }, "Situation de travaux facturée");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "facture.situation_facturee", entityType: "facture", entityId: result.id, payload: { devisId: input.devisId, pourcentage: input.pourcentageCumule } });
+          return result;
+        });
       }),
 
     /** Émettre un avoir (note de crédit) sur une facture d'origine — montants négatifs. */
     creerAvoir: facturesCreer.input(avoirInputSchema).mutation(({ ctx, input }) => {
       const { factureOrigineId, ...data } = input;
-      return creerAvoir(repo, ctx.tenant, factureOrigineId, data, compta);
+      return withOutbox(db, repo, async (r, tx) => {
+        const result = await creerAvoir(r, ctx.tenant, factureOrigineId, data, compta);
+        if (tx) await outboxEvent(tx, ctx.tenant, { action: "facture.avoir_creee", entityType: "facture", entityId: result.id, payload: { factureOrigineId } });
+        return result;
+      });
     }),
 
     /** Alias de surface (parité client `trpc.factures.createAvoir`) : même use-case que `creerAvoir`. */
     createAvoir: facturesCreer.input(avoirInputSchema).mutation(({ ctx, input }) => {
       const { factureOrigineId, ...data } = input;
-      return creerAvoir(repo, ctx.tenant, factureOrigineId, data, compta);
+      return withOutbox(db, repo, async (r, tx) => {
+        const result = await creerAvoir(r, ctx.tenant, factureOrigineId, data, compta);
+        if (tx) await outboxEvent(tx, ctx.tenant, { action: "facture.avoir_creee", entityType: "facture", entityId: result.id, payload: { factureOrigineId } });
+        return result;
+      });
     }),
 
     /** Enregistrement d'un paiement (partiel ou soldant) — passe `payee` si soldée. */
@@ -346,16 +375,19 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
         note: z.string().max(5000).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const result = await ajouterReglement(repo, ctx.tenant, {
-          factureId: input.factureId,
-          montant: input.montant,
-          date: toDate(input.date) as Date,
-          mode: input.mode,
-          reference: input.reference ?? null,
-          note: input.note ?? null,
+        return withOutbox(db, repo, async (r, tx) => {
+          const result = await ajouterReglement(r, ctx.tenant, {
+            factureId: input.factureId,
+            montant: input.montant,
+            date: toDate(input.date) as Date,
+            mode: input.mode,
+            reference: input.reference ?? null,
+            note: input.note ?? null,
+          });
+          ctx.log.info({ event: "reglement_ajoute", factureId: input.factureId, montant: Number(input.montant), mode: input.mode }, "Reglement ajouté");
+          if (tx) await outboxEvent(tx, ctx.tenant, { action: "facture.reglement_ajoute", entityType: "facture", entityId: input.factureId, payload: { montant: input.montant, mode: input.mode } });
+          return result;
         });
-        ctx.log.info({ event: "reglement_ajoute", factureId: input.factureId, montant: Number(input.montant), mode: input.mode }, "Reglement ajouté");
-        return result;
       }),
 
     /*
