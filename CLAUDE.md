@@ -459,7 +459,7 @@ durable est **incomplet**.
      supprime l'en-tête `host`, donc le backend bâtissait `success_url` sur l'hôte **interne**
      (`staging-newstack`) → Stripe renvoyait le navigateur vers le **backend**. Fix : le dispatcher
      pose `x-forwarded-host`/`x-forwarded-proto` (hôte public) et le backend les privilégie.
-2. **Cookie d'auth = `token`** (PAS `auth_token`) — cf. `src/interface/http/auth-cookie.ts`.
+2. **Cookie d'auth = `token`** (PAS `auth_token`) — cf. `apps/api/interface/http/auth-cookie.ts`.
 3. **Vérifie au plus près du vrai chemin** : passe par l'edge public (`https://staging.operioz.com`),
    pas seulement par le backend en direct, pour inclure dispatcher + en-têtes + service worker.
 4. **Confirme la correction de bout en bout** (ex. récupérer la session Stripe via l'API pour lire
@@ -467,29 +467,12 @@ durable est **incomplet**.
 5. **Ajoute un garde-fou** (test anti-régression) qui reproduit le déclencheur réel — long lot tRPC,
    `x-forwarded-host` qui prime sur `host`, etc.
 
-## Archivage électronique 10 ans (OPE-295 — Investigation en cours)
+## Archivage électronique 10 ans (OPE-295 — ✅ TRANCHÉ)
 
-**Obligation légale** (Code de commerce Art. L.123-28-1, expert §11.7) : toute facture électronique doit être archivée à **valeur probante 10 ans** (Factur-X + PDF/A-3 + horodatage + piste d'audit).
+**Décision (OPE-899, 2026-06-30) : SuperPDP archive 10 ans à intégrité garantie. SAE tiers non requis.**
+→ Voir findings complets : `docs/architecture/ope-295-archivage-superpdp-findings.md`
 
-**Statut** : SuperPDP (PA choisie) **ne clarifie PAS publiquement** s'il archive 10 ans. Investigation en cours (OPE-295).
-
-### Stratégie et décision
-- 👉 Docs : [`docs/architecture/ope-295-archivage-superpdp-findings.md`](docs/architecture/ope-295-archivage-superpdp-findings.md)
-
-### Scénarios
-| Cas | Action |
-|-----|--------|
-| **SuperPDP conforme 10 ans** | Noop — archivage PA seule, doc seule |
-| **SuperPDP NON-conforme** | Intégrer SAE tiers (ADSN recommandé, voir plan implémentation) |
-| **Réponse ambiguë** | Prudence → ajouter SAE en parallèle |
-
-### Implémentation SAE tiers (si requis)
-- 👉 Plan détaillé : [`docs/architecture/ope-295-sae-integration-plan.md`](docs/architecture/ope-295-sae-integration-plan.md)
-- Abstraction `ArchivagePort` (symétrique `PaPort`)
-- Adapter ADSN (recommandé : 0,01€/doc, REST API, NF Z42-013 en cours)
-- Non-bloquant (parallèle PA) — archivage après émission SuperPDP
-
-**Timeline** : attendre réponse SuperPDP (48h) → décider SAE oui/non → implémenter si requis (~1 semaine).
+OPE-295 clos.
 
 ## Boucle autonome de tests (cron 10 min) — méthode de travail
 
@@ -508,7 +491,7 @@ autres agents ») — non redétaillée ici.
   itération avance la colonne d'UNE feature (1–3 fichiers). Exécution contre le **PG local bootstrappé**
   (`DATABASE_URL=postgres://artisan_user:artisan_password@localhost:5432/artisan_mvp`, rôle `app_tenant`
   + RLS) → commit chirurgical sur `staging`. Détail/ordre : `docs/testing/journal-tests-manquants.md`.
-- **Déployer uniquement un fix `src/`** (`./scripts/deploy-backend.sh`) ; un ajout de test
+- **Déployer uniquement un fix `apps/api/`** (`./scripts/deploy-backend.sh`) ; un ajout de test
   pur ne change pas le runtime → pas de déploiement.
 - **Documenter sur 4 canaux** : (1) le journal `.md`, (2) **Linear** — issue parent de suivi (OPE-318)
   + **une issue enfant par itération** (« test(\<module\>): … », Done), (3) **ntfy**
