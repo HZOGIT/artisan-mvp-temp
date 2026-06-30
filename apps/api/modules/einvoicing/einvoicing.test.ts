@@ -93,6 +93,39 @@ describe("einvoicing.emettre", () => {
   });
 });
 
+describe("einvoicing.onboardEntity", () => {
+  it("lève ValidationError si paDisponible = false", async () => {
+    const db = { transaction: () => Promise.resolve([]) } as unknown as DbClient;
+    const r = createEinvoicingRouter(new FakePaAdapter(), db, false);
+    await expect(r.createCaller(ctx()).onboardEntity())
+      .rejects.toThrow("Aucune plateforme de dématérialisation");
+  });
+
+  it("lève PRECONDITION_FAILED si aucun token SuperPDP en base", async () => {
+    const db = {
+      transaction: (fn: (tx: unknown) => unknown) => fn(makeFakeTx([])),
+    } as unknown as DbClient;
+    const r = createEinvoicingRouter(new FakePaAdapter(), db, true);
+    await expect(r.createCaller(ctx()).onboardEntity())
+      .rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+  });
+
+  it("active l'entité si un token SuperPDP existe", async () => {
+    let txCall = 0;
+    const db = {
+      transaction: (fn: (tx: unknown) => unknown) => {
+        txCall++;
+        if (txCall === 1) return fn(makeFakeTx([{ expiresAt: new Date() }]));
+        return fn(makeFakeTx([], () => {}));
+      },
+      select: () => makeSelectChain([{ siret: "83814693700027", nomEntreprise: "ACME", email: "a@a.fr" }]),
+    } as unknown as DbClient;
+    const r = createEinvoicingRouter(new FakePaAdapter(), db, true);
+    const result = await r.createCaller(ctx()).onboardEntity();
+    expect(result.paEntityId).toBe("fake-entity-83814693700027");
+  });
+});
+
 describe("ensureArtisanEntity", () => {
   it("lève une erreur si l'artisan n'a pas de SIRET", async () => {
     const db = {

@@ -22,5 +22,6 @@
   "oauth_connecte": "Connecté à SuperPDP",
   "oauth_non_connecte": "Non connecté",
   "oauth_connecter": "Connecter à SuperPDP",
-  "oauth_reconnecter": "Reconnecter"
+  "oauth_reconnecter": "Reconnecter",
+  "connecter_superpdp_avant": "Connectez-vous d'abord à SuperPDP pour activer la facturation électronique."
 }

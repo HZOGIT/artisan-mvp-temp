@@ -12,8 +12,17 @@ import { ValidationError } from "../../../../shared/errors";
 
 export function createEinvoicingRouter(pa: PaPort, db: DbClient, paDisponible: boolean) {
   return router({
-    onboardEntity: protectedProcedure.mutation(({ ctx }) => {
+    onboardEntity: protectedProcedure.mutation(async ({ ctx }) => {
       if (!paDisponible) throw new ValidationError("Aucune plateforme de dématérialisation configurée");
+      const tokens = await withTenant(db, ctx.tenant, (tx) =>
+        tx.select({ expiresAt: superpdpTokens.expiresAt })
+          .from(superpdpTokens)
+          .where(eq(superpdpTokens.artisanId, ctx.tenant.artisanId))
+          .limit(1),
+      );
+      if (tokens.length === 0) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Connectez-vous d'abord à SuperPDP" });
+      }
       return ensureArtisanEntity(db, pa, ctx.tenant);
     }),
 
