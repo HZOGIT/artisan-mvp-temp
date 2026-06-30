@@ -1486,8 +1486,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   /** Cron CNIL — purge des positions GPS expirées toutes les 6 h (rétention 8 h par position). */
   app.register(geoPurgeCronPlugin, { technicienRepo, db: getDbHandle().db });
 
-  /** Cron RGPD Art. 17 — purge définitive des comptes en attente de suppression depuis > 30j. */
-  app.register(rgpdCronPlugin, { db: getDbHandle().db });
+  /** Cron RGPD Art. 17 — audit DRY-RUN des comptes en attente depuis > 30j (pool owner requis — FORCE RLS cross-tenant). */
+  app.register(rgpdCronPlugin, { db: getOwnerDbHandle().db });
 
   /** Cron RGPD Art. 5(1)(e) — rétention limitée multi-tables (prospects, sessions, events, devices, LLM payloads). Owner handle requis : plusieurs tables ont FORCE ROW LEVEL SECURITY, app_tenant sans contexte tenant renverrait 0 lignes. */
   app.register(retentionPurgeCronPlugin, { db: getOwnerDbHandle().db });
