@@ -52,6 +52,8 @@ export function generateFacturXML(
           return [{ tvaCategorieId: categId, taux: parseFloat(def.taux), baseHT: totalHT, montantTVA: totalTVA }];
         })();
 
+  const typeCode = facture.typeDocument === "avoir" ? "381" : "380";
+
   const sellerName = escXml(artisan.nomEntreprise || "Artisan");
   const sellerAddr = escXml(artisan.adresse || "");
   const sellerCP = escXml(artisan.codePostal || "");
@@ -89,7 +91,7 @@ export function generateFacturXML(
   </rsm:ExchangedDocumentContext>
   <rsm:ExchangedDocument>
     <ram:ID>${escXml(facture.numero ?? "")}</ram:ID>
-    <ram:TypeCode>380</ram:TypeCode>
+    <ram:TypeCode>${typeCode}</ram:TypeCode>
     <ram:IssueDateTime>
       <udt:DateTimeString format="102">${dateStr}</udt:DateTimeString>
     </ram:IssueDateTime>
