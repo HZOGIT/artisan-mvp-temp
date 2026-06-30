@@ -69,6 +69,13 @@ export interface CreateInvoiceForCycleParams {
   readonly taxCents: number;
   readonly currency: string;
   readonly planDescription: string;
+  readonly sellerName?: string;
+  readonly sellerAddress?: string;
+  readonly sellerSiret?: string;
+  readonly sellerTvaIntracom?: string;
+  readonly buyerName?: string;
+  readonly buyerAddress?: string;
+  readonly buyerSiret?: string;
 }
 
 export interface AppendEventParams {
@@ -134,7 +141,10 @@ export interface IBillingRepository {
 
   /** Factures */
   findInvoicesByArtisan(ctx: TenantContext, limit?: number): Promise<BillingInvoice[]>;
+  findInvoiceById(ctx: TenantContext, id: number): Promise<BillingInvoice | null>;
   createInvoiceForCycle(params: CreateInvoiceForCycleParams): Promise<BillingInvoice>;
+  updateInvoicePdfUrl(id: number, pdfUrl: string): Promise<void>;
+  findArtisanInfo(artisanId: number): Promise<{ name: string | null; address: string | null; siret: string | null } | null>;
 
   /** Journal immuable */
   appendEvent(params: AppendEventParams): Promise<BillingEvent>;

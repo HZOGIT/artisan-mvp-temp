@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
-import { CreditCard, Calendar, Receipt, Loader2, Trash2, Star, Plus, XCircle, RotateCcw } from "lucide-react";
+import { CreditCard, Calendar, Receipt, Loader2, Trash2, Star, Plus, XCircle, RotateCcw, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -397,7 +397,7 @@ function PlanSelectorCard({
                   </div>
                   <span className="text-2xl font-bold tabular-nums">
                     {plan.monthly}€
-                    <span className="text-sm font-normal text-muted-foreground">{t("billingMaison.parMois", "/mois")}</span>
+                    <span className="text-sm font-normal text-muted-foreground">{t("billingMaison.parMois", "/mois TTC")}</span>
                   </span>
                   {!isCurrent && (
                     <Button
@@ -432,7 +432,15 @@ function PlanSelectorCard({
   );
 }
 
-function InvoicesCard({ invoices }: { invoices: BillingInvoice[] }) {
+function InvoicesCard({
+  invoices,
+  onDownload,
+  isDownloading,
+}: {
+  invoices: BillingInvoice[];
+  onDownload: (invoiceId: number) => Promise<{ url: string }>;
+  isDownloading: boolean;
+}) {
   const { t } = useTranslation("abonnement");
   return (
     <Card>
@@ -465,6 +473,25 @@ function InvoicesCard({ invoices }: { invoices: BillingInvoice[] }) {
                   <Badge variant={inv.status === "paid" ? "default" : "secondary"}>
                     {INVOICE_STATUS_LABELS[inv.status] ?? inv.status}
                   </Badge>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={isDownloading}
+                    onClick={() => {
+                      onDownload(inv.id).then(({ url }: { url: string }) => {
+                        window.open(url, "_blank", "noopener,noreferrer");
+                      }).catch(() => {
+                        toast.error(t("billingMaison.erreurTelechargement", "Impossible de télécharger la facture."));
+                      });
+                    }}
+                    title={t("billingMaison.telecharger", "Télécharger la facture PDF")}
+                  >
+                    {isDownloading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Download className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
                 </div>
               </li>
             ))}
@@ -484,6 +511,7 @@ export function BillingMaisonSection() {
     changePlan, isChangingPlan,
     cancelAtPeriodEnd, isCanceling,
     reactivate, isReactivating,
+    downloadInvoice, isDownloadingInvoice,
   } = useBillingMaison();
   const [addCardOpen, setAddCardOpen] = useState(false);
 
@@ -543,7 +571,11 @@ export function BillingMaisonSection() {
         isSettingDefault={isSettingDefault}
       />
       <AddCardDialog open={addCardOpen} onOpenChange={setAddCardOpen} />
-      <InvoicesCard invoices={recentInvoices} />
+      <InvoicesCard
+        invoices={recentInvoices}
+        onDownload={downloadInvoice}
+        isDownloading={isDownloadingInvoice}
+      />
     </div>
   );
 }

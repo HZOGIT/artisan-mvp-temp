@@ -1181,9 +1181,12 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   }, getDbHandle().db);
 
   const billingRepo = new BillingRepositoryDrizzle(getDbHandle().db);
+  const billingStorage = deps.storage ?? new OvhS3Adapter(getDbHandle().db);
   const billing = createBillingModule({
     repo: billingRepo,
     deps: { repo: billingRepo, billing: new BillingAdapter(), stripe: deps.stripePort ?? new StripeAdapter() },
+    pdf: new JsPdfAdapter(),
+    storage: billingStorage,
   });
 
   const platformAdmin = createPlatformAdminModule(getOwnerDbHandle().db);

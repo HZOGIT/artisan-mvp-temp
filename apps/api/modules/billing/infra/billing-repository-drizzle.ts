@@ -11,6 +11,7 @@ import {
   billingWebhookEvents,
   artisanModules,
   modules,
+  artisans,
 } from "../../../../../drizzle/schema.pg";
 import type { BillingPaymentMethod, BillingSubscription, BillingCycle, BillingInvoice, BillingEvent, BillingChargeAttempt } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
@@ -478,6 +479,13 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
           currency: params.currency,
           billing_cycle_id: params.cycleId,
           paid_at: new Date(),
+          seller_name: params.sellerName ?? null,
+          seller_address: params.sellerAddress ?? null,
+          seller_siret: params.sellerSiret ?? null,
+          seller_tva_intracom: params.sellerTvaIntracom ?? null,
+          buyer_name: params.buyerName ?? null,
+          buyer_address: params.buyerAddress ?? null,
+          buyer_siret: params.buyerSiret ?? null,
         })
         .returning();
       if (!invoice) throw new Error("billing_invoices insert returned no row");
@@ -498,6 +506,27 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
     });
   }
 
+
+  async findInvoiceById(ctx: TenantContext, id: number): Promise<BillingInvoice | null> {
+    const [row] = await withTenant(this.db, ctx, (tx) =>
+      tx.select().from(billingInvoices).where(and(eq(billingInvoices.id, id), eq(billingInvoices.artisan_id, ctx.artisanId))).limit(1),
+    );
+    return row ?? null;
+  }
+
+  async updateInvoicePdfUrl(id: number, pdfUrl: string): Promise<void> {
+    await this.db.update(billingInvoices).set({ pdf_url: pdfUrl, updated_at: new Date() }).where(eq(billingInvoices.id, id));
+  }
+
+  async findArtisanInfo(artisanId: number): Promise<{ name: string | null; address: string | null; siret: string | null } | null> {
+    const [row] = await this.db
+      .select({ name: artisans.nomEntreprise, address: artisans.adresse, siret: artisans.siret })
+      .from(artisans)
+      .where(eq(artisans.id, artisanId))
+      .limit(1);
+    if (!row) return null;
+    return { name: row.name ?? null, address: row.address ?? null, siret: row.siret ?? null };
+  }
 
   async markWebhookProcessed(stripeEventId: string, eventType: string, payload: Record<string, unknown>): Promise<boolean> {
     const result = await this.db

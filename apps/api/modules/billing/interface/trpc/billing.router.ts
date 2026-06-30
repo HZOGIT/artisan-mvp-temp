@@ -12,6 +12,7 @@ import {
   cancelAtPeriodEnd,
   reactivateSubscription,
   activateOnboardingSubscription,
+  downloadSubscriptionInvoice,
   NotFoundError,
   InvalidPlanError,
 } from "../../application/billing-use-cases";
@@ -101,6 +102,13 @@ export function createBillingRouter(deps: BillingDeps) {
       )
       .mutation(({ ctx, input }) =>
         activateOnboardingSubscription(deps, ctx.tenant, input).catch(mapError),
+      ),
+
+    /** Génère (ou retourne) le PDF de la facture d'abonnement. */
+    downloadInvoice: protectedProcedure
+      .input(z.object({ invoiceId: z.number().int().positive() }))
+      .mutation(({ ctx, input }) =>
+        downloadSubscriptionInvoice(deps, ctx.tenant, input.invoiceId).catch(mapError),
       ),
   });
 }
