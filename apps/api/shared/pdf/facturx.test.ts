@@ -34,6 +34,12 @@ describe("generateFacturXML (Factur-X CII, profil MINIMUM)", () => {
     expect(xml).toContain("<ram:ID>FAC-001</ram:ID>");
   });
 
+  it("avoir → TypeCode 381 (credit note EN 16931)", () => {
+    const xml = generateFacturXML(facture({ typeDocument: "avoir" }), artisan(), client());
+    expect(xml).toContain("<ram:TypeCode>381</ram:TypeCode>");
+    expect(xml).not.toContain("<ram:TypeCode>380</ram:TypeCode>");
+  });
+
   it("date émise + échéance au format CII 102 (YYYYMMDD)", () => {
     const xml = generateFacturXML(facture(), artisan(), client());
     expect(xml).toContain('<udt:DateTimeString format="102">20260305</udt:DateTimeString>');
