@@ -349,9 +349,9 @@ describe.skipIf(!URL)("billing.router e2e (billing maison protégé)", () => {
     expect(evts[0]!.actor).toBe(`user:${UID}`);
   });
 
-  it("garde owner — mutations billing refusées à un membre non-owner (→ 403)", async () => {
+  it("garde owner — procédures billing refusées à un membre non-owner (→ 403)", async () => {
     const memberTok = await jwt(MEMBER_UID);
-    const mutations: Array<["POST", string, unknown]> = [
+    const procs: Array<["GET" | "POST", string, unknown]> = [
       ["POST", "billing.createSetupIntent", undefined],
       ["POST", "billing.confirmPaymentMethod", { stripePaymentMethodId: "pm_x", stripeCustomerId: "cus_x", setAsDefault: true }],
       ["POST", "billing.revokePaymentMethod", { paymentMethodId: 1 }],
@@ -360,17 +360,13 @@ describe.skipIf(!URL)("billing.router e2e (billing maison protégé)", () => {
       ["POST", "billing.cancelAtPeriodEnd", undefined],
       ["POST", "billing.reactivate", undefined],
       ["POST", "billing.activateOnboardingSubscription", { planId: "starter", paymentMethodId: 1 }],
+      ["GET",  "billing.getBillingInfo", undefined],
+      ["POST", "billing.downloadInvoice", { invoiceId: 1 }],
     ];
-    for (const [method, path, input] of mutations) {
+    for (const [method, path, input] of procs) {
       const res = await injectTrpc(app, method, path, input, memberTok);
       expect(res.statusCode, `${path} doit être 403 pour un membre non-owner`).toBe(403);
     }
-  });
-
-  it("garde owner — getBillingInfo accessible au membre non-owner (lecture seule)", async () => {
-    const memberTok = await jwt(MEMBER_UID);
-    const res = await injectTrpc(app, "GET", "billing.getBillingInfo", undefined, memberTok);
-    expect(res.statusCode).toBe(200);
   });
 
   it("garde owner — mutations billing autorisées pour l'owner (→ pas de 403)", async () => {

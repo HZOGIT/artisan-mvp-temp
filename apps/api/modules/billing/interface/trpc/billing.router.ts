@@ -88,7 +88,7 @@ export function createBillingRouter(deps: BillingDeps) {
     ),
 
     /** Retourne subscription + cartes + 12 dernières factures. */
-    getBillingInfo: protectedProcedure.query(({ ctx }) =>
+    getBillingInfo: ownerProcedure.query(({ ctx }) =>
       getBillingInfo(deps, ctx.tenant),
     ),
 
@@ -105,7 +105,7 @@ export function createBillingRouter(deps: BillingDeps) {
       ),
 
     /** Génère (ou retourne) le PDF de la facture d'abonnement. */
-    downloadInvoice: protectedProcedure
+    downloadInvoice: ownerProcedure
       .input(z.object({ invoiceId: z.number().int().positive() }))
       .mutation(({ ctx, input }) =>
         downloadSubscriptionInvoice(deps, ctx.tenant, input.invoiceId).catch(mapError),
