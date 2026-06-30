@@ -1,5 +1,6 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { BillingPaymentMethod, BillingSubscription, BillingCycle, BillingInvoice, BillingEvent, BillingChargeAttempt } from "../../../../../drizzle/schema.pg";
+import type { DbClient } from "../../../shared/db";
 
 export interface SavePaymentMethodParams {
   readonly artisanId: number;
@@ -160,6 +161,9 @@ export interface IBillingRepository {
 
   /** Bus métier unifié (event_outbox) */
   emitOutboxEvent(params: EmitOutboxEventParams): Promise<void>;
+
+  /** Retourne une copie du repo scoped à une transaction (pour withOutbox). */
+  withDb(db: DbClient): IBillingRepository;
 
   /**
    * Marque un événement Stripe comme traité (INSERT ... ON CONFLICT DO NOTHING).

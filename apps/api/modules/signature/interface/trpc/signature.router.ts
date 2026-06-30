@@ -47,7 +47,7 @@ export function createSignatureRouter(deps: SignatureDeps, publicDeps: Signature
         const result = await createSignatureLink(deps, ctx.tenant, input.devisId);
         ctx.log.info({ event: "signature_link_created", devisId: input.devisId }, "Lien de signature généré");
         const tx = db;
-        if (tx) await outboxEvent(tx, ctx.tenant, { action: "devis.signature_envoyee", entityType: "devis", entityId: input.devisId, payload: {} }).catch(() => {});
+        if (tx) await outboxEvent(tx, ctx.tenant, { action: "devis.signature_envoyee", entityType: "devis", entityId: input.devisId, payload: {} });
         return result;
       }),
 

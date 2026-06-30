@@ -1187,7 +1187,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const billingStorage = deps.storage ?? new OvhS3Adapter(getDbHandle().db);
   const billing = createBillingModule({
     repo: billingRepo,
-    deps: { repo: billingRepo, billing: new BillingAdapter(), stripe: deps.stripePort ?? new StripeAdapter() },
+    deps: { repo: billingRepo, billing: new BillingAdapter(), stripe: deps.stripePort ?? new StripeAdapter(), db: getDbHandle().db },
     pdf: new JsPdfAdapter(),
     storage: billingStorage,
   });
@@ -1308,7 +1308,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     webhookSecret: deps.stripeWebhookSecret ?? process.env.STRIPE_WEBHOOK_SECRET ?? "",
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
     onBillingWebhookEvent: (eventType, piId, fc, fm, stripeEventId) =>
-      handleBillingWebhookEvent({ repo: billingRepo }, eventType, piId, fc, fm, stripeEventId),
+      handleBillingWebhookEvent({ repo: billingRepo, db: getDbHandle().db }, eventType, piId, fc, fm, stripeEventId),
     onSubscriptionWebhookEvent: async (artisanId, priceId, stripeStatus) => {
       const ctx = { artisanId, userId: 0 };
       const existing = await billingRepo.findSubscription(ctx);
@@ -1360,6 +1360,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     billing: new BillingAdapter(),
     notifier: billingNotifier,
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+    db: getDbHandle().db,
   };
 
   registerBillingSchedulerRoute(app, { ...billingSchedulerDeps, secret: process.env.SCHEDULER_SECRET ?? "" });

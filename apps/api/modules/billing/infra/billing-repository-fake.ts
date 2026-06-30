@@ -487,4 +487,8 @@ export class FakeBillingRepository implements IBillingRepository {
   async emitOutboxEvent(params: EmitOutboxEventParams): Promise<void> {
     this.outboxEvents.push(params);
   }
+
+  withDb(_db: unknown): IBillingRepository {
+    return this;
+  }
 }

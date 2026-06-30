@@ -1,16 +1,19 @@
 import type { IBillingRepository } from "./billing-repository";
 import type { BillingPort } from "../../../shared/ports/billing";
 import type { SubscriptionEventNotifier } from "../../subscription/application/subscription-event-notifier";
+import type { DbClient } from "../../../shared/db";
 import { isDue, isZombie, isStuckProcessing, nextPeriod, nextRetryAt, MAX_DUNNING_ATTEMPTS } from "../domain/billing-cycle";
 import { planById } from "../domain/plan";
 import { OPERIOZ } from "../domain/operioz-config";
 import { subscriptionEmail } from "../../subscription/domain/webhook";
+import { withOutbox } from "../../../shared/events/with-outbox";
 
 export interface SchedulerDeps {
   readonly repo: IBillingRepository;
   readonly billing: BillingPort;
   readonly notifier?: SubscriptionEventNotifier;
   readonly appUrl?: string;
+  readonly db?: DbClient;
 }
 
 const TICK_BATCH_SIZE = 200;
@@ -246,23 +249,25 @@ async function handleDunning(deps: SchedulerDeps, p: DunningParams): Promise<voi
 
   if (isFinalAttempt) {
     const GRACE_48H_MS = 48 * 3600_000;
-    await deps.repo.updateCancelAt({ artisanId, userId: 0 }, new Date(now.getTime() + GRACE_48H_MS));
-    await deps.repo.updateSubscriptionStatus({ artisanId, userId: 0 }, "past_due");
     const suspendedSub = await deps.repo.findSubscriptionById(subscriptionId);
-    if (suspendedSub) await deps.repo.deactivateLockedModules(artisanId, suspendedSub.plan_id);
-    await deps.repo.appendEvent({
-      entityType: "billing_subscription",
-      entityId: subscriptionId,
-      eventType: "subscription.suspended",
-      payload: { artisanId, reason: "max_dunning_attempts" },
-      actor: "scheduler",
-    });
-    await deps.repo.emitOutboxEvent({
-      artisanId,
-      action: "abonnement.suspendu",
-      entityType: "abonnement",
-      entityId: subscriptionId,
-      payload: { raison: "max_dunning_attempts" },
+    await withOutbox(deps.db, deps.repo, async (r, _tx) => {
+      await r.updateCancelAt({ artisanId, userId: 0 }, new Date(now.getTime() + GRACE_48H_MS));
+      await r.updateSubscriptionStatus({ artisanId, userId: 0 }, "past_due");
+      if (suspendedSub) await r.deactivateLockedModules(artisanId, suspendedSub.plan_id);
+      await r.appendEvent({
+        entityType: "billing_subscription",
+        entityId: subscriptionId,
+        eventType: "subscription.suspended",
+        payload: { artisanId, reason: "max_dunning_attempts" },
+        actor: "scheduler",
+      });
+      await r.emitOutboxEvent({
+        artisanId,
+        action: "abonnement.suspendu",
+        entityType: "abonnement",
+        entityId: subscriptionId,
+        payload: { raison: "max_dunning_attempts" },
+      });
     });
     if (deps.notifier) {
       const appUrl = deps.appUrl ?? "https://www.operioz.com";
@@ -579,32 +584,32 @@ async function activateExpiredTrials(deps: SchedulerDeps, now: Date): Promise<nu
        * Si updateSubscriptionPeriod échoue APRÈS createCycle, le cycle existe déjà → guard
        * findPendingCycleForPeriod empêche le doublon, et updateSubscriptionPeriod est retentée.
        */
-      const existing = await deps.repo.findPendingCycleForPeriod(sub.id, trialEnd);
-      if (!existing) {
-        await deps.repo.createCycle({
-          subscriptionId: sub.id,
-          periodStart: trialEnd,
-          periodEnd,
-          amountCents,
-          currency: "eur",
+      await withOutbox(deps.db, deps.repo, async (r, _tx) => {
+        const existing = await r.findPendingCycleForPeriod(sub.id, trialEnd);
+        if (!existing) {
+          await r.createCycle({
+            subscriptionId: sub.id,
+            periodStart: trialEnd,
+            periodEnd,
+            amountCents,
+            currency: "eur",
+          });
+        }
+        await r.updateSubscriptionPeriod(sub.id, "active", trialEnd, periodEnd);
+        await r.appendEvent({
+          entityType: "billing_subscription",
+          entityId: sub.id,
+          eventType: "subscription.trial_expired",
+          payload: { artisanId: sub.artisan_id, planId: sub.plan_id, interval },
+          actor: "scheduler",
         });
-      }
-
-      await deps.repo.updateSubscriptionPeriod(sub.id, "active", trialEnd, periodEnd);
-
-      await deps.repo.appendEvent({
-        entityType: "billing_subscription",
-        entityId: sub.id,
-        eventType: "subscription.trial_expired",
-        payload: { artisanId: sub.artisan_id, planId: sub.plan_id, interval },
-        actor: "scheduler",
-      });
-      await deps.repo.emitOutboxEvent({
-        artisanId: sub.artisan_id,
-        action: "abonnement.active",
-        entityType: "abonnement",
-        entityId: sub.id,
-        payload: { planId: sub.plan_id, dateDebut: trialEnd.toISOString() },
+        await r.emitOutboxEvent({
+          artisanId: sub.artisan_id,
+          action: "abonnement.active",
+          entityType: "abonnement",
+          entityId: sub.id,
+          payload: { planId: sub.plan_id, dateDebut: trialEnd.toISOString() },
+        });
       });
 
       activated++;
@@ -640,24 +645,26 @@ async function processDueCancellations(deps: SchedulerDeps, now: Date): Promise<
        * futur : sans ce fix, le cycle resterait "failed" avec un next_retry_at qui ne
        * sera jamais déclenché (sub annulée → exclue de findSubscriptionsWithDueCycles).
        */
-      const nonTerminalCycle = await deps.repo.findNonTerminalCycle(sub.id);
-      if (nonTerminalCycle) {
-        await deps.repo.updateCycleStatus(nonTerminalCycle.id, { status: "skipped" });
-      }
-      await deps.repo.updateSubscriptionStatus({ artisanId: sub.artisan_id, userId: 0 }, "canceled");
-      await deps.repo.appendEvent({
-        entityType: "billing_subscription",
-        entityId: sub.id,
-        eventType: "subscription.canceled",
-        payload: { artisanId: sub.artisan_id, cancelAt: (sub.cancel_at ?? now).toISOString(), via: "scheduler" },
-        actor: "scheduler",
-      });
-      await deps.repo.emitOutboxEvent({
-        artisanId: sub.artisan_id,
-        action: "abonnement.annule",
-        entityType: "abonnement",
-        entityId: sub.id,
-        payload: { cancelAt: (sub.cancel_at ?? now).toISOString(), via: "scheduler" },
+      await withOutbox(deps.db, deps.repo, async (r, _tx) => {
+        const nonTerminalCycle = await r.findNonTerminalCycle(sub.id);
+        if (nonTerminalCycle) {
+          await r.updateCycleStatus(nonTerminalCycle.id, { status: "skipped" });
+        }
+        await r.updateSubscriptionStatus({ artisanId: sub.artisan_id, userId: 0 }, "canceled");
+        await r.appendEvent({
+          entityType: "billing_subscription",
+          entityId: sub.id,
+          eventType: "subscription.canceled",
+          payload: { artisanId: sub.artisan_id, cancelAt: (sub.cancel_at ?? now).toISOString(), via: "scheduler" },
+          actor: "scheduler",
+        });
+        await r.emitOutboxEvent({
+          artisanId: sub.artisan_id,
+          action: "abonnement.annule",
+          entityType: "abonnement",
+          entityId: sub.id,
+          payload: { cancelAt: (sub.cancel_at ?? now).toISOString(), via: "scheduler" },
+        });
       });
       count++;
     } catch (err) {
@@ -692,21 +699,24 @@ export async function runSchedulerTick(deps: SchedulerDeps): Promise<{ charged: 
   for (const { subscription, cycle } of due) {
     try {
       if (subscription.cancel_at !== null && subscription.cancel_at <= now) {
-        await deps.repo.updateCycleStatus(cycle.id, { status: "skipped" });
-        await deps.repo.updateSubscriptionStatus({ artisanId: subscription.artisan_id, userId: 0 }, "canceled");
-        await deps.repo.appendEvent({
-          entityType: "billing_subscription",
-          entityId: subscription.id,
-          eventType: "subscription.canceled",
-          payload: { artisanId: subscription.artisan_id, cancelAt: subscription.cancel_at.toISOString(), via: "scheduler" },
-          actor: "scheduler",
-        });
-        await deps.repo.emitOutboxEvent({
-          artisanId: subscription.artisan_id,
-          action: "abonnement.annule",
-          entityType: "abonnement",
-          entityId: subscription.id,
-          payload: { cancelAt: subscription.cancel_at.toISOString(), via: "scheduler" },
+        const cancelAt = subscription.cancel_at;
+        await withOutbox(deps.db, deps.repo, async (r, _tx) => {
+          await r.updateCycleStatus(cycle.id, { status: "skipped" });
+          await r.updateSubscriptionStatus({ artisanId: subscription.artisan_id, userId: 0 }, "canceled");
+          await r.appendEvent({
+            entityType: "billing_subscription",
+            entityId: subscription.id,
+            eventType: "subscription.canceled",
+            payload: { artisanId: subscription.artisan_id, cancelAt: cancelAt.toISOString(), via: "scheduler" },
+            actor: "scheduler",
+          });
+          await r.emitOutboxEvent({
+            artisanId: subscription.artisan_id,
+            action: "abonnement.annule",
+            entityType: "abonnement",
+            entityId: subscription.id,
+            payload: { cancelAt: cancelAt.toISOString(), via: "scheduler" },
+          });
         });
         cancelled++;
         continue;

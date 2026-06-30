@@ -4,11 +4,13 @@ import type { BillingPort } from "../../../shared/ports/billing";
 import type { StripePort } from "../../../shared/ports/stripe";
 import type { PdfPort } from "../../../shared/ports/pdf";
 import type { StoragePort } from "../../../shared/ports/storage";
+import type { DbClient } from "../../../shared/db";
 import type { BillingPaymentMethod, BillingSubscription, BillingInvoice } from "../../../../../drizzle/schema.pg";
 import { planById } from "../domain/plan";
 import type { BillingInterval } from "../domain/plan";
 import { OPERIOZ } from "../domain/operioz-config";
 import type { FactureAbonnementData } from "../../../shared/pdf/pdf-generator";
+import { withOutbox } from "../../../shared/events/with-outbox";
 
 export interface BillingDeps {
   readonly repo: IBillingRepository;
@@ -16,6 +18,7 @@ export interface BillingDeps {
   readonly stripe: StripePort;
   readonly pdf?: PdfPort;
   readonly storage?: StoragePort;
+  readonly db?: DbClient;
 }
 
 
@@ -192,7 +195,7 @@ export class InvalidPlanError extends Error {
 }
 
 export async function changePlan(
-  deps: Pick<BillingDeps, "repo">,
+  deps: Pick<BillingDeps, "repo" | "db">,
   ctx: TenantContext,
   newPlanId: string,
   now: Date = new Date(),
@@ -246,25 +249,27 @@ export async function changePlan(
     await deps.repo.updateCycleAmount(pendingCycle.id, pendingCycleAmount);
   }
 
-  await deps.repo.appendEvent({
-    entityType: "billing_subscription",
-    entityId: sub.id,
-    eventType: "subscription.plan_changed",
-    payload: { artisanId: sub.artisan_id, from: sub.plan_id, to: newPlanId, pendingCycleUpdated: !!pendingCycle },
-    actor: `user:${ctx.userId}`,
-  });
-  await deps.repo.emitOutboxEvent({
-    artisanId: ctx.artisanId,
-    userId: ctx.userId,
-    action: "abonnement.plan_change",
-    entityType: "abonnement",
-    entityId: sub.id,
-    payload: { from: sub.plan_id, to: newPlanId, montantCents: knownPlan.amountCentsByInterval[interval], prorataImmediat, dateEffet: now.toISOString() },
+  await withOutbox(deps.db, deps.repo, async (r, _tx) => {
+    await r.appendEvent({
+      entityType: "billing_subscription",
+      entityId: sub.id,
+      eventType: "subscription.plan_changed",
+      payload: { artisanId: sub.artisan_id, from: sub.plan_id, to: newPlanId, pendingCycleUpdated: !!pendingCycle },
+      actor: `user:${ctx.userId}`,
+    });
+    await r.emitOutboxEvent({
+      artisanId: ctx.artisanId,
+      userId: ctx.userId,
+      action: "abonnement.plan_change",
+      entityType: "abonnement",
+      entityId: sub.id,
+      payload: { from: sub.plan_id, to: newPlanId, montantCents: knownPlan.amountCentsByInterval[interval], prorataImmediat, dateEffet: now.toISOString() },
+    });
   });
 }
 
 
-export async function cancelAtPeriodEnd(deps: Pick<BillingDeps, "repo">, ctx: TenantContext): Promise<void> {
+export async function cancelAtPeriodEnd(deps: Pick<BillingDeps, "repo" | "db">, ctx: TenantContext): Promise<void> {
   const sub = await deps.repo.findSubscription(ctx);
   if (!sub) throw new NotFoundError("Aucun abonnement actif");
   if (sub.status === "canceled") return;
@@ -276,25 +281,27 @@ export async function cancelAtPeriodEnd(deps: Pick<BillingDeps, "repo">, ctx: Te
    * l'annulation serait planifiée à now() et la sub serait annulée immédiatement à l'activation.
    */
   const cancelAt = sub.current_period_end ?? sub.trial_ends_at ?? new Date();
-  await deps.repo.updateCancelAt(ctx, cancelAt);
-  await deps.repo.appendEvent({
-    entityType: "billing_subscription",
-    entityId: sub.id,
-    eventType: "subscription.cancel_scheduled",
-    payload: { artisanId: sub.artisan_id, cancelAt: cancelAt.toISOString() },
-    actor: `user:${ctx.userId}`,
-  });
-  await deps.repo.emitOutboxEvent({
-    artisanId: ctx.artisanId,
-    userId: ctx.userId,
-    action: "abonnement.annulation_planifiee",
-    entityType: "abonnement",
-    entityId: sub.id,
-    payload: { cancelAt: cancelAt.toISOString() },
+  await withOutbox(deps.db, deps.repo, async (r, _tx) => {
+    await r.updateCancelAt(ctx, cancelAt);
+    await r.appendEvent({
+      entityType: "billing_subscription",
+      entityId: sub.id,
+      eventType: "subscription.cancel_scheduled",
+      payload: { artisanId: sub.artisan_id, cancelAt: cancelAt.toISOString() },
+      actor: `user:${ctx.userId}`,
+    });
+    await r.emitOutboxEvent({
+      artisanId: ctx.artisanId,
+      userId: ctx.userId,
+      action: "abonnement.annulation_planifiee",
+      entityType: "abonnement",
+      entityId: sub.id,
+      payload: { cancelAt: cancelAt.toISOString() },
+    });
   });
 }
 
-export async function reactivateSubscription(deps: Pick<BillingDeps, "repo">, ctx: TenantContext): Promise<void> {
+export async function reactivateSubscription(deps: Pick<BillingDeps, "repo" | "db">, ctx: TenantContext): Promise<void> {
   const sub = await deps.repo.findSubscription(ctx);
   if (!sub) throw new NotFoundError("Aucun abonnement actif");
   /*
@@ -305,21 +312,23 @@ export async function reactivateSubscription(deps: Pick<BillingDeps, "repo">, ct
   if (sub.status === "canceled") return;
   if (sub.cancel_at === null) return;
 
-  await deps.repo.updateCancelAt(ctx, null);
-  await deps.repo.appendEvent({
-    entityType: "billing_subscription",
-    entityId: sub.id,
-    eventType: "subscription.reactivated",
-    payload: { artisanId: sub.artisan_id },
-    actor: `user:${ctx.userId}`,
-  });
-  await deps.repo.emitOutboxEvent({
-    artisanId: ctx.artisanId,
-    userId: ctx.userId,
-    action: "abonnement.reactivite",
-    entityType: "abonnement",
-    entityId: sub.id,
-    payload: { planId: sub.plan_id },
+  await withOutbox(deps.db, deps.repo, async (r, _tx) => {
+    await r.updateCancelAt(ctx, null);
+    await r.appendEvent({
+      entityType: "billing_subscription",
+      entityId: sub.id,
+      eventType: "subscription.reactivated",
+      payload: { artisanId: sub.artisan_id },
+      actor: `user:${ctx.userId}`,
+    });
+    await r.emitOutboxEvent({
+      artisanId: ctx.artisanId,
+      userId: ctx.userId,
+      action: "abonnement.reactivite",
+      entityType: "abonnement",
+      entityId: sub.id,
+      payload: { planId: sub.plan_id },
+    });
   });
 }
 
@@ -334,7 +343,7 @@ export interface ActivateOnboardingSubscriptionParams {
  * Idempotent : retourne l'abonnement existant non-annulé s'il en existe déjà un.
  */
 export async function activateOnboardingSubscription(
-  deps: Pick<BillingDeps, "repo">,
+  deps: Pick<BillingDeps, "repo" | "db">,
   ctx: TenantContext,
   params: ActivateOnboardingSubscriptionParams,
 ): Promise<{ subscriptionId: number }> {
@@ -345,34 +354,36 @@ export async function activateOnboardingSubscription(
   if (existing && existing.status !== "canceled") return { subscriptionId: existing.id };
 
   const trialEndsAt = new Date(Date.now() + 15 * 24 * 3600_000);
-  const sub = await deps.repo.saveSubscription({
-    artisanId: ctx.artisanId,
-    planId: params.planId,
-    billingMode: "maison",
-    status: "trialing",
-    currentPeriodStart: null,
-    currentPeriodEnd: null,
-    trialEndsAt,
-    paymentMethodId: pm.id,
+  const subscriptionId = await withOutbox(deps.db, deps.repo, async (r, _tx) => {
+    const sub = await r.saveSubscription({
+      artisanId: ctx.artisanId,
+      planId: params.planId,
+      billingMode: "maison",
+      status: "trialing",
+      currentPeriodStart: null,
+      currentPeriodEnd: null,
+      trialEndsAt,
+      paymentMethodId: pm.id,
+    });
+    await r.appendEvent({
+      entityType: "billing_subscription",
+      entityId: sub.id,
+      eventType: "subscription.onboarding_activated",
+      payload: { artisanId: ctx.artisanId, planId: params.planId, trialEndsAt: trialEndsAt.toISOString() },
+      actor: `user:${ctx.userId}`,
+    });
+    await r.emitOutboxEvent({
+      artisanId: ctx.artisanId,
+      userId: ctx.userId,
+      action: "abonnement.essai_demarre",
+      entityType: "abonnement",
+      entityId: sub.id,
+      payload: { planId: params.planId, trialEndsAt: trialEndsAt.toISOString() },
+    });
+    return sub.id;
   });
 
-  await deps.repo.appendEvent({
-    entityType: "billing_subscription",
-    entityId: sub.id,
-    eventType: "subscription.onboarding_activated",
-    payload: { artisanId: ctx.artisanId, planId: params.planId, trialEndsAt: trialEndsAt.toISOString() },
-    actor: `user:${ctx.userId}`,
-  });
-  await deps.repo.emitOutboxEvent({
-    artisanId: ctx.artisanId,
-    userId: ctx.userId,
-    action: "abonnement.essai_demarre",
-    entityType: "abonnement",
-    entityId: sub.id,
-    payload: { planId: params.planId, trialEndsAt: trialEndsAt.toISOString() },
-  });
-
-  return { subscriptionId: sub.id };
+  return { subscriptionId };
 }
 
 
