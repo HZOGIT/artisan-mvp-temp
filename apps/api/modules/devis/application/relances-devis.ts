@@ -9,6 +9,7 @@ import type { IModeleEmailRepository } from "../../modeles-email/application/mod
 import { buildModeleEmail } from "../../modeles-email/domain/render";
 import type { IEmailOptoutRepository } from "../../emails/application/email-optout-repository";
 import type { IEmailLogWriter } from "../../emails/application/email-log-writer";
+import type { DevisSignatureReader } from "./devis-signature-reader";
 
 /*
  * Dépendances des relances de devis (composition : devis + relances + client/artisan + email +
@@ -27,6 +28,10 @@ export interface DevisRelanceDeps {
   /** Optionnel : si présent, vérifie l'opt-out RGPD avant envoi. */
   readonly optoutRepo?: IEmailOptoutRepository;
   readonly emailLogWriter?: IEmailLogWriter;
+  /** Optionnel : si présent, un lien « Consulter et signer » est ajouté à la relance si une signature existe. */
+  readonly signatureReader?: DevisSignatureReader;
+  /** URL publique du frontend (ex. https://staging.operioz.com) pour construire le lien `/devis-public/<token>`. */
+  readonly appUrl?: string;
 }
 
 function escapeHtml(s: string): string {
@@ -49,12 +54,16 @@ function messageParDefaut(numero: string, artisanName: string, nomClient?: strin
 }
 
 /** Corps HTML de l'email de relance (pur). Le message libre est échappé (anti-XSS). */
-function buildRelanceBody(numero: string, message: string, artisan: ArtisanInfo | null): string {
+function buildRelanceBody(numero: string, message: string, artisan: ArtisanInfo | null, signatureUrl?: string | null): string {
   const a = (k: string): string => escapeHtml(String(artisan?.[k] ?? ""));
+  const signatureButton = signatureUrl
+    ? `<div style="text-align:center;margin:24px 0;"><a href="${signatureUrl}" style="display:inline-block;background-color:#1e40af;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;padding:14px 32px;border-radius:6px;">Consulter et signer en ligne</a></div>`
+    : "";
   return (
     `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">` +
     `<h2 style="color: #2c3e50;">Relance - Devis n°${escapeHtml(numero)}</h2>` +
     `<p>${escapeHtml(message)}</p>` +
+    signatureButton +
     `<hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">` +
     `<p style="color: #7f8c8d; font-size: 12px;">${a("nomEntreprise")}<br>${a("adresse")}<br>${a("codePostal")} ${a("ville")}<br>${a("telephone")}</p>` +
     `</div>`
@@ -121,14 +130,18 @@ export async function envoyerRelanceDevis(
   const artisan = await deps.artisanReader.getArtisan(ctx);
   const artisanName = artisan?.nomEntreprise || "Votre artisan";
   const message = input.message || messageParDefaut(devis.numero, artisanName);
+
+  const signature = deps.signatureReader ? await deps.signatureReader.getByDevisId(ctx, devis.id) : null;
+  const signatureUrl = signature && deps.appUrl ? `${deps.appUrl}/devis-public/${signature.token}` : null;
+
   const modele = deps.modeleEmailRepo ? await deps.modeleEmailRepo.getDefaultByType(ctx, "relance_devis") : null;
   const emailContent = modele
     ? buildModeleEmail(
         modele,
-        { client_nom: clientNom(client), client_prenom: client.prenom ?? "", numero: devis.numero, nom_entreprise: artisanName },
+        { client_nom: clientNom(client), client_prenom: client.prenom ?? "", numero: devis.numero, nom_entreprise: artisanName, lien_signature: signatureUrl ?? "" },
         input.message ?? null,
       )
-    : { subject: `Relance - Devis n°${devis.numero}`, body: buildRelanceBody(devis.numero, message, artisan) };
+    : { subject: `Relance - Devis n°${devis.numero}`, body: buildRelanceBody(devis.numero, message, artisan, signatureUrl) };
   await envoyerEtEnregistrer(deps, ctx, devis.id, { ...client, email: client.email }, { ...emailContent, fromName: artisanName, replyTo: artisan?.email ?? undefined }, message);
   return { success: true, message: "Relance envoyée avec succès" };
 }
@@ -169,13 +182,17 @@ export async function envoyerRelancesAutomatiques(
     if (!client || !client.email) continue;
     if (deps.optoutRepo && await deps.optoutRepo.isOptedOut(client.email)) continue;
     const message = messageParDefaut(d.numero, artisanName, clientNom(client));
+
+    const signature = deps.signatureReader ? await deps.signatureReader.getByDevisId(ctx, d.id) : null;
+    const signatureUrl = signature && deps.appUrl ? `${deps.appUrl}/devis-public/${signature.token}` : null;
+
     const emailContent = modele
       ? buildModeleEmail(
           modele,
-          { client_nom: clientNom(client), client_prenom: client.prenom ?? "", numero: d.numero, nom_entreprise: artisanName },
+          { client_nom: clientNom(client), client_prenom: client.prenom ?? "", numero: d.numero, nom_entreprise: artisanName, lien_signature: signatureUrl ?? "" },
           null,
         )
-      : { subject: `Relance - Devis n°${d.numero}`, body: buildRelanceBody(d.numero, message, artisan) };
+      : { subject: `Relance - Devis n°${d.numero}`, body: buildRelanceBody(d.numero, message, artisan, signatureUrl) };
     const ok = await envoyerEtEnregistrer(deps, ctx, d.id, { ...client, email: client.email }, { ...emailContent, fromName: artisanName, replyTo: artisan?.email ?? undefined }, message);
     if (ok) relancesEnvoyees++;
   }
