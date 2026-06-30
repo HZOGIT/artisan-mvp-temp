@@ -788,7 +788,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       email: emailAdapter,
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
       signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db),
-      signatureCreator: new DevisSignatureCreatorDrizzle(getDbHandle().db),
+      signatureCreator: new DevisSignatureCreatorDrizzle(getOwnerDbHandle().db),
       appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
       modeleEmailRepo,
       piecesJointesRepo: new PiecesJointesRepositoryDrizzle(getDbHandle().db),
@@ -1003,16 +1003,16 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const subscription = createSubscriptionModule(subscriptionReader);
   /*
    * Signature électronique de devis (SENSIBLE) — surface ARTISAN protégée + surface PUBLIQUE par
-   * token (portail de signature, RLS public-token sur `devis`). `signatures_devis` est HORS RLS :
-   * l'anti-IDOR passe par l'appartenance du devis parent (lue sous RLS). Immutabilité post-signature
-   * garantie par la garde SQL `statut='en_attente'` dans les writers.
+   * token (portail de signature, RLS public-token sur `devis` + `signatures_devis`). Le repo protégé
+   * utilise owner (HORS FORCE RLS) : anti-IDOR garanti en amont par le use-case (contexte tenant).
+   * Immutabilité post-signature garantie par la garde SQL `statut='en_attente'` dans les writers.
    */
   const signatureDb = getDbHandle().db;
   const signatureEmail = emailAdapter;
   const signatureNotifications = new SignatureNotificationWriterDrizzle(signatureDb);
   const signature = createSignatureModule({
     protectedDeps: {
-      repo: new SignatureRepositoryDrizzle(signatureDb),
+      repo: new SignatureRepositoryDrizzle(getOwnerDbHandle().db),
       contextReader: new SignatureContextReaderDrizzle(signatureDb),
       email: signatureEmail,
       notifications: signatureNotifications,
@@ -1068,7 +1068,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     buildAssistantWriteHandlersFromRepos(
       { clientRepo, interventionRepo, devisRepo, factureRepo, devisReader: new DevisReaderDrizzle(getDbHandle().db), commandeRepo },
       {
-        devis: { artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db), clientReader: new SharedClientReaderDrizzle(getDbHandle().db), signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db), signatureCreator: new DevisSignatureCreatorDrizzle(getDbHandle().db), appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com", pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000), modeleEmailRepo },
+        devis: { artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db), clientReader: new SharedClientReaderDrizzle(getDbHandle().db), signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db), signatureCreator: new DevisSignatureCreatorDrizzle(getOwnerDbHandle().db), appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com", pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000), modeleEmailRepo },
         facture: { artisanReader: new ArtisanReaderDrizzle(getDbHandle().db), clientReader: new ClientReaderDrizzle(getDbHandle().db), pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000), modeleEmailRepo },
         relance: { artisanReader: new ArtisanReaderDrizzle(getDbHandle().db), clientReader: new ClientReaderDrizzle(getDbHandle().db), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000), modeleEmailRepo, appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com", portalTokenReader: new PortalAccessRepositoryDrizzle(getDbHandle().db) },
         commande: { repo: commandeRepo, fournisseurRepo, artisanReader: new CommandeArtisanReaderDrizzle(getDbHandle().db), pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },

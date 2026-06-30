@@ -171,8 +171,8 @@ describe.skipIf(!URL)("DevisRepositoryDrizzle (PG, RLS + scope tenant + lignes)"
 
     const sfx = Date.now();
     await admin.query(
-      `insert into signatures_devis ("devisId", token, "expiresAt", statut) values ($1, $2, now() + interval '30 days', 'accepte')`,
-      [d.id, `tok-sig-${sfx}`],
+      `insert into signatures_devis ("artisanId","devisId", token, "expiresAt", statut) values ($1, $2, $3, now() + interval '30 days', 'accepte')`,
+      [A, d.id, `tok-sig-${sfx}`],
     );
 
     expect(await repo.signatureAccepteeParClient(ctx(A), d.id)).toBe(true);

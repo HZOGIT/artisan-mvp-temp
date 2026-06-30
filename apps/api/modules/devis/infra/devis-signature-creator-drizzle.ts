@@ -10,9 +10,9 @@ import type { DevisSignatureCreator } from "../application/envoyer-devis-email";
 export class DevisSignatureCreatorDrizzle implements DevisSignatureCreator {
   constructor(private readonly db: DbClient) {}
 
-  async create(devisId: number): Promise<{ token: string }> {
+  async create(devisId: number, artisanId: number): Promise<{ token: string }> {
     const token = generateSignatureToken();
-    await this.db.insert(signaturesDevis).values({ devisId, token, expiresAt: computeSignatureExpiry(new Date()) });
+    await this.db.insert(signaturesDevis).values({ artisanId, devisId, token, expiresAt: computeSignatureExpiry(new Date()) });
     return { token };
   }
 }

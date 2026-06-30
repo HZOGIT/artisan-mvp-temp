@@ -13,6 +13,7 @@ describe.skipIf(!URL)("SignatureRepositoryDrizzle (persistance signatures_devis)
   const admin = new Pool({ connectionString: URL });
   const app = createDbClient(URL!);
   const repo = new SignatureRepositoryDrizzle(app.db);
+  let artisanId = 0;
   let devisId = 0;
 
   const cleanup = async () => {
@@ -24,7 +25,7 @@ describe.skipIf(!URL)("SignatureRepositoryDrizzle (persistance signatures_devis)
 
   beforeAll(async () => {
     await cleanup();
-    const artisanId = (await admin.query('insert into artisans ("userId","nomEntreprise") values ($1,$2) returning id', [UID, "Sig Repo"])).rows[0].id;
+    artisanId = (await admin.query('insert into artisans ("userId","nomEntreprise") values ($1,$2) returning id', [UID, "Sig Repo"])).rows[0].id;
     const clientId = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [artisanId, "C"])).rows[0].id;
     devisId = (await admin.query('insert into devis ("artisanId","clientId",numero,statut) values ($1,$2,$3,$4) returning id', [artisanId, clientId, `SR-${UID}`, "envoye"])).rows[0].id;
   });
@@ -36,7 +37,7 @@ describe.skipIf(!URL)("SignatureRepositoryDrizzle (persistance signatures_devis)
   });
 
   it("create : insère + renvoie la signature avec les défauts (statut en_attente)", async () => {
-    const sig = await repo.create({ devisId, token: TOKEN, expiresAt: new Date(Date.now() + 30 * 86400000) });
+    const sig = await repo.create({ artisanId, devisId, token: TOKEN, expiresAt: new Date(Date.now() + 30 * 86400000) });
     expect(sig.token).toBe(TOKEN);
     expect(sig.devisId).toBe(devisId);
     expect(sig.statut).toBe("en_attente");

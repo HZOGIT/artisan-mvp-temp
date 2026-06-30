@@ -39,7 +39,7 @@ describe.skipIf(!URL)("SignaturePublicReaderDrizzle (RLS accès public par token
     const clientId = (await admin.query('insert into clients ("artisanId",nom,email) values ($1,$2,$3) returning id', [artisanId, "Client", "c@test.com"])).rows[0].id;
     const devisId = (await admin.query('insert into devis ("artisanId","clientId",numero,"totalTTC") values ($1,$2,$3,$4) returning id', [artisanId, clientId, `SIG-${userId}`, "1200.00"])).rows[0].id;
     await admin.query('insert into devis_lignes ("devisId",designation,"prixUnitaireHT") values ($1,$2,$3)', [devisId, "Ligne 1", "1000.00"]);
-    await admin.query('insert into signatures_devis ("devisId",token,"expiresAt") values ($1,$2, now() + interval \'30 days\')', [devisId, token]);
+    await admin.query('insert into signatures_devis ("artisanId","devisId",token,"expiresAt") values ($1,$2,$3, now() + interval \'30 days\')', [artisanId, devisId, token]);
     return { artisanId, devisId };
   };
 

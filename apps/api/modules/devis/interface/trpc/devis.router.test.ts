@@ -234,7 +234,7 @@ describe.skipIf(!URL)("devis.router e2e (HTTP → tRPC → use-case → repo →
     await callMutation(server, "devis.addLigne", { devisId: id, designation: "Pose", quantite: "1", prixUnitaireHT: "100.00" }, tA);
     await admin.query("update devis set statut='envoye' where id=$1", [id]);
     const signToken = `test-close-sig-${id}-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`.slice(0, 64);
-    await admin.query("insert into signatures_devis (\"devisId\",token,\"expiresAt\",statut) values ($1,$2,now()+interval '30 days','en_attente')", [id, signToken]);
+    await admin.query("insert into signatures_devis (\"artisanId\",\"devisId\",token,\"expiresAt\",statut) values ($1,$2,$3,now()+interval '30 days','en_attente')", [artisanA, id, signToken]);
     const res = await callMutation(server, "devis.accepter", { id }, tA);
     expect(res.statusCode).toBe(200);
     const { rows } = await admin.query("select statut from signatures_devis where token=$1", [signToken]);

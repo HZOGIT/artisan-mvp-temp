@@ -71,6 +71,7 @@ export async function createSignatureLink(
   const now = (deps.maintenant ?? (() => new Date()))();
   const token = generateSignatureToken();
   const signature = await deps.repo.create({
+    artisanId: ctx.artisanId,
     devisId,
     token,
     expiresAt: computeSignatureExpiry(now),

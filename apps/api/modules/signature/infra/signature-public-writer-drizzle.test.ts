@@ -39,7 +39,7 @@ describe.skipIf(!URL)("SignaturePublicWriterDrizzle (effets publics sous RLS)", 
     artisanId = (await admin.query('insert into artisans ("userId","nomEntreprise","email") values ($1,$2,$3) returning id', [UID, "W", "w@test.com"])).rows[0].id;
     const clientId = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [artisanId, "C"])).rows[0].id;
     devisId = (await admin.query('insert into devis ("artisanId","clientId",numero,statut) values ($1,$2,$3,$4) returning id', [artisanId, clientId, `SIGW-${UID}`, "envoye"])).rows[0].id;
-    await admin.query('insert into signatures_devis ("devisId",token,"expiresAt") values ($1,$2, now() + interval \'30 days\')', [devisId, TOKEN]);
+    await admin.query('insert into signatures_devis ("artisanId","devisId",token,"expiresAt") values ($1,$2,$3, now() + interval \'30 days\')', [artisanId, devisId, TOKEN]);
     opt1 = (await admin.query('insert into devis_options ("devisId",nom) values ($1,$2) returning id', [devisId, "Standard"])).rows[0].id;
     opt2 = (await admin.query('insert into devis_options ("devisId",nom) values ($1,$2) returning id', [devisId, "Premium"])).rows[0].id;
   });
