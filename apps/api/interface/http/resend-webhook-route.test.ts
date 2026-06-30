@@ -106,6 +106,14 @@ describe.skipIf(!URL)("POST /api/resend/webhook", () => {
     expect((await fakeNotifRepo.list({ artisanId: 42, userId: 0 })).length).toBe(countBefore);
   });
 
+  it("retry Svix (même svix-id, writer null car statut inchangé) → 200 sans notif dupliquée", async () => {
+    vi.mocked(fakeWriter.updateStatutByResendId).mockResolvedValueOnce(null);
+    const countBefore = (await fakeNotifRepo.list({ artisanId: 42, userId: 0 })).length;
+    const res = await postSigned({ type: "email.bounced", data: { email_id: "rid-bounce-1" } }, "msg_b1");
+    expect(res.statusCode).toBe(200);
+    expect((await fakeNotifRepo.list({ artisanId: 42, userId: 0 })).length).toBe(countBefore);
+  });
+
   it("writer retourne null (resendId inconnu) → 200 sans notification", async () => {
     vi.mocked(fakeWriter.updateStatutByResendId).mockResolvedValueOnce(null);
     const countBefore = (await fakeNotifRepo.list({ artisanId: 42, userId: 0 })).length;

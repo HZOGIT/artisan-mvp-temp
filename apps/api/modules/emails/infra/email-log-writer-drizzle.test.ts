@@ -70,6 +70,11 @@ describe.skipIf(!URL)("EmailLogWriterDrizzle (PG, update par resendId + isolatio
     expect(await writer.updateStatutByResendId("resend-inconnu-999", "plainte")).toBeNull();
   });
 
+  it("retry même statut → null (déduplication at-least-once)", async () => {
+    /** A est déjà en 'bounce' après le 1er test. Un 2e appel avec le même statut = no-op. */
+    expect(await writer.updateStatutByResendId("resend-aaa-001", "bounce")).toBeNull();
+  });
+
   it("isolation RLS : tenant A ne voit pas le log de B (même après update)", async () => {
     const rowsA = await reader.list({ artisanId: A, userId: 0 }, {});
     expect(rowsA.every((r) => r.artisanId === A)).toBe(true);
