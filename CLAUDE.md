@@ -265,6 +265,42 @@ Une base neuve n'a besoin d'aucun script manuel.
   (`./scripts/deploy-backend.sh`). BDD de **test** en retard (gate L2/L3/e2e → `column … does not exist`) :
   **`task db:provision`**.
 
+## Jobs système / reconcilers : pool DB & RLS
+
+**Un job système / reconciler / poller qui balaye PLUSIEURS tenants doit choisir le bon pool de connexion selon la RLS de la table cible.**
+
+### Règle 1 — pool owner obligatoire pour les tables RLS-FORCE (cross-tenant)
+
+| Table | RLS | Pool à utiliser |
+|---|---|---|
+| Toutes les tables tenant (factures, paiements_stripe, notifications, emails_log…) | **FORCE** | `getOwnerDbHandle` (owner) |
+| `events`, `event_outbox` | OFF | `app_tenant` OK |
+
+**Piège silencieux** : avec `app_tenant` sans `SET app.tenant` posé, toute policy RLS-FORCE renvoie **0 ligne** — le job semble tourner sans erreur mais ne fait **rien** (no-op silencieux). C'est la cause racine des incidents #382 et #386 (paiements non réconciliés FAC-20/FAC-00018, paiement Stripe jamais rapproché).
+
+Règle pratique :
+- Job/reconciler cross-tenant sur table RLS-FORCE → **`getOwnerDbHandle`**, pas `getDbHandle`.
+- Contexte tenant normal (requête utilisateur) → `app_tenant` reste la règle ; `getOwnerDbHandle` est réservé aux jobs système.
+
+### Règle 2 — TOUJOURS de VRAIS tests (anti false-green)
+
+**Un test doit reproduire les conditions RÉELLES de prod, sinon il ment (vert à tort).**
+
+- Les tests de jobs système / reconcilers / repos / RLS tournent **sous `APP_DATABASE_URL` (rôle `app_tenant`)**, **JAMAIS** sous `DATABASE_URL` (owner, qui bypasse la RLS). Un test en owner passe même quand le job est un no-op en prod → false-green.
+- Le test doit **ÉCHOUER avant le fix** et **passer après** — pas de test de complaisance.
+- Il reproduit le déclencheur réel : bon rôle (`app_tenant`), RLS active, tenant non posé pour les jobs cross-tenant.
+- Tout reconciler/job système livré sans test sous `app_tenant` reproduisant le no-op = **à rejeter**.
+
+Pattern récurrent (#347, #382, #386) : faux-test owner-bypass (voir aussi OPE-674), false-green cache ESLint.
+
+> Pour les repos, passer `APP_DATABASE_URL` à vitest (jamais à la main pour la base de test) :
+> ```bash
+> DATABASE_URL="$(grep ^DATABASE_URL= .env.test.local | cut -d= -f2-)" \
+>   node_modules/.bin/vitest run -c vitest.api.config.ts --no-file-parallelism <fichiers>
+> ```
+
+---
+
 ## Setup & Seeding
 
 Le script `scripts/seed-data.ts` crée un jeu de données démo complet et idempotent (purge avant réinsertion).
