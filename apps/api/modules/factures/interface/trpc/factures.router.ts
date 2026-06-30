@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import { router, protectedProcedure, permissionProcedure } from "../../../../interface/trpc/trpc";
+
+/** Permissions factures (parité legacy) : créer/modifier/émettre/encaisser/avoir = `factures.creer` ; supprimer = `factures.supprimer`. */
+const facturesCreer = permissionProcedure("factures.creer");
+const facturesSupprimer = permissionProcedure("factures.supprimer");
 import { TVA_CATEGORIES_MAP } from "../../../../shared/tva/taux-tva-fr";
 import type { IFactureRepository } from "../../application/facture-repository";
 import type { IDevisReader } from "../../application/devis-reader";
@@ -159,7 +163,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
       .input(z.object({ factureId: z.number().int() }))
       .query(({ ctx, input }) => getAuditLogFacture(repo, ctx.tenant, input.factureId)),
 
-    create: protectedProcedure
+    create: facturesCreer
       .input(createSchema)
       .mutation(async ({ ctx, input }) => {
         const lockDate = await lockDateReader?.getLockDate(ctx.tenant) ?? null;
@@ -177,7 +181,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
         });
       }),
 
-    update: protectedProcedure
+    update: facturesCreer
       .input(z.object({ id: z.number().int() }).and(updateSchema))
       .mutation(async ({ ctx, input }) => {
         const lockDate = await lockDateReader?.getLockDate(ctx.tenant) ?? null;
@@ -185,14 +189,14 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
         return modifierFacture(repo, ctx.tenant, id, { ...data, dateEcheance: toDate(dateEcheance) }, lockDate);
       }),
 
-    delete: protectedProcedure
+    delete: facturesSupprimer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerFacture(repo, ctx.tenant, input.id);
         return { success: true };
       }),
 
-    addLigne: protectedProcedure
+    addLigne: facturesCreer
       .input(z.object({ factureId: z.number().int() }).and(ligneCreateSchema))
       .mutation(({ ctx, input }) => {
         const { factureId, tvaCategorieId, remise: remiseNum, ...data } = input;
@@ -201,7 +205,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
         return ajouterLigneFacture(repo, ctx.tenant, factureId, { ...data, tauxTVA, tvaCategorieId: effectiveCategorieId, remise: String(remiseNum ?? 0) });
       }),
 
-    updateLigne: protectedProcedure
+    updateLigne: facturesCreer
       .input(z.object({ id: z.number().int(), factureId: z.number().int() }).and(ligneUpdateSchema))
       .mutation(({ ctx, input }) => {
         const { id, factureId, tvaCategorieId, remise: remiseNum, ...data } = input;
@@ -209,7 +213,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
         return modifierLigneFacture(repo, ctx.tenant, factureId, id, { ...data, ...(tauxTVA !== undefined && { tauxTVA }), ...(tvaCategorieId !== undefined && { tvaCategorieId }), ...(remiseNum !== undefined && { remise: String(remiseNum) }) });
       }),
 
-    deleteLigne: protectedProcedure
+    deleteLigne: facturesCreer
       .input(z.object({ id: z.number().int(), factureId: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerLigneFacture(repo, ctx.tenant, input.factureId, input.id);
@@ -220,7 +224,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
      * Transitions de statut (machine à états dans le use-case : Conflict→409 si invalide).
      * ⚠️ Le passage à `payee` se fait via le paiement (étape ultérieure), pas ici.
      */
-    envoyer: protectedProcedure
+    envoyer: facturesCreer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         return withOutbox(db, repo, async (r, tx) => {
@@ -246,12 +250,12 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
         });
       }),
 
-    marquerEnRetard: protectedProcedure
+    marquerEnRetard: facturesCreer
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => changerStatutFacture(repo, ctx.tenant, input.id, "en_retard")),
 
     /** Convertir un devis accepté en facture (cross-domaine : lit le devis via le reader injecté). */
-    convertirDepuisDevis: protectedProcedure
+    convertirDepuisDevis: facturesCreer
       .input(z.object({ devisId: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         const result = await convertirDevisEnFacture(repo, devisReader, ctx.tenant, input.devisId);
@@ -260,7 +264,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
       }),
 
     /** Créer une facture d'acompte (estAcompte=true) depuis un devis accepté (montant fixe TTC). */
-    facturerAcompte: protectedProcedure
+    facturerAcompte: facturesCreer
       .input(z.object({
         devisId: z.number().int(),
         montant: decimal,
@@ -272,7 +276,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
       }),
 
     /** Créer la facture de solde (lignes devis + déductions acomptes) depuis un devis accepté. */
-    facturerSolde: protectedProcedure
+    facturerSolde: facturesCreer
       .input(z.object({ devisId: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         const result = await facturerSolde(repo, devisReader, ctx.tenant, input);
@@ -281,7 +285,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
       }),
 
     /** Facturer une situation de travaux sur un devis accepté (avancement partiel). */
-    facturerSituation: protectedProcedure
+    facturerSituation: facturesCreer
       .input(z.object({
         devisId: z.number().int(),
         pourcentageCumule: z.number().min(0.01).max(100),
@@ -293,19 +297,19 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
       }),
 
     /** Émettre un avoir (note de crédit) sur une facture d'origine — montants négatifs. */
-    creerAvoir: protectedProcedure.input(avoirInputSchema).mutation(({ ctx, input }) => {
+    creerAvoir: facturesCreer.input(avoirInputSchema).mutation(({ ctx, input }) => {
       const { factureOrigineId, ...data } = input;
       return creerAvoir(repo, ctx.tenant, factureOrigineId, data, compta);
     }),
 
     /** Alias de surface (parité client `trpc.factures.createAvoir`) : même use-case que `creerAvoir`. */
-    createAvoir: protectedProcedure.input(avoirInputSchema).mutation(({ ctx, input }) => {
+    createAvoir: facturesCreer.input(avoirInputSchema).mutation(({ ctx, input }) => {
       const { factureOrigineId, ...data } = input;
       return creerAvoir(repo, ctx.tenant, factureOrigineId, data, compta);
     }),
 
     /** Enregistrement d'un paiement (partiel ou soldant) — passe `payee` si soldée. */
-    enregistrerPaiement: protectedProcedure
+    enregistrerPaiement: facturesCreer
       .input(z.object({ id: z.number().int(), montant: decimal, date: isoDate.optional(), mode: z.string().max(50).optional() }))
       .mutation(async ({ ctx, input }) => {
         return withOutbox(db, repo, async (r, tx) => {
@@ -320,7 +324,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
      * Paiement partiel ou soldant (parité client `trpc.factures.markAsPaid`) : cumule montantPaye,
      * marque `payee` uniquement si totalTTC soldé, génère les écritures FEC. Date invalide → 400.
      */
-    markAsPaid: protectedProcedure
+    markAsPaid: facturesCreer
       .input(z.object({ id: z.number().int(), montantPaye: decimal, datePaiement: isoDate }))
       .mutation(async ({ ctx, input }) => {
         return withOutbox(db, repo, async (r, tx) => {
@@ -331,7 +335,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
         });
       }),
 
-    ajouterReglement: protectedProcedure
+    ajouterReglement: facturesCreer
       .input(z.object({
         factureId: z.number().int(),
         montant: decimal,
@@ -357,7 +361,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
      * Envoi de la facture par email (PDF en pièce jointe) — parité client `trpc.factures.sendByEmail`.
      * ownership 404 / client.email 400 / rate-limit 429 ; passe `envoyee` si brouillon/validee (sans FEC).
      */
-    sendByEmail: protectedProcedure
+    sendByEmail: facturesCreer
       .input(
         z.object({
           factureId: z.number().int(),
@@ -391,7 +395,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
         }),
 
       /** Génère le PDF d'attestation TVA réduite et le stocke. Renvoie l'URL publique. */
-      generer: protectedProcedure
+      generer: facturesCreer
         .input(
           z.object({
             factureId: z.number().int().optional(),
@@ -459,7 +463,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
         }),
 
       /** Attache un PDF signé (base64) à une attestation existante. */
-      attacherSignee: protectedProcedure
+      attacherSignee: facturesCreer
         .input(z.object({ id: z.number().int(), fichierBase64: z.string().min(1) }))
         .mutation(async ({ ctx, input }) => {
           if (!attestationRepo || !storage || !db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Stockage non configuré" });
