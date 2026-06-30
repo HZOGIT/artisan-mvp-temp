@@ -184,6 +184,7 @@ import { rgpdCronPlugin } from "./shared/infra/rgpd-cron";
 import { retentionPurgeCronPlugin } from "./shared/infra/retention-purge-cron";
 import { notificationsCronPlugin } from "./shared/infra/notifications-cron";
 import { genererRappelsFacturesEnRetard } from "./modules/notifications/application/derived-use-cases";
+import { creerNotificationsDepuisEvents } from "./modules/notifications/application/events-notification-consumer";
 import { genererAlertesStock } from "./modules/stocks/application/alertes-use-cases";
 import { genererAlertesRetardLivraison } from "./modules/commandes/application/alertes-retard-use-cases";
 import { genererAlertesReconductionContrats } from "./modules/contrats-maintenance/application/alertes-reconduction-use-cases";
@@ -1469,6 +1470,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
         }
         return { alertsCreated };
       },
+      generateFromEvents: () => creerNotificationsDepuisEvents(getOwnerDbHandle().db),
     },
   });
 
