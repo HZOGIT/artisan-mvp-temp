@@ -63,9 +63,15 @@ async function handleConnectCheckoutCompleted(
 ): Promise<void> {
   const metadata = (session.metadata ?? {}) as Record<string, unknown>;
   const token = metadata.token_paiement ? String(metadata.token_paiement) : null;
-  if (!token || !metadata.facture_id) return;
+  if (!token || !metadata.facture_id) {
+    deps.log?.warn({ event: "connect_checkout_no_token", metadata }, "Connect checkout.session.completed sans token_paiement ou facture_id — skip");
+    return;
+  }
   const resolved = await deps.paymentWriter.resolvePaiement(token);
-  if (!resolved) return;
+  if (!resolved) {
+    deps.log?.warn({ event: "connect_checkout_resolve_null", token }, "Connect checkout.session.completed — resolvePaiement retourne null pour le token");
+    return;
+  }
   await deps.paymentWriter.completeCheckout({
     artisanId: resolved.artisanId,
     paiementId: resolved.paiementId,

@@ -73,7 +73,7 @@ export const portalPaymentReconciliationPollerPlugin = fp(
               `SELECT ps.id, ps."artisanId", ps."factureId", ps."stripeSessionId", ps."tokenPaiement",
                       ps."stripe_connect_account_id" AS "stripeConnectAccountId"
                FROM paiements_stripe ps
-               WHERE ps.statut = 'en_attente' AND ps."createdAt" < $1`,
+               WHERE ps.statut IN ('en_attente', 'expire') AND ps."createdAt" < $1`,
               [cutoff],
             );
 
