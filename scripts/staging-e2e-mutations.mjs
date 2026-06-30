@@ -480,6 +480,100 @@ async function casClientsCreateUpdateDelete() {
 }
 
 await casClientsCreateUpdateDelete();
+
+// ── CAS 9 — OPE-904 : paiement facture routé sur compte Stripe Connect (direct charge, 0 commission)
+// Anti-régression : avant Lot 4, le checkout était créé sur le compte PLATEFORME Operioz (pas l'artisan).
+// Ce cas vérifie que : (A) la session Stripe est accessible via `Stripe-Account: acct_...` du compte
+// connecté, (B) `application_fee_amount` est absent (0 commission), (C) le PaymentIntent succeed sur
+// le compte connecté. Requiert STRIPE_SECRET_KEY en env.
+async function casConnectDirectChargeFact() {
+  casesRun++;
+  const tag = 'connect.paiement-facture-direct-charge';
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeKey) {
+    issues.push({ tag, skipped: 'STRIPE_SECRET_KEY absent — passer via pw-run.sh: STRIPE_SECRET_KEY=sk_test_...' });
+    return;
+  }
+  const stripeHdrs = (acctId) => ({
+    'Authorization': `Bearer ${stripeKey}`,
+    ...(acctId ? { 'Stripe-Account': acctId } : {}),
+  });
+  const trpcPost = async (proc, input) => ctx.request.post(`${BACKEND}/api/trpc/${proc}?batch=1`, {
+    headers: { 'content-type': 'application/json' },
+    data: { '0': { json: input } },
+  });
+  try {
+    const connectStatus = await trpcGet('connect.getStatus', null);
+    if (!connectStatus?.chargesEnabled || !connectStatus?.accountId) {
+      issues.push({ tag, skipped: `charges_enabled=${connectStatus?.chargesEnabled ?? false} accountId=${connectStatus?.accountId ?? 'null'} — activer Stripe Connect en test mode` });
+      return;
+    }
+    const acctId = connectStatus.accountId;
+
+    const factures = (await trpcGet('factures.list', null)) ?? [];
+    const fact = factures.find(f => f.statut === 'envoyee');
+    if (!fact?.clientId) { issues.push({ tag, skipped: 'aucune facture envoyée avec clientId sur le compte e2e' }); return; }
+
+    const rAcc = await trpcPost('clientPortal.generateAccess', { clientId: fact.clientId });
+    if (!rAcc.ok()) { issues.push({ tag, step: 'portal-access', error: `HTTP ${rAcc.status()}` }); return; }
+    const token = (await rAcc.json())[0]?.result?.data?.json?.token;
+    if (!token) { issues.push({ tag, step: 'portal-token', error: 'token absent' }); return; }
+
+    const rCs = await ctx.request.post(`${BACKEND}/api/paiement/create-checkout-session`, {
+      data: { factureId: fact.id, token },
+    });
+    if (!rCs.ok()) {
+      const body = await rCs.json().catch(() => ({}));
+      issues.push({ tag, step: 'create-checkout', error: `HTTP ${rCs.status()} — ${body.error ?? JSON.stringify(body)}` });
+      return;
+    }
+    const { sessionId } = await rCs.json();
+    if (!sessionId) { issues.push({ tag, step: 'session-id', error: 'sessionId absent' }); return; }
+
+    /* ASSERT A — session accessible via Stripe-Account du compte connecté (preuve de routage) */
+    const rSess = await ctx.request.get(
+      `https://api.stripe.com/v1/checkout/sessions/${sessionId}?expand%5B0%5D=payment_intent`,
+      { headers: stripeHdrs(acctId) }
+    );
+    if (!rSess.ok()) {
+      issues.push({ tag, step: 'stripe-retrieve', error: `Stripe ${rSess.status()} — session non trouvée sur compte connecté ${acctId} (routage sur compte plateforme ?)` });
+      return;
+    }
+    const sess = await rSess.json();
+    console.log(`[${tag}] ✓ ASSERT A: session ${sessionId} routée sur compte connecté ${acctId}`);
+
+    /* ASSERT B — 0 commission */
+    const piObj = typeof sess.payment_intent === 'object' && sess.payment_intent !== null ? sess.payment_intent : null;
+    if (piObj?.application_fee_amount != null) {
+      issues.push({ tag, step: 'no-app-fee', error: `application_fee_amount = ${piObj.application_fee_amount}, attendu null (0 commission)` });
+    } else {
+      console.log(`[${tag}] ✓ ASSERT B: application_fee_amount absent — 0 commission`);
+    }
+
+    /* ASSERT C — paiement confirmé sur compte connecté */
+    const piId = piObj?.id ?? (typeof sess.payment_intent === 'string' ? sess.payment_intent : null);
+    if (piId) {
+      const rConf = await ctx.request.post(
+        `https://api.stripe.com/v1/payment_intents/${piId}/confirm`,
+        { headers: stripeHdrs(acctId), form: { payment_method: 'pm_card_visa' } }
+      );
+      const piResult = await rConf.json();
+      if (piResult.status === 'succeeded') {
+        if (piResult.application_fee_amount != null) {
+          issues.push({ tag, step: 'pi-no-fee', error: `PI application_fee_amount = ${piResult.application_fee_amount}` });
+        } else {
+          console.log(`[${tag}] ✓ ASSERT C: PI ${piId} succeeded sur compte connecté ${acctId}, 0 application_fee`);
+        }
+      } else {
+        issues.push({ tag, step: 'pi-confirm', error: `PI status = ${piResult.status} (attendu succeeded) — code: ${piResult.last_payment_error?.code ?? 'n/a'}` });
+      }
+    }
+  } catch (e) {
+    issues.push({ tag, error: String(e).slice(0, 300) });
+  }
+}
+
+await casConnectDirectChargeFact();
 // ── (Ajouter ici les cas factures/contrats et tout futur bug d'intégration front↔tRPC) ─────────────
 
 console.log('=== E2E MUTATIONS RESULT ===');

@@ -73,6 +73,8 @@ export class StripeAdapter implements StripePort {
   }
 
   async createInvoiceCheckout(p: CreateInvoiceCheckoutParams): Promise<{ url: string | null; sessionId: string }> {
+    /* ponytail: fail-fast — charge plateforme architecturalement impossible pour les paiements clients finaux */
+    if (!p.stripeConnectAccountId) throw new Error("stripeConnectAccountId requis — charge plateforme interdite pour les paiements clients finaux");
     const s = await this.sdk();
     const session = await s.checkout.sessions.create(
       {

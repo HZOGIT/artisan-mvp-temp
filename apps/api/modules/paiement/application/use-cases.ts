@@ -91,6 +91,8 @@ export async function createInvoiceCheckout(
   const chargesEnabled = await deps.reader.getArtisanChargesEnabled(ctx);
   if (!chargesEnabled) return { kind: "bad-request", message: "Le paiement en ligne n'est pas encore activé par l'artisan" };
   const stripeConnectAccountId = (await deps.reader.getArtisanConnectAccountId(ctx)) ?? "";
+  /* ponytail: double-garde — chargesEnabled implique accountId non-vide, mais vérification explicite rend IMPOSSIBLE une charge plateforme si les deux méthodes divergent */
+  if (!stripeConnectAccountId) return { kind: "bad-request", message: "Le paiement en ligne n'est pas encore activé par l'artisan" };
   const facture = await deps.reader.getFactureCheckout(ctx, input.factureId);
   if (!facture || facture.clientId !== access.clientId) return { kind: "not-found" };
   if (facture.statut === "payee") return { kind: "bad-request", message: "Cette facture est déjà payée" };
