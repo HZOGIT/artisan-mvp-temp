@@ -1377,7 +1377,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   app.register(portalPaymentReconciliationPollerPlugin, {
     stripe: deps.stripePort ?? new StripeAdapter(),
     writer: new WebhookPaymentWriterDrizzle(getDbHandle().db),
-    dbUrl: getDbHandle().pool.options.connectionString ?? "",
+    dbUrl: getOwnerDbHandle().pool.options.connectionString ?? "",
     genererEcritures: async (artisanId: number, factureId: number) => {
       await compta.genererEcrituresVente({ artisanId, userId: 0 }, factureId);
       await compta.genererEcrituresEncaissement({ artisanId, userId: 0 }, factureId);
