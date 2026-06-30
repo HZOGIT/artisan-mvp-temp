@@ -65,6 +65,7 @@ describe("devis — invariants métier (synthèse)", () => {
   it("INV-5 : immutabilité post-acceptation — devis accepté figé (modif/suppr/lignes → Conflict)", async () => {
     const repo = repoWithClient(A, 100);
     const d = await creerDevis(repo, A, { clientId: 100 });
+    await ajouterLigneDevis(repo, A, d.id, { designation: "Pose", quantite: "1", prixUnitaireHT: "100.00" });
     await changerStatutDevis(repo, A, d.id, "envoye", fakeArtisanReader);
     await changerStatutDevis(repo, A, d.id, "accepte");
     await expect(modifierDevis(repo, A, d.id, { objet: "x" })).rejects.toBeInstanceOf(ConflictError);
@@ -75,7 +76,8 @@ describe("devis — invariants métier (synthèse)", () => {
   it("INV-6 : machine à états — transitions valides only ; terminaux figés ; idempotence", async () => {
     const repo = repoWithClient(A, 100);
     const d = await creerDevis(repo, A, { clientId: 100 });
-    await expect(changerStatutDevis(repo, A, d.id, "accepte")).rejects.toBeInstanceOf(ConflictError); // saute envoye
+    await expect(changerStatutDevis(repo, A, d.id, "accepte")).rejects.toBeInstanceOf(ConflictError); // saute envoye (transition check avant garde)
+    await ajouterLigneDevis(repo, A, d.id, { designation: "Pose", quantite: "1", prixUnitaireHT: "100.00" });
     expect((await changerStatutDevis(repo, A, d.id, "envoye", fakeArtisanReader)).statut).toBe("envoye");
     expect((await changerStatutDevis(repo, A, d.id, "envoye")).statut).toBe("envoye"); // idempotent
     await changerStatutDevis(repo, A, d.id, "expire");

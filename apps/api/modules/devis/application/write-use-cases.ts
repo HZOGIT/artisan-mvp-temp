@@ -139,6 +139,11 @@ export async function changerStatutDevis(
   if (!TRANSITIONS[devis.statut].includes(cible)) {
     throw new ConflictError(`Transition de statut invalide : ${devis.statut} → ${cible}`);
   }
+  if (cible === "envoye" || cible === "accepte") {
+    if (Number(devis.totalHT) <= 0) {
+      throw new ValidationError("Un devis sans ligne ou sans montant ne peut pas être envoyé");
+    }
+  }
   if (cible === "envoye") {
     if (!artisanReader) throw new ValidationError("Le SIRET de l'artisan est requis pour envoyer un devis");
     const artisan = await artisanReader.getArtisan(ctx);
