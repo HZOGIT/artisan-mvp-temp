@@ -187,6 +187,7 @@ import { artisans as artisansTable, paOutbox } from "../../drizzle/schema.pg";
 import { makeDepensesRecurrentesJob } from "./modules/depenses/application/depenses-recurrentes-job";
 import { contratsVisitesCronPlugin } from "./shared/infra/contrats-visites-cron";
 import { rappelRdvClientCronPlugin } from "./shared/infra/rappel-rdv-client-cron";
+import { analysePhotosCronPlugin } from "./shared/infra/analyse-photos-cron";
 import { ensureStripeWebhookEndpoint } from "./shared/infra/stripe-webhook-setup";
 import { WebhookPaymentWriterDrizzle } from "./modules/subscription/infra/webhook-payment-writer-drizzle";
 import { SubscriptionEventNotifierDrizzle } from "./modules/subscription/infra/subscription-event-notifier-drizzle";
@@ -1416,6 +1417,12 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   app.register(contratsVisitesCronPlugin, {
     repo: contratRepo,
     db: getDbHandle().db,
+  });
+
+  /** Cron analyse photos — tick toutes les 5 min, retraite les analyses en_attente avec photos (cross-tenant ownerDb). */
+  app.register(analysePhotosCronPlugin, {
+    ownerDb: getOwnerDbHandle().db,
+    devisIADeps: devisIA.deps,
   });
 
   /** Cron rappel RDV client — tick horaire, envoie les emails J-1 aux clients (idempotent via drapeau). */
