@@ -149,7 +149,7 @@ describe.skipIf(!URL)("stocks.router e2e (HTTP → tRPC → use-case → repo �
     const sortie = await callMutation(server, "stocks.adjustQuantity", { stockId: id, type: "sortie", quantite: "4" }, tA);
     expect(sortie.json().result.data.quantiteEnStock).toBe("11.00");
     const mvts = (await callQuery(server, "stocks.getMouvements", { stockId: id }, tA)).json().result.data as Array<{ type: string; quantiteAvant: string; quantiteApres: string }>;
-    expect(mvts.length).toBe(2);
+    expect(mvts.length).toBe(3); /* Stock initial + entree + sortie */
     expect(mvts[0].type).toBe("sortie"); // récents d'abord
     expect(mvts[0].quantiteAvant).toBe("15.00");
     expect(mvts[0].quantiteApres).toBe("11.00");
@@ -157,9 +157,9 @@ describe.skipIf(!URL)("stocks.router e2e (HTTP → tRPC → use-case → repo �
 
   it("adjustQuantity : sortie > stock → 400 (quantité jamais négative, aucun mouvement)", async () => {
     const tA = await token(UA);
-    const id = (await callMutation(server, "stocks.create", { reference: "NEG", designation: "Garde-fou", quantiteEnStock: "3" }, tA)).json().result.data.id as number;
+    const id = (await callMutation(server, "stocks.create", { reference: "NEG", designation: "Garde-fou", quantiteEnStock: "0" }, tA)).json().result.data.id as number;
     expect((await callMutation(server, "stocks.adjustQuantity", { stockId: id, type: "sortie", quantite: "5" }, tA)).statusCode).toBe(400);
-    expect((await callQuery(server, "stocks.getById", { id }, tA)).json().result.data.quantiteEnStock).toBe("3.00");
+    expect((await callQuery(server, "stocks.getById", { id }, tA)).json().result.data.quantiteEnStock).toBe("0.00");
     expect((await callQuery(server, "stocks.getMouvements", { stockId: id }, tA)).json().result.data).toEqual([]);
   });
 
