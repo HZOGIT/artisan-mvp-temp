@@ -20,6 +20,7 @@ export interface SchedulerDeps {
   readonly db?: DbClient;
   readonly pdf?: PdfPort;
   readonly emailLogWriter?: IEmailLogWriter;
+  readonly logger?: { error(obj: Record<string, unknown>, msg: string): void };
 }
 
 const TICK_BATCH_SIZE = 200;
@@ -243,7 +244,9 @@ export async function chargeOffSessionForCycle(
         buyerSiret: artisanInfo?.siret ?? undefined,
       });
       /* ponytail: best-effort — ne jamais laisser l'email bloquer le flux de facturation */
-      sendInvoiceEmail(deps, invoice, cycle, artisanInfo).catch(() => {});
+      sendInvoiceEmail(deps, invoice, cycle, artisanInfo).catch((err: unknown) =>
+        deps.logger?.error({ event: "billing_invoice_email_failed", err, artisanId }, "email facture abonnement non envoyé"),
+      );
       /*
        * Guard symétrique de FIX-CE (webhook) et FIX-CC (zombie recovery) :
        * ne pas avancer la période si la sub a été annulée entre le claimCycleForCharging
@@ -524,7 +527,9 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<number> {
         buyerSiret: zombieArtisanInfo?.siret ?? undefined,
       });
       /* ponytail: best-effort — ne jamais laisser l'email bloquer la récupération zombie */
-      sendInvoiceEmail(deps, zombieInvoice, cycle, zombieArtisanInfo).catch(() => {});
+      sendInvoiceEmail(deps, zombieInvoice, cycle, zombieArtisanInfo).catch((err: unknown) =>
+        deps.logger?.error({ event: "billing_invoice_email_failed", err, artisanId }, "email facture abonnement non envoyé"),
+      );
       await advanceSubscriptionAfterPayment(deps.repo, cycle.subscription_id, artisanId, cycle, resolveInterval(sub.billing_interval));
     } else if (pi.status === "processing") {
       /*

@@ -1393,6 +1393,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     db: getDbHandle().db,
     pdf: new JsPdfAdapter(),
     emailLogWriter: sharedEmailLogWriter,
+    logger: app.log,
   };
 
   registerBillingSchedulerRoute(app, { ...billingSchedulerDeps, secret: process.env.SCHEDULER_SECRET ?? "" });
