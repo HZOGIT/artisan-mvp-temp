@@ -1,4 +1,4 @@
-import type { CheckoutSessionStatus, CreateAccountLinkParams, CreateConnectAccountParams, CreateCustomerParams, CreateInvoiceCheckoutParams, StripePort, StripeWebhookEvent } from "./stripe";
+import type { CheckoutSessionStatus, ConnectAccountData, CreateAccountLinkParams, CreateConnectAccountParams, CreateCustomerParams, CreateInvoiceCheckoutParams, StripePort, StripeWebhookEvent } from "./stripe";
 import { getSecret } from "../config/secrets";
 
 const STRIPE_MODULE = "stripe";
@@ -11,9 +11,17 @@ type StripeSDK = {
       retrieve(id: string): Promise<{ payment_status: string; payment_intent: string | { id: string } | null }>;
     };
   };
-  webhooks: { constructEvent(payload: Buffer, signature: string, secret: string): StripeWebhookEvent & { account?: string } };
-  accounts: { create(p: unknown): Promise<{ id: string }> };
+  accounts: {
+    retrieve(id: string): Promise<{
+      charges_enabled: boolean;
+      payouts_enabled: boolean;
+      details_submitted: boolean;
+      requirements: Record<string, unknown> | null;
+    }>;
+    create(p: unknown): Promise<{ id: string }>;
+  };
   accountLinks: { create(p: unknown): Promise<{ url: string }> };
+  webhooks: { constructEvent(payload: Buffer, signature: string, secret: string): StripeWebhookEvent & { account?: string } };
 };
 
 export class StripeAdapter implements StripePort {
@@ -49,6 +57,17 @@ export class StripeAdapter implements StripePort {
     } catch {
       return null;
     }
+  }
+
+  async retrieveConnectAccount(accountId: string): Promise<ConnectAccountData> {
+    const s = await this.sdk();
+    const acct = await s.accounts.retrieve(accountId);
+    return {
+      charges_enabled: acct.charges_enabled,
+      payouts_enabled: acct.payouts_enabled,
+      details_submitted: acct.details_submitted,
+      requirements: acct.requirements ?? null,
+    };
   }
 
   async createInvoiceCheckout(p: CreateInvoiceCheckoutParams): Promise<{ url: string | null; sessionId: string }> {
@@ -148,5 +167,12 @@ export class FakeStripePort implements StripePort {
   async createAccountLink(p: CreateAccountLinkParams): Promise<{ url: string }> {
     this.accountLinks.push(p);
     return { url: `https://connect.stripe.test/onboarding/${p.accountId}_${++this.seq}` };
+  }
+
+  public retrievableAccounts: Map<string, ConnectAccountData> = new Map();
+  async retrieveConnectAccount(accountId: string): Promise<ConnectAccountData> {
+    const acct = this.retrievableAccounts.get(accountId);
+    if (!acct) throw new Error(`FakeStripePort: no retrievable account for ${accountId}`);
+    return acct;
   }
 }
