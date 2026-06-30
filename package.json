@@ -20,7 +20,7 @@
     "lint:api": "eslint -c eslint.api.config.mjs --concurrency=auto --cache --cache-strategy=content --cache-location node_modules/.cache/eslint/api/ apps/api",
     "lint:parallel": "concurrently -n api,web --kill-others-on-fail \"pnpm lint:api\" \"pnpm lint:web\"",
     "test:unit:api": "vitest run -c vitest.unit.api.config.ts",
-    "prepare": "husky"
+    "prepare": "husky && (git config merge.drizzle-journal.driver 'node scripts/drizzle/canonicalize-journal.mjs merge %O %A %B' 2>/dev/null; true)"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",
