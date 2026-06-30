@@ -97,15 +97,15 @@ export class PortalPaymentReaderDrizzle implements PortalPaymentReader {
     return a?.nomEntreprise ?? null;
   }
 
-  getSessionEnAttente(ctx: TenantContext, factureId: number, now: Date): Promise<{ url: string | null } | null> {
+  getSessionEnAttente(ctx: TenantContext, factureId: number, now: Date): Promise<{ url: string | null; sessionId: string | null } | null> {
     const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     return withTenant(this.db, ctx, async (tx) => {
       const [p] = await tx
-        .select({ url: paiementsStripe.lienPaiement })
+        .select({ url: paiementsStripe.lienPaiement, sessionId: paiementsStripe.stripeSessionId })
         .from(paiementsStripe)
         .where(and(eq(paiementsStripe.factureId, factureId), eq(paiementsStripe.artisanId, ctx.artisanId), eq(paiementsStripe.statut, "en_attente"), gte(paiementsStripe.createdAt, cutoff)))
         .limit(1);
-      return p ? { url: p.url } : null;
+      return p ? { url: p.url, sessionId: p.sessionId } : null;
     });
   }
 }

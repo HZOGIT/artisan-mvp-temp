@@ -1,3 +1,4 @@
+import { ConflictError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type {
   PortalPaymentReader,
@@ -18,7 +19,10 @@ export class FakePortalPaymentReader implements PortalPaymentReader {
   private checkouts = new Map<string, FactureCheckout>();
   private contacts = new Map<string, ClientContact>();
   private artisanNoms = new Map<number, string>();
-  private sessionsEnAttente = new Map<string, { url: string | null; createdAt: Date }>();
+  private sessionsEnAttente = new Map<string, { url: string | null; sessionId: string | null; createdAt: Date }>();
+  /** Quand vrai, le premier appel à getSessionEnAttente retourne null (simule la race TOCTOU : session pas encore en DB). */
+  skipFirstSessionLookup = false;
+  private firstSessionLookupDone = false;
 
   seedCheckout(artisanId: number, factureId: number, f: FactureCheckout): void {
     this.checkouts.set(`${artisanId}:${factureId}`, f);
@@ -29,8 +33,8 @@ export class FakePortalPaymentReader implements PortalPaymentReader {
   seedArtisanNom(artisanId: number, nom: string): void {
     this.artisanNoms.set(artisanId, nom);
   }
-  seedSessionEnAttente(artisanId: number, factureId: number, session: { url: string | null; createdAt?: Date }): void {
-    this.sessionsEnAttente.set(`${artisanId}:${factureId}`, { url: session.url, createdAt: session.createdAt ?? new Date() });
+  seedSessionEnAttente(artisanId: number, factureId: number, session: { url: string | null; sessionId?: string | null; createdAt?: Date }): void {
+    this.sessionsEnAttente.set(`${artisanId}:${factureId}`, { url: session.url, sessionId: session.sessionId ?? null, createdAt: session.createdAt ?? new Date() });
   }
 
   seedAccess(token: string, a: PortalAccess): void {
@@ -61,21 +65,31 @@ export class FakePortalPaymentReader implements PortalPaymentReader {
   async getArtisanNom(ctx: TenantContext): Promise<string | null> {
     return this.artisanNoms.get(ctx.artisanId) ?? null;
   }
-  async getSessionEnAttente(ctx: TenantContext, factureId: number, now: Date): Promise<{ url: string | null } | null> {
+  async getSessionEnAttente(ctx: TenantContext, factureId: number, now: Date): Promise<{ url: string | null; sessionId: string | null } | null> {
+    if (this.skipFirstSessionLookup && !this.firstSessionLookupDone) {
+      this.firstSessionLookupDone = true;
+      return null;
+    }
     const s = this.sessionsEnAttente.get(`${ctx.artisanId}:${factureId}`);
     if (!s) return null;
     const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    return s.createdAt >= cutoff ? { url: s.url } : null;
+    return s.createdAt >= cutoff ? { url: s.url, sessionId: s.sessionId } : null;
   }
 }
 
 /** Writer paiement portail fake : collecte les paiements créés (assertions). */
 export class FakePortalPaymentWriter implements PortalPaymentWriter {
   public created: Array<{ artisanId: number; factureId: number; stripeSessionId: string; tokenPaiement: string }> = [];
+  /** Simule la violation UNIQUE PG (race TOCTOU) au premier appel si vrai. */
+  public forceConflictOnce = false;
   async createPaiement(
     ctx: TenantContext,
     input: { factureId: number; stripeSessionId: string; montant: string; lienPaiement: string | null; tokenPaiement: string },
   ): Promise<void> {
+    if (this.forceConflictOnce) {
+      this.forceConflictOnce = false;
+      throw new ConflictError("Session paiement déjà en cours pour cette facture");
+    }
     this.created.push({ artisanId: ctx.artisanId, factureId: input.factureId, stripeSessionId: input.stripeSessionId, tokenPaiement: input.tokenPaiement });
   }
 }

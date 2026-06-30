@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { ConflictError } from "../../../shared/errors";
 import type { StripePort } from "../../../shared/ports/stripe";
 import type { TenantContext } from "../../../shared/tenant";
 import type { PortalPaymentReader } from "./portal-payment-reader";
@@ -114,13 +115,24 @@ export async function createInvoiceCheckout(
     portalToken: input.token,
   });
 
-  await deps.writer.createPaiement(ctx, {
-    factureId: input.factureId,
-    stripeSessionId: result.sessionId,
-    montant: facture.totalTTC,
-    lienPaiement: result.url,
-    tokenPaiement,
-  });
+  try {
+    await deps.writer.createPaiement(ctx, {
+      factureId: input.factureId,
+      stripeSessionId: result.sessionId,
+      montant: facture.totalTTC,
+      lienPaiement: result.url,
+      tokenPaiement,
+    });
+  } catch (err) {
+    if (!(err instanceof ConflictError)) throw err;
+    /*
+     * ponytail: race TOCTOU — soft-check passé simultanément, index UNIQUE PG a rejeté le 2e INSERT.
+     * On relit la session gagnante (idempotent) plutôt que de renvoyer une erreur.
+     */
+    const existante = await deps.reader.getSessionEnAttente(ctx, input.factureId, now);
+    if (existante?.sessionId) return { kind: "ok", url: existante.url, sessionId: existante.sessionId };
+    return { kind: "bad-request", message: "Un paiement est déjà en cours pour cette facture. Veuillez patienter ou contacter votre artisan." };
+  }
 
   return { kind: "ok", url: result.url, sessionId: result.sessionId };
 }
