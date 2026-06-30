@@ -128,7 +128,9 @@ export function createInterventionsRouter(repo: IInterventionRepository, congeRe
               }
             }
           }
-          if (tx) await outboxEvent(tx, ctx.tenant, { action: "intervention.modifiee", entityType: "intervention", entityId: id, payload: { interventionId: id } });
+          const statutAction: Partial<Record<string, string>> = { en_cours: "intervention.demarree", terminee: "intervention.terminee", annulee: "intervention.annulee" };
+          const action = (rest.statut && statutAction[rest.statut]) ?? "intervention.modifiee";
+          if (tx) await outboxEvent(tx, ctx.tenant, { action, entityType: "intervention", entityId: id, payload: { interventionId: id } });
           return result;
         });
       }),
