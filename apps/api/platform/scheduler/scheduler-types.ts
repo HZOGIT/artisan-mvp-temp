@@ -20,6 +20,10 @@ export function monthlyKey(d: Date): string {
   return d.toISOString().slice(0, 7);
 }
 
+export function hourlyKey(d: Date): string {
+  return d.toISOString().slice(0, 13);
+}
+
 export function weeklyKey(d: Date): string {
   const thursday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
   const dow = thursday.getUTCDay() || 7;
