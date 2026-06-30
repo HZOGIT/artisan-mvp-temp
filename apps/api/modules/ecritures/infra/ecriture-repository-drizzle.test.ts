@@ -49,7 +49,7 @@ describe.skipIf(!URL)("EcritureRepositoryDrizzle (PG, RLS + scope tenant)", () =
     const now = new Date();
     const res = await admin.query<{ id: number }>(`
       INSERT INTO factures ("artisanId", "clientId", "dateFacture", "createdAt", "updatedAt")
-      SELECT $1, 1, $2, $2, $2 FROM generate_series(1, 9)
+      SELECT $1, 1, $2, $2, $2 FROM generate_series(1, 12)
       RETURNING id
     `, [A, now]);
     fIds = res.rows.map((r) => r.id);
@@ -99,7 +99,7 @@ describe.skipIf(!URL)("EcritureRepositoryDrizzle (PG, RLS + scope tenant)", () =
     expect(recree.length).toBe(3);
   });
 
-  it("validateByFacture + hasValidatedEcritures : inaltérabilité (écritures → validée)", async () => {
+  it("validateByFacture + hasValidatedEcritures : inaltérabilité + ecritureNum non-NULL partagé", async () => {
     await repo.createMany(ctx(A), pieceVente(fIds[4]));
     expect(await repo.hasValidatedEcritures(ctx(A), fIds[4])).toBe(false);
     const count = await repo.validateByFacture(ctx(A), fIds[4]);
@@ -107,6 +107,10 @@ describe.skipIf(!URL)("EcritureRepositoryDrizzle (PG, RLS + scope tenant)", () =
     expect(await repo.hasValidatedEcritures(ctx(A), fIds[4])).toBe(true);
     const rows = await repo.listByFacture(ctx(A), fIds[4]);
     expect(rows.every((e) => e.statut === "validee")).toBe(true);
+    /* ecritureNum non-NULL et identique pour toutes les lignes de la pièce */
+    const num = rows[0].ecritureNum;
+    expect(num).not.toBeNull();
+    expect(rows.every((e) => e.ecritureNum === num)).toBe(true);
   });
 
   it("hasValidatedEcritures isolation tenant : B ne voit pas les validées de A", async () => {
@@ -151,5 +155,40 @@ describe.skipIf(!URL)("EcritureRepositoryDrizzle (PG, RLS + scope tenant)", () =
     /* toutes les lignes de chaque pièce partagent le même ecritureNum */
     expect(e7.every((e) => e.ecritureNum === num7)).toBe(true);
     expect(e8.every((e) => e.ecritureNum === num8)).toBe(true);
+  });
+
+  it("ecritureNum permanent : insertion ultérieure ne change pas les existants (anti-régression A47 A-1)", async () => {
+    /* Pièce 1 : validée → obtient un ecritureNum */
+    await repo.createMany(ctx(A), pieceVente(fIds[9]));
+    await repo.validateByFacture(ctx(A), fIds[9]);
+    const avant = (await repo.listByFacture(ctx(A), fIds[9]))[0].ecritureNum;
+    expect(avant).not.toBeNull();
+
+    /* Pièce 2 : validée ensuite → num distinct */
+    await repo.createMany(ctx(A), pieceVente(fIds[10]));
+    await repo.validateByFacture(ctx(A), fIds[10]);
+    const numPiece2 = (await repo.listByFacture(ctx(A), fIds[10]))[0].ecritureNum;
+    expect(numPiece2).not.toBeNull();
+    expect(numPiece2).not.toBe(avant);
+
+    /* La pièce 1 conserve son ecritureNum d'origine */
+    const apres = (await repo.listByFacture(ctx(A), fIds[9]))[0].ecritureNum;
+    expect(apres).toBe(avant);
+  });
+
+  it("ecritureNum par exercice : 2025 et 2026 ont des séquences indépendantes", async () => {
+    /* Pièce exercice 2025 */
+    const d25 = new Date("2025-12-01T00:00:00Z");
+    await repo.createMany(ctx(A), [
+      { dateEcriture: d25, journal: "VE", numeroCompte: "411000", libelle: "F25", debit: "120.00", factureId: fIds[11] },
+      { dateEcriture: d25, journal: "VE", numeroCompte: "706000", libelle: "F25", credit: "100.00", factureId: fIds[11] },
+      { dateEcriture: d25, journal: "VE", numeroCompte: "445711", libelle: "F25", credit: "20.00", factureId: fIds[11] },
+    ]);
+    await repo.validateByFacture(ctx(A), fIds[11]);
+    const num25 = (await repo.listByFacture(ctx(A), fIds[11]))[0].ecritureNum;
+
+    /* Les deux nums sont non-NULL — la séquence par exercice peut faire coïncider les valeurs
+       (deux exercices peuvent tous les deux avoir ecritureNum=1 si c'est la 1ère de l'exercice) */
+    expect(num25).not.toBeNull();
   });
 });

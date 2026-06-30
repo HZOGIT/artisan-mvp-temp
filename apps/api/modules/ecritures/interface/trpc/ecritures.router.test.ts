@@ -52,11 +52,13 @@ describe.skipIf(!URL)("ecritures.router e2e (lecture compta — HTTP → tRPC �
   const app = createDbClient(APP_URL!);
   let artisanA = 0;
   let artisanB = 0;
+  let factureId = 0;
   let server: ReturnType<typeof buildApp>;
   const ctx = (artisanId: number): TenantContext => ({ artisanId, userId: 1 });
 
   const purge = async (uid: number) => {
     await admin.query('delete from ecritures_comptables where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
+    await admin.query('delete from factures where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from artisans where "userId"=$1', [uid]);
     await admin.query("delete from users where id=$1", [uid]);
   };
@@ -68,9 +70,14 @@ describe.skipIf(!URL)("ecritures.router e2e (lecture compta — HTTP → tRPC �
     }
     artisanA = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UA])).rows[0].id;
     artisanB = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UB])).rows[0].id;
-    // Seed VE + AC pour A (via le repo Drizzle, app_tenant + RLS).
+    const fRes = await admin.query<{ id: number }>(
+      'insert into factures ("artisanId", "clientId", "dateFacture", "createdAt", "updatedAt") values ($1, 1, now(), now(), now()) returning id',
+      [artisanA],
+    );
+    factureId = fRes.rows[0].id;
+    /* Seed VE + AC pour A (via le repo Drizzle, app_tenant + RLS). */
     const repo = new EcritureRepositoryDrizzle(app.db);
-    await repo.createMany(ctx(artisanA), piece(701));
+    await repo.createMany(ctx(artisanA), piece(factureId));
     await repo.createMany(ctx(artisanA), pieceAchat());
     server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(app.db), ecritureRepo: new EcritureRepositoryDrizzle(app.db) });
   });
@@ -89,7 +96,7 @@ describe.skipIf(!URL)("ecritures.router e2e (lecture compta — HTTP → tRPC �
   it("list + byFacture + balance scopés au tenant A", async () => {
     const tA = await token(UA);
     expect((await q(server, "ecritures.list", undefined, tA)).json().result.data.length).toBe(6); // 3 VE + 3 AC
-    expect((await q(server, "ecritures.byFacture", { factureId: 701 }, tA)).json().result.data.length).toBe(3);
+    expect((await q(server, "ecritures.byFacture", { factureId: factureId }, tA)).json().result.data.length).toBe(3);
     const balance = (await q(server, "ecritures.balance", undefined, tA)).json().result.data as Array<{ numeroCompte: string; solde: string }>;
     expect(balance.find((l) => l.numeroCompte === "411000")!.solde).toBe("120.00");
     expect(balance.reduce((s, l) => s + Number(l.solde), 0)).toBeCloseTo(0, 2); // Σsoldes = 0
@@ -111,7 +118,7 @@ describe.skipIf(!URL)("ecritures.router e2e (lecture compta — HTTP → tRPC �
   it("isolation cross-tenant : B ne voit pas les écritures de A", async () => {
     const tB = await token(UB);
     expect((await q(server, "ecritures.list", undefined, tB)).json().result.data).toEqual([]);
-    expect((await q(server, "ecritures.byFacture", { factureId: 701 }, tB)).json().result.data).toEqual([]);
+    expect((await q(server, "ecritures.byFacture", { factureId: factureId }, tB)).json().result.data).toEqual([]);
     expect((await q(server, "ecritures.balance", undefined, tB)).json().result.data).toEqual([]);
   });
 });
