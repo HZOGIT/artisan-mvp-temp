@@ -101,6 +101,17 @@ describe("factures — marquerFacturePayee (markAsPaid + FEC)", () => {
       marquerFacturePayee(repo, A, f.id, { montantPaye: "0.00", datePaiement: "2026-03-10" }),
     ).rejects.toBeInstanceOf(ConflictError);
   });
+
+  it("crée un reglement traçant la source de paiement (anti-régression OPE-982)", async () => {
+    const repo = new FakeFactureRepository();
+    repo.registerClient(A.artisanId, 100);
+    const id = await factureEmise(repo);
+    await marquerFacturePayee(repo, A, id, { montantPaye: "120.00", datePaiement: "2026-03-10" });
+    const reglements = repo.getReglementsForTest(id);
+    expect(reglements).toHaveLength(1);
+    expect(reglements[0].montant).toBe("120.00");
+    expect(reglements[0].date).toEqual(new Date("2026-03-10"));
+  });
 });
 
 describe("factures — archivage notification rappel à la mise en payée (OPE-795)", () => {
