@@ -23,8 +23,6 @@ RUN pnpm build:newstack
 
 # ── Runtime : deps de prod + bundle, utilisateur non-root ────────────────────
 FROM node:alpine AS runtime
-ARG GIT_SHA=unknown
-LABEL git.sha=$GIT_SHA
 WORKDIR /app
 ENV NODE_ENV=production \
     TZ=Europe/Paris \
@@ -37,6 +35,8 @@ COPY --from=builder /app/dist-newstack ./dist-newstack
 # Migrations Drizzle (SQL + meta/_journal.json) : appliquées au boot par le SDK migrate(). Le bundle
 # esbuild n'embarque pas les .sql → on les copie. migrationsFolder = "drizzle" relatif au cwd /app.
 COPY --from=builder /app/drizzle ./drizzle
+ARG GIT_SHA=unknown
+LABEL git.sha=$GIT_SHA
 # Tini-less : on lance node directement ; le nouveau stack gère son arrêt.
 USER node
 EXPOSE 3001
