@@ -24,7 +24,7 @@ describe.skipIf(!URL)("GET /api/paiement/status/:factureId (public par token por
 
   beforeAll(async () => {
     await cleanup();
-    const artisanId = (await admin.query('insert into artisans ("userId","nomEntreprise") values ($1,$2) returning id', [UID, "Plomberie X"])).rows[0].id;
+    const artisanId = (await admin.query('insert into artisans ("userId","nomEntreprise","stripe_connect_account_id","stripe_connect_charges_enabled") values ($1,$2,$3,$4) returning id', [UID, "Plomberie X", "acct_e2e_checkout_test", true])).rows[0].id;
     const clientId = (await admin.query('insert into clients ("artisanId",nom,email) values ($1,$2,$3) returning id', [artisanId, "Durand", "c@test.com"])).rows[0].id;
     factureId = (await admin.query('insert into factures ("artisanId","clientId",numero,statut,"totalTTC") values ($1,$2,$3,$4,$5) returning id', [artisanId, clientId, "FAC-R", "envoyee", "240.00"])).rows[0].id;
     await admin.query('insert into client_portal_access ("clientId","artisanId",token,email,"expiresAt","isActive") values ($1,$2,$3,$4, now() + interval \'7 days\', true)', [clientId, artisanId, TOKEN, "c@test.com"]);
@@ -75,6 +75,7 @@ describe.skipIf(!URL)("GET /api/paiement/status/:factureId (public par token por
     // Régression : derrière le dispatcher Pages, `host` = hôte INTERNE du new-stack ; bâtir la
     // redirection dessus renvoie l'utilisateur vers le BACKEND (→ 404 sur /portail/*). Le dispatcher
     // pose `x-forwarded-host` = hôte public d'origine → c'est lui qui DOIT déterminer l'origin.
+    await admin.query('delete from paiements_stripe where "factureId"=$1', [factureId]);
     const before = stripe.invoiceCheckouts.length;
     const res = await app.inject({
       method: "POST",
