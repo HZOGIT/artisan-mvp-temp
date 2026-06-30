@@ -10,6 +10,7 @@ import {
   bigint,
   jsonb,
   unique,
+  index,
 } from "drizzle-orm/pg-core";
 
 export const userRoleEnum = pgEnum("user_role", ["admin", "artisan", "secretaire", "technicien"]);
@@ -78,7 +79,9 @@ export const eventOutbox = pgTable("event_outbox", {
   action: varchar("action", { length: 128 }).notNull(),
   payload: jsonb("payload"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_event_outbox_created").on(t.createdAt),
+]);
 export type EventOutbox = typeof eventOutbox.$inferSelect;
 export type InsertEventOutbox = typeof eventOutbox.$inferInsert;
 

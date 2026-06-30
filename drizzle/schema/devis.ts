@@ -101,7 +101,9 @@ export const devisOptions = pgTable("devis_options", {
   dateSelection: timestamp("dateSelection"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
-});
+}, (t) => [
+  index("idx_devis_options_devis").on(t.devisId),
+]);
 export type DevisOption = typeof devisOptions.$inferSelect;
 export type InsertDevisOption = typeof devisOptions.$inferInsert;
 

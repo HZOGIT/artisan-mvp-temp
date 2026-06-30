@@ -55,7 +55,9 @@ export const interventionsTechniciens = pgTable("interventions_techniciens", {
   technicienId: integer("technicienId").notNull(),
   role: varchar("role", { length: 50 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_interventions_tech_intervention").on(t.interventionId),
+]);
 export type InterventionTechnicien = typeof interventionsTechniciens.$inferSelect;
 export type InsertInterventionTechnicien = typeof interventionsTechniciens.$inferInsert;
 
