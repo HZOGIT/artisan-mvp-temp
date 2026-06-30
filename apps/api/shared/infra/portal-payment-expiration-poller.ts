@@ -16,11 +16,33 @@ export interface PortalPaymentExpirationPollerOptions {
   readonly dbUrl: string;
 }
 
-interface PendingSession {
+export interface PendingSession {
   readonly id: number;
   readonly artisanId: number;
   readonly stripeSessionId: string;
   readonly stripeConnectAccountId: string | null;
+}
+
+export type ExpirationOutcome = "expired" | "skipped-open" | "skipped-complete" | "skipped-null";
+
+/**
+ * Décide si une session en_attente doit être expirée, et le fait si oui.
+ * "complete" = paiement réussi → ne pas expirer (le webhook ou le réconciliateur traitera).
+ * "expired" (Stripe) = session abandonnée → expirer notre ligne.
+ * Exporté pour test L1.
+ */
+export async function expirePaymentIfNeeded(
+  row: PendingSession,
+  stripe: StripePort,
+  writer: PortalPaymentWriter,
+): Promise<ExpirationOutcome> {
+  const status = await stripe.retrieveCheckoutSession(row.stripeSessionId, row.stripeConnectAccountId ?? undefined);
+  if (!status) return "skipped-null";
+  if (status.sessionStatus === "open") return "skipped-open";
+  if (status.sessionStatus === "complete") return "skipped-complete";
+
+  await writer.expirePaiement({ artisanId: row.artisanId, userId: 0 }, row.id);
+  return "expired";
 }
 
 export const portalPaymentExpirationPollerPlugin = fp(
@@ -43,14 +65,14 @@ export const portalPaymentExpirationPollerPlugin = fp(
             let expired = 0;
             for (const row of rows) {
               try {
-                const status = await opts.stripe.retrieveCheckoutSession(row.stripeSessionId, row.stripeConnectAccountId ?? undefined);
-                if (status?.sessionStatus === "open") continue;
-                await opts.writer.expirePaiement({ artisanId: row.artisanId, userId: 0 }, row.id);
-                expired++;
-                app.log.warn(
-                  { event: "portal_payment_expired", paiementId: row.id, artisanId: row.artisanId },
-                  `Paiement portail expiré (artisan ${row.artisanId}, paiement ${row.id})`,
-                );
+                const outcome = await expirePaymentIfNeeded(row, opts.stripe, opts.writer);
+                if (outcome === "expired") {
+                  expired++;
+                  app.log.warn(
+                    { event: "portal_payment_expired", paiementId: row.id, artisanId: row.artisanId },
+                    `Paiement portail expiré (artisan ${row.artisanId}, paiement ${row.id})`,
+                  );
+                }
               } catch (err) {
                 app.log.error(
                   { event: "portal_payment_expiration_item_error", paiementId: row.id, error: err instanceof Error ? err.message : String(err) },

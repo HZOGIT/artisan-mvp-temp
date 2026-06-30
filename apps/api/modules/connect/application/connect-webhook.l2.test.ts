@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
+import { Pool } from "pg";
 import { processConnectWebhook } from "./connect-webhook-use-cases";
 import { ConnectArtisanWriterDrizzle } from "../infra/connect-artisan-writer-drizzle";
+import { WebhookPaymentWriterDrizzle } from "../../subscription/infra/webhook-payment-writer-drizzle";
 import { createDbClient } from "../../../shared/db";
 import type { DbHandle } from "../../../shared/db";
 import { artisans } from "../../../../../drizzle/schema.pg";
@@ -113,5 +115,94 @@ describe.skipIf(!ownerDbUrl || !appDbUrl)("processConnectWebhook L2 — anti-ré
       { rawBody: Buffer.from("{}"), signature: "bad-sig" },
     );
     expect(result.http).toBe(400);
+  });
+});
+
+/**
+ * L2 anti-régression OPE-970 : checkout.session.completed (direct charge Connect) → facture payée.
+ * Reproduit FAC-23 : Stripe OK mais facture restait impayée (expiration poller écrasait la réconciliation).
+ * Vérifie que processConnectWebhook avec paymentWriter marque la facture payée + émet facture.payee.
+ */
+const UID_970 = 9982001;
+const TOKEN_970 = `tok-connect-l2-ope970-${Date.now()}`;
+
+describe.skipIf(!ownerDbUrl || !appDbUrl)("processConnectWebhook L2 — checkout.session.completed → facture payée (OPE-970)", () => {
+  const admin = new Pool({ connectionString: ownerDbUrl! });
+  let ownerHandle970: DbHandle;
+  const appClient = createDbClient(appDbUrl!);
+  let artisanId = 0;
+  let factureId = 0;
+  let paiementId = 0;
+
+  const cleanup = async () => {
+    await admin.query(`DELETE FROM event_outbox WHERE "artisanId" IN (SELECT id FROM artisans WHERE "userId"=$1)`, [UID_970]);
+    await admin.query(`DELETE FROM notifications WHERE "artisanId" IN (SELECT id FROM artisans WHERE "userId"=$1)`, [UID_970]);
+    await admin.query(`DELETE FROM paiements_stripe WHERE "artisanId" IN (SELECT id FROM artisans WHERE "userId"=$1)`, [UID_970]);
+    await admin.query(`DELETE FROM factures WHERE "artisanId" IN (SELECT id FROM artisans WHERE "userId"=$1)`, [UID_970]);
+    await admin.query(`DELETE FROM clients WHERE "artisanId" IN (SELECT id FROM artisans WHERE "userId"=$1)`, [UID_970]);
+    await admin.query(`DELETE FROM artisans WHERE "userId"=$1`, [UID_970]);
+    await admin.query(`DELETE FROM users WHERE id=$1`, [UID_970]);
+  };
+
+  beforeAll(async () => {
+    ownerHandle970 = createDbClient(ownerDbUrl!);
+    await cleanup();
+    await admin.query(`INSERT INTO users (id, email, role) VALUES ($1, $2, 'artisan')`, [UID_970, `connect-l2-ope970-${UID_970}@test.local`]);
+    artisanId = (await admin.query(`INSERT INTO artisans ("userId") VALUES ($1) RETURNING id`, [UID_970])).rows[0].id;
+    const clientId = (await admin.query(`INSERT INTO clients ("artisanId", nom, prenom) VALUES ($1, 'Martin', 'Paul') RETURNING id`, [artisanId])).rows[0].id;
+    factureId = (await admin.query(`INSERT INTO factures ("artisanId", "clientId", numero, statut, "totalTTC") VALUES ($1, $2, 'FAC-CONNECT-L2', 'envoyee', '350.00') RETURNING id`, [artisanId, clientId])).rows[0].id;
+    paiementId = (await admin.query(
+      `INSERT INTO paiements_stripe ("artisanId", "factureId", "tokenPaiement", statut, montant, "stripeSessionId") VALUES ($1, $2, $3, 'en_attente', '350.00', 'cs_connect_l2_ope970') RETURNING id`,
+      [artisanId, factureId, TOKEN_970],
+    )).rows[0].id;
+  });
+
+  afterAll(async () => {
+    await cleanup();
+    await appClient.close();
+    await ownerHandle970.close();
+    await admin.end();
+  });
+
+  it("checkout.session.completed Connect → facture payée + paiement payee + facture.payee dans outbox", async () => {
+    const session = {
+      payment_intent: "pi_connect_l2_ope970",
+      metadata: { token_paiement: TOKEN_970, facture_id: String(factureId) },
+    };
+    const event: StripeWebhookEvent = {
+      id: "evt_connect_l2_ope970",
+      type: "checkout.session.completed",
+      account: "acct_waidev_test",
+      data: { object: session },
+    };
+
+    const connectWriter = new ConnectArtisanWriterDrizzle(ownerHandle970.db);
+    const paymentWriter = new WebhookPaymentWriterDrizzle(appClient.db);
+
+    const result = await processConnectWebhook(
+      {
+        stripe: makeFakeStripe(event),
+        writer: connectWriter,
+        paymentWriter,
+        webhookSecret: "whsec_test",
+      },
+      { rawBody: Buffer.from("{}"), signature: "valid" },
+    );
+
+    expect(result.http).toBe(200);
+
+    const facRow = (await admin.query(`SELECT statut, "montantPaye" FROM factures WHERE id=$1`, [factureId])).rows[0];
+    expect(facRow.statut).toBe("payee");
+    expect(facRow.montantPaye).toBe("350.00");
+
+    const paiRow = (await admin.query(`SELECT statut, "stripePaymentIntentId" FROM paiements_stripe WHERE id=$1`, [paiementId])).rows[0];
+    expect(paiRow.statut).toBe("payee");
+    expect(paiRow.stripePaymentIntentId).toBe("pi_connect_l2_ope970");
+
+    const outboxRows = (await admin.query(
+      `SELECT action FROM event_outbox WHERE "artisanId"=$1 AND action='facture.payee' ORDER BY id DESC LIMIT 1`,
+      [artisanId],
+    )).rows;
+    expect(outboxRows).toHaveLength(1);
   });
 });

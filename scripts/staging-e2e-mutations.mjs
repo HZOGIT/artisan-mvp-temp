@@ -564,6 +564,21 @@ async function casConnectDirectChargeFact() {
         } else {
           console.log(`[${tag}] ✓ ASSERT C: PI ${piId} succeeded sur compte connecté ${acctId}, 0 application_fee`);
         }
+
+        /* ASSERT D — facture marquée payée après connect webhook (anti-régression OPE-970 : statut ne changeait pas) */
+        let factureStat = null;
+        for (let i = 0; i < 10; i++) {
+          await new Promise(r => setTimeout(r, 2000));
+          const allFacs = (await trpcGet('factures.list', null)) ?? [];
+          const updated = allFacs.find(f => f.id === fact.id);
+          if (updated?.statut === 'payee') { factureStat = 'payee'; break; }
+          factureStat = updated?.statut ?? null;
+        }
+        if (factureStat === 'payee') {
+          console.log(`[${tag}] ✓ ASSERT D: facture ${fact.id} statut=payee après paiement Connect`);
+        } else {
+          issues.push({ tag, step: 'facture-payee', error: `facture.statut = ${factureStat ?? 'null'} après ~20s (attendu payee) — connect-webhook ou réconciliation non traité (OPE-970)` });
+        }
       } else {
         issues.push({ tag, step: 'pi-confirm', error: `PI status = ${piResult.status} (attendu succeeded) — code: ${piResult.last_payment_error?.code ?? 'n/a'}` });
       }
