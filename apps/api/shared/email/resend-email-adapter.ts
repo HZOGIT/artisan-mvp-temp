@@ -56,6 +56,7 @@ export class ResendEmailAdapter implements EmailPort {
       to,
       subject,
       html: message.unsubscribeUrl ? injectUnsubscribeFooter(body, message.unsubscribeUrl) : body,
+      ...(message.idempotencyKey ? { idempotencyKey: message.idempotencyKey } : {}),
     };
     if (message.unsubscribeUrl) {
       const url = message.unsubscribeUrl;
