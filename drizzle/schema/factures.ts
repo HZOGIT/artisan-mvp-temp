@@ -119,7 +119,7 @@ export const paiementsStripe = pgTable("paiements_stripe", {
   montant: numeric("montant", { precision: 10, scale: 2 }).notNull(),
   devise: varchar("devise", { length: 3 }).default("EUR"),
   statut: paiementStatutEnum("statut").default("en_attente"),
-  lienPaiement: varchar("lienPaiement", { length: 500 }),
+  lienPaiement: text("lienPaiement"),
   tokenPaiement: varchar("tokenPaiement", { length: 64 }),
   paidAt: timestamp("paidAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
