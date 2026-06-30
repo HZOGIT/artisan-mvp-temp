@@ -172,6 +172,31 @@ describe.skipIf(!URL)("devis.router e2e (HTTP → tRPC → use-case → repo →
     expect((await callMutation(server, "devis.envoyer", { id }, tB)).statusCode).toBe(404);
   });
 
+  it("états terminaux (accepte/refuse/expire) — aucune transition possible (409)", async () => {
+    const tA = await token(UA);
+    const mk = async () => {
+      const id = (await callMutation(server, "devis.create", { clientId: clientA }, tA)).json().result.data.id as number;
+      await callMutation(server, "devis.addLigne", { devisId: id, designation: "Pose", quantite: "1", prixUnitaireHT: "50.00" }, tA);
+      return id;
+    };
+
+    const idA = await mk();
+    await admin.query("update devis set statut='accepte' where id=$1", [idA]);
+    expect((await callMutation(server, "devis.envoyer", { id: idA }, tA)).statusCode).toBe(409);
+    expect((await callMutation(server, "devis.refuser", { id: idA }, tA)).statusCode).toBe(409);
+    expect((await callMutation(server, "devis.expirer", { id: idA }, tA)).statusCode).toBe(409);
+
+    const idR = await mk();
+    await admin.query("update devis set statut='refuse' where id=$1", [idR]);
+    expect((await callMutation(server, "devis.envoyer", { id: idR }, tA)).statusCode).toBe(409);
+    expect((await callMutation(server, "devis.accepter", { id: idR }, tA)).statusCode).toBe(409);
+
+    const idE = await mk();
+    await admin.query("update devis set statut='expire' where id=$1", [idE]);
+    expect((await callMutation(server, "devis.envoyer", { id: idE }, tA)).statusCode).toBe(409);
+    expect((await callMutation(server, "devis.accepter", { id: idE }, tA)).statusCode).toBe(409);
+  });
+
   it("franchise TVA : addLigne sans tvaCategorieId → FR_FRANCHISE ; tvaCategorieId explicite non-FR_20 préservé", async () => {
     const tA = await token(UA);
     await admin.query('update artisans set "franchiseTVA"=true where id=$1', [artisanA]);

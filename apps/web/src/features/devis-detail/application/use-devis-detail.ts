@@ -30,6 +30,7 @@ export function useDevisDetail(id: number) {
     envoyer: trpc.devis.envoyer.useMutation(),
     accepter: trpc.devis.accepter.useMutation(),
     refuser: trpc.devis.refuser.useMutation(),
+    expirer: trpc.devis.expirer.useMutation(),
     /** actions */
     deleteLigne: trpc.devis.deleteLigne.useMutation({ onSuccess: inv }),
     convertToFacture: trpc.devis.convertToFacture.useMutation(),
