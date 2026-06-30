@@ -201,13 +201,14 @@ export async function changePlan(
   if (sub.plan_id === newPlanId) return;
 
   const oldPlan = planById(sub.plan_id);
+  const interval: "monthly" | "yearly" = sub.billing_interval === "yearly" ? "yearly" : "monthly";
   await deps.repo.updateSubscriptionPlan(ctx, newPlanId);
   await deps.repo.deactivateLockedModules(ctx.artisanId, newPlanId);
   await deps.repo.reactivateDefaultModulesForPlan(ctx.artisanId, newPlanId);
 
   const pendingCycle = await deps.repo.findPendingCycle(sub.id);
+  let prorataImmediat = false;
   if (pendingCycle) {
-    const interval = sub.billing_interval === "yearly" ? "yearly" : "monthly";
     const newAmountCents = knownPlan.amountCentsByInterval[interval];
     const oldAmountCents = oldPlan ? oldPlan.amountCentsByInterval[interval] : newAmountCents;
     const diff = newAmountCents - oldAmountCents;
@@ -221,6 +222,7 @@ export async function changePlan(
         const prorationCents = Math.round((remainingMs / periodLengthMs) * Math.abs(diff));
         if (diff > 0 && prorationCents > 0) {
           /* upgrade mi-cycle : charge immédiate pour les jours restants × différentiel */
+          prorataImmediat = true;
           await deps.repo.createCycle({
             subscriptionId: sub.id,
             periodStart: now,
@@ -245,6 +247,14 @@ export async function changePlan(
     payload: { artisanId: sub.artisan_id, from: sub.plan_id, to: newPlanId, pendingCycleUpdated: !!pendingCycle },
     actor: `user:${ctx.userId}`,
   });
+  await deps.repo.emitOutboxEvent({
+    artisanId: ctx.artisanId,
+    userId: ctx.userId,
+    action: "abonnement.plan_change",
+    entityType: "abonnement",
+    entityId: sub.id,
+    payload: { from: sub.plan_id, to: newPlanId, montantCents: knownPlan.amountCentsByInterval[interval], prorataImmediat, dateEffet: now.toISOString() },
+  });
 }
 
 
@@ -268,6 +278,14 @@ export async function cancelAtPeriodEnd(deps: Pick<BillingDeps, "repo">, ctx: Te
     payload: { artisanId: sub.artisan_id, cancelAt: cancelAt.toISOString() },
     actor: `user:${ctx.userId}`,
   });
+  await deps.repo.emitOutboxEvent({
+    artisanId: ctx.artisanId,
+    userId: ctx.userId,
+    action: "abonnement.annulation_planifiee",
+    entityType: "abonnement",
+    entityId: sub.id,
+    payload: { cancelAt: cancelAt.toISOString() },
+  });
 }
 
 export async function reactivateSubscription(deps: Pick<BillingDeps, "repo">, ctx: TenantContext): Promise<void> {
@@ -288,6 +306,14 @@ export async function reactivateSubscription(deps: Pick<BillingDeps, "repo">, ct
     eventType: "subscription.reactivated",
     payload: { artisanId: sub.artisan_id },
     actor: `user:${ctx.userId}`,
+  });
+  await deps.repo.emitOutboxEvent({
+    artisanId: ctx.artisanId,
+    userId: ctx.userId,
+    action: "abonnement.reactivite",
+    entityType: "abonnement",
+    entityId: sub.id,
+    payload: { planId: sub.plan_id },
   });
 }
 
@@ -330,6 +356,14 @@ export async function activateOnboardingSubscription(
     eventType: "subscription.onboarding_activated",
     payload: { artisanId: ctx.artisanId, planId: params.planId, trialEndsAt: trialEndsAt.toISOString() },
     actor: `user:${ctx.userId}`,
+  });
+  await deps.repo.emitOutboxEvent({
+    artisanId: ctx.artisanId,
+    userId: ctx.userId,
+    action: "abonnement.essai_demarre",
+    entityType: "abonnement",
+    entityId: sub.id,
+    payload: { planId: params.planId, trialEndsAt: trialEndsAt.toISOString() },
   });
 
   return { subscriptionId: sub.id };

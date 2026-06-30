@@ -79,6 +79,15 @@ export interface AppendEventParams {
   readonly actor?: string;
 }
 
+export interface EmitOutboxEventParams {
+  readonly artisanId: number;
+  readonly userId?: number;
+  readonly action: string;
+  readonly entityType: string;
+  readonly entityId: number;
+  readonly payload?: Record<string, unknown>;
+}
+
 export interface IBillingRepository {
   /** Moyens de paiement */
   listPaymentMethods(ctx: TenantContext): Promise<BillingPaymentMethod[]>;
@@ -138,6 +147,9 @@ export interface IBillingRepository {
 
   /** Journal immuable */
   appendEvent(params: AppendEventParams): Promise<BillingEvent>;
+
+  /** Bus métier unifié (event_outbox) */
+  emitOutboxEvent(params: EmitOutboxEventParams): Promise<void>;
 
   /**
    * Marque un événement Stripe comme traité (INSERT ... ON CONFLICT DO NOTHING).

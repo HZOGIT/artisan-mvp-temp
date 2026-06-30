@@ -78,6 +78,14 @@ export async function handleBillingWebhookEvent(
             payload: { via: "webhook", artisanId, nextPeriodStart: start.toISOString(), nextPeriodEnd: end.toISOString() },
             actor: "stripe_webhook",
           });
+          const plan = planById(sub.plan_id);
+          await deps.repo.emitOutboxEvent({
+            artisanId,
+            action: "abonnement.paiement_reussi",
+            entityType: "abonnement",
+            entityId: sub.id,
+            payload: { planId: sub.plan_id, montantCents: plan ? plan.amountCentsByInterval[interval] : cycle.amount_cents, periode: { debut: cycle.period_end.toISOString(), fin: end.toISOString() } },
+          });
         }
       }
     }
@@ -127,6 +135,15 @@ export async function handleBillingWebhookEvent(
      * payment_intent.payment_failed en retard → sans ce guard, sub "canceled" → "past_due"
      * (résurrection involontaire + notification de suspension d'un abo déjà annulé).
      */
+    if (!isFinalAttempt && artisanId !== null) {
+      await deps.repo.emitOutboxEvent({
+        artisanId,
+        action: "abonnement.paiement_echoue",
+        entityType: "abonnement",
+        entityId: attempt.cycle_id,
+        payload: { tentativeNo: attemptCount, prochainEssaiAt: retryAt?.toISOString() ?? null },
+      });
+    }
     if (isFinalAttempt && cycle && sub && sub.status !== "canceled") {
       await deps.repo.updateSubscriptionStatus({ artisanId: sub.artisan_id, userId: 0 }, "past_due");
       await deps.repo.appendEvent({

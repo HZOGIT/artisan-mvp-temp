@@ -27,7 +27,9 @@ import type {
   SubscriptionWithDueCycle,
   AppendEventParams,
   CreateInvoiceForCycleParams,
+  EmitOutboxEventParams,
 } from "../application/billing-repository";
+import { outboxEvent } from "../../../shared/events/outbox-event";
 
 /**
  * billing_payment_methods : RLS tenant — accès via withTenant.
@@ -541,6 +543,16 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
   }
 
   async saveStripeCustomerId(_artisanId: number, _stripeCustomerId: string): Promise<void> {
+  }
+
+  async emitOutboxEvent(params: EmitOutboxEventParams): Promise<void> {
+    /* ponytail: billing n'a pas de tx englobant — best-effort comme appendEvent */
+    const tx = this.db;
+    await outboxEvent(
+      tx,
+      { artisanId: params.artisanId, userId: params.userId ?? 0 },
+      { action: params.action, entityType: params.entityType, entityId: params.entityId, payload: params.payload },
+    );
   }
 
   async countActiveUsers(ctx: TenantContext): Promise<number> {

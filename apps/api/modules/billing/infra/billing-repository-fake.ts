@@ -9,6 +9,7 @@ import type {
   SubscriptionWithDueCycle,
   AppendEventParams,
   CreateInvoiceForCycleParams,
+  EmitOutboxEventParams,
 } from "../application/billing-repository";
 import type {
   BillingPaymentMethod,
@@ -37,6 +38,7 @@ export class FakeBillingRepository implements IBillingRepository {
   public invoices: BillingInvoice[] = [];
   public invoiceLines: BillingInvoiceLine[] = [];
   public events: BillingEvent[] = [];
+  public outboxEvents: EmitOutboxEventParams[] = [];
   private seqCounters: Map<string, number> = new Map();
   public processedWebhookIds: Set<string> = new Set();
   public customerIds: Map<number, string> = new Map();
@@ -460,5 +462,9 @@ export class FakeBillingRepository implements IBillingRepository {
 
   async countActiveUsers(_ctx: TenantContext): Promise<number> {
     return this.activeUserCount;
+  }
+
+  async emitOutboxEvent(params: EmitOutboxEventParams): Promise<void> {
+    this.outboxEvents.push(params);
   }
 }
