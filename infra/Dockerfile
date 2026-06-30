@@ -23,6 +23,8 @@ RUN pnpm build:newstack
 
 # ── Runtime : deps de prod + bundle, utilisateur non-root ────────────────────
 FROM node:alpine AS runtime
+ARG GIT_SHA=unknown
+LABEL git.sha=$GIT_SHA
 WORKDIR /app
 ENV NODE_ENV=production \
     TZ=Europe/Paris \

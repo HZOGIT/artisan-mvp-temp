@@ -57,7 +57,10 @@ if [ -z "$PROXY_ID" ]; then
   $COMPOSE up -d --remove-orphans
 fi
 
-$COMPOSE up -d --build "new-stack-$NEXT"
+GIT_SHA=$(git rev-parse HEAD)
+echo "  SHA embarqué dans l'image : $GIT_SHA"
+$COMPOSE build --build-arg GIT_SHA="$GIT_SHA" "new-stack-$NEXT"
+$COMPOSE up -d "new-stack-$NEXT"
 
 echo "▶ Attente health du nouveau slot (new-stack-$NEXT)…"
 for i in $(seq 1 30); do
