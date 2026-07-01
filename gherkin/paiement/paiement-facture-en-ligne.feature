@@ -12,3 +12,11 @@ Fonctionnalité: Paiement d'une facture en ligne
     Quand le client règle la facture avec la carte de test "4242 4242 4242 4242"
     Alors la facture passe au statut "Payée"
     Et le client voit une confirmation de paiement
+
+  @erreur
+  Scénario: Le paiement échoue si la carte est refusée
+    Étant donné qu'une facture au statut "Envoyée" est réglable en ligne
+    Quand le client tente de régler avec la carte de test "4000 0000 0000 9995"
+    Alors le paiement échoue pour fonds insuffisants
+    Et la facture reste au statut "Envoyée"
+    Et le client peut réessayer le paiement
