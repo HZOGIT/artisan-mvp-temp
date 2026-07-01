@@ -140,4 +140,64 @@ describe.skipIf(!URL)("devis.router — gate de permission (authz OPE-789)", () 
     const res = await mut(server, "devis.delete", { id }, await jwt(MEMBER));
     expect(res.statusCode).toBe(200);
   });
+
+  /** OPE-1024 — reads + transitions sans gate */
+  it("membre sans devis.voir → list 403", async () => {
+    const res = await injectTrpc(server, "GET", "devis.list", undefined, await jwt(MEMBER));
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("membre sans devis.voir → getById 403", async () => {
+    const tokOwner = await jwt(OWNER);
+    const id = ((await mut(server, "devis.create", { clientId }, tokOwner)).json() as { result: { data: { id: number } } }).result.data.id;
+    const res = await injectTrpc(server, "GET", "devis.getById", { id }, await jwt(MEMBER));
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("membre sans devis.voir → getLignes 403", async () => {
+    const tokOwner = await jwt(OWNER);
+    const devisId = ((await mut(server, "devis.create", { clientId }, tokOwner)).json() as { result: { data: { id: number } } }).result.data.id;
+    const res = await injectTrpc(server, "GET", "devis.getLignes", { devisId }, await jwt(MEMBER));
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("membre sans devis.creer → refuser 403", async () => {
+    await admin.query('delete from permissions_utilisateur where "userId"=$1 and permission=$2', [MEMBER, "devis.creer"]);
+    const tokOwner = await jwt(OWNER);
+    const id = ((await mut(server, "devis.create", { clientId }, tokOwner)).json() as { result: { data: { id: number } } }).result.data.id;
+    await admin.query("update devis set statut='envoye' where id=$1", [id]);
+    const res = await mut(server, "devis.refuser", { id }, await jwt(MEMBER));
+    expect(res.statusCode).toBe(403);
+    await admin.query('insert into permissions_utilisateur ("userId",permission,autorise) values ($1,$2,true) on conflict do nothing', [MEMBER, "devis.creer"]);
+  });
+
+  it("membre sans devis.creer → expirer 403", async () => {
+    await admin.query('delete from permissions_utilisateur where "userId"=$1 and permission=$2', [MEMBER, "devis.creer"]);
+    const tokOwner = await jwt(OWNER);
+    const id = ((await mut(server, "devis.create", { clientId }, tokOwner)).json() as { result: { data: { id: number } } }).result.data.id;
+    const res = await mut(server, "devis.expirer", { id }, await jwt(MEMBER));
+    expect(res.statusCode).toBe(403);
+    await admin.query('insert into permissions_utilisateur ("userId",permission,autorise) values ($1,$2,true) on conflict do nothing', [MEMBER, "devis.creer"]);
+  });
+
+  it("membre avec devis.voir → list/getById not 403", async () => {
+    await admin.query('insert into permissions_utilisateur ("userId",permission,autorise) values ($1,$2,true) on conflict do nothing', [MEMBER, "devis.voir"]);
+    const tok = await jwt(MEMBER);
+    expect((await injectTrpc(server, "GET", "devis.list", undefined, tok)).statusCode).not.toBe(403);
+    const tokOwner = await jwt(OWNER);
+    const id = ((await mut(server, "devis.create", { clientId }, tokOwner)).json() as { result: { data: { id: number } } }).result.data.id;
+    expect((await injectTrpc(server, "GET", "devis.getById", { id }, tok)).statusCode).not.toBe(403);
+  });
+
+  it("membre avec devis.creer → refuser/expirer not 403", async () => {
+    const tokOwner = await jwt(OWNER);
+    const tok = await jwt(MEMBER);
+
+    const id1 = ((await mut(server, "devis.create", { clientId }, tokOwner)).json() as { result: { data: { id: number } } }).result.data.id;
+    await admin.query("update devis set statut='envoye' where id=$1", [id1]);
+    expect((await mut(server, "devis.refuser", { id: id1 }, tok)).statusCode).not.toBe(403);
+
+    const id2 = ((await mut(server, "devis.create", { clientId }, tokOwner)).json() as { result: { data: { id: number } } }).result.data.id;
+    expect((await mut(server, "devis.expirer", { id: id2 }, tok)).statusCode).not.toBe(403);
+  });
 });
