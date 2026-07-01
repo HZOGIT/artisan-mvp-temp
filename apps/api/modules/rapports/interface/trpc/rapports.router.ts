@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import { router, permissionProcedure } from "../../../../interface/trpc/trpc";
 import type { IRapportRepository } from "../../application/rapport-repository";
 import { basculerFavori, creerRapport, executerRapport, listRapports, supprimerRapport } from "../../application/use-cases";
 
@@ -16,22 +16,24 @@ const createSchema = z.object({
   graphiqueType: z.enum(["bar", "line", "pie", "doughnut"]).optional(),
 });
 
+const statsProcedure = permissionProcedure("statistiques.voir");
+
 /** Routeur tRPC des rapports personnalisables. Surface client : list/create/delete/toggleFavori/executer. */
 export function createRapportsRouter(repo: IRapportRepository) {
   return router({
-    list: protectedProcedure.query(({ ctx }) => listRapports(repo, ctx.tenant)),
+    list: statsProcedure.query(({ ctx }) => listRapports(repo, ctx.tenant)),
 
-    create: protectedProcedure.input(createSchema).mutation(({ ctx, input }) => creerRapport(repo, ctx.tenant, input)),
+    create: statsProcedure.input(createSchema).mutation(({ ctx, input }) => creerRapport(repo, ctx.tenant, input)),
 
-    delete: protectedProcedure
+    delete: statsProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => supprimerRapport(repo, ctx.tenant, input.id)),
 
-    toggleFavori: protectedProcedure
+    toggleFavori: statsProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => basculerFavori(repo, ctx.tenant, input.id)),
 
-    executer: protectedProcedure
+    executer: statsProcedure
       .input(z.object({ rapportId: z.number().int(), parametres: z.record(z.string(), z.unknown()).optional() }))
       .query(({ ctx, input }) => executerRapport(repo, ctx.tenant, input.rapportId, input.parametres)),
   });
