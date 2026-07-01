@@ -1,0 +1,51 @@
+# Backlog scénarios Gherkin — boucle d'enrichissement
+
+État persistant de la boucle cron (relu à chaque tick). **Règle : on fait les
+classiques / essentiels d'abord, puis on enrichit / complexifie.** Chaque tick
+prend **le premier item non coché** de la section « Essentiels », l'ancre dans
+le code, écrit UN scénario de qualité, coche la case.
+
+Recette + conventions : [`README.md`](README.md). Chaque scénario doit être
+**grounded dans le code** (citer le module / use-case de `apps/api/modules/…`).
+
+## Cartes de test Stripe (à utiliser dans les scénarios paiement)
+
+| Carte | Comportement |
+|---|---|
+| `4242 4242 4242 4242` | Paiement accepté (Visa) |
+| `4000 0000 0000 9995` | Refusé — fonds insuffisants |
+| `4000 0025 0000 3155` | Authentification 3D Secure requise |
+| `4000 0000 0000 0002` | Refusé — carte déclinée |
+
+## Essentiels (P0 — classiques, à faire d'abord)
+
+- [x] `commercial` · client signe un devis (`signature`)
+- [x] `commercial` · devis signé → facture (`factures`)
+- [x] `commercial` · **paiement** facture en ligne, carte OK 4242 (`paiement/use-cases.createInvoiceCheckout`)
+- [ ] `commercial` · l'artisan crée puis envoie un devis (`devis/application` create + envoyer)
+- [ ] `commercial` · l'artisan relance un devis non signé (`relances-devis`)
+- [ ] `commercial` · le client refuse un devis (`devis` transition refuser)
+- [ ] `commercial` · une facture non payée passe « en_retard » (`factures` transition)
+- [ ] `onboarding` · l'artisan démarre son abonnement, carte 4242, essai 15 j (`billing.activateOnboardingSubscription` + `createSetupIntent`/`confirmPaymentMethod`)
+- [ ] `clients` · l'artisan crée un client (`clients/application` create)
+- [ ] `clients` · l'artisan importe des clients (`clients` import)
+- [ ] `terrain` · l'artisan planifie une intervention et l'affecte à un technicien (`interventions` create + affecter)
+- [ ] `terrain` · le technicien clôture une intervention (`interventions-mobile`)
+- [ ] `gestion` · l'artisan crée un article avec TVA (`articles/application` create)
+- [ ] `onboarding` · l'artisan complète son profil entreprise (`artisan/application`)
+
+## Enrichissement / edge (P1+ — après les essentiels)
+
+- [ ] `commercial` · paiement refusé, carte 4000 0000 0000 9995 → facture reste impayée
+- [ ] `commercial` · paiement 3D Secure requis, carte 4000 0025 0000 3155
+- [ ] `commercial` · double paiement empêché (session en attente — `getSessionEnAttente`)
+- [ ] `commercial` · paiement en ligne refusé si l'artisan n'a pas activé Stripe Connect (`chargesEnabled=false`)
+- [ ] `billing` · l'artisan change de plan (`changePlan` + `previewPlanChange`)
+- [ ] `billing` · l'artisan résilie en fin de période (`cancelAtPeriodEnd`) puis réactive (`reactivateSubscription`)
+- [ ] `billing` · prélèvement off-session échoué → relance/dunning (`chargeOffSessionForCycle` / `runSchedulerTick`)
+- [ ] `commercial` · devis expire automatiquement à échéance (`devis` expirer)
+
+## Fait
+
+Les cases cochées ci-dessus. Fichiers dans `gherkin/<module>/*.feature`,
+synchronisés Notion via `task notion:gherkin:sync`.
