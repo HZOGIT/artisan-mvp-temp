@@ -30,7 +30,7 @@ Recette + conventions : [`README.md`](README.md). Chaque scénario doit être
 - [x] `clients` · l'artisan crée un client (`clients/application` create)
 - [x] `clients` · l'artisan importe des clients (`clients` import)
 - [x] `terrain` · l'artisan planifie une intervention et l'affecte à un technicien (`interventions` create + affecter)
-- [ ] `terrain` · le technicien clôture une intervention (`interventions-mobile`)
+- [x] `terrain` · le technicien clôture une intervention (`interventions-mobile`)
 - [ ] `gestion` · l'artisan crée un article avec TVA (`articles/application` create)
 - [ ] `onboarding` · l'artisan complète son profil entreprise (`artisan/application`)
 
