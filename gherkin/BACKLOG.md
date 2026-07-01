@@ -58,7 +58,7 @@ Recette + conventions : [`README.md`](README.md). Chaque scénario doit être
 - [x] `commercial` · l'artisan crée un contrat de maintenance récurrent (`contrats-maintenance`)
 - [x] `commercial` · l'artisan crée des variantes de devis (`devis-options`)
 - [x] `clients` · l'artisan fusionne deux fiches client en doublon (`clients` champsFusionnes)
-- [ ] `clients` · l'artisan échange avec un client via le chat (`chat`)
+- [x] `clients` · l'artisan échange avec un client via le chat (`chat`)
 - [ ] `terrain` · l'artisan exporte son calendrier au format iCal (`calendrier.getIcalFeed`)
 - [ ] `gestion` · l'artisan met à jour le prix d'un article du catalogue (`articles` update)
 
