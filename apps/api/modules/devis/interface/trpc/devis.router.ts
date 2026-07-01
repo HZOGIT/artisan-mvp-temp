@@ -9,6 +9,7 @@ import { outboxEvent } from "../../../../shared/events/outbox-event";
 import { withOutbox } from "../../../../shared/events/with-outbox";
 import { signaturesDevis } from "../../../../../../drizzle/schema.pg";
 /** Permissions (parité legacy) : actions sur lignes/envoi/duplication = `devis.creer` ; conversion en facture = `factures.creer`. */
+const devisVoir = permissionProcedure("devis.voir");
 const devisCreer = permissionProcedure("devis.creer");
 const devisSupprimer = permissionProcedure("devis.supprimer");
 const facturesCreer = permissionProcedure("factures.creer");
@@ -133,14 +134,14 @@ export function createDevisRouter(
   };
   const nonSignesDeps = { devisRepo: repo, clientReader: mailing.clientReader, signatureReader };
   return router({
-    list: protectedProcedure.query(({ ctx }) => listDevis(repo, ctx.tenant)),
+    list: devisVoir.query(({ ctx }) => listDevis(repo, ctx.tenant)),
 
     /** Détail enrichi (parité legacy : `{ ...devis, lignes, client }`) — consommé par DevisDetail. */
-    getById: protectedProcedure
+    getById: devisVoir
       .input(z.object({ id: z.number().int() }))
       .query(({ ctx, input }) => getDevisDetail(repo, mailing.clientReader, ctx.tenant, input.id)),
 
-    getLignes: protectedProcedure
+    getLignes: devisVoir
       .input(z.object({ devisId: z.number().int() }))
       .query(({ ctx, input }) => listLignesDevis(repo, ctx.tenant, input.devisId)),
 
@@ -244,7 +245,7 @@ export function createDevisRouter(
         });
       }),
 
-    refuser: protectedProcedure
+    refuser: devisCreer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         return withOutbox(db, repo, async (r, tx) => {
@@ -255,7 +256,7 @@ export function createDevisRouter(
         });
       }),
 
-    expirer: protectedProcedure
+    expirer: devisCreer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         return withOutbox(db, repo, async (r, tx) => {
@@ -266,9 +267,9 @@ export function createDevisRouter(
       }),
 
     /** ── Modèles de devis (gabarits réutilisables) exposés sous `devis.*` (parité client) ────────── */
-    getModeles: protectedProcedure.query(({ ctx }) => listModelesDevis(modeleRepo, ctx.tenant)),
+    getModeles: devisVoir.query(({ ctx }) => listModelesDevis(modeleRepo, ctx.tenant)),
 
-    getModeleWithLignes: protectedProcedure
+    getModeleWithLignes: devisVoir
       .input(z.object({ modeleId: z.number().int() }))
       .query(({ ctx, input }) => getModeleDevisAvecLignes(modeleRepo, ctx.tenant, input.modeleId)),
 
