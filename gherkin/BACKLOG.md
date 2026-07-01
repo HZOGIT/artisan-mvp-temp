@@ -41,7 +41,7 @@ Recette + conventions : [`README.md`](README.md). Chaque scénario doit être
 - [x] `commercial` · double paiement empêché (session en attente — `getSessionEnAttente`)
 - [x] `commercial` · paiement en ligne refusé si l'artisan n'a pas activé Stripe Connect (`chargesEnabled=false`)
 - [x] `billing` · l'artisan change de plan (`changePlan` + `previewPlanChange`)
-- [ ] `billing` · l'artisan résilie en fin de période (`cancelAtPeriodEnd`) puis réactive (`reactivateSubscription`)
+- [x] `billing` · l'artisan résilie en fin de période (`cancelAtPeriodEnd`) puis réactive (`reactivateSubscription`)
 - [ ] `billing` · prélèvement off-session échoué → relance/dunning (`chargeOffSessionForCycle` / `runSchedulerTick`)
 - [ ] `commercial` · devis expire automatiquement à échéance (`devis` expirer)
 
