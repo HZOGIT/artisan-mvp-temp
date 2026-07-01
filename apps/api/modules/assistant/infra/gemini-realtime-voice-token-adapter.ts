@@ -1,6 +1,7 @@
 import { RealtimeTokenError, type RealtimeVoiceTokenPort, type VoiceTokenMinted, type VoiceTokenSetup } from "../application/voice-token-use-cases";
 import { toGeminiTools } from "./gemini-agentic-adapter";
 import { fetchWithRetry } from "../../../shared/http/fetch-with-retry";
+import { getSecretSync } from "../../../shared/config/secrets";
 
 /*
  * Adapter Gemini du mint vocal : POST `v1alpha/auth_tokens` (token éphémère pour la session Live). Body
@@ -38,8 +39,8 @@ export function buildAuthTokenBody(setup: VoiceTokenSetup, model: string, now: n
 
 export class GeminiRealtimeVoiceTokenAdapter implements RealtimeVoiceTokenPort {
   async mint(setup: VoiceTokenSetup): Promise<VoiceTokenMinted> {
-    const model = process.env.GEMINI_LIVE_MODEL || LIVE_MODEL_DEFAULT;
-    const apiKey = process.env.GEMINI_API_KEY ?? "";
+    const model = getSecretSync("GEMINI_LIVE_MODEL") ?? LIVE_MODEL_DEFAULT;
+    const apiKey = getSecretSync("GEMINI_API_KEY") ?? "";
     const now = Date.now();
     const body = buildAuthTokenBody(setup, model, now);
 

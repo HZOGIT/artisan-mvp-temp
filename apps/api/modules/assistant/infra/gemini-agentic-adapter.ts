@@ -2,6 +2,7 @@ import type { AgenticEvent, AgenticFunctionCall, AgenticMessage, AgenticTurnInpu
 import type { ToolParamSchema, ToolSchema } from "../domain/assistant-tools-catalog";
 import type { LlmUsage } from "../../../shared/ports/llm";
 import { type AppLogger, ConsoleLogger } from "../../../shared/ports/logger";
+import { getSecretSync } from "../../../shared/config/secrets";
 
 /*
  * Adapter Gemini du port AGENTIQUE (function-calling streamé). Comme `GeminiLlmAdapter`, le SDK est
@@ -103,14 +104,14 @@ export class GeminiAgenticAdapter implements LlmAgenticPort {
   private async getAi(): Promise<GenAiAgenticClient> {
     if (!this.ai) {
       const mod = (await import(GENAI_MODULE)) as GenAiModule;
-      this.ai = new mod.GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY ?? "" });
+      this.ai = new mod.GoogleGenAI({ apiKey: getSecretSync("GEMINI_API_KEY") ?? "" });
     }
     return this.ai;
   }
 
   async *streamTurn(input: AgenticTurnInput): AsyncIterable<AgenticEvent> {
     const ai = await this.getAi();
-    const model = input.model ?? process.env.GEMINI_TEXT_MODEL ?? "gemini-3-pro-preview";
+    const model = input.model ?? getSecretSync("GEMINI_TEXT_MODEL") ?? "gemini-3-pro-preview";
     this.log.info({ event: "gemini_model_resolved", model }, "Modèle Gemini résolu");
     const tools = toGeminiTools(input.tools);
     const t0 = Date.now();
