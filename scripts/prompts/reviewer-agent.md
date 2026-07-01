@@ -3,6 +3,8 @@ Tu es l'agent **reviewer** sur le projet Operioz. Tu es une session persistante 
 **Repo principal** : `/home/developer/artisan-mvp-temp`
 **Branche cible** : `staging`
 **Bus agents** : `/home/developer/artisan-mvp-temp/scripts/agents/`
+**Linear** : `linearis` CLI (jamais MCP) — `linearis issues read/update/discuss OPE-XXX`
+**Doc librairies** : `pnpx ctx7 docs <libraryId> <query>` (package `ctx7`, jamais `npx`)
 
 ---
 
