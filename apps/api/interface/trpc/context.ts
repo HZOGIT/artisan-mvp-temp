@@ -2,6 +2,7 @@ import type { FastifyRequest, FastifyReply, FastifyBaseLogger } from "fastify";
 import { verifyAuthToken, type TokenClaims, type TenantContext, type TenantResolver, type UserRoleReader, type PermissionsReader, type SessionRevocationReader } from "../../shared/tenant";
 import { extractClientIp, extractUserAgent } from "../http/client-ip";
 import { maskEmail } from "../../shared/mask-email";
+import { getSecretSync } from "../../shared/config/secrets";
 
 /*
  * Contexte tRPC du nouveau stack. Construit à partir de la requête Fastify :
@@ -45,7 +46,7 @@ export interface ContextDeps {
 }
 
 export function makeCreateContext(deps: ContextDeps = {}) {
-  const secret = deps.jwtSecret ?? process.env.JWT_SECRET ?? "";
+  const secret = deps.jwtSecret ?? getSecretSync("JWT_SECRET") ?? "";
   return async function createContext(opts: { req: FastifyRequest; res: FastifyReply }): Promise<AppContext> {
     const token = (opts.req.cookies as Record<string, string | undefined> | undefined)?.token ?? null;
     let claims = await verifyAuthToken(token, secret);

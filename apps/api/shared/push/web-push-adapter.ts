@@ -2,6 +2,7 @@ import webpush from "web-push";
 import { and, eq } from "drizzle-orm";
 import { pushSubscriptions } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../db";
+import { getSecretSync } from "../config/secrets";
 
 export interface PushPort {
   subscribe(artisanId: number, endpoint: string, keys: { p256dh: string; auth: string }): Promise<void>;
@@ -10,25 +11,30 @@ export interface PushPort {
   getPublicKey(): string | null;
 }
 
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY ?? null;
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY ?? null;
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT ?? "mailto:support@operioz.com";
-
-if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
-  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-}
-
 /*
  * Adapter web-push. `technicienId` dans la table legacy = artisanId dans le new-stack
  * (table jamais alimentée jusqu'ici, réutilisation sémantique sans migration).
  * Envoi best-effort via `Promise.allSettled` : un échec d'une sub n'en bloque pas d'autres.
  * No-op silencieux si VAPID non configuré (dev/staging sans clés).
+ *
+ * Les clés VAPID sont lues via getSecretSync au moment de l'instanciation (buildApp, après
+ * hydrateSecrets) — pas au niveau module, sinon le cache serait encore froid à l'import.
  */
 export class WebPushAdapter implements PushPort {
-  constructor(private readonly db: DbClient) {}
+  private readonly publicKey: string | null;
+  private readonly privateKey: string | null;
+
+  constructor(private readonly db: DbClient) {
+    this.publicKey = getSecretSync("VAPID_PUBLIC_KEY") ?? null;
+    this.privateKey = getSecretSync("VAPID_PRIVATE_KEY") ?? null;
+    const subject = getSecretSync("VAPID_SUBJECT") ?? "mailto:support@operioz.com";
+    if (this.publicKey && this.privateKey) {
+      webpush.setVapidDetails(subject, this.publicKey, this.privateKey);
+    }
+  }
 
   getPublicKey(): string | null {
-    return VAPID_PUBLIC_KEY;
+    return this.publicKey;
   }
 
   async subscribe(artisanId: number, endpoint: string, keys: { p256dh: string; auth: string }): Promise<void> {
@@ -45,7 +51,7 @@ export class WebPushAdapter implements PushPort {
   }
 
   async sendToUser(artisanId: number, payload: { title: string; body: string }): Promise<void> {
-    if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
+    if (!this.publicKey || !this.privateKey) return;
     const subs = await this.db
       .select()
       .from(pushSubscriptions)

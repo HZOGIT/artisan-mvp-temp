@@ -1,6 +1,18 @@
 import { describe, it, expect, vi } from "vitest";
-import { ensureStripeWebhookEndpoint, ensureStripeConnectWebhookEndpoint } from "./stripe-webhook-setup";
+import { ensureStripeWebhookEndpoint, ensureStripeConnectWebhookEndpoint, bootstrapStripeWebhooks } from "./stripe-webhook-setup";
 import type { StripeWebhookSDK } from "./stripe-webhook-setup";
+import type { AppLogger } from "../ports/logger";
+
+/** Logger espion qui capture toutes les entrées ({obj, msg}) pour asserter l'absence de secret. */
+function makeSpyLogger(): AppLogger & { entries: Array<{ obj: Record<string, unknown>; msg: string }> } {
+  const entries: Array<{ obj: Record<string, unknown>; msg: string }> = [];
+  const rec = (obj: Record<string, unknown>, msg: string): void => { entries.push({ obj, msg }); };
+  return { entries, info: rec, warn: rec, error: rec, debug: rec };
+}
+
+/** Sérialise toutes les entrées de log en une chaîne — pour vérifier qu'un secret n'y apparaît jamais. */
+const logDump = (log: { entries: Array<{ obj: Record<string, unknown>; msg: string }> }): string =>
+  log.entries.map((e) => `${JSON.stringify(e.obj)} ${e.msg}`).join("\n");
 
 const EVENTS = [
   "checkout.session.completed",
@@ -38,6 +50,14 @@ describe("ensureStripeWebhookEndpoint", () => {
       description: "Operioz — auto-setup",
     });
     expect(result).toBe("whsec_newSecret");
+  });
+
+  it("ne loggue JAMAIS le signing secret en clair à la création", async () => {
+    const sdk = makeSDK([]);
+    const log = makeSpyLogger();
+    const result = await ensureStripeWebhookEndpoint("sk_test_key", URL, log, () => sdk);
+    expect(result).toBe("whsec_newSecret");
+    expect(logDump(log)).not.toContain("whsec_newSecret");
   });
 
   it("retourne null si endpoint existant avec tous les events (idempotent)", async () => {
@@ -131,5 +151,51 @@ describe("ensureStripeConnectWebhookEndpoint", () => {
     const result = await ensureStripeConnectWebhookEndpoint("sk_test_key", CONNECT_URL, undefined, () => sdk);
     expect(sdk.webhookEndpoints.update).toHaveBeenCalledWith("we_connect_existing", { enabled_events: CONNECT_EVENTS });
     expect(result).toBeNull();
+  });
+});
+
+describe("bootstrapStripeWebhooks", () => {
+  const baseDeps = () => ({
+    stripeKey: "sk_test_key",
+    backendPublicUrl: "https://example.com",
+    log: makeSpyLogger(),
+    persistSecret: vi.fn<(key: string, value: string) => Promise<void>>().mockResolvedValue(undefined),
+  });
+
+  it("endpoint créé → persiste le secret via setSecret (clé + secret) + log 'recréé', sans throw ni secret en clair", async () => {
+    const deps = baseDeps();
+    await expect(
+      bootstrapStripeWebhooks({
+        ...deps,
+        ensureWebhook: async () => "whsec_web",
+        ensureConnectWebhook: async () => "whsec_connect",
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(deps.persistSecret).toHaveBeenCalledWith("STRIPE_WEBHOOK_SECRET", "whsec_web");
+    expect(deps.persistSecret).toHaveBeenCalledWith("STRIPE_CONNECT_WEBHOOK_SECRET", "whsec_connect");
+    const dump = logDump(deps.log);
+    expect(dump).toContain("recréé et signing secret stocké dans le secrets manager");
+    expect(dump).not.toContain("whsec_web");
+    expect(dump).not.toContain("whsec_connect");
+  });
+
+  it("endpoints déjà présents (ensure* → null) → aucun setSecret, idempotent", async () => {
+    const deps = baseDeps();
+    await bootstrapStripeWebhooks({
+      ...deps,
+      ensureWebhook: async () => null,
+      ensureConnectWebhook: async () => null,
+    });
+    expect(deps.persistSecret).not.toHaveBeenCalled();
+  });
+
+  it("passe backendPublicUrl → URLs webhook correctes vers ensure*", async () => {
+    const deps = baseDeps();
+    const ensureWebhook = vi.fn<(key: string, url: string) => Promise<string | null>>().mockResolvedValue(null);
+    const ensureConnectWebhook = vi.fn<(key: string, url: string) => Promise<string | null>>().mockResolvedValue(null);
+    await bootstrapStripeWebhooks({ ...deps, ensureWebhook, ensureConnectWebhook });
+    expect(ensureWebhook).toHaveBeenCalledWith("sk_test_key", "https://example.com/api/stripe/webhook", deps.log);
+    expect(ensureConnectWebhook).toHaveBeenCalledWith("sk_test_key", "https://example.com/api/stripe/connect-webhook", deps.log);
   });
 });

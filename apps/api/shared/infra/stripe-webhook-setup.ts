@@ -125,9 +125,9 @@ export async function ensureStripeWebhookEndpoint(
     sdk.webhookEndpoints.create({ url: webhookUrl, enabled_events: events, description: "Operioz — auto-setup" }),
   );
   const newSecret = created.secret ?? null;
-  log?.warn(
+  log?.info(
     { event: "stripe_webhook_created", id: created.id, url: webhookUrl },
-    `Webhook Stripe créé. ⚠️ Copiez ce secret dans STRIPE_WEBHOOK_SECRET : ${newSecret ?? "(secret non retourné)"}`,
+    "Webhook Stripe créé — signing secret persisté par l'appelant dans le secrets manager",
   );
   return newSecret;
 }
@@ -176,9 +176,44 @@ export async function ensureStripeConnectWebhookEndpoint(
     sdk.webhookEndpoints.create({ url: connectWebhookUrl, enabled_events: events, description: "Operioz Connect — auto-setup", connect: true }),
   );
   const newSecret = created.secret ?? null;
-  log?.warn(
+  log?.info(
     { event: "stripe_connect_webhook_created", id: created.id, url: connectWebhookUrl },
-    `Webhook Connect créé. ⚠️ Copiez ce secret dans STRIPE_CONNECT_WEBHOOK_SECRET : ${newSecret ?? "(secret non retourné)"}`,
+    "Webhook Connect créé — signing secret persisté par l'appelant dans le secrets manager",
   );
   return newSecret;
+}
+
+type EnsureWebhook = (secretKey: string, url: string, log?: AppLogger) => Promise<string | null>;
+
+export interface BootstrapStripeWebhooksDeps {
+  readonly stripeKey: string;
+  readonly backendPublicUrl: string;
+  readonly log: AppLogger;
+  /** Persiste un signing secret dans le provider actif (write-through cache). Injecté = setSecret. */
+  readonly persistSecret: (key: string, value: string) => Promise<void>;
+  readonly ensureWebhook: EnsureWebhook;
+  readonly ensureConnectWebhook: EnsureWebhook;
+}
+
+/**
+ * Auto-setup des deux webhooks Stripe au boot. Idempotent : si un endpoint existe déjà, `ensure*`
+ * renvoie `null` → rien à faire. Si un endpoint est CRÉÉ, `ensure*` renvoie son signing secret → on
+ * le PERSISTE via `persistSecret` (provider actif + write-through cache), sans throw et sans jamais
+ * logguer le secret en clair. Grâce au write-through, la route runtime lit le nouveau secret dès ce
+ * boot (pas de 2e déploiement).
+ */
+export async function bootstrapStripeWebhooks(deps: BootstrapStripeWebhooksDeps): Promise<void> {
+  const webhookUrl = `${deps.backendPublicUrl}/api/stripe/webhook`;
+  const newSecret = await deps.ensureWebhook(deps.stripeKey, webhookUrl, deps.log);
+  if (newSecret) {
+    await deps.persistSecret("STRIPE_WEBHOOK_SECRET", newSecret);
+    deps.log.warn({ event: "stripe_webhook_recreated" }, "Webhook Stripe recréé et signing secret stocké dans le secrets manager");
+  }
+
+  const connectWebhookUrl = `${deps.backendPublicUrl}/api/stripe/connect-webhook`;
+  const newConnectSecret = await deps.ensureConnectWebhook(deps.stripeKey, connectWebhookUrl, deps.log);
+  if (newConnectSecret) {
+    await deps.persistSecret("STRIPE_CONNECT_WEBHOOK_SECRET", newConnectSecret);
+    deps.log.warn({ event: "stripe_connect_webhook_recreated" }, "Webhook Connect Stripe recréé et signing secret stocké dans le secrets manager");
+  }
 }

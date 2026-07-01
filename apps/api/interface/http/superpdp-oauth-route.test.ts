@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterAll, beforeAll } from "vitest";
 import { SignJWT } from "jose";
 import { Pool } from "pg";
 import { buildApp } from "../../app";
+import { hydrateSecrets } from "../../shared/config/secrets";
 
 const URL = process.env.DATABASE_URL;
 const SECRET = "test-secret-superpdp-oauth-route-32ch";
@@ -35,6 +36,8 @@ describe.skipIf(!URL)("superpdp-oauth-route — client_secret + redirect_uri dan
     process.env.SUPERPDP_CLIENT_ID = CLIENT_ID;
     process.env.SUPERPDP_CLIENT_SECRET = CLIENT_SECRET;
     process.env.SUPERPDP_REDIRECT_URI = REDIRECT_URI;
+    /* Ordre de boot prod : env posé → hydrateSecrets snapshot le cache → buildApp lit via getSecretSync. */
+    await hydrateSecrets();
     app = buildApp({ jwtSecret: SECRET });
   });
 

@@ -55,7 +55,7 @@ const ENV_KEYS = [
   "SECRETS_PROVIDER", "SECRET_GET_TIMEOUT_MS",
   "BWS_ACCESS_TOKEN", "BWS_ORGANIZATION_ID", "BWS_PROJECT_ID",
   "OVH_SECRET_MANAGER_ENDPOINT", "OVH_SECRET_MANAGER_TOKEN", "OVH_SECRET_MANAGER_PATH",
-  "STRIPE_SECRET_KEY", "RESEND_API_KEY", "GEMINI_API_KEY", "NEW_KEY", "EPHEMERAL_KEY",
+  "STRIPE_SECRET_KEY", "RESEND_API_KEY", "GEMINI_API_KEY", "NEW_KEY", "EPHEMERAL_KEY", "JWT_SECRET", "NOTION_TOKEN",
 ];
 
 describe("secrets resolver (multi-providers, async)", () => {
@@ -139,6 +139,26 @@ describe("secrets resolver (multi-providers, async)", () => {
     await setSecret("EPHEMERAL_KEY", "v");
     expect(await getSecret("EPHEMERAL_KEY")).toBe("v");
     expect(process.env.EPHEMERAL_KEY).toBeUndefined();
+  });
+
+  it("getSecretSync (composition root) lit le cache hydraté du vault, jamais process.env", async () => {
+    process.env.BWS_ACCESS_TOKEN = "token_test";
+    process.env.BWS_ORGANIZATION_ID = "org_test";
+    process.env.JWT_SECRET = "jwt_env_LEAK";
+    bwState.secrets = { JWT_SECRET: "jwt_vault" };
+    const { hydrateSecrets, getSecretSync } = await import("./secrets");
+    await hydrateSecrets();
+    expect(getSecretSync("JWT_SECRET")).toBe("jwt_vault");
+  });
+
+  it("getSecretSync résout un secret vault-only ABSENT de process.env", async () => {
+    process.env.BWS_ACCESS_TOKEN = "token_test";
+    process.env.BWS_ORGANIZATION_ID = "org_test";
+    bwState.secrets = { NOTION_TOKEN: "ntn_vault_only" };
+    const { hydrateSecrets, getSecretSync } = await import("./secrets");
+    await hydrateSecrets();
+    expect(process.env.NOTION_TOKEN).toBeUndefined();
+    expect(getSecretSync("NOTION_TOKEN")).toBe("ntn_vault_only");
   });
 
   it("timeout live-get → renvoie le CACHE (jamais process.env)", async () => {

@@ -201,8 +201,8 @@ import { createConnectReconcilerJob } from "./modules/connect/application/connec
 import { contratsVisitesCronPlugin } from "./shared/infra/contrats-visites-cron";
 import { rappelRdvClientCronPlugin } from "./shared/infra/rappel-rdv-client-cron";
 import { analysePhotosCronPlugin } from "./shared/infra/analyse-photos-cron";
-import { ensureStripeWebhookEndpoint, ensureStripeConnectWebhookEndpoint } from "./shared/infra/stripe-webhook-setup";
-import { getStripeConnectWebhookSecret } from "./shared/config/secrets";
+import { ensureStripeWebhookEndpoint, ensureStripeConnectWebhookEndpoint, bootstrapStripeWebhooks } from "./shared/infra/stripe-webhook-setup";
+import { getStripeConnectWebhookSecret, getSecretSync, getSecret, setSecret } from "./shared/config/secrets";
 import { WebhookPaymentWriterDrizzle } from "./modules/subscription/infra/webhook-payment-writer-drizzle";
 import { SubscriptionEventNotifierDrizzle } from "./modules/subscription/infra/subscription-event-notifier-drizzle";
 import { registerUploadLogoRoute } from "./interface/http/upload-logo-route";
@@ -563,7 +563,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
    * Origines CORS autorisées : CORS_ORIGIN (liste séparée par virgules) sinon APP_URL. Plusieurs
    * fronts cross-origin partagent le backend (app artisan + SPA admin) → on parse en tableau.
    */
-  const corsOriginEnv = process.env.CORS_ORIGIN ?? process.env.APP_URL;
+  const corsOriginEnv = getSecretSync("CORS_ORIGIN") ?? getSecretSync("APP_URL");
   const corsOrigins = corsOriginEnv
     ? corsOriginEnv.split(",").map((o) => o.trim()).filter(Boolean)
     : false;
@@ -578,7 +578,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     crossOriginResourcePolicy: { policy: "cross-origin" },
   });
 
-  const backendPublicUrl = deps.backendPublicUrl ?? process.env.BACKEND_PUBLIC_URL ?? deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com";
+  const backendPublicUrl = deps.backendPublicUrl ?? getSecretSync("BACKEND_PUBLIC_URL") ?? deps.lienBaseUrl ?? getSecretSync("APP_URL") ?? "https://www.operioz.com";
 
   app.setErrorHandler<FastifyError>((error, req, reply) => {
     const status = error.statusCode ?? 500;
@@ -606,7 +606,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       repo: deps.demandeAvisRepo ?? new DemandeAvisRepositoryDrizzle(getDbHandle().db),
       email: emailAdapter,
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(),
-      lienBaseUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+      lienBaseUrl: deps.lienBaseUrl ?? getSecretSync("APP_URL") ?? "https://www.operioz.com",
       artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
     },
     /*
@@ -714,9 +714,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     email: emailAdapter,
     optoutRepo: new EmailOptoutRepositoryDrizzle(getDbHandle().db),
     db: deps.clientsDb ?? getDbHandle().db,
-    appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+    appUrl: deps.lienBaseUrl ?? getSecretSync("APP_URL") ?? "https://www.operioz.com",
     backendPublicUrl: backendPublicUrl,
-    unsubscribeSecret: deps.emailUnsubscribeSecret ?? process.env.EMAIL_UNSUBSCRIBE_SECRET ?? process.env.JWT_SECRET ?? "dev-unsubscribe-secret",
+    unsubscribeSecret: deps.emailUnsubscribeSecret ?? getSecretSync("EMAIL_UNSUBSCRIBE_SECRET") ?? getSecretSync("JWT_SECRET") ?? "dev-unsubscribe-secret",
   });
   /*
    * Repo interventions partagé : module interventions ET composé par rdv (`confirm` crée une
@@ -789,7 +789,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
       signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db),
       signatureCreator: new DevisSignatureCreatorDrizzle(getOwnerDbHandle().db),
-      appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+      appUrl: deps.lienBaseUrl ?? getSecretSync("APP_URL") ?? "https://www.operioz.com",
       modeleEmailRepo,
       piecesJointesRepo: new PiecesJointesRepositoryDrizzle(getDbHandle().db),
       storage: deps.storage ?? new OvhS3Adapter(getDbHandle().db),
@@ -839,7 +839,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       db: deps.facturesDb ?? getDbHandle().db,
       piecesJointesRepo: new PiecesJointesRepositoryDrizzle(getDbHandle().db),
       emailLogWriter: sharedEmailLogWriter,
-      appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+      appUrl: deps.lienBaseUrl ?? getSecretSync("APP_URL") ?? "https://www.operioz.com",
       portalTokenReader: new PortalAccessRepositoryDrizzle(getDbHandle().db),
     },
     push: pushAdapter,
@@ -990,15 +990,15 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const auth = createAuthModule({
     repository: deps.authRepo ?? new AuthRepositoryDrizzle(getDbHandle().db),
     hasher: new BcryptPasswordHasher(),
-    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    jwtSecret: deps.jwtSecret ?? getSecretSync("JWT_SECRET") ?? "",
     email: emailAdapter,
     signinRateLimiter: deps.signinRateLimiter ?? new SlidingWindowRateLimiter(10, 15 * 60 * 1000),
     signupRateLimiter: deps.signupRateLimiter ?? new SlidingWindowRateLimiter(5, 60 * 60 * 1000),
     resetRateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(5, 60 * 60 * 1000),
-    appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+    appUrl: deps.lienBaseUrl ?? getSecretSync("APP_URL") ?? "https://www.operioz.com",
     backendPublicUrl: backendPublicUrl,
     optoutRepo: new EmailOptoutRepositoryDrizzle(getDbHandle().db),
-    unsubscribeSecret: deps.emailUnsubscribeSecret ?? process.env.EMAIL_UNSUBSCRIBE_SECRET ?? process.env.JWT_SECRET ?? "dev-unsubscribe-secret",
+    unsubscribeSecret: deps.emailUnsubscribeSecret ?? getSecretSync("EMAIL_UNSUBSCRIBE_SECRET") ?? getSecretSync("JWT_SECRET") ?? "dev-unsubscribe-secret",
   });
   const subscription = createSubscriptionModule(subscriptionReader);
   /*
@@ -1016,7 +1016,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       contextReader: new SignatureContextReaderDrizzle(signatureDb),
       email: signatureEmail,
       notifications: signatureNotifications,
-      appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+      appUrl: deps.lienBaseUrl ?? getSecretSync("APP_URL") ?? "https://www.operioz.com",
       emailLogWriter: sharedEmailLogWriter,
       pdf: new JsPdfAdapter(),
       artisanReader: new SharedArtisanReaderDrizzle(signatureDb),
@@ -1068,9 +1068,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     buildAssistantWriteHandlersFromRepos(
       { clientRepo, interventionRepo, devisRepo, factureRepo, devisReader: new DevisReaderDrizzle(getDbHandle().db), commandeRepo },
       {
-        devis: { artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db), clientReader: new SharedClientReaderDrizzle(getDbHandle().db), signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db), signatureCreator: new DevisSignatureCreatorDrizzle(getOwnerDbHandle().db), appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com", pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000), modeleEmailRepo },
+        devis: { artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db), clientReader: new SharedClientReaderDrizzle(getDbHandle().db), signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db), signatureCreator: new DevisSignatureCreatorDrizzle(getOwnerDbHandle().db), appUrl: deps.lienBaseUrl ?? getSecretSync("APP_URL") ?? "https://www.operioz.com", pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000), modeleEmailRepo },
         facture: { artisanReader: new ArtisanReaderDrizzle(getDbHandle().db), clientReader: new ClientReaderDrizzle(getDbHandle().db), pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000), modeleEmailRepo },
-        relance: { artisanReader: new ArtisanReaderDrizzle(getDbHandle().db), clientReader: new ClientReaderDrizzle(getDbHandle().db), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000), modeleEmailRepo, appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com", portalTokenReader: new PortalAccessRepositoryDrizzle(getDbHandle().db) },
+        relance: { artisanReader: new ArtisanReaderDrizzle(getDbHandle().db), clientReader: new ClientReaderDrizzle(getDbHandle().db), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000), modeleEmailRepo, appUrl: deps.lienBaseUrl ?? getSecretSync("APP_URL") ?? "https://www.operioz.com", portalTokenReader: new PortalAccessRepositoryDrizzle(getDbHandle().db) },
         commande: { repo: commandeRepo, fournisseurRepo, artisanReader: new CommandeArtisanReaderDrizzle(getDbHandle().db), pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
       },
     ),
@@ -1118,7 +1118,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       chatDb,
       emailAdapter,
       new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
-      deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+      deps.lienBaseUrl ?? getSecretSync("APP_URL") ?? "https://www.operioz.com",
     ),
   });
   /*
@@ -1132,9 +1132,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   });
 
   const feedback = createFeedbackModule({
-    notionToken: process.env.NOTION_TOKEN,
-    notionDatabaseId: process.env.NOTION_FEEDBACK_DATABASE_ID,
-    notionEnvironment: process.env.APP_URL?.includes("staging") ? "Staging" : "Production",
+    notionToken: getSecretSync("NOTION_TOKEN"),
+    notionDatabaseId: getSecretSync("NOTION_FEEDBACK_DATABASE_ID"),
+    notionEnvironment: getSecretSync("APP_URL")?.includes("staging") ? "Staging" : "Production",
   });
   feedback.syncSchema?.().catch((err: unknown) => app.log.warn({ err }, "notion schema sync échoué — propriété Email peut manquer dans la DB feedback"));
   /** Module `devices` (appareils/sessions de l'utilisateur). Table HORS RLS scopée par userId. */
@@ -1174,7 +1174,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
    */
   const portalAccessRepo = new PortalAccessRepositoryDrizzle(getDbHandle().db);
   const clientPortal = createClientPortalModule({
-    defaultOrigin: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+    defaultOrigin: deps.lienBaseUrl ?? getSecretSync("APP_URL") ?? "https://www.operioz.com",
     access: portalAccessRepo,
     docs: new PortalDocsReaderDrizzle(getDbHandle().db),
     scheduling: new PortalSchedulingReaderDrizzle(getDbHandle().db),
@@ -1211,9 +1211,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   const einvoicing = buildEinvoicingModule({
     PA_PROVIDER: process.env.PA_PROVIDER,
-    SUPERPDP_CLIENT_ID: process.env.SUPERPDP_CLIENT_ID,
-    SUPERPDP_CLIENT_SECRET: process.env.SUPERPDP_CLIENT_SECRET,
-    SUPERPDP_BASE_URL: process.env.SUPERPDP_BASE_URL,
+    SUPERPDP_CLIENT_ID: getSecretSync("SUPERPDP_CLIENT_ID"),
+    SUPERPDP_CLIENT_SECRET: getSecretSync("SUPERPDP_CLIENT_SECRET"),
+    SUPERPDP_BASE_URL: getSecretSync("SUPERPDP_BASE_URL"),
     NODE_ENV: process.env.NODE_ENV,
   }, getDbHandle().db);
 
@@ -1239,7 +1239,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     artisanRepo: deps.artisanRepo ?? new ArtisanRepositoryDrizzle(getDbHandle().db),
     stripe: deps.stripePort ?? new StripeAdapter(),
     db: getDbHandle().db,
-    appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+    appUrl: deps.lienBaseUrl ?? getSecretSync("APP_URL") ?? "https://www.operioz.com",
   });
 
   /*
@@ -1344,7 +1344,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     rateLimiter: new SlidingWindowRateLimiter(60, 60 * 1000),
   });
 
-  const appUrlForPortail = deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com";
+  const appUrlForPortail = deps.lienBaseUrl ?? getSecretSync("APP_URL") ?? "https://www.operioz.com";
   const onCheckoutCompletedEmail = async (data: { artisanId: number; factureId: number; clientId: number; clientEmail: string; clientName: string; factureNumero: string; totalTTC: string }): Promise<void> => {
     const ctx = { artisanId: data.artisanId, userId: 0 };
     const artisan = await new ArtisanReaderDrizzle(getDbHandle().db).getArtisan(ctx);
@@ -1364,7 +1364,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     stripe: deps.stripePort ?? new StripeAdapter(),
     paymentWriter: new WebhookPaymentWriterDrizzle(getDbHandle().db),
     notifier: new SubscriptionEventNotifierDrizzle(getDbHandle().db, emailAdapter),
-    webhookSecret: deps.stripeWebhookSecret ?? process.env.STRIPE_WEBHOOK_SECRET ?? "",
+    webhookSecret: deps.stripeWebhookSecret ?? getSecretSync("STRIPE_WEBHOOK_SECRET") ?? "",
     appUrl: appUrlForPortail,
     onBillingWebhookEvent: (eventType, piId, fc, fm, stripeEventId) =>
       handleBillingWebhookEvent({ repo: billingRepo, db: getDbHandle().db }, eventType, piId, fc, fm, stripeEventId),
@@ -1393,7 +1393,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     onCheckoutCompletedEmail,
   });
 
-  const resendSecret = deps.resendWebhookSecret ?? process.env.RESEND_WEBHOOK_SECRET;
+  const resendSecret = deps.resendWebhookSecret ?? getSecretSync("RESEND_WEBHOOK_SECRET");
   if (resendSecret) {
     registerResendWebhookRoute(app, {
       resendWebhookSecret: resendSecret,
@@ -1407,14 +1407,14 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   /** Flow OAuth SuperPDP par artisan — authorize + callback. */
   if (einvoicing.superpdpAdapter) {
-    const superpdpBaseUrl = process.env.SUPERPDP_BASE_URL ?? (process.env.NODE_ENV === "production" ? "https://api.superpdp.tech" : "https://sandbox.superpdp.tech");
+    const superpdpBaseUrl = getSecretSync("SUPERPDP_BASE_URL") ?? (process.env.NODE_ENV === "production" ? "https://api.superpdp.tech" : "https://sandbox.superpdp.tech");
     registerSuperpdpOauthRoutes(app, {
       adapter: einvoicing.superpdpAdapter,
       baseUrl: superpdpBaseUrl,
-      clientId: process.env.SUPERPDP_CLIENT_ID ?? "",
-      clientSecret: process.env.SUPERPDP_CLIENT_SECRET ?? "",
-      redirectUri: process.env.SUPERPDP_REDIRECT_URI ?? "https://staging.operioz.com/api/einvoicing/oauth/callback",
-      jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+      clientId: getSecretSync("SUPERPDP_CLIENT_ID") ?? "",
+      clientSecret: getSecretSync("SUPERPDP_CLIENT_SECRET") ?? "",
+      redirectUri: getSecretSync("SUPERPDP_REDIRECT_URI") ?? "https://staging.operioz.com/api/einvoicing/oauth/callback",
+      jwtSecret: deps.jwtSecret ?? getSecretSync("JWT_SECRET") ?? "",
       resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
       db: getDbHandle().db,
     });
@@ -1426,7 +1426,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     repo: billingOwnerRepo,
     billing: new BillingAdapter(),
     notifier: billingNotifier,
-    appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+    appUrl: deps.lienBaseUrl ?? getSecretSync("APP_URL") ?? "https://www.operioz.com",
     db: getOwnerDbHandle().db,
     pdf: new JsPdfAdapter(),
     emailLogWriter: sharedEmailLogWriter,
@@ -1434,7 +1434,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     observeOnly: process.env.BILLING_OBSERVE_ONLY !== "false",
   };
 
-  registerBillingSchedulerRoute(app, { ...billingSchedulerDeps, secret: process.env.SCHEDULER_SECRET ?? "" });
+  registerBillingSchedulerRoute(app, { ...billingSchedulerDeps, secret: getSecretSync("SCHEDULER_SECRET") ?? "" });
 
   /** Cron billing maison — tick toutes les 10 min, lock pg_advisory_xact pour éviter les doublons multi-réplica. */
   app.register(billingCronPlugin, { schedulerDeps: billingSchedulerDeps, db: getDbHandle().db, dbUrl: getDbHandle().pool.options.connectionString ?? "", onCritical: (msg) => app.log.fatal({ event: "billing_tick_critical" }, msg), intervalMinutes: 10 });
@@ -1675,14 +1675,14 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   /** Upload/suppression du logo artisan `/api/upload-logo` (auth cookie JWT). Stocké en data-URL base64. */
   registerUploadLogoRoute(app, {
-    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    jwtSecret: deps.jwtSecret ?? getSecretSync("JWT_SECRET") ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
     writer: deps.logoWriter ?? new ArtisanLogoWriterDrizzle(getDbHandle().db),
   });
 
   /** Export FEC opposable `/api/comptabilite/fec` (auth cookie JWT) — Σdébit=Σcrédit, téléchargeable. */
   registerComptabiliteExportRoute(app, {
-    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    jwtSecret: deps.jwtSecret ?? getSecretSync("JWT_SECRET") ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
     reader: deps.comptabiliteReader ?? new ComptabiliteReaderDrizzle(getDbHandle().db),
     csvReader: new FacturesCsvReaderDrizzle(getDbHandle().db),
@@ -1690,7 +1690,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   /** Portabilité RGPD Art. 20 — `GET /api/rgpd/export` (auth cookie JWT) → ZIP JSON toutes données du compte. */
   registerRgpdExportRoute(app, {
-    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    jwtSecret: deps.jwtSecret ?? getSecretSync("JWT_SECRET") ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
     db: getDbHandle().db,
   });
@@ -1698,7 +1698,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   /** Désinscription email lifecycle/marketing — public par token signé HMAC (RFC 8058 + lien visible). */
   registerEmailUnsubscribeRoute(app, {
     optoutRepo: new EmailOptoutRepositoryDrizzle(getDbHandle().db),
-    unsubscribeSecret: deps.emailUnsubscribeSecret ?? process.env.EMAIL_UNSUBSCRIBE_SECRET ?? process.env.JWT_SECRET ?? "dev-unsubscribe-secret",
+    unsubscribeSecret: deps.emailUnsubscribeSecret ?? getSecretSync("EMAIL_UNSUBSCRIBE_SECRET") ?? getSecretSync("JWT_SECRET") ?? "dev-unsubscribe-secret",
   });
 
   /** Statut de paiement + Checkout Stripe — portail client, public par token. */
@@ -1707,7 +1707,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     writer: new PortalPaymentWriterDrizzle(getDbHandle().db),
     stripe: deps.stripePort ?? new StripeAdapter(),
     rateLimiter: new SlidingWindowRateLimiter(20, 60 * 1000),
-    appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+    appUrl: deps.lienBaseUrl ?? getSecretSync("APP_URL") ?? "https://www.operioz.com",
   });
 
   /** Refresh URL Stripe Connect — recrée un Account Link expiré et redirige l'artisan. */
@@ -1721,7 +1721,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   /** Assistant agentique SSE `/api/assistant/stream` — réutilise agentRegistry/agentLlm hoistés ci-dessus. */
   registerAssistantAgentRoute(app, {
-    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    jwtSecret: deps.jwtSecret ?? getSecretSync("JWT_SECRET") ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
     llm: agentLlm,
     registry: agentRegistry,
@@ -1740,7 +1740,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   });
 
   registerVoiceToolRoute(app, {
-    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    jwtSecret: deps.jwtSecret ?? getSecretSync("JWT_SECRET") ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
     registry: agentRegistry,
     rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
@@ -1749,7 +1749,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   /** Token éphémère Gemini Live `POST /api/voice/token` — auth cookie, déclare les mêmes outils que le registry agentique. */
   registerVoiceTokenRoute(app, {
-    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    jwtSecret: deps.jwtSecret ?? getSecretSync("JWT_SECRET") ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
     tokenPort: new GeminiRealtimeVoiceTokenAdapter(),
     artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
@@ -1763,7 +1763,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   /** PDF bon de commande fournisseur `/api/commandes-fournisseurs/:id/pdf` (auth cookie, jsPDF). */
   registerCommandePdfRoute(app, {
-    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    jwtSecret: deps.jwtSecret ?? getSecretSync("JWT_SECRET") ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
     commandeRepo,
     fournisseurReader: fournisseurRepo,
@@ -1773,7 +1773,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   /** PDF contrat de maintenance `/api/contrats/:id/pdf` (auth cookie, jsPDF). */
   registerContratPdfRoute(app, {
-    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    jwtSecret: deps.jwtSecret ?? getSecretSync("JWT_SECRET") ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
     contratRepo,
     clientReader: clientRepo,
@@ -1783,7 +1783,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   /** PDF bon d'intervention `/api/interventions/:id/bon-pdf` (auth cookie, jsPDF). */
   registerInterventionPdfRoute(app, {
-    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    jwtSecret: deps.jwtSecret ?? getSecretSync("JWT_SECRET") ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
     interventionRepo,
     clientReader: clientRepo,
@@ -1824,7 +1824,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   /** Upload multipart d'une pièce jointe (plan, photo, attestation) sur un devis ou une facture. Auth cookie. */
   registerUploadPieceJointeRoute(app, {
-    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    jwtSecret: deps.jwtSecret ?? getSecretSync("JWT_SECRET") ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
     storage: facturesStorage,
     db: getDbHandle().db,
@@ -1840,7 +1840,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   /** Téléchargement d'une attestation TVA depuis l'interface artisan (auth cookie). */
   registerAttestationTvaDownloadRoute(app, {
-    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    jwtSecret: deps.jwtSecret ?? getSecretSync("JWT_SECRET") ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
     db: getDbHandle().db,
     storage: facturesStorage,
@@ -1851,7 +1851,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
    * + `/api/comptabilite/facturx/:id`, auth cookie). MONTÉES mais PAS routées tant qu'absentes de MIGRATED_ROUTES.
    */
   registerFacturxRoutes(app, {
-    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    jwtSecret: deps.jwtSecret ?? getSecretSync("JWT_SECRET") ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
     factureReader: factureRepo,
     clientReader: clientRepo,
@@ -1865,7 +1865,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
    * qu'absentes de MIGRATED_ROUTES.
    */
   registerExportLotRoutes(app, {
-    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    jwtSecret: deps.jwtSecret ?? getSecretSync("JWT_SECRET") ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
     factureLister: factureRepo,
     factureReader: factureRepo,
@@ -1889,7 +1889,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
   /** §4 HORS-tRPC : persistance des transcripts de la session vocale (`/api/voice/persist`, auth cookie). */
   registerVoiceRoute(app, {
-    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    jwtSecret: deps.jwtSecret ?? getSecretSync("JWT_SECRET") ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
     threadsRepo: new AssistantThreadsRepositoryDrizzle(getDbHandle().db),
     threadWriter: new AssistantThreadWriterDrizzle(getDbHandle().db),
@@ -1899,27 +1899,16 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   /** Expose le routeur racine assemblé (introspection : garde-fou de cohérence des domaines montés). */
   app.decorate("appRouter", appRouter);
 
-  /** Auto-setup webhook Stripe au démarrage (idempotent — skip si endpoint déjà présent). Fail-closed si clé présente mais Stripe refuse. */
+  /** Auto-setup webhooks Stripe au démarrage (idempotent). Endpoint créé → signing secret persisté via setSecret (write-through), sans throw ni secret en clair. */
   app.addHook("onReady", async () => {
-    const stripeKey = process.env.STRIPE_SECRET_KEY ?? "";
-
-    const webhookUrl = `${backendPublicUrl}/api/stripe/webhook`;
-    const newSecret = await ensureStripeWebhookEndpoint(stripeKey, webhookUrl, app.log as unknown as AppLogger);
-    if (newSecret) {
-      const envSecret = deps.stripeWebhookSecret ?? process.env.STRIPE_WEBHOOK_SECRET ?? "";
-      if (newSecret !== envSecret) {
-        throw new Error(`Webhook Stripe créé avec un nouveau secret. Mettez à jour STRIPE_WEBHOOK_SECRET puis relancez le déploiement. Secret : ${newSecret}`);
-      }
-    }
-
-    const connectWebhookUrl = `${backendPublicUrl}/api/stripe/connect-webhook`;
-    const newConnectSecret = await ensureStripeConnectWebhookEndpoint(stripeKey, connectWebhookUrl, app.log as unknown as AppLogger);
-    if (newConnectSecret) {
-      const envConnectSecret = getStripeConnectWebhookSecret() ?? "";
-      if (newConnectSecret !== envConnectSecret) {
-        throw new Error(`Webhook Connect créé avec un nouveau secret. Mettez à jour STRIPE_CONNECT_WEBHOOK_SECRET puis relancez le déploiement. Secret : ${newConnectSecret}`);
-      }
-    }
+    await bootstrapStripeWebhooks({
+      stripeKey: (await getSecret("STRIPE_SECRET_KEY")) ?? "",
+      backendPublicUrl,
+      log: app.log as unknown as AppLogger,
+      persistSecret: setSecret,
+      ensureWebhook: ensureStripeWebhookEndpoint,
+      ensureConnectWebhook: ensureStripeConnectWebhookEndpoint,
+    });
   });
 
   return app;
