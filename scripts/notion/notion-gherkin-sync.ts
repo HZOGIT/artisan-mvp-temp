@@ -92,17 +92,17 @@ function parseFeatureFile(abs: string): Scenario[] {
   const out: Scenario[] = [];
   let featureTags: string[] = [];
   let pending: string[] = [];
-  let cur: { name: string; tags: string[]; steps: string[] } | null = null;
+  let cur: { name: string; kw: string; tags: string[]; steps: string[] } | null = null;
   const flush = () => {
     if (!cur) return;
     const allTags = [...featureTags, ...cur.tags];
     const bloc = tagValues(allTags, "@bloc:")[0] ?? "";
-    const modules = tagValues(allTags, "@modules:");
-    const bare = allTags.filter((t) => !t.startsWith("@bloc:") && !t.startsWith("@modules:")).map((t) => t.replace(/^@/, ""));
+    const modules = allTags.filter((t) => t.startsWith("@module:")).map((t) => t.slice("@module:".length));
+    const bare = allTags.filter((t) => !t.startsWith("@bloc:") && !t.startsWith("@module:")).map((t) => t.replace(/^@/, ""));
     const nature = bare.find((t) => NATURE_TAGS.has(t)) ?? "autre";
     const tags = bare.filter((t) => !NATURE_TAGS.has(t));
     const steps = cur.steps.filter((l) => l.trim().length > 0);
-    const gherkin = [`Scénario: ${cur.name}`, ...steps].join("\n");
+    const gherkin = [`${cur.kw}: ${cur.name}`, ...steps].join("\n");
     out.push({
       slug: `${relNoExt}#${kebab(cur.name)}`,
       module, bloc, modules, nom: cur.name, nature, tags, gherkin,
@@ -118,7 +118,7 @@ function parseFeatureFile(abs: string): Scenario[] {
     if (line.startsWith("@")) { pending.push(...line.split(/\s+/).filter((t) => t.startsWith("@"))); continue; }
     if (/^(Fonctionnalité|Feature)\s*:/i.test(line)) { featureTags = pending; pending = []; continue; }
     const sm = line.match(/^(Scénario|Scenario)\s*:\s*(.*)$/i);
-    if (sm) { flush(); cur = { name: sm[2].trim(), tags: pending, steps: [] }; pending = []; continue; }
+    if (sm) { flush(); cur = { name: sm[2].trim(), kw: sm[1], tags: pending, steps: [] }; pending = []; continue; }
     if (cur) cur.steps.push(raw);
   }
   flush();
@@ -189,7 +189,7 @@ function machineProps(s: Scenario) {
   return {
     Nom: { title: [{ text: { content: s.nom.slice(0, 2000) } }] },
     Slug: { rich_text: [{ text: { content: s.slug } }] },
-    Bloc: { select: { name: s.bloc || "Autre" } },
+    Bloc: { select: { name: s.bloc ? s.bloc.charAt(0).toUpperCase() + s.bloc.slice(1) : "Autre" } },
     Module: { select: { name: s.module } },
     Modules: { multi_select: s.modules.map((name) => ({ name })) },
     Nature: { select: { name: s.nature } },

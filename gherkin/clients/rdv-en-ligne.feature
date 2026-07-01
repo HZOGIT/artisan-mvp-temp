@@ -1,13 +1,19 @@
 # language: fr
-@bloc:Clients @modules:rdv-en-ligne,clients,interventions,avis @public
-Fonctionnalité: Du RDV en ligne à l'avis client
+@bloc:clients @module:rdv-en-ligne @module:clients @module:interventions @module:avis @public
+Fonctionnalité: Du rendez-vous en ligne à l'avis client
+
+  Parcours client : une prise de RDV en ligne crée automatiquement le client
+  et l'intervention ; l'intervention terminée déclenche une demande d'avis.
 
   @nominal
-  Scénario: Un prospect prend RDV en ligne, devient client et laisse un avis
+  Scénario: Une prise de RDV en ligne crée le client et l'intervention
     Étant donné que l'artisan a publié sa page de prise de RDV en ligne
-    Quand un prospect réserve un créneau "Diagnostic fuite" pour mardi 9h
-    Alors une fiche client est créée automatiquement pour ce prospect
-    Et une intervention "Diagnostic fuite" est planifiée pour mardi 9h
-    Quand l'artisan marque l'intervention comme "Terminée"
+    Quand un prospect réserve un créneau "Diagnostic fuite" le mardi à 9h
+    Alors une fiche client est créée pour ce prospect
+    Et une intervention "Diagnostic fuite" est planifiée le mardi à 9h
+
+  @nominal
+  Scénario: Une intervention terminée déclenche une demande d'avis
+    Étant donné qu'une intervention est planifiée pour un client
+    Quand l'artisan marque l'intervention comme terminée
     Alors une demande d'avis est envoyée au client
-    Et l'avis publié apparaît sur la fiche du client
