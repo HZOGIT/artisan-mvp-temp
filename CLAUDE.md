@@ -210,6 +210,28 @@ Deux endpoints s'auto-configurent au démarrage (`onReady`, `app.ts`) via `strip
 ⚠️ Les deux secrets sont indépendants — si l'un manque, l'app ne démarre pas.
 Précédent staging : endpoint Connect créé via l'API Stripe Dashboard + `STRIPE_CONNECT_WEBHOOK_SECRET` posé dans `.env.staging`.
 
+## Secrets — où vivent les secrets
+
+**Résolveur coexistant** (`apps/api/shared/config/secrets.ts`) : Bitwarden Secrets Manager en priorité + fallback `process.env`.
+
+| Env | Mode actuel | Source des secrets |
+|---|---|---|
+| Prod | BW actif (si `BWS_ACCESS_TOKEN` posé) | cache BW → fallback `.env` |
+| Staging | `.env` pur (`BWS_ACCESS_TOKEN` absent) | `.env.staging` sur le serveur |
+| Dev | `.env` pur | `.env` local |
+
+**Fonctionnement au boot** :
+- `hydrateSecrets()` charge les secrets BW si `BWS_ACCESS_TOKEN` est posé ; sinon **no-op** (mode `.env` pur, comportement inchangé).
+- `getSecret(key)` → cache BW d'abord, sinon `process.env[key]`, sinon `undefined`.
+
+⚠️ **Staging = mode `.env` pur** : `BWS_ACCESS_TOKEN` n'est pas posé → BW est inactif. Un secret ajouté dans BW ne sera **jamais lu** en staging. Ajouter les secrets staging dans `.env.staging` sur le serveur (ou variable d'env Docker), **pas dans BW**.
+
+**Si BW est actif** (prod, ou staging avec `BWS_ACCESS_TOKEN` explicitement posé) :
+```bash
+BWS_ACCESS_TOKEN=… bws secret create <CLÉ> <valeur> <project-id>
+```
+Projet unique `operioz-staging`. La clé = nom exact de la variable d'env. Les secrets BW rechargés au prochain boot remplacent la valeur `.env`.
+
 ## Règle commentaires
 
 **`//` interdit dans tout le code TypeScript** (règle ESLint `local/comments-jsdoc-only` active sur `apps/api/**` et `apps/web/src/**`).
