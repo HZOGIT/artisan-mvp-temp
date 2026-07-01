@@ -141,9 +141,9 @@ linearis issues create "titre" --team Operioz --priority 2 --parent-ticket OPE-X
 
 ---
 
-## Context7 CLI — ctx7
+## Context7 — `npx context7`
 
-Outil pour récupérer la doc à jour des librairies avant de coder — via la **CLI ctx7**, jamais « ctx7 MCP » :
+Outil pour récupérer la doc à jour des librairies avant de coder — commande exacte : `npx context7`, jamais un binaire `ctx7` standalone (inexistant) ni « ctx7 MCP » :
 
 ```bash
 npx context7 search <terme>                              # chercher un projet

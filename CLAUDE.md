@@ -124,9 +124,9 @@ Toutes les opérations Linear (lire, créer, commenter, mettre à jour un statut
 
 ---
 
-## Context7 CLI — ctx7
+## Context7 — `npx context7`
 
-`ctx7` est disponible via `npx context7` — **outil officiel pour récupérer la documentation à jour des librairies** avant d'écrire du code qui en dépend (aligné YAGNI : vérifier l'API réelle plutôt que deviner). Dans les plans/prompts : « via la **CLI ctx7** » — jamais « ctx7 MCP » ni « ctx7 » seul.
+`npx context7` est l'**outil officiel pour récupérer la documentation à jour des librairies** avant d'écrire du code qui en dépend (aligné YAGNI : vérifier l'API réelle plutôt que deviner). Dans les plans/prompts : « via `npx context7` » — jamais « ctx7 MCP » ni un binaire `ctx7` standalone (inexistant sur ce serveur).
 
 ```bash
 # Chercher un projet (trouver l'identifiant exact)
@@ -142,7 +142,7 @@ npx context7 info /drizzle-team/drizzle-orm
 npx context7 /tanstack/router "navigation imperative" -k 10000
 ```
 
-Toutes les recherches de doc passent par la **CLI ctx7** — jamais par le MCP Context7.
+Toutes les recherches de doc passent par `npx context7` — jamais par le MCP Context7.
 
 ---
 
