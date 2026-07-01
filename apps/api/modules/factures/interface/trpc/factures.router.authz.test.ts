@@ -19,6 +19,7 @@ const OWNER = 9894401;
 /** collaborateur non-owner de OWNER (isOwner: false — soumis aux gates) */
 const MEMBER = 9894402;
 
+
 const jwt = (userId: number) =>
   new SignJWT({ userId, email: `u${userId}@t.fr` })
     .setProtectedHeader({ alg: "HS256" })
@@ -27,6 +28,10 @@ const jwt = (userId: number) =>
 
 function mut(app: ReturnType<typeof buildApp>, path: string, input: unknown, tok?: string) {
   return injectTrpc(app, "POST", path, input, tok);
+}
+
+function q(app: ReturnType<typeof buildApp>, path: string, input: unknown, tok?: string) {
+  return injectTrpc(app, "GET", path, input, tok);
 }
 
 /**
@@ -119,5 +124,51 @@ describe.skipIf(!URL)("factures.router — gate de permission (authz OPE-785)", 
     const fId = ((await mut(server, "factures.create", { clientId }, tokOwner)).json() as { result: { data: { id: number } } }).result.data.id;
     const res = await mut(server, "factures.delete", { id: fId }, await jwt(MEMBER));
     expect(res.statusCode).toBe(200);
+  });
+
+  it("list — membre sans factures.voir → 403", async () => {
+    expect((await q(server, "factures.list", undefined, await jwt(MEMBER))).statusCode).toBe(403);
+  });
+
+  it("list — owner bypasse la garde → non-403", async () => {
+    expect((await q(server, "factures.list", undefined, await jwt(OWNER))).statusCode).not.toBe(403);
+  });
+
+  it("list — membre AVEC factures.voir → non-403", async () => {
+    await admin.query('insert into permissions_utilisateur ("userId",permission,autorise) values ($1,$2,true)', [MEMBER, "factures.voir"]);
+    expect((await q(server, "factures.list", undefined, await jwt(MEMBER))).statusCode).not.toBe(403);
+    await admin.query('delete from permissions_utilisateur where "userId"=$1 and permission=$2', [MEMBER, "factures.voir"]);
+  });
+
+  it("getById — membre sans factures.voir → 403", async () => {
+    expect((await q(server, "factures.getById", { id: 1 }, await jwt(MEMBER))).statusCode).toBe(403);
+  });
+
+  it("getById — owner bypasse la garde → non-403", async () => {
+    expect((await q(server, "factures.getById", { id: 999999999 }, await jwt(OWNER))).statusCode).not.toBe(403);
+  });
+
+  it("getLignes — membre sans factures.voir → 403", async () => {
+    expect((await q(server, "factures.getLignes", { factureId: 1 }, await jwt(MEMBER))).statusCode).toBe(403);
+  });
+
+  it("getLignes — owner bypasse la garde → non-403", async () => {
+    expect((await q(server, "factures.getLignes", { factureId: 999999999 }, await jwt(OWNER))).statusCode).not.toBe(403);
+  });
+
+  it("getAvoirsByFacture — membre sans factures.voir → 403", async () => {
+    expect((await q(server, "factures.getAvoirsByFacture", { factureId: 1 }, await jwt(MEMBER))).statusCode).toBe(403);
+  });
+
+  it("getAvoirsByFacture — owner bypasse la garde → non-403", async () => {
+    expect((await q(server, "factures.getAvoirsByFacture", { factureId: 999999999 }, await jwt(OWNER))).statusCode).not.toBe(403);
+  });
+
+  it("getAuditLog — membre sans factures.voir → 403", async () => {
+    expect((await q(server, "factures.getAuditLog", { factureId: 1 }, await jwt(MEMBER))).statusCode).toBe(403);
+  });
+
+  it("getAuditLog — owner bypasse la garde → non-403", async () => {
+    expect((await q(server, "factures.getAuditLog", { factureId: 999999999 }, await jwt(OWNER))).statusCode).not.toBe(403);
   });
 });

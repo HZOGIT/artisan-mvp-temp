@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { router, protectedProcedure, permissionProcedure } from "../../../../interface/trpc/trpc";
+import { router, permissionProcedure } from "../../../../interface/trpc/trpc";
 
 /** Permissions factures (parité legacy) : créer/modifier/émettre/encaisser/avoir = `factures.creer` ; supprimer = `factures.supprimer`. */
+const facturesVoir = permissionProcedure("factures.voir");
 const facturesCreer = permissionProcedure("factures.creer");
 const facturesSupprimer = permissionProcedure("factures.supprimer");
 import { TVA_CATEGORIES_MAP } from "../../../../shared/tva/taux-tva-fr";
@@ -140,14 +141,14 @@ const avoirInputSchema = z.object({
 export function createFacturesRouter(repo: IFactureRepository, devisReader: IDevisReader, compta: ComptaPort, mailing: FactureMailingDeps, push?: PushPort, outboxInTx?: (artisanId: number, factureId: number, tx: DbClient) => Promise<void>, db?: DbClient, stockRepo?: IStockRepository, storage?: StoragePort, attestationRepo?: IAttestationTvaRepository, lockDateReader?: { getLockDate(ctx: TenantContext): Promise<string | null> }, notifRepo?: INotificationRepository) {
 
   return router({
-    list: protectedProcedure.query(({ ctx }) => listFactures(repo, ctx.tenant)),
+    list: facturesVoir.query(({ ctx }) => listFactures(repo, ctx.tenant)),
 
     /** Détail enrichi (parité legacy : `{ ...facture, lignes, client }`) — consommé par FactureDetail. */
-    getById: protectedProcedure
+    getById: facturesVoir
       .input(z.object({ id: z.number().int() }))
       .query(({ ctx, input }) => getFactureDetail(repo, mailing.clientReader, ctx.tenant, input.id, attestationRepo)),
 
-    getLignes: protectedProcedure
+    getLignes: facturesVoir
       .input(z.object({ factureId: z.number().int() }))
       .query(({ ctx, input }) => listLignesFacture(repo, ctx.tenant, input.factureId)),
 
@@ -155,12 +156,12 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
      * Avoirs émis sur une facture (parité client `trpc.factures.getAvoirsByFacture`). Lecture seule,
      * scopée tenant (→ [] hors tenant, comme le legacy).
      */
-    getAvoirsByFacture: protectedProcedure
+    getAvoirsByFacture: facturesVoir
       .input(z.object({ factureId: z.number().int() }))
       .query(({ ctx, input }) => getAvoirsFacture(repo, ctx.tenant, input.factureId)),
 
     /** Journal d'audit d'une facture (parité client `trpc.factures.getAuditLog`). Lecture seule, scopée. */
-    getAuditLog: protectedProcedure
+    getAuditLog: facturesVoir
       .input(z.object({ factureId: z.number().int() }))
       .query(({ ctx, input }) => getAuditLogFacture(repo, ctx.tenant, input.factureId)),
 
@@ -417,14 +418,14 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
       ),
 
     attestationTva: router({
-      getByFacture: protectedProcedure
+      getByFacture: facturesVoir
         .input(z.object({ factureId: z.number().int() }))
         .query(({ ctx, input }) => {
           if (!attestationRepo) return [];
           return attestationRepo.listByFacture(ctx.tenant, input.factureId);
         }),
 
-      getByDevis: protectedProcedure
+      getByDevis: facturesVoir
         .input(z.object({ devisId: z.number().int() }))
         .query(({ ctx, input }) => {
           if (!attestationRepo) return [];
