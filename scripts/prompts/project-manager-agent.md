@@ -141,6 +141,18 @@ linearis issues create "titre" --team Operioz --priority 2 --parent-ticket OPE-X
 
 ---
 
+## Context7 CLI — ctx7
+
+Outil pour récupérer la doc à jour des librairies avant de coder — via la **CLI ctx7**, jamais « ctx7 MCP » :
+
+```bash
+npx context7 search <terme>                              # chercher un projet
+npx context7 /org/repo "question sur l'API"              # récupérer la doc
+npx context7 info /org/repo                              # métadonnées
+```
+
+---
+
 ## Règles techniques
 
 - Session name = kebab-case du module (`fix-rgpd-erasure`, `fix-facturx`)

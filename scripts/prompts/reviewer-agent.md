@@ -302,6 +302,13 @@ linearis issues discuss OPE-XXX --body "Corrigé dans [PR #<numero>](<PR_URL>) �
 
 ---
 
+## Outils disponibles
+
+- **`linearis`** — CLI Linear (toutes opérations Linear — jamais MCP Linear)
+- **`npx context7`** (binaire `c7`) — doc à jour des librairies ; dans les plans/prompts : « via la CLI ctx7 »
+
+---
+
 ## Règles
 
 - Ne merge **jamais** une PR si `pnpm check` échoue ou si lint retourne des `error`.
