@@ -32,10 +32,10 @@ export function createIntegrationsComptablesRouter(repo: IIntegrationsComptables
   return router({
     getConfig: protectedProcedure.query(({ ctx }) => getConfig(repo, ctx.tenant)),
     saveConfig: permissionProcedure("integrations-comptables.configurer").input(saveConfigSchema).mutation(({ ctx, input }) => saveConfig(repo, ctx.tenant, input)),
-    saveSyncConfig: protectedProcedure.input(saveSyncConfigSchema).mutation(({ ctx, input }) => saveSyncConfig(repo, ctx.tenant, input)),
+    saveSyncConfig: permissionProcedure("integrations-comptables.configurer").input(saveSyncConfigSchema).mutation(({ ctx, input }) => saveSyncConfig(repo, ctx.tenant, input)),
     getSyncStatus: protectedProcedure.query(({ ctx }) => getSyncStatus(repo, ctx.tenant)),
-    getExports: protectedProcedure.query(({ ctx }) => getExports(repo, ctx.tenant)),
-    genererExport: protectedProcedure
+    getExports: permissionProcedure("comptabilite.voir").query(({ ctx }) => getExports(repo, ctx.tenant)),
+    genererExport: permissionProcedure("integrations-comptables.configurer")
       .input(z.object({ logiciel: logicielEnum, formatExport: formatEnum, dateDebut: z.string(), dateFin: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const result = await genererExport({ repo, fec }, ctx.tenant, input);
@@ -43,20 +43,20 @@ export function createIntegrationsComptablesRouter(repo: IIntegrationsComptables
         ctx.log.warn({ event: "comptabilite_export_genere", logiciel: input.logiciel, format: input.formatExport, dateDebut: input.dateDebut, dateFin: input.dateFin }, "Export comptable généré");
         return result;
       }),
-    getSyncLogs: protectedProcedure.query(({ ctx }) => getSyncLogs(repo, ctx.tenant)),
-    getPendingItems: protectedProcedure.query(({ ctx }) => getPendingItems(repo, ctx.tenant)),
-    lancerSync: protectedProcedure.mutation(async ({ ctx }) => {
+    getSyncLogs: permissionProcedure("comptabilite.voir").query(({ ctx }) => getSyncLogs(repo, ctx.tenant)),
+    getPendingItems: permissionProcedure("comptabilite.voir").query(({ ctx }) => getPendingItems(repo, ctx.tenant)),
+    lancerSync: permissionProcedure("integrations-comptables.configurer").mutation(async ({ ctx }) => {
       const result = await lancerSync(repo, ctx.tenant);
       ctx.log.info({ event: "comptabilite_sync_lancee" }, "Sync comptable déclenchée manuellement");
       return result;
     }),
-    retrySync: protectedProcedure.input(z.object({ type: z.enum(["facture", "paiement"]), id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    retrySync: permissionProcedure("integrations-comptables.configurer").input(z.object({ type: z.enum(["facture", "paiement"]), id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const result = await retrySync(repo, ctx.tenant, input.id);
       ctx.log.info({ event: "comptabilite_sync_retry", type: input.type, id: input.id }, "Retry sync comptable");
       return result;
     }),
 
-    getLockDate: protectedProcedure.query(({ ctx }) => getLockDate(repo, ctx.tenant)),
+    getLockDate: permissionProcedure("comptabilite.voir").query(({ ctx }) => getLockDate(repo, ctx.tenant)),
 
     verrouillerCompta: permissionProcedure("integrations-comptables.configurer")
       .input(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable() }))
