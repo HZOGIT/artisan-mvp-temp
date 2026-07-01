@@ -43,10 +43,10 @@ Recette + conventions : [`README.md`](README.md). Chaque scénario doit être
 - [x] `commercial` · paiement 3D Secure requis, carte 4000 0025 0000 3155
 - [x] `commercial` · double paiement empêché (session en attente — `getSessionEnAttente`)
 - [x] `commercial` · paiement en ligne refusé si l'artisan n'a pas activé Stripe Connect (`chargesEnabled=false`)
-- [x] `billing` · l'artisan change de plan (`changePlan` + `previewPlanChange`)
-- [x] `billing` · l'artisan résilie en fin de période (`cancelAtPeriodEnd`) puis réactive (`reactivateSubscription`)
-- [x] `billing` · prélèvement off-session échoué → relance/dunning (`chargeOffSessionForCycle` / `runSchedulerTick`)
 - [x] `commercial` · devis expire automatiquement à échéance (`devis` expirer)
+
+> Retirés (HORS SCOPE — gestion d'abonnement, bloc Paramètres) : changement de plan,
+> résiliation/réactivation, dunning off-session. Fichiers `billing/` supprimés + Notion archivé.
 
 ## Vague 2 — enrichissement DANS LE SCOPE (Onboarding · Commercial · Clients · Terrain[interv+cal] · Gestion[articles] · paiement)
 
