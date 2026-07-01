@@ -7,7 +7,7 @@ export interface ConnectWebhookDeps {
   readonly stripe: StripePort;
   /** Implémentation Drizzle (owner pool) injectée depuis app.ts. */
   readonly writer: ConnectArtisanWriter;
-  readonly webhookSecret: string;
+  readonly webhookSecret: string | (() => string | undefined);
   readonly log?: AppLogger;
   /** Soldage des paiements de factures (checkout.session.completed / payment_intent.payment_failed depuis compte connecté). */
   readonly paymentWriter?: WebhookPaymentWriter;
@@ -38,11 +38,12 @@ export async function processConnectWebhook(
   input: { rawBody: Buffer; signature: string | undefined },
 ): Promise<ConnectWebhookResult> {
   if (!input.signature) return { http: 400, body: { error: "Missing signature" } };
-  if (!deps.webhookSecret) return { http: 500, body: { error: "Webhook not configured" } };
+  const secret = typeof deps.webhookSecret === "function" ? (deps.webhookSecret() ?? "") : deps.webhookSecret;
+  if (!secret) return { http: 500, body: { error: "Webhook not configured" } };
 
   let event;
   try {
-    event = await deps.stripe.constructEvent(input.rawBody, input.signature, deps.webhookSecret);
+    event = await deps.stripe.constructEvent(input.rawBody, input.signature, secret);
   } catch {
     /* ponytail: best-effort — signature invalide → 400 */
     return { http: 400, body: { error: "Webhook signature verification failed" } };

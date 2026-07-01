@@ -70,6 +70,21 @@ describe("processConnectWebhook", () => {
     expect(result.http).toBe(500);
   });
 
+  it("rotation — getter appelé par requête : nouveau secret utilisé sans ré-enregistrement", async () => {
+    let currentSecret = "whsec_v1";
+    const captured: string[] = [];
+    const baseStripe = makeStripe({ id: "evt_test_r1", type: "account.updated", data: { object: {} } });
+    const spyStripe = {
+      ...baseStripe,
+      constructEvent: vi.fn().mockImplementation(async (_rb: Buffer, _sig: string, sec: string) => { captured.push(sec); return { id: "evt_test_r1", type: "account.updated", data: { object: {} } }; }),
+    };
+    const common: ConnectWebhookDeps = { stripe: spyStripe, writer: makeWriter(), webhookSecret: () => currentSecret };
+    await processConnectWebhook(common, { rawBody: RAW, signature: SIG });
+    currentSecret = "whsec_v2";
+    await processConnectWebhook(common, { rawBody: RAW, signature: SIG });
+    expect(captured).toEqual(["whsec_v1", "whsec_v2"]);
+  });
+
   it("retourne 400 si signature invalide (constructEvent throw)", async () => {
     const result = await processConnectWebhook(makeDeps(null, { throwOnConstruct: true }), { rawBody: RAW, signature: SIG });
     expect(result.http).toBe(400);
