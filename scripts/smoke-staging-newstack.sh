@@ -12,8 +12,11 @@ cd "$(dirname "$0")/.."
 NEWSTACK_URL="http://localhost:3010"
 PG="docker exec artisan-staging-postgres-1 psql -U artisan_user -d artisan_mvp -tAc"
 
-JWT_SECRET=$(grep -E '^JWT_SECRET=' .env.staging | cut -d= -f2- | tr -d '"')
-[ -n "$JWT_SECRET" ] || { echo "✖ JWT_SECRET introuvable dans .env.staging"; exit 1; }
+JWT_SECRET=$(grep -E '^JWT_SECRET=' .env.staging | cut -d= -f2- | tr -d '"' || true)
+if [ -z "$JWT_SECRET" ]; then
+  JWT_SECRET=$(BWS_ACCESS_TOKEN="$(grep -E '^BWS_ACCESS_TOKEN=' .env.staging | cut -d= -f2-)" bws secret list "$(grep -E '^BWS_PROJECT_ID=' .env.staging | cut -d= -f2-)" -o json 2>/dev/null | python3 -c "import json,sys;print(next((s['value'] for s in json.load(sys.stdin) if s['key']=='JWT_SECRET'),''))")
+fi
+[ -n "$JWT_SECRET" ] || { echo "✖ JWT_SECRET introuvable (.env.staging strict-minimum : lu depuis le vault BWS)"; exit 1; }
 
 # 1) Faux utilisateurs staging A et B (idempotents, marqueur `smoke+…@operioz.test`) + un artisan chacun.
 ensure_user() {
