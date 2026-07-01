@@ -28,7 +28,7 @@ Recette + conventions : [`README.md`](README.md). Chaque scénario doit être
 - [x] `commercial` · une facture non payée passe « en_retard » (`factures` transition)
 - [x] `onboarding` · l'artisan démarre son abonnement, carte 4242, essai 15 j (`billing.activateOnboardingSubscription` + `createSetupIntent`/`confirmPaymentMethod`)
 - [x] `clients` · l'artisan crée un client (`clients/application` create)
-- [ ] `clients` · l'artisan importe des clients (`clients` import)
+- [x] `clients` · l'artisan importe des clients (`clients` import)
 - [ ] `terrain` · l'artisan planifie une intervention et l'affecte à un technicien (`interventions` create + affecter)
 - [ ] `terrain` · le technicien clôture une intervention (`interventions-mobile`)
 - [ ] `gestion` · l'artisan crée un article avec TVA (`articles/application` create)
