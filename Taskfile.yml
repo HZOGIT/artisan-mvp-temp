@@ -187,3 +187,8 @@ tasks:
     dir: '{{.STAGING_DIR}}'
     cmds:
       - '{{.STAGING_COMPOSE}} exec postgres psql -U {{.DB_USER}} -d {{.DB_NAME}}'
+
+  notion:gherkin:sync:
+    desc: "Synchronise les scénarios Gherkin (gherkin/**/*.feature) vers la DB Notion semi-éditable (upsert par slug). DRY=1 pour un dry-run sans écriture. Token dans .env.notion."
+    cmds:
+      - 'pnpm exec tsx scripts/notion/notion-gherkin-sync.ts {{if ne .DRY "1"}}--apply{{end}}'
