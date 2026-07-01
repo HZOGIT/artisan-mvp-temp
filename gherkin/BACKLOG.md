@@ -38,7 +38,7 @@ Recette + conventions : [`README.md`](README.md). Chaque scénario doit être
 
 - [x] `commercial` · paiement refusé, carte 4000 0000 0000 9995 → facture reste impayée
 - [x] `commercial` · paiement 3D Secure requis, carte 4000 0025 0000 3155
-- [ ] `commercial` · double paiement empêché (session en attente — `getSessionEnAttente`)
+- [x] `commercial` · double paiement empêché (session en attente — `getSessionEnAttente`)
 - [ ] `commercial` · paiement en ligne refusé si l'artisan n'a pas activé Stripe Connect (`chargesEnabled=false`)
 - [ ] `billing` · l'artisan change de plan (`changePlan` + `previewPlanChange`)
 - [ ] `billing` · l'artisan résilie en fin de période (`cancelAtPeriodEnd`) puis réactive (`reactivateSubscription`)

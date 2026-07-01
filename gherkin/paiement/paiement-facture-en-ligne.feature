@@ -27,3 +27,10 @@ Fonctionnalité: Paiement d'une facture en ligne
     Quand le client règle avec la carte de test "4000 0025 0000 3155" et valide l'authentification 3D Secure
     Alors la facture passe au statut "Payée"
     Et le client voit une confirmation de paiement
+
+  @edge
+  Scénario: Relancer le paiement réutilise la session en cours sans en créer une seconde
+    Étant donné qu'une session de paiement est déjà ouverte pour une facture "Envoyée"
+    Quand le client relance le paiement de cette facture
+    Alors il est redirigé vers la session de paiement déjà en cours
+    Et aucune seconde session de paiement n'est créée
