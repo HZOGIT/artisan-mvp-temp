@@ -22,7 +22,7 @@ Recette + conventions : [`README.md`](README.md). Chaque scénario doit être
 - [x] `commercial` · client signe un devis (`signature`)
 - [x] `commercial` · devis signé → facture (`factures`)
 - [x] `commercial` · **paiement** facture en ligne, carte OK 4242 (`paiement/use-cases.createInvoiceCheckout`)
-- [ ] `commercial` · l'artisan crée puis envoie un devis (`devis/application` create + envoyer)
+- [x] `commercial` · l'artisan crée puis envoie un devis (`devis/application` create + envoyer)
 - [ ] `commercial` · l'artisan relance un devis non signé (`relances-devis`)
 - [ ] `commercial` · le client refuse un devis (`devis` transition refuser)
 - [ ] `commercial` · une facture non payée passe « en_retard » (`factures` transition)
