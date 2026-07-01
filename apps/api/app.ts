@@ -1364,7 +1364,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     stripe: deps.stripePort ?? new StripeAdapter(),
     paymentWriter: new WebhookPaymentWriterDrizzle(getDbHandle().db),
     notifier: new SubscriptionEventNotifierDrizzle(getDbHandle().db, emailAdapter),
-    webhookSecret: deps.stripeWebhookSecret ?? getSecretSync("STRIPE_WEBHOOK_SECRET") ?? "",
+    webhookSecret: () => deps.stripeWebhookSecret ?? getSecretSync("STRIPE_WEBHOOK_SECRET") ?? "",
     appUrl: appUrlForPortail,
     onBillingWebhookEvent: (eventType, piId, fc, fm, stripeEventId) =>
       handleBillingWebhookEvent({ repo: billingRepo, db: getDbHandle().db }, eventType, piId, fc, fm, stripeEventId),
@@ -1383,7 +1383,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   registerStripeConnectWebhookRoute(app, {
     stripe: deps.stripePort ?? new StripeAdapter(),
     writer: new ConnectArtisanWriterDrizzle(getOwnerDbHandle().db),
-    webhookSecret: getStripeConnectWebhookSecret() ?? "",
+    webhookSecret: () => getStripeConnectWebhookSecret() ?? "",
     paymentWriter: new WebhookPaymentWriterDrizzle(getDbHandle().db),
     genererEcrituresFacture: async (artisanId: number, factureId: number) => {
       await compta.genererEcrituresVente({ artisanId, userId: 0 }, factureId);

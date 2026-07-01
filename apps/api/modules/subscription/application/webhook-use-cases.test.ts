@@ -29,6 +29,21 @@ describe("processStripeWebhook (fail-closed)", () => {
     expect(r.http).toBe(500);
   });
 
+  it("rotation — getter appelé par requête : nouveau secret utilisé sans ré-enregistrement", async () => {
+    let currentSecret = "whsec_v1";
+    const captured: string[] = [];
+    const base = build();
+    const spyStripe = {
+      ...base.stripe,
+      constructEvent: async (rb: Buffer, sig: string, sec: string) => { captured.push(sec); return base.stripe.constructEvent(rb, sig, sec); },
+    };
+    const common = { stripe: spyStripe, paymentWriter: base.paymentWriter, notifier: base.notifier, webhookSecret: () => currentSecret, appUrl: "https://app.test" };
+    await processStripeWebhook(common, { rawBody: raw({ id: "evt_test_r1", type: "x", data: { object: {} } }), signature: SIG });
+    currentSecret = "whsec_v2";
+    await processStripeWebhook(common, { rawBody: raw({ id: "evt_test_r2", type: "x", data: { object: {} } }), signature: SIG });
+    expect(captured).toEqual(["whsec_v1", "whsec_v2"]);
+  });
+
   it("signature invalide → 400 (constructEvent throw)", async () => {
     const { deps } = build();
     const r = await processStripeWebhook(deps, { rawBody: raw({ id: "evt_1", type: "x", data: { object: {} } }), signature: "WRONG" });

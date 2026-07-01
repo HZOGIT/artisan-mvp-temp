@@ -21,7 +21,7 @@ export interface StripeWebhookDeps {
   readonly stripe: StripePort;
   readonly paymentWriter: WebhookPaymentWriter;
   readonly notifier: SubscriptionEventNotifier;
-  readonly webhookSecret: string;
+  readonly webhookSecret: string | (() => string | undefined);
   readonly appUrl: string;
   readonly log?: AppLogger;
   readonly onBillingWebhookEvent?: (eventType: string, paymentIntentId: string, failureCode?: string | null, failureMessage?: string | null, stripeEventId?: string) => Promise<void>;
@@ -117,11 +117,12 @@ export async function processStripeWebhook(
   input: { rawBody: Buffer; signature: string | undefined },
 ): Promise<WebhookResult> {
   if (!input.signature) return { http: 400, body: { error: "Missing signature" } };
-  if (!deps.webhookSecret) return { http: 500, body: { error: "Webhook not configured" } };
+  const secret = typeof deps.webhookSecret === "function" ? (deps.webhookSecret() ?? "") : deps.webhookSecret;
+  if (!secret) return { http: 500, body: { error: "Webhook not configured" } };
 
   let event;
   try {
-    event = await deps.stripe.constructEvent(input.rawBody, input.signature, deps.webhookSecret);
+    event = await deps.stripe.constructEvent(input.rawBody, input.signature, secret);
   } catch {
     /* ponytail: best-effort — signature invalide → 400 */
     return { http: 400, body: { error: "Webhook signature verification failed" } };
