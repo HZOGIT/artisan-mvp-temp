@@ -24,7 +24,7 @@ Recette + conventions : [`README.md`](README.md). Chaque scénario doit être
 - [x] `commercial` · **paiement** facture en ligne, carte OK 4242 (`paiement/use-cases.createInvoiceCheckout`)
 - [x] `commercial` · l'artisan crée puis envoie un devis (`devis/application` create + envoyer)
 - [x] `commercial` · l'artisan relance un devis non signé (`relances-devis`)
-- [ ] `commercial` · le client refuse un devis (`devis` transition refuser)
+- [x] `commercial` · le client refuse un devis (`devis` transition refuser)
 - [ ] `commercial` · une facture non payée passe « en_retard » (`factures` transition)
 - [ ] `onboarding` · l'artisan démarre son abonnement, carte 4242, essai 15 j (`billing.activateOnboardingSubscription` + `createSetupIntent`/`confirmPaymentMethod`)
 - [ ] `clients` · l'artisan crée un client (`clients/application` create)
