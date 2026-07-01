@@ -210,6 +210,28 @@ Deux endpoints s'auto-configurent au démarrage (`onReady`, `app.ts`) via `strip
 ⚠️ Les deux secrets sont indépendants — si l'un manque, l'app ne démarre pas.
 Précédent staging : endpoint Connect créé via l'API Stripe Dashboard + `STRIPE_CONNECT_WEBHOOK_SECRET` posé dans `.env.staging`.
 
+## Secrets — où vivent les secrets
+
+**Tout secret applicatif vit dans le secrets manager**, jamais dans un `.env` committé.
+
+| Env | Provider | Magasin |
+|---|---|---|
+| Prod | OVH Secrets Manager | vault OVH |
+| Staging | Bitwarden (BWS) | projet `operioz-staging` |
+| Dev | ProcessDotEnv | `.env` local (env = magasin) |
+
+**`.env` = strict minimum** : uniquement les creds d'amorçage du vault actif (prod : creds OVH ; staging : `BWS_ACCESS_TOKEN` + `BWS_ORGANIZATION_ID` + `BWS_PROJECT_ID`) + config non-secrète du runtime (`NODE_ENV`…). **Interdit d'ajouter un nouveau secret applicatif dans un `.env` committé** (même règle que `.env.production` ci-dessus).
+
+**Lecture runtime** via `getSecret(key)` async (couche secrets manager). **Pas de fallback `process.env`** : un secret absent du vault = erreur **fail-closed**, jamais masqué par une valeur d'env résiduelle.
+
+**Ajouter / mettre à jour un secret staging** (`bws` v2.1.0 installé) :
+```bash
+BWS_ACCESS_TOKEN=… bws secret create <CLÉ> <valeur> <project-id>
+```
+Projet unique `operioz-staging`. La clé doit être le **nom exact de la variable d'env**.
+
+**Rotation sans redéploiement** : mettre à jour la valeur dans le vault → `getSecret` la relit en live (timeout 300 ms → cache interne).
+
 ## Règle commentaires
 
 **`//` interdit dans tout le code TypeScript** (règle ESLint `local/comments-jsdoc-only` active sur `apps/api/**` et `apps/web/src/**`).
