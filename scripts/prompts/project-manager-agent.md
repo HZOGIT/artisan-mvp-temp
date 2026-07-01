@@ -141,6 +141,17 @@ linearis issues create "titre" --team Operioz --priority 2 --parent-ticket OPE-X
 
 ---
 
+## Context7 CLI — pnpx ctx7
+
+Doc à jour des librairies. Package `ctx7`, invoqué via **`pnpx ctx7`** (jamais `npx`, jamais `context7`) :
+
+```bash
+pnpx ctx7 library <name>                    # résout un nom → library ID
+pnpx ctx7 docs <libraryId> <query>          # renvoie la doc + snippets
+```
+
+---
+
 ## Règles techniques
 
 - Session name = kebab-case du module (`fix-rgpd-erasure`, `fix-facturx`)

@@ -124,6 +124,20 @@ Toutes les opérations Linear (lire, créer, commenter, mettre à jour un statut
 
 ---
 
+## Context7 CLI — pnpx ctx7
+
+`ctx7` (package `ctx7` v0.5.3, loggé globalement) — **outil de récupération de doc à jour des librairies** (Upstash Context7). Invocation : **`pnpx ctx7`** — jamais `npx`, jamais `context7`, jamais un binaire `ctx7` sur PATH (n'existe pas en PATH).
+
+```bash
+pnpx ctx7 library <name>                    # résout un nom → Context7-compatible library ID
+pnpx ctx7 docs <libraryId> <query>          # renvoie la doc + snippets de code
+pnpx ctx7 login | setup | upgrade
+```
+
+Usage type : récupérer la doc officielle d'une lib avant d'écrire du code qui en dépend (cohérent avec YAGNI — vérifier l'API réelle plutôt que deviner). Dans les plans/prompts : « via `pnpx ctx7` » — jamais « ctx7 MCP » ni « ctx7 » seul.
+
+---
+
 ## Structure du projet
 
 ```
