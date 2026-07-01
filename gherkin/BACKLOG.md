@@ -48,7 +48,7 @@ Recette + conventions : [`README.md`](README.md). Chaque scénario doit être
 ## Vague 2 — modules non encore couverts (grounded)
 
 - [x] `clients` · le client dépose un avis, l'artisan le modère (`avis.soumettreAvisPublic` / `changerStatutAvis`)
-- [ ] `clients` · l'artisan répond à un avis publié (`avis.repondreAvis`)
+- [x] `clients` · l'artisan répond à un avis publié (`avis.repondreAvis`)
 - [ ] `clients` · le client annule ou replanifie un RDV en ligne (`rdv-en-ligne`)
 - [ ] `gestion` · l'artisan enregistre une dépense (`depenses/application` create)
 - [ ] `gestion` · l'artisan génère la balance / export FEC (`comptabilite.getBalance` / `getFecPreview`)
