@@ -56,7 +56,7 @@ Recette + conventions : [`README.md`](README.md). Chaque scénario doit être
 - [x] `clients` · l'artisan répond à un avis publié (`avis.repondreAvis`)
 - [x] `clients` · le client annule ou replanifie un RDV en ligne (`rdv-en-ligne`)
 - [x] `commercial` · l'artisan crée un contrat de maintenance récurrent (`contrats-maintenance`)
-- [ ] `commercial` · l'artisan crée des variantes de devis (`devis-options`)
+- [x] `commercial` · l'artisan crée des variantes de devis (`devis-options`)
 - [ ] `clients` · l'artisan fusionne deux fiches client en doublon (`clients` champsFusionnes)
 - [ ] `clients` · l'artisan échange avec un client via le chat (`chat`)
 - [ ] `terrain` · l'artisan exporte son calendrier au format iCal (`calendrier.getIcalFeed`)
