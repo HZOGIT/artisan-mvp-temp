@@ -20,3 +20,10 @@ Fonctionnalité: Paiement d'une facture en ligne
     Alors le paiement échoue pour fonds insuffisants
     Et la facture reste au statut "Envoyée"
     Et le client peut réessayer le paiement
+
+  @edge
+  Scénario: Le paiement aboutit après une authentification 3D Secure
+    Étant donné qu'une facture au statut "Envoyée" est réglable en ligne
+    Quand le client règle avec la carte de test "4000 0025 0000 3155" et valide l'authentification 3D Secure
+    Alors la facture passe au statut "Payée"
+    Et le client voit une confirmation de paiement
