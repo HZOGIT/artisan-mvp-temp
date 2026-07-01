@@ -1,5 +1,5 @@
 # language: fr
-@bloc:commercial @module:paiement @module:factures @module:client-portal @critique @paiement
+@bloc:commercial @module:paiement @module:factures @module:client-portal @module:connect @critique @paiement
 Fonctionnalité: Paiement d'une facture en ligne
 
   Parcours d'encaissement : le client règle une facture par carte via le lien
@@ -34,3 +34,10 @@ Fonctionnalité: Paiement d'une facture en ligne
     Quand le client relance le paiement de cette facture
     Alors il est redirigé vers la session de paiement déjà en cours
     Et aucune seconde session de paiement n'est créée
+
+  @erreur
+  Scénario: Le paiement en ligne est indisponible si l'artisan n'a pas activé Stripe Connect
+    Étant donné qu'une facture "Envoyée" a été transmise au client
+    Et que l'artisan n'a pas activé le paiement en ligne
+    Quand le client tente de régler la facture en ligne
+    Alors le paiement en ligne n'est pas disponible car l'artisan ne l'a pas encore activé
