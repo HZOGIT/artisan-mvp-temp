@@ -212,25 +212,33 @@ Précédent staging : endpoint Connect créé via l'API Stripe Dashboard + `STRI
 
 ## Secrets — où vivent les secrets
 
-**Résolveur coexistant** (`apps/api/shared/config/secrets.ts`) : Bitwarden Secrets Manager en priorité + fallback `process.env`.
+**Résolveur multi-providers async** (`apps/api/shared/config/secrets.ts` + `shared/config/providers/`). Un provider actif est la **SEULE source autoritaire** ; `process.env` n'est **PAS** un fallback général.
 
-| Env | Mode actuel | Source des secrets |
+**3 providers** (interface `SecretProvider` = `get`/`set`/`load`) :
+
+| Provider | Env cible | Actif quand |
 |---|---|---|
-| Prod | BW actif (si `BWS_ACCESS_TOKEN` posé) | cache BW → fallback `.env` |
-| Staging | `.env` pur (`BWS_ACCESS_TOKEN` absent) | `.env.staging` sur le serveur |
-| Dev | `.env` pur | `.env` local |
+| `OvhSecretsManagerProvider` (**prod**) | production | `SECRETS_PROVIDER=ovh` ou `OVH_SECRET_MANAGER_TOKEN` présent |
+| `BitwardenSecretProvider` (alternative) | — | `SECRETS_PROVIDER=bitwarden` ou `BWS_ACCESS_TOKEN` présent |
+| `ProcessDotEnvSecretProvider` (**défaut** dev/staging) | dev, staging | sinon (aucun creds coffre) |
 
-**Fonctionnement au boot** :
-- `hydrateSecrets()` charge les secrets BW si `BWS_ACCESS_TOKEN` est posé ; sinon **no-op** (mode `.env` pur, comportement inchangé).
-- `getSecret(key)` → cache BW d'abord, sinon `process.env[key]`, sinon `undefined`.
+Sélection : `SECRETS_PROVIDER=ovh|bitwarden|env` explicite, sinon auto par credentials présentes.
 
-⚠️ **Staging = mode `.env` pur** : `BWS_ACCESS_TOKEN` n'est pas posé → BW est inactif. Un secret ajouté dans BW ne sera **jamais lu** en staging. Ajouter les secrets staging dans `.env.staging` sur le serveur (ou variable d'env Docker), **pas dans BW**.
+**Sémantique (fail-closed)** :
+- `getSecret(key)` **async** : course `provider.get(key)` contre `SECRET_GET_TIMEOUT_MS` (défaut **300 ms**). Résout à temps → rafraîchit le cache + renvoie la valeur live. **Timeout OU erreur → fallback CACHE (jamais `process.env`)**. Absent du provider ET du cache → `undefined` (misconfig **visible**, pas masquée par une valeur d'env résiduelle).
+- `setSecret(key, value)` **async** : écrit chez le provider primaire + write-through cache.
+- `getSecretSync(key)` : lecture **synchrone du cache chaud** (pas de course). Réservé aux lectures de boot et singletons mémoïsés (`getDbHandle` = 302 appelants sync ; les URLs DB sont de l'infra boot lue une fois).
+- `hydrateSecrets()` (boot, **bloquant, sans timeout**) = `provider.load()` réchauffe le cache **avant** toute lecture de config → les `getSecretSync` de boot lisent le cache chaud.
+- `process.env` lu **uniquement** par `ProcessDotEnvSecretProvider` (son magasin, en dev — `load()` snapshot l'env dans le cache) et pour les **creds d'amorçage du coffre** (`SECRETS_PROVIDER`, `OVH_*`, `BWS_*`). `NODE_ENV` est runtime (injecté Docker), lu direct comme `auth-cookie.ts`/`logger-fastify.ts`.
 
-**Si BW est actif** (prod, ou staging avec `BWS_ACCESS_TOKEN` explicitement posé) :
-```bash
-BWS_ACCESS_TOKEN=… bws secret create <CLÉ> <valeur> <project-id>
-```
-Projet unique `operioz-staging`. La clé = nom exact de la variable d'env. Les secrets BW rechargés au prochain boot remplacent la valeur `.env`.
+**`.env` = strict minimum** (creds d'amorçage du coffre **actif** uniquement) :
+
+| Env | `.env` contient | Le reste (infra + secrets) |
+|---|---|---|
+| Prod (OVH) | `SECRETS_PROVIDER=ovh`, `OVH_SECRET_MANAGER_ENDPOINT`, `OVH_SECRET_MANAGER_TOKEN` (+ `OVH_SECRET_MANAGER_PATH` optionnel), `NODE_ENV` | dans le coffre OVH (`DATABASE_URL`, `APP_DATABASE_URL`, `STRIPE_*`, `JWT_SECRET`, `whsec`, `RESEND_API_KEY`, `GEMINI_API_KEY`, `PORT`, `HOST`…) |
+| Staging / Dev | tout dans `.env.staging` / `.env` (ProcessDotEnv) | — |
+
+**OVH Secret Manager (prod)** = API compatible **HashiCorp Vault KV v2** (OKMS). Endpoint `https://<region>.okms.ovh.net/api/<okms_id>`, auth PAT en header `X-Vault-Token`, tous les secrets applicatifs dans **un** secret KV2 agrégé (objet plat clé→valeur) au chemin `OVH_SECRET_MANAGER_PATH` (défaut `operioz`). `set()` = read-merge-write.
 
 ## Règle commentaires
 
