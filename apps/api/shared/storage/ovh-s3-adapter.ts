@@ -7,7 +7,7 @@ import { withTenant } from "../db/with-tenant";
 import type { TenantContext } from "../tenant";
 import { files } from "../../../../drizzle/schema/files";
 import { outboxEvent } from "../events/outbox-event";
-import { getSecret } from "../config/secrets";
+import { getSecretSync } from "../config/secrets";
 
 /*
  * Adapter OVH Object Storage (S3-compatible, région GRA — Gravelines).
@@ -32,14 +32,14 @@ export class OvhS3Adapter implements StoragePort {
 
   constructor(db: DbClient, s3?: S3Client, bucket?: string, publicBaseUrl?: string) {
     this.db = db;
-    this.bucket = bucket ?? getSecret("OVH_S3_BUCKET") ?? "operioz-staging";
-    this.publicBaseUrl = (publicBaseUrl ?? getSecret("OVH_S3_PUBLIC_BASE_URL") ?? "").replace(/\/$/, "");
+    this.bucket = bucket ?? getSecretSync("OVH_S3_BUCKET") ?? "operioz-staging";
+    this.publicBaseUrl = (publicBaseUrl ?? getSecretSync("OVH_S3_PUBLIC_BASE_URL") ?? "").replace(/\/$/, "");
     this.s3 = s3 ?? new S3Client({
       region: "gra",
-      endpoint: getSecret("OVH_S3_ENDPOINT") ?? "https://s3.gra.io.cloud.ovh.net",
+      endpoint: getSecretSync("OVH_S3_ENDPOINT") ?? "https://s3.gra.io.cloud.ovh.net",
       credentials: {
-        accessKeyId: getSecret("OVH_S3_ACCESS_KEY") ?? "",
-        secretAccessKey: getSecret("OVH_S3_SECRET_KEY") ?? "",
+        accessKeyId: getSecretSync("OVH_S3_ACCESS_KEY") ?? "",
+        secretAccessKey: getSecretSync("OVH_S3_SECRET_KEY") ?? "",
       },
       /* ponytail: forcePathStyle requis pour les endpoints S3 non-AWS */
       forcePathStyle: true,

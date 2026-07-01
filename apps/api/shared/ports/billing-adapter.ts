@@ -28,12 +28,13 @@ type StripeSDK = {
 
 export class BillingAdapter implements BillingPort {
   private client: StripeSDK | null = null;
-  constructor(private readonly secretKey = getSecret("STRIPE_SECRET_KEY") ?? "") {}
+  constructor(private readonly secretKey?: string) {}
 
   private async sdk(): Promise<StripeSDK> {
     if (this.client) return this.client;
+    const key = this.secretKey ?? (await getSecret("STRIPE_SECRET_KEY")) ?? "";
     const mod = (await import(STRIPE_MODULE)) as { default: new (key: string) => StripeSDK };
-    this.client = new mod.default(this.secretKey);
+    this.client = new mod.default(key);
     return this.client;
   }
 

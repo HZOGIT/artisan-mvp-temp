@@ -6,7 +6,7 @@
 import type { LlmPort, LlmCompleteOptions, LlmResult, LlmUsage, LlmStreamChunk } from "./llm";
 import type { VisionPort, VisionRequest, VisionMultiRequest } from "./vision";
 import type { AppLogger } from "./logger";
-import { getSecret } from "../config/secrets";
+import { getSecret, getSecretSync } from "../config/secrets";
 
 /** Forme structurelle du usageMetadata retourné par le SDK @google/genai v1.52. */
 type GeminiUsageMeta = {
@@ -77,11 +77,11 @@ export class GeminiLlmAdapter implements LlmPort {
 
   private async client(): Promise<GenAiClient> {
     const mod = (await import(GENAI_MODULE)) as GenAiModule;
-    return new mod.GoogleGenAI({ apiKey: getSecret("GEMINI_API_KEY") ?? "" });
+    return new mod.GoogleGenAI({ apiKey: (await getSecret("GEMINI_API_KEY")) ?? "" });
   }
 
   private resolvedModel(opts?: LlmCompleteOptions): string {
-    return opts?.model ?? getSecret("GEMINI_TEXT_MODEL") ?? "gemini-3-pro-preview";
+    return opts?.model ?? getSecretSync("GEMINI_TEXT_MODEL") ?? "gemini-3-pro-preview";
   }
 
   private request(prompt: string, opts?: LlmCompleteOptions) {
@@ -160,9 +160,9 @@ export class GeminiLlmAdapter implements LlmPort {
 export class GeminiVisionAdapter implements VisionPort {
   async analyzeImage(req: VisionRequest): Promise<string> {
     const mod = (await import(GENAI_MODULE)) as GenAiModule;
-    const ai = new mod.GoogleGenAI({ apiKey: getSecret("GEMINI_API_KEY") ?? "" });
+    const ai = new mod.GoogleGenAI({ apiKey: (await getSecret("GEMINI_API_KEY")) ?? "" });
     const res = await ai.models.generateContent({
-      model: req.model ?? getSecret("GEMINI_TEXT_MODEL") ?? "gemini-3-pro-preview",
+      model: req.model ?? getSecretSync("GEMINI_TEXT_MODEL") ?? "gemini-3-pro-preview",
       contents: [{ role: "user", parts: [{ inlineData: { mimeType: req.mimeType, data: req.base64 } }, { text: req.prompt }] }],
       config: {
         ...(req.system ? { systemInstruction: req.system } : {}),
@@ -174,12 +174,12 @@ export class GeminiVisionAdapter implements VisionPort {
 
   async analyzeImages(req: VisionMultiRequest): Promise<string> {
     const mod = (await import(GENAI_MODULE)) as GenAiModule;
-    const ai = new mod.GoogleGenAI({ apiKey: getSecret("GEMINI_API_KEY") ?? "" });
+    const ai = new mod.GoogleGenAI({ apiKey: (await getSecret("GEMINI_API_KEY")) ?? "" });
     const imageParts = req.images.map((img) =>
       img.base64 !== undefined ? { inlineData: { mimeType: img.mimeType, data: img.base64 } } : { fileData: { mimeType: img.mimeType, fileUri: img.fileUri ?? "" } },
     );
     const res = await ai.models.generateContent({
-      model: req.model ?? getSecret("GEMINI_TEXT_MODEL") ?? "gemini-3-pro-preview",
+      model: req.model ?? getSecretSync("GEMINI_TEXT_MODEL") ?? "gemini-3-pro-preview",
       contents: [{ role: "user", parts: [...imageParts, { text: req.prompt }] }],
       config: {
         ...(req.system ? { systemInstruction: req.system } : {}),

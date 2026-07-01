@@ -1,6 +1,6 @@
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
-import { getSecret } from "../config/secrets";
+import { getSecretSync } from "../config/secrets";
 
 /** Le nouveau stack est PostgreSQL-only : pas d'indirection de dialecte ici. */
 export type DbClient = NodePgDatabase<Record<string, never>>;
@@ -33,7 +33,7 @@ export function createDbClient(connectionString: string, max = 10): DbHandle {
 let defaultHandle: DbHandle | null = null;
 export function getDbHandle(): DbHandle {
   if (defaultHandle) return defaultHandle;
-  const url = getSecret("APP_DATABASE_URL");
+  const url = getSecretSync("APP_DATABASE_URL");
   if (!url) {
     throw new Error(
       "APP_DATABASE_URL manquant — le runtime DOIT utiliser le rôle applicatif non-superuser (RLS)",
@@ -51,7 +51,7 @@ export function getDbHandle(): DbHandle {
 let ownerHandle: DbHandle | null = null;
 export function getOwnerDbHandle(): DbHandle {
   if (ownerHandle) return ownerHandle;
-  const url = getSecret("DATABASE_URL");
+  const url = getSecretSync("DATABASE_URL");
   if (!url) {
     throw new Error("DATABASE_URL manquant — le pool owner est requis pour les requêtes cross-tenant (platformAdmin)");
   }

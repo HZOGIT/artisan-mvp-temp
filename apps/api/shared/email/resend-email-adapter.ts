@@ -25,14 +25,19 @@ function injectUnsubscribeFooter(html: string, url: string): string {
 
 export class ResendEmailAdapter implements EmailPort {
   private readonly log: AppLogger;
-  private readonly resend: Resend | null;
-  private readonly emailFrom: string;
+  private resend: Resend | null | undefined;
+  private emailFrom = "Operioz <noreply@operioz.com>";
 
   constructor(logger?: AppLogger) {
     this.log = logger ?? new ConsoleLogger();
-    const apiKey = getSecret("RESEND_API_KEY");
+  }
+
+  /** Init paresseuse : lit les secrets live au 1er envoi (après hydrateSecrets), puis mémoïse. */
+  private async ensureInit(): Promise<void> {
+    if (this.resend !== undefined) return;
+    const apiKey = await getSecret("RESEND_API_KEY");
     this.resend = apiKey ? new Resend(apiKey) : null;
-    this.emailFrom = getSecret("EMAIL_FROM") ?? "Operioz <noreply@operioz.com>";
+    this.emailFrom = (await getSecret("EMAIL_FROM")) ?? "Operioz <noreply@operioz.com>";
     if (!this.resend) {
       this.log.warn({ event: "email_no_resend_key" }, "RESEND_API_KEY non configuré — emails simulés");
     }
@@ -42,8 +47,9 @@ export class ResendEmailAdapter implements EmailPort {
     const { to, subject, body } = message;
     if (!to || !subject || !body) throw new Error("Paramètres d'email manquants");
     if (!EMAIL_RE.test(to)) throw new Error("Adresse email invalide");
+    await this.ensureInit();
     if (!this.resend) {
-      if (getSecret("NODE_ENV") === "production") {
+      if (process.env.NODE_ENV === "production") {
         this.log.error({ event: "email_not_configured", to: maskEmail(to), subject }, "RESEND_API_KEY non configuré en production");
         throw new Error("Service email non configuré");
       }

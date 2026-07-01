@@ -3,7 +3,7 @@ export default {
   meta: { type: "suggestion", docs: { description: "process.env interdit hors config.ts — centraliser l'accès aux vars d'env." }, schema: [] },
   create(context) {
     const file = context.filename ?? context.getFilename();
-    if (/\/(config|env)(\/[^/]+)?\.ts$|\.config\.ts$/.test(file)) return {};
+    if (/\/(config|env)\/.*\.ts$|\/(config|env)\.ts$|\.config\.ts$/.test(file)) return {};
     return {
       MemberExpression(node) {
         if (
