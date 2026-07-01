@@ -1,5 +1,8 @@
 # Backlog scénarios Gherkin — boucle d'enrichissement
 
+> ⛔ **STOP CRON À 50** : dès que la DB Notion atteint **50 scénarios**, arrêter
+> la boucle (`CronDelete 81f9bbce`) — ne plus ajouter de scénario au-delà.
+
 État persistant de la boucle cron (relu à chaque tick). **Règle : on fait les
 classiques / essentiels d'abord, puis on enrichit / complexifie.** Chaque tick
 prend **le premier item non coché** de la section « Essentiels », l'ancre dans
@@ -45,18 +48,19 @@ Recette + conventions : [`README.md`](README.md). Chaque scénario doit être
 - [x] `billing` · prélèvement off-session échoué → relance/dunning (`chargeOffSessionForCycle` / `runSchedulerTick`)
 - [x] `commercial` · devis expire automatiquement à échéance (`devis` expirer)
 
-## Vague 2 — modules non encore couverts (grounded)
+## Vague 2 — enrichissement DANS LE SCOPE (Onboarding · Commercial · Clients · Terrain[interv+cal] · Gestion[articles] · paiement)
+
+> Hors scope (ne PAS traiter) : dépenses, comptabilité, stocks, commandes, chantiers, congés, véhicules, notes de frais.
 
 - [x] `clients` · le client dépose un avis, l'artisan le modère (`avis.soumettreAvisPublic` / `changerStatutAvis`)
 - [x] `clients` · l'artisan répond à un avis publié (`avis.repondreAvis`)
 - [x] `clients` · le client annule ou replanifie un RDV en ligne (`rdv-en-ligne`)
-- [ ] `gestion` · l'artisan enregistre une dépense (`depenses/application` create)
-- [ ] `gestion` · l'artisan génère la balance / export FEC (`comptabilite.getBalance` / `getFecPreview`)
-- [ ] `gestion` · mouvement de stock et alerte de rupture (`stocks/application`)
-- [ ] `gestion` · l'artisan crée un bon de commande fournisseur (`commandes/application`)
-- [ ] `commercial` · l'artisan crée un contrat de maintenance récurrent (`contrats-maintenance`)
-- [ ] `terrain` · l'artisan crée un chantier et y rattache des interventions (`chantiers`)
-- [ ] `gestion` · l'artisan pose et valide un congé technicien (`conges`)
+- [x] `commercial` · l'artisan crée un contrat de maintenance récurrent (`contrats-maintenance`)
+- [ ] `commercial` · l'artisan crée des variantes de devis (`devis-options`)
+- [ ] `clients` · l'artisan fusionne deux fiches client en doublon (`clients` champsFusionnes)
+- [ ] `clients` · l'artisan échange avec un client via le chat (`chat`)
+- [ ] `terrain` · l'artisan exporte son calendrier au format iCal (`calendrier.getIcalFeed`)
+- [ ] `gestion` · l'artisan met à jour le prix d'un article du catalogue (`articles` update)
 
 ## Fait
 
