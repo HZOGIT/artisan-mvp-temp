@@ -76,6 +76,24 @@ describe.skipIf(!URL)("integrationsComptables.router e2e (protégé)", () => {
     expect((await injectTrpc(app, "POST", "integrationsComptables.verrouillerCompta", { date: null }, tC)).statusCode).toBe(403);
   });
 
+  it("gate permission : membre sans `integrations-comptables.configurer` → saveSyncConfig/genererExport/lancerSync/retrySync 403", async () => {
+    await admin.query("delete from permissions_utilisateur where \"userId\"=$1", [COLLAB_UID]);
+    const tC = await jwt(COLLAB_UID);
+    expect((await injectTrpc(app, "POST", "integrationsComptables.saveSyncConfig", { syncAutoFactures: true }, tC)).statusCode, "saveSyncConfig").toBe(403);
+    expect((await injectTrpc(app, "POST", "integrationsComptables.genererExport", { logiciel: "sage", formatExport: "fec", dateDebut: "2026-01-01", dateFin: "2026-12-31" }, tC)).statusCode, "genererExport").toBe(403);
+    expect((await injectTrpc(app, "POST", "integrationsComptables.lancerSync", {}, tC)).statusCode, "lancerSync").toBe(403);
+    expect((await injectTrpc(app, "POST", "integrationsComptables.retrySync", { type: "facture", id: 1 }, tC)).statusCode, "retrySync").toBe(403);
+  });
+
+  it("gate permission : membre sans `comptabilite.voir` → getExports/getSyncLogs/getPendingItems/getLockDate 403", async () => {
+    await admin.query("delete from permissions_utilisateur where \"userId\"=$1", [COLLAB_UID]);
+    const tC = await jwt(COLLAB_UID);
+    expect((await injectTrpc(app, "GET", "integrationsComptables.getExports", undefined, tC)).statusCode, "getExports").toBe(403);
+    expect((await injectTrpc(app, "GET", "integrationsComptables.getSyncLogs", undefined, tC)).statusCode, "getSyncLogs").toBe(403);
+    expect((await injectTrpc(app, "GET", "integrationsComptables.getPendingItems", undefined, tC)).statusCode, "getPendingItems").toBe(403);
+    expect((await injectTrpc(app, "GET", "integrationsComptables.getLockDate", undefined, tC)).statusCode, "getLockDate").toBe(403);
+  });
+
   it("gate permission : owner (UID) sans permission DB → saveConfig 200, verrouillerCompta 200 (bypass propriétaire)", async () => {
     await admin.query("delete from permissions_utilisateur where \"userId\"=$1", [UID]);
     const tok = await jwt(UID);
