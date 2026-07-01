@@ -45,6 +45,19 @@ Recette + conventions : [`README.md`](README.md). Chaque scénario doit être
 - [x] `billing` · prélèvement off-session échoué → relance/dunning (`chargeOffSessionForCycle` / `runSchedulerTick`)
 - [x] `commercial` · devis expire automatiquement à échéance (`devis` expirer)
 
+## Vague 2 — modules non encore couverts (grounded)
+
+- [x] `clients` · le client dépose un avis, l'artisan le modère (`avis.soumettreAvisPublic` / `changerStatutAvis`)
+- [ ] `clients` · l'artisan répond à un avis publié (`avis.repondreAvis`)
+- [ ] `clients` · le client annule ou replanifie un RDV en ligne (`rdv-en-ligne`)
+- [ ] `gestion` · l'artisan enregistre une dépense (`depenses/application` create)
+- [ ] `gestion` · l'artisan génère la balance / export FEC (`comptabilite.getBalance` / `getFecPreview`)
+- [ ] `gestion` · mouvement de stock et alerte de rupture (`stocks/application`)
+- [ ] `gestion` · l'artisan crée un bon de commande fournisseur (`commandes/application`)
+- [ ] `commercial` · l'artisan crée un contrat de maintenance récurrent (`contrats-maintenance`)
+- [ ] `terrain` · l'artisan crée un chantier et y rattache des interventions (`chantiers`)
+- [ ] `gestion` · l'artisan pose et valide un congé technicien (`conges`)
+
 ## Fait
 
 Les cases cochées ci-dessus. Fichiers dans `gherkin/<module>/*.feature`,
