@@ -47,7 +47,7 @@ function isTrackedEvent(type: string): type is TrackedEventType {
 }
 
 export interface ResendWebhookDeps {
-  readonly resendWebhookSecret: string;
+  readonly resendWebhookSecret: () => string;
   /** Writer cross-tenant pour MAJ statut (requiert connexion superuser). */
   readonly emailLogWriter?: IEmailLogWriter;
   /** Pour créer une notification artisan sur bounce/plainte. */
@@ -68,7 +68,7 @@ export function registerResendWebhookRoute(
       const rawBody = Buffer.isBuffer(req.body)
         ? req.body
         : Buffer.from(typeof req.body === "string" ? req.body : "");
-      if (!verifyResendSignature(rawBody, req.headers as Record<string, string | string[] | undefined>, deps.resendWebhookSecret)) {
+      if (!verifyResendSignature(rawBody, req.headers as Record<string, string | string[] | undefined>, deps.resendWebhookSecret())) {
         req.log.warn({ event: "resend_webhook_invalid_signature" }, "Resend webhook: signature invalide");
         return reply.code(400).send({ error: "invalid signature" });
       }

@@ -1396,7 +1396,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const resendSecret = deps.resendWebhookSecret ?? getSecretSync("RESEND_WEBHOOK_SECRET");
   if (resendSecret) {
     registerResendWebhookRoute(app, {
-      resendWebhookSecret: resendSecret,
+      resendWebhookSecret: () => deps.resendWebhookSecret ?? getSecretSync("RESEND_WEBHOOK_SECRET") ?? "",
       emailLogWriter: sharedEmailLogWriter,
       notificationRepo,
     });
@@ -1434,7 +1434,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     observeOnly: process.env.BILLING_OBSERVE_ONLY !== "false",
   };
 
-  registerBillingSchedulerRoute(app, { ...billingSchedulerDeps, secret: getSecretSync("SCHEDULER_SECRET") ?? "" });
+  registerBillingSchedulerRoute(app, { ...billingSchedulerDeps, secret: () => getSecretSync("SCHEDULER_SECRET") ?? "" });
 
   /** Cron billing maison — tick toutes les 10 min, lock pg_advisory_xact pour éviter les doublons multi-réplica. */
   app.register(billingCronPlugin, { schedulerDeps: billingSchedulerDeps, db: getDbHandle().db, dbUrl: getDbHandle().pool.options.connectionString ?? "", onCritical: (msg) => app.log.fatal({ event: "billing_tick_critical" }, msg), intervalMinutes: 10 });

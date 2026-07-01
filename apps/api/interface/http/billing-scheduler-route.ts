@@ -7,10 +7,11 @@ import { runSchedulerTick } from "../../modules/billing/application/billing-sche
  * Sécurisé par le header `x-scheduler-secret` (Railway cron ou cron externe).
  * Ne pas exposer publiquement.
  */
-export function registerBillingSchedulerRoute(app: FastifyInstance, deps: SchedulerDeps & { secret: string }): void {
+export function registerBillingSchedulerRoute(app: FastifyInstance, deps: SchedulerDeps & { secret: () => string }): void {
   app.post("/internal/billing/tick", async (req, reply) => {
     const provided = (req.headers["x-scheduler-secret"] as string | undefined) ?? "";
-    if (!deps.secret || provided !== deps.secret) {
+    const expected = deps.secret();
+    if (!expected || provided !== expected) {
       return reply.code(401).send({ error: "Unauthorized" });
     }
     try {
