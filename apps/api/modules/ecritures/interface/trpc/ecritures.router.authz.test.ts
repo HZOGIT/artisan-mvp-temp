@@ -97,4 +97,31 @@ describe.skipIf(!URL)("ecritures.router authz — permission gates (OPE-792)", (
     const tok = await jwt(OWNER);
     expect((await q(server, "ecritures.exportFec", { debut: "2026-01-01", fin: "2026-12-31" }, tok)).statusCode).not.toBe(403);
   });
+
+  it("list — membre sans comptabilite.voir → 403", async () => {
+    const tok = await jwt(MEMBER);
+    expect((await q(server, "ecritures.list", undefined, tok)).statusCode).toBe(403);
+  });
+
+  it("list — owner bypasse la garde → non-403", async () => {
+    const tok = await jwt(OWNER);
+    expect((await q(server, "ecritures.list", undefined, tok)).statusCode).not.toBe(403);
+  });
+
+  it("list — membre AVEC comptabilite.voir → non-403", async () => {
+    await admin.query('insert into permissions_utilisateur ("userId",permission,autorise) values ($1,$2,true)', [MEMBER, "comptabilite.voir"]);
+    const tok = await jwt(MEMBER);
+    expect((await q(server, "ecritures.list", undefined, tok)).statusCode).not.toBe(403);
+    await admin.query('delete from permissions_utilisateur where "userId"=$1 and permission=$2', [MEMBER, "comptabilite.voir"]);
+  });
+
+  it("byFacture — membre sans comptabilite.voir → 403", async () => {
+    const tok = await jwt(MEMBER);
+    expect((await q(server, "ecritures.byFacture", { factureId: 1 }, tok)).statusCode).toBe(403);
+  });
+
+  it("byFacture — owner bypasse la garde → non-403", async () => {
+    const tok = await jwt(OWNER);
+    expect((await q(server, "ecritures.byFacture", { factureId: 1 }, tok)).statusCode).not.toBe(403);
+  });
 });
