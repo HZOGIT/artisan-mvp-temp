@@ -124,6 +124,28 @@ Toutes les opérations Linear (lire, créer, commenter, mettre à jour un statut
 
 ---
 
+## Context7 — `npx context7`
+
+`npx context7` est l'**outil officiel pour récupérer la documentation à jour des librairies** avant d'écrire du code qui en dépend (aligné YAGNI : vérifier l'API réelle plutôt que deviner). Dans les plans/prompts : « via `npx context7` » — jamais « ctx7 MCP » ni un binaire `ctx7` standalone (inexistant sur ce serveur).
+
+```bash
+# Chercher un projet (trouver l'identifiant exact)
+npx context7 search drizzle
+
+# Récupérer la doc d'une librairie (identifiant /org/repo ou nom court)
+npx context7 /drizzle-team/drizzle-orm "comment définir une relation many-to-many"
+
+# Afficher les métadonnées d'un projet
+npx context7 info /drizzle-team/drizzle-orm
+
+# Options utiles : -t json (sortie JSON), -k 10000 (max tokens, défaut 5000)
+npx context7 /tanstack/router "navigation imperative" -k 10000
+```
+
+Toutes les recherches de doc passent par `npx context7` — jamais par le MCP Context7.
+
+---
+
 ## Structure du projet
 
 ```
