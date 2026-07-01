@@ -212,25 +212,25 @@ Précédent staging : endpoint Connect créé via l'API Stripe Dashboard + `STRI
 
 ## Secrets — où vivent les secrets
 
-**Tout secret applicatif vit dans le secrets manager**, jamais dans un `.env` committé.
+**Résolveur coexistant** (`apps/api/shared/config/secrets.ts`) : Bitwarden Secrets Manager en priorité + fallback `process.env`.
 
-| Env | Provider | Magasin |
+| Env | Mode actuel | Source des secrets |
 |---|---|---|
-| Prod | OVH Secrets Manager | vault OVH |
-| Staging | Bitwarden (BWS) | projet `operioz-staging` |
-| Dev | ProcessDotEnv | `.env` local (env = magasin) |
+| Prod | BW actif (si `BWS_ACCESS_TOKEN` posé) | cache BW → fallback `.env` |
+| Staging | `.env` pur (`BWS_ACCESS_TOKEN` absent) | `.env.staging` sur le serveur |
+| Dev | `.env` pur | `.env` local |
 
-**`.env` = strict minimum** : uniquement les creds d'amorçage du vault actif (prod : creds OVH ; staging : `BWS_ACCESS_TOKEN` + `BWS_ORGANIZATION_ID` + `BWS_PROJECT_ID`) + config non-secrète du runtime (`NODE_ENV`…). **Interdit d'ajouter un nouveau secret applicatif dans un `.env` committé** (même règle que `.env.production` ci-dessus).
+**Fonctionnement au boot** :
+- `hydrateSecrets()` charge les secrets BW si `BWS_ACCESS_TOKEN` est posé ; sinon **no-op** (mode `.env` pur, comportement inchangé).
+- `getSecret(key)` → cache BW d'abord, sinon `process.env[key]`, sinon `undefined`.
 
-**Lecture runtime** via `getSecret(key)` async (couche secrets manager). **Pas de fallback `process.env`** : un secret absent du vault = erreur **fail-closed**, jamais masqué par une valeur d'env résiduelle.
+⚠️ **Staging = mode `.env` pur** : `BWS_ACCESS_TOKEN` n'est pas posé → BW est inactif. Un secret ajouté dans BW ne sera **jamais lu** en staging. Ajouter les secrets staging dans `.env.staging` sur le serveur (ou variable d'env Docker), **pas dans BW**.
 
-**Ajouter / mettre à jour un secret staging** (`bws` v2.1.0 installé) :
+**Si BW est actif** (prod, ou staging avec `BWS_ACCESS_TOKEN` explicitement posé) :
 ```bash
 BWS_ACCESS_TOKEN=… bws secret create <CLÉ> <valeur> <project-id>
 ```
-Projet unique `operioz-staging`. La clé doit être le **nom exact de la variable d'env**.
-
-**Rotation sans redéploiement** : mettre à jour la valeur dans le vault → `getSecret` la relit en live (timeout 300 ms → cache interne).
+Projet unique `operioz-staging`. La clé = nom exact de la variable d'env. Les secrets BW rechargés au prochain boot remplacent la valeur `.env`.
 
 ## Règle commentaires
 
