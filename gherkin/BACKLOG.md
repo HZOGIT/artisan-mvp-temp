@@ -43,7 +43,7 @@ Recette + conventions : [`README.md`](README.md). Chaque scénario doit être
 - [x] `billing` · l'artisan change de plan (`changePlan` + `previewPlanChange`)
 - [x] `billing` · l'artisan résilie en fin de période (`cancelAtPeriodEnd`) puis réactive (`reactivateSubscription`)
 - [x] `billing` · prélèvement off-session échoué → relance/dunning (`chargeOffSessionForCycle` / `runSchedulerTick`)
-- [ ] `commercial` · devis expire automatiquement à échéance (`devis` expirer)
+- [x] `commercial` · devis expire automatiquement à échéance (`devis` expirer)
 
 ## Fait
 
