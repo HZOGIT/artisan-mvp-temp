@@ -5,7 +5,7 @@
 #   docker run --rm -e DATABASE_URL=... -e APP_DATABASE_URL=... -e JWT_SECRET=... -p 3001:3001 operioz-newstack
 
 # ── Builder : install complet + bundle du nouveau stack ──────────────────────
-FROM node:alpine AS builder
+FROM node:slim AS builder
 WORKDIR /app
 ENV CI=true
 # pnpm (corepack absent de node:alpine récent) ; version alignée sur packageManager.
@@ -22,12 +22,14 @@ COPY packages/contract ./packages/contract
 RUN pnpm build:newstack
 
 # ── Runtime : deps de prod + bundle, utilisateur non-root ────────────────────
-FROM node:alpine AS runtime
+FROM node:slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production \
     TZ=Europe/Paris \
     NEW_STACK_PORT=3001 \
     HOST=0.0.0.0
+# ca-certificates : requis par le SDK Bitwarden (rustls) pour le TLS sortant vers identity.bitwarden.com.
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 RUN npm install -g pnpm@11.5.1
 COPY package.json pnpm-lock.yaml .npmrc pnpm-workspace.yaml ./
 RUN HUSKY=0 pnpm install --prod --frozen-lockfile --ignore-scripts && pnpm store prune
